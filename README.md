@@ -1,5 +1,7 @@
 # rapidfuzz-js
 
+[![CI](https://github.com/sarunast/rapidfuzz-js/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sarunast/rapidfuzz-js/actions/workflows/ci.yml)
+
 Fast fuzzy string matching for JavaScript and TypeScript, based on
 [RapidFuzz](https://github.com/rapidfuzz/RapidFuzz).
 
