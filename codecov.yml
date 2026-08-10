@@ -96,7 +96,8 @@ test_analytics:
   # history, which is the one thing a local run does not have.
   flake_detection: true
 
-# Bundle analysis, uploaded from the same job after `pnpm build`.
+# Bundle analysis, uploaded by the Codecov plugin inside tsdown rather than by
+# a step of its own — see tsdown.config.ts, where a missing token turns it off.
 #
 # Read it as "what does the published package weigh", not "what will a consumer
 # ship". tsdown builds with `unbundle: true`, so dist/ is one file per source

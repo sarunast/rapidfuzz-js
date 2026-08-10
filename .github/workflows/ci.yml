@@ -37,7 +37,14 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # The token is for the build inside `pnpm check`: tsdown carries the
+      # Codecov plugin, which measures the bundle and uploads it. Without a
+      # token the plugin turns itself off, which is what a laptop and the
+      # release job both get — neither should depend on Codecov being up.
       - run: pnpm check
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       # `pnpm check` already ran the tests; this re-runs them instrumented, for
       # the lcov.info and the JUnit results the uploads below want. The 100% gate is
@@ -62,37 +69,24 @@ jobs:
       # when a test fails, and a failing run is precisely the one worth
       # uploading. The upload never fails the job — a test that broke should be
       # reported by the test step, not by the analytics for it.
+      #
+      # `codecov-action` with `report_type: test_results` rather than the
+      # `codecov/test-results-action` the docs suggest. Both wrap the same CLI,
+      # and this repository allows actions by pattern — `codecov/codecov-action@*`
+      # and `pnpm/action-setup@*` — so the separate action fails the run before a
+      # job starts. Widening the allowlist to admit a second action would be the
+      # alternative; using the one already trusted is cheaper.
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/codecov-action@v7
         with:
+          report_type: test_results
           files: ./test-report.junit.xml
+          # Without this the CLI also uploads whatever else it finds, and what
+          # it finds under `report_type: test_results` is the coverage report.
+          disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
-
-      # Sizes of the published files, so a pull request that grows one says so.
-      # `pnpm check` above already built dist/.
-      #
-      # This measures what npm serves, not what a consumer ships: tsdown builds
-      # with `unbundle: true`, so dist/ is one file per source module and a
-      # bundler tree-shakes across those boundaries afterwards.
-      #
-      # Skipped without a token, which is the case on a pull request from a
-      # fork — the CLI has nowhere to upload and would fail the job over a
-      # measurement. The check is in the script rather than an `if:` because a
-      # step's own `env` is not in scope for its own condition.
-      - name: Bundle sizes
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          if [ -z "$CODECOV_TOKEN" ]; then
-            echo "::notice::no CODECOV_TOKEN — skipping bundle analysis"
-            exit 0
-          fi
-          pnpm exec bundle-analyzer ./dist \
-            --bundle-name=rapidfuzz-js-dist \
-            --upload-token="$CODECOV_TOKEN" \
-            --ignore-patterns "**/*.map" "**/*.d.ts"
 
   # package.json declares engines.node >=22, so prove the source tests still
   # pass on the minimum supported runtime. The full check job above validates
