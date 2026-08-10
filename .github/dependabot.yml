@@ -1,0 +1,9 @@
+version: 2
+
+updates:
+  # Open updates when the workflows' readable major-version tags advance.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
