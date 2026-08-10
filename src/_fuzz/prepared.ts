@@ -53,7 +53,9 @@ import {
   hasWhitespaceOf,
   preparedTokenChoice,
   sortedOf,
+  stringContainsWhitespace,
   tokenChoicePreparer,
+  tokenForm,
   tokenViewOf,
 } from './tokens.js'
 import {
@@ -135,6 +137,22 @@ function tokenisesInput(kind: PreparedFuzzKind): boolean {
 /** Build the internal query-caching hook shared by all fuzz scorers. */
 export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
   const usesTokens = tokenisesInput(kind)
+  // Every token scorer but one splits whatever it is handed, so converting a
+  // raw candidate up front costs nothing it would not spend anyway. `wRatio` is
+  // the exception, and the reason this is a second predicate rather than a
+  // reuse of `usesTokens`: its most common route answers with the base ratio
+  // without ever splitting, and the LCS kernels read a BMP string through
+  // `charCodeAt` exactly as they read code points. So it takes a candidate as
+  // it comes and expands it only on the branches that tokenise — which, over an
+  // `extract`, is the difference between one `Uint32Array` per candidate and
+  // none at all.
+  //
+  // The query is untouched by this. It is prepared once per `extract`, so
+  // converting it eagerly costs one allocation against the candidates'
+  // thousands, and holding it converted is what keeps the token branches
+  // comparable: a token of characters and a token of code points never compare
+  // elementwise equal, so the two sides have to meet in one form.
+  const convertsChoice = usesTokens && kind !== 'wRatio'
   // One preparer per scorer rather than per query: `prepareFuzz` runs once, at
   // the point each scorer below is built.
   const prepareChoice: PrepareChoice = usesTokens
@@ -220,7 +238,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
         if (!isSequence(rawChoice)) {
           throw new TypeError('fuzz scorers expect a string or an array-like sequence')
         }
-        b = usesTokens ? convSequence(rawChoice) : scorerSequence(rawChoice)
+        b = convertsChoice ? convSequence(rawChoice) : scorerSequence(rawChoice)
       }
       const cutoff = rawCutoff ?? 0
 
@@ -330,10 +348,16 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
             // answer that *takes* the shortcut: if that invariant ever changed,
             // a wrong `false` would skip the token scorers outright, while a
             // wrong `true` only costs work.
+            //
+            // The candidate reaches here unconverted, so its own test goes
+            // through whichever spelling it arrived in — a prepared view always
+            // holds code points, an unprepared candidate may still be a string.
             if (
               !hasWhitespaceOf(queryTokens) &&
               !(choiceView === undefined
-                ? containsWhitespace(b)
+                ? typeof b === 'string'
+                  ? stringContainsWhitespace(b)
+                  : containsWhitespace(b)
                 : hasWhitespaceOf(choiceView))
             )
               return result
@@ -342,7 +366,11 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
               result,
               tokenRatioConverted(
                 a,
-                b,
+                // Expanded here and not before: the shortcut above is the route
+                // most candidates take, and it needs no tokens. `a` is already
+                // code points, so this is what puts the two sides in the one
+                // form their token sets have to share.
+                tokenForm(b),
                 dynamicCutoff,
                 queryView,
                 choiceView,
@@ -354,26 +382,30 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
           const partialScale = lenRatio <= 8 ? 0.9 : 0.6
           dynamicCutoff = Math.max(dynamicCutoff, result) / partialScale
           // `nativeCharSetOf` without the representation test the `partialRatio`
-          // branch needs: `wRatio` tokenises, so both sides were converted to
-          // code points above and `a` is never a string here.
+          // branch needs: `a` is the query, and `wRatio` holds a query as code
+          // points, so the pruning set is only ever built over that spelling.
+          // The candidate is the side that may still be a string, and the scan
+          // prunes with `===` — so it is expanded here, which is the same job
+          // `alignRepresentation` does for the `partialRatio` branch above.
+          const bPartial = alignRepresentation(b, a)
           const partial =
-            a.length <= b.length
+            a.length <= bPartial.length
               ? partialRatioImpl(
                   a,
-                  b,
+                  bPartial,
                   dynamicCutoff / 100,
                   patternOf(),
                   true,
                   nativeCharSetOf(),
                 ).score
-              : partialRatioConverted(a, b, dynamicCutoff)
+              : partialRatioConverted(a, bPartial, dynamicCutoff)
           result = Math.max(result, partial * partialScale)
           dynamicCutoff = Math.max(dynamicCutoff, result) / unbaseScale
           return Math.max(
             result,
             partialTokenRatioConverted(
               a,
-              b,
+              tokenForm(b),
               dynamicCutoff,
               queryView,
               choiceView,

@@ -14,14 +14,14 @@
  * converting raw input, is already done by the time a prepared branch runs. The
  * two copies have to be kept in step by hand.
  */
-import { asSequence, convSequence, isNone } from '../_common.js'
+import { asSequence, convSequence, hasSurrogatePair, isNone } from '../_common.js'
 import {
   applyProcessor,
   partialRatioConverted,
   ratioConverted,
   ratio_impl,
 } from './basic.js'
-import { containsWhitespace } from './tokens.js'
+import { containsWhitespace, stringContainsWhitespace, tokenForm } from './tokens.js'
 import { partialTokenRatioConverted, tokenRatioConverted } from './tokenScorers.js'
 import type { FuzzInput, FuzzOptions } from './types.js'
 
@@ -48,14 +48,40 @@ export function wRatio_impl(
   let scoreCutoff = options.scoreCutoff ?? 0
   if (scoreCutoff > 100) return 0
 
-  // One conversion for up to four component scorers.
-  const a = convSequence(p1)
-  const b = convSequence(p2)
+  // One conversion for up to four component scorers — but only when one is
+  // needed. Almost every call is two BMP strings that share no whitespace, and
+  // that call returns the base ratio below without a token scorer ever running;
+  // converting first spent two `Uint32Array` allocations and two full scans to
+  // reach an answer the strings could have given.
+  //
+  // The representation is a property of the *pair*, not of either side: keeping
+  // a BMP string as a string while its partner became code points would have
+  // them meet as `'a'` and `97`, which `===` reports as different. So this is
+  // the same four-part test as `convPair`, in the same order, written out to
+  // skip the tuple it allocates — the shape `levenshteinDistance_impl` already
+  // uses, and what `hasSurrogatePair` is exported for.
+  let a: ArrayLike<unknown>
+  let b: ArrayLike<unknown>
+  if (
+    typeof p1 === 'string' &&
+    typeof p2 === 'string' &&
+    !hasSurrogatePair(p1) &&
+    !hasSurrogatePair(p2)
+  ) {
+    a = p1
+    b = p2
+  } else {
+    a = convSequence(p1)
+    b = convSequence(p2)
+  }
 
-  // Measured after conversion: upstream counts Python characters, so a
-  // character outside the BMP is one element and not the two UTF-16 code units
-  // it occupies. Taking the ratio first would pick the partial-scoring branch
-  // for lengths the component scorers below never see.
+  // Measured on whichever form the pair settled into, never on the raw input:
+  // upstream counts Python characters, so a character outside the BMP is one
+  // element and not the two UTF-16 code units it occupies. Taking the ratio
+  // first would pick the partial-scoring branch for lengths the component
+  // scorers below never see. The string branch above is not an exception —
+  // it is reached only when neither side splits a code point, which is exactly
+  // when `.length` already *is* the character count.
   const len1 = a.length
   const len2 = b.length
   const lenRatio = len1 > len2 ? len1 / len2 : len2 / len1
@@ -68,9 +94,20 @@ export function wRatio_impl(
     // no whitespace" rather than "splits into one token" because that is what
     // the test actually proves — a single token with a space around it splits
     // into one token too, but its sorted form differs from the input.
-    if (!containsWhitespace(a) && !containsWhitespace(b)) return endRatio
+    // Each side is tested through whichever of the two the pair settled into.
+    // Both are strings or neither is, but only a test on each proves that to
+    // the checker, and the pair of `typeof`s costs nothing beside the scan.
+    if (
+      !(typeof a === 'string' ? stringContainsWhitespace(a) : containsWhitespace(a)) &&
+      !(typeof b === 'string' ? stringContainsWhitespace(b) : containsWhitespace(b))
+    ) {
+      return endRatio
+    }
     scoreCutoff = Math.max(scoreCutoff, endRatio) / UNBASE_SCALE
-    return Math.max(endRatio, tokenRatioConverted(a, b, scoreCutoff) * UNBASE_SCALE)
+    return Math.max(
+      endRatio,
+      tokenRatioConverted(tokenForm(a), tokenForm(b), scoreCutoff) * UNBASE_SCALE,
+    )
   }
 
   const PARTIAL_SCALE = lenRatio <= 8 ? 0.9 : 0.6
@@ -81,7 +118,9 @@ export function wRatio_impl(
   scoreCutoff = Math.max(scoreCutoff, endRatio) / UNBASE_SCALE
   return Math.max(
     endRatio,
-    partialTokenRatioConverted(a, b, scoreCutoff) * UNBASE_SCALE * PARTIAL_SCALE,
+    partialTokenRatioConverted(tokenForm(a), tokenForm(b), scoreCutoff) *
+      UNBASE_SCALE *
+      PARTIAL_SCALE,
   )
 }
 
