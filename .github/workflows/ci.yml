@@ -23,12 +23,12 @@ jobs:
     name: check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Reads the version from package.json's packageManager field.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -40,18 +40,23 @@ jobs:
   # library. Tests only: the build toolchain's own Node requirement is not the
   # published package's, and conflating the two would force engines up to 22
   # for a reason no consumer ever encounters. Node 24 is covered by `check`.
+  #
+  # Node 20 reached end of life on 2026-04-30 and is kept only because
+  # engines.node still admits it. Raising that floor is a breaking change for
+  # consumers, so it is a deliberate decision rather than a CI cleanup — drop
+  # this entry and the engines range in the same commit whenever it is made.
   test:
     name: test (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22]
+        node: [20, 22, 26]
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
