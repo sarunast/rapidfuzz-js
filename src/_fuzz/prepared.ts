@@ -158,9 +158,20 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
     // `queryTokenChoice` is never null — a query that is not a sequence has
     // already thrown above. The stand-in empty split, token set and sorted form
     // that used to sit here are gone with the eager preparation that needed
-    // them: nothing is built until a branch asks, so a non-token kind carrying
-    // no tokenisation costs nothing to represent.
+    // them: a non-token kind now carries no tokenisation rather than an empty
+    // one.
     const queryView = queryTokenChoice ?? undefined
+    // The same view, named so that the sorted forms below can be typed without
+    // re-testing what the throw above settled. A non-token kind never reads it
+    // and takes the second arm, which is why that arm is a real one rather than
+    // a fallback no input reaches.
+    //
+    // Not lazy, unlike everything around it. `tokenViewOf` is `{ sequence }`,
+    // so the second arm costs one object literal per *prepared query* — not per
+    // candidate — which an `extract` over ten thousand choices pays once. An
+    // accessor to defer that would be more code than the allocation it saves.
+    // The derived forms are the expensive part, and those are still on demand.
+    const queryTokens = queryTokenChoice ?? tokenViewOf(a)
     // Masks for the token-sorted query. Token-sort scoring reaches the same
     // kernel as `ratio` but with a different left-hand sequence, so it needs
     // masks of its own; without them every choice rebuilt the sorted query's.
@@ -169,7 +180,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
     let sortedPattern: PatternMask | null = null
     const sortedPatternOf = (): PatternMask => {
       if (sortedPattern === null) {
-        const sorted = sortedOf(queryView ?? tokenViewOf(a))
+        const sorted = sortedOf(queryTokens)
         sortedPattern = prepareLcsPattern(sorted, 0, sorted.length)
       }
       return sortedPattern
@@ -181,7 +192,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
     // to expand and both sides already agree.
     let sortedCharSet: ReadonlySet<unknown> | null = null
     const sortedCharSetOf = (): ReadonlySet<unknown> =>
-      (sortedCharSet ??= charSetOf(sortedOf(queryView ?? tokenViewOf(a))))
+      (sortedCharSet ??= charSetOf(sortedOf(queryTokens)))
     // The window scan's pruning set, which upstream's `CachedPartialRatio` also
     // holds beside its cached ratio. Rebuilt per candidate before this, which on
     // an `extract` of ten thousand is ten thousand walks of the same query.
@@ -210,7 +221,6 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
         }
         b = usesTokens ? convSequence(rawChoice) : scorerSequence(rawChoice)
       }
-      if (usesTokens && typeof b === 'string') b = convSequence(b)
       const cutoff = rawCutoff ?? 0
 
       switch (kind) {
@@ -259,7 +269,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
           // can be handed down. Without them this rebuilt the same mask for the
           // same sorted query once per candidate — the very thing the prepared
           // `partialRatio` path stopped doing.
-          const sortedQuery = sortedOf(queryView ?? tokenViewOf(a))
+          const sortedQuery = sortedOf(queryTokens)
           const sortedChoice = sortedOf(choiceView ?? tokenViewOf(b))
           // `partialAlignmentConverted` would ignore both when the candidate is
           // the shorter side, but these are arguments, so they would be built on
@@ -320,9 +330,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
             // a wrong `false` would skip the token scorers outright, while a
             // wrong `true` only costs work.
             if (
-              !(queryView === undefined
-                ? containsWhitespace(a)
-                : hasWhitespaceOf(queryView)) &&
+              !hasWhitespaceOf(queryTokens) &&
               !(choiceView === undefined
                 ? containsWhitespace(b)
                 : hasWhitespaceOf(choiceView))

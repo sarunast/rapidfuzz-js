@@ -12,8 +12,8 @@
  *
  * ## One array, three regions
  *
- * {@link PatternMask.masks} holds every mask, and {@link patternBase} turns any
- * element into one index into it:
+ * {@link PatternMask.masks} holds every mask, and one index into it addresses
+ * any element:
  *
  * - `[0, highStart)` — Latin-1, at `symbol * words`, as it always was.
  * - `[highStart, strayStart)` — a window over the pattern's *own* high symbols,
@@ -45,8 +45,8 @@
  * Cyrillic, because the decode landed on every element of the path the wide
  * table exists to make fast.
  *
- * That does not make it a shared function: see {@link patternBase} for why each
- * kernel carries its own copy of the body instead.
+ * Working out that index is not a shared function: see "Where an element's
+ * masks start" below for why each kernel carries its own copy of the body.
  */
 
 // Declared here rather than imported from `shared.ts`. These are read once per
@@ -136,60 +136,52 @@ function isHighSymbol(symbol: unknown): symbol is number {
 }
 
 /**
- * Where this element's masks start in {@link PatternMask.masks}, or `-1` if the
- * pattern does not hold it.
+ * ## Where an element's masks start in {@link PatternMask.masks}
  *
- * `NaN` is spelled `symbol === symbol` and given no slot, so it matches nothing
- * — every other comparison in this library is `===`, under which `NaN` does not
+ * Every kernel that reads a `PatternMask` decides that inline, with the same
+ * three-part test:
+ *
+ * ```
+ * let base = -1
+ * if (typeof symbol === 'number' && symbol >= 0 && symbol < DIRECT_LOOKUP_LIMIT &&
+ *     (symbol | 0) === symbol) {
+ *   base = symbol * words
+ * } else if (typeof symbol === 'number' && (symbol | 0) === symbol) {
+ *   const shifted = symbol - highBase
+ *   base = shifted >= 0 && shifted < highCount
+ *     ? highStart + shifted * words
+ *     : (wideOffsets.get(symbol) ?? -1)
+ * } else if (symbol === symbol) {
+ *   base = wideOffsets.get(symbol) ?? -1
+ * }
+ * ```
+ *
+ * A base below zero means the pattern does not hold the element. `NaN` is
+ * spelled `symbol === symbol` and given no slot at all, so it matches nothing —
+ * every other comparison in this library is `===`, under which `NaN` does not
  * equal itself, and a `Map` would say it does.
  *
- * ## This is the definition; the kernels carry copies
+ * ## Written out at each site, never called
  *
- * {@link preparePattern} below is the only caller, and it runs once per pattern.
- * Every kernel that reads a `PatternMask` writes this body out at its own call
- * site instead, and that is not a style choice.
- *
- * Shared, it is called with whatever any kernel is scoring: numbers when the
- * input is a string, one-character strings and arbitrary objects when it is an
- * array. One function seeing all of them goes megamorphic and stops
- * specialising — measured at **2.43x slower** once other call sites had used it,
- * against a module-local copy that did not move. Across the suite that showed up
- * as `partialRatio` at 0.49x to 0.59x and the whole thing at -13.5%, which is
- * how it was found: the micro-benchmark that said the call was free exercised
- * one site with one element type, which is exactly the case that cannot see
- * this.
+ * That is not a style choice. Shared, one function is called with whatever any
+ * kernel is scoring: numbers when the input is a string, one-character strings
+ * and arbitrary objects when it is an array. One function seeing all of them
+ * goes megamorphic and stops specialising — measured at **2.43x slower** once
+ * other call sites had used it, against a module-local copy that did not move.
+ * Across the suite that showed up as `partialRatio` at 0.49x to 0.59x and the
+ * whole thing at -13.5%, which is how it was found: the micro-benchmark that
+ * said the call was free exercised one site with one element type, which is
+ * exactly the case that cannot see this.
  *
  * So each copy specialises on the elements its own kernel sees. `shared.ts`
  * documents the same rule for the analogous test against the shared table; this
  * is that rule again, for the same reason, at a larger cost. Any copy that
- * disagrees with this body is a bug.
+ * disagrees with the body above is a bug.
+ *
+ * {@link preparePattern} does not use it. It knows which region each element it
+ * deferred belongs to, having just decided that, and writes the two cases out
+ * separately rather than asking a lookup to work it out again.
  */
-export function patternBase(
-  symbol: unknown,
-  words: number,
-  highBase: number,
-  highCount: number,
-  highStart: number,
-  wideOffsets: ReadonlyMap<unknown, number>,
-): number {
-  if (
-    typeof symbol === 'number' &&
-    symbol >= 0 &&
-    symbol < DIRECT_LOOKUP_LIMIT &&
-    (symbol | 0) === symbol
-  ) {
-    return symbol * words
-  }
-  if (typeof symbol === 'number' && (symbol | 0) === symbol) {
-    const shifted = symbol - highBase
-    if (shifted >= 0 && shifted < highCount) return highStart + shifted * words
-  }
-  if (symbol === symbol) {
-    const offset = wideOffsets.get(symbol)
-    if (offset !== undefined) return offset
-  }
-  return -1
-}
 
 /**
  * Build the match masks for one pattern and keep them for repeated scoring.
@@ -238,8 +230,16 @@ export function preparePattern(
   let masks = new Int32Array(directCells)
   let low = 0
   let high = -1
-  let deferred: number[] | null = null
-  let strays: Map<unknown, number> | null = null
+  // Deferred elements are remembered together with the region they belong to,
+  // rather than by position alone. That is what lets the writes below place
+  // each one directly, with no lookup to answer again what this loop has just
+  // decided — and so with no "the pattern does not hold it" case for a write
+  // that only ever runs over elements the pattern does hold.
+  //
+  // Both records are allocated only if the pattern turns out to need them, so
+  // an all-Latin-1 pattern — the common one — allocates neither.
+  let highs: { at: number[]; of: number[] } | null = null
+  let strays: { at: number[]; slot: number[]; index: Map<unknown, number> } | null = null
 
   for (let i = 0; i < length; i++) {
     const index = start + i * step
@@ -250,18 +250,25 @@ export function preparePattern(
     }
     // `NaN` matches nothing, so it is given no slot at all.
     if (symbol !== symbol) continue
-    if (deferred === null) deferred = []
-    deferred.push(i)
     if (isHighSymbol(symbol)) {
+      highs ??= { at: [], of: [] }
+      highs.at.push(i)
+      highs.of.push(symbol)
       if (high < 0 || symbol < low) low = symbol
       if (symbol > high) high = symbol
       continue
     }
-    if (strays === null) strays = new Map<unknown, number>()
-    strays.set(symbol, 0)
+    strays ??= { at: [], slot: [], index: new Map<unknown, number>() }
+    let slot = strays.index.get(symbol)
+    if (slot === undefined) {
+      slot = strays.index.size
+      strays.index.set(symbol, slot)
+    }
+    strays.at.push(i)
+    strays.slot.push(slot)
   }
 
-  if (deferred === null) {
+  if (highs === null && strays === null) {
     return Object.freeze({
       length,
       words,
@@ -280,40 +287,52 @@ export function preparePattern(
   const highCount = windowed ? span : 0
 
   // Too wide to window: those elements need slots of their own after all. Only
-  // the deferred positions are revisited, never the whole pattern.
-  if (!windowed) {
-    for (let d = 0; d < deferred.length; d++) {
-      const index = start + deferred[d] * step
-      const symbol = stringPattern ? pattern.charCodeAt(index) : pattern[index]
-      if (!isHighSymbol(symbol)) continue
-      if (strays === null) strays = new Map<unknown, number>()
-      strays.set(symbol, 0)
+  // the deferred positions move across, never the whole pattern.
+  if (!windowed && highs !== null) {
+    const moved = (strays ??= { at: [], slot: [], index: new Map<unknown, number>() })
+    for (let d = 0; d < highs.at.length; d++) {
+      const symbol = highs.of[d]
+      let slot = moved.index.get(symbol)
+      if (slot === undefined) {
+        slot = moved.index.size
+        moved.index.set(symbol, slot)
+      }
+      moved.at.push(highs.at[d])
+      moved.slot.push(slot)
     }
+    highs = null
   }
 
   const highStart = directCells
   const strayStart = highStart + highCount * words
-  let strayCount = 0
-  if (strays !== null) {
-    for (const key of strays.keys()) {
-      strays.set(key, strayStart + strayCount * words)
-      strayCount++
-    }
-  }
+  const strayCount = strays === null ? 0 : strays.index.size
 
   // The Latin-1 block is already filled, so it moves rather than being rebuilt.
   const grown = new Int32Array(strayStart + strayCount * words)
   grown.set(masks)
   masks = grown
 
-  const wideOffsets = strays ?? EMPTY_WIDE
-  for (let d = 0; d < deferred.length; d++) {
-    const i = deferred[d]
-    const index = start + i * step
-    const symbol = stringPattern ? pattern.charCodeAt(index) : pattern[index]
-    const base = patternBase(symbol, words, highBase, highCount, highStart, wideOffsets)
-    if (base < 0) continue
-    masks[base + (i >>> WORD_SHIFT)] |= 1 << (i & WORD_MASK)
+  if (highs !== null) {
+    for (let d = 0; d < highs.at.length; d++) {
+      const i = highs.at[d]
+      const base = highStart + (highs.of[d] - highBase) * words
+      masks[base + (i >>> WORD_SHIFT)] |= 1 << (i & WORD_MASK)
+    }
+  }
+
+  let wideOffsets: ReadonlyMap<unknown, number> = EMPTY_WIDE
+  if (strays !== null) {
+    for (let d = 0; d < strays.at.length; d++) {
+      const i = strays.at[d]
+      const base = strayStart + strays.slot[d] * words
+      masks[base + (i >>> WORD_SHIFT)] |= 1 << (i & WORD_MASK)
+    }
+    // Slot indices become the absolute offsets the kernels read. Updating a key
+    // already in the map does not move it, so the walk sees each one once.
+    for (const [symbol, slot] of strays.index) {
+      strays.index.set(symbol, strayStart + slot * words)
+    }
+    wideOffsets = strays.index
   }
 
   return Object.freeze({

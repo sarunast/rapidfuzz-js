@@ -1,9 +1,13 @@
 // Ported from RapidFuzz tests/distance/test_Hamming.py
 import { expect, it } from 'vitest'
 
-import { hammingDistance, hammingEditops } from '../../src/distance/hamming.js'
+import {
+  hammingDistance,
+  hammingEditops,
+  hammingOpcodes,
+} from '../../src/distance/hamming.js'
 import { defaultProcess } from '../../src/utils.js'
-import { editopTuples } from '../common.js'
+import { editopTuples, opcodeTuples } from '../common.js'
 import { Hamming } from './scorers.js'
 
 it('handles the basic cases', () => {
@@ -62,5 +66,11 @@ it('reports the edit operations', () => {
 it('rejects editops on differing lengths when padding is disabled', () => {
   expect(() => hammingEditops('aaaa', 'aaaaa', { pad: false })).toThrow(
     'Sequences are not the same length.',
+  )
+})
+
+it('expresses the same alignment as blocks', () => {
+  expect(opcodeTuples(hammingOpcodes('qabxcd', 'abycdf'))).toEqual(
+    opcodeTuples(hammingEditops('qabxcd', 'abycdf').toOpcodes()),
   )
 })

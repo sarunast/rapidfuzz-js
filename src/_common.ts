@@ -543,12 +543,6 @@ export function alignRepresentation(
   return typeof s === 'string' && typeof other !== 'string' ? convSequence(s) : s
 }
 
-/** Convert strings as code points for token scorers that require normalization. */
-export function prepareNormalizedScorerChoice(choice: unknown): unknown {
-  if (!isSequence(choice)) return choice
-  return convSequence(choice)
-}
-
 /** Read a process-prepared sequence after validating its opaque record. */
 export function preparedScorerSequence(value: unknown): ArrayLike<unknown> | null {
   return isPreparedSequence(value) ? value.value : null

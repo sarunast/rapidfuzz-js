@@ -8,7 +8,8 @@
 // reach the same bucket, or one identity is counted as two tokens.
 import { describe, expect, it } from 'vitest'
 
-import { tokenSetRatio, tokenSortRatio } from '../src/fuzz.js'
+import { tokenSetRatio, tokenSortRatio, wRatio } from '../src/fuzz.js'
+import { matrixScores } from './matrix.js'
 
 describe('tokens holding objects', () => {
   // Regression: the hash used to be `String(x)`, which runs the caller's
@@ -92,4 +93,113 @@ describe('tokens holding symbols', () => {
 
     expect(tokenSortRatio([a, ' ', b], [b, ' ', a])).toBe(100)
   })
+
+  // Descriptions separate two symbols where they differ; identity is only the
+  // tie-break for the ones they do not.
+  it('sorts symbols by description before falling back to identity', () => {
+    const early = Symbol('aaa')
+    const late = Symbol('zzz')
+
+    expect(tokenSortRatio([early, ' ', late], [late, ' ', early])).toBe(100)
+  })
+})
+
+// The comparator behind `tokenSortRatio` has to be a total order over whatever
+// a JavaScript array can hold, because `Array.prototype.sort` with a
+// contradictory comparator sorts `[x, y]` and `[y, x]` differently — and
+// agreeing on those two is the whole of what `tokenSortRatio` claims.
+describe('ordering tokens of every element type', () => {
+  const SPACE = ' '
+  const SYM = Symbol('dup')
+  const TWIN = Symbol('dup')
+  const OBJ = { name: 'a' }
+  const OTHER = { name: 'b' }
+
+  // No single-character strings: `convElement` turns those into code points,
+  // which is the branch the numbers below already cover.
+  const BAG: readonly unknown[] = [
+    undefined,
+    null,
+    false,
+    true,
+    2,
+    1,
+    10n,
+    2n,
+    'cd',
+    'ab',
+    SYM,
+    TWIN,
+    OBJ,
+    OTHER,
+  ]
+
+  /** One element per token, so the sort is a sort of the bag itself. */
+  function tokens(items: readonly unknown[]): unknown[] {
+    const out: unknown[] = []
+    for (const item of items) {
+      if (out.length > 0) out.push(SPACE)
+      out.push(item)
+    }
+    return out
+  }
+
+  it('sorts the same bag into the same order whichever way it arrives', () => {
+    expect(tokenSortRatio(tokens(BAG), tokens([...BAG].reverse()))).toBe(100)
+    expect(tokenSetRatio(tokens(BAG), tokens([...BAG].reverse()))).toBe(100)
+  })
+
+  it('orders two tokens by the first element that differs', () => {
+    expect(
+      tokenSortRatio([OBJ, OBJ, SPACE, OBJ, OTHER], [OBJ, OTHER, SPACE, OBJ, OBJ]),
+    ).toBe(100)
+  })
+
+  // `NaN` is unordered by `<` and unequal to itself, so it needs a place of its
+  // own in the order — and two tokens holding one are two tokens, not one.
+  it('gives NaN a place past every real number', () => {
+    const forward = [
+      Number.NaN,
+      SPACE,
+      5,
+      SPACE,
+      Number.NaN,
+      SPACE,
+      2,
+      SPACE,
+      Number.NaN,
+      SPACE,
+      9,
+    ]
+    const backward = [
+      9,
+      SPACE,
+      Number.NaN,
+      SPACE,
+      2,
+      SPACE,
+      Number.NaN,
+      SPACE,
+      5,
+      SPACE,
+      Number.NaN,
+    ]
+
+    expect(tokenSortRatio(forward, backward)).toBe(tokenSortRatio(backward, forward))
+    expect(tokenSetRatio(forward, backward)).toBe(tokenSetRatio(backward, forward))
+  })
+
+  // The whitespace scan reads an element that is not a code point through its
+  // general form rather than the numeric one.
+  it('finds no whitespace among elements that are not code points', () => {
+    expect(wRatio([OBJ, OTHER], [OBJ, OTHER])).toBe(100)
+    expect(wRatio([OBJ, OTHER], [OBJ, SYM])).toBeLessThan(100)
+  })
+})
+
+// `scoreMatrix` converts every choice once through the token preparer, which
+// has to hand back anything that is not a sequence untouched for the scorer to
+// answer for.
+it('passes a missing choice through the token preparer', () => {
+  expect(matrixScores(['fuzzy wuzzy'], [null], { scorer: tokenSortRatio })).toEqual([[0]])
 })

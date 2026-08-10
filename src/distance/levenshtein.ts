@@ -37,7 +37,6 @@ import {
   shiftedRowBitSet,
 } from './_bitParallel.js'
 import {
-  lcsLength,
   lcsLengthRange,
   levenshteinPrepared,
   levenshteinPreparedRow,
@@ -498,9 +497,7 @@ function distance_(
 
     // Substitution can never win when it costs at least delete + insert.
     if (replace >= insert + delete_) {
-      const lcs = Number.isFinite(scoreCutoff)
-        ? lcsLengthRange(s1, 0, len1, s2, 0, len2, scaledCutoff)
-        : lcsLength(s1, s2)
+      const lcs = lcsLengthRange(s1, 0, len1, s2, 0, len2, scaledCutoff)
       return (len1 + len2 - 2 * lcs) * insert
     }
   }
@@ -901,6 +898,15 @@ export function levenshteinOpcodes(
   return levenshteinEditops(s1, s2, options).toOpcodes()
 }
 
+/**
+ * Widest budget {@link levenshteinSmallBand} can band inside one word.
+ *
+ * Its diagonal band is `2 * budget + 1` wide and it holds the band in a single
+ * 32-bit word, so anything past 15 would have the part that does not fit
+ * dropped and come back too large.
+ */
+const MAX_BAND_BUDGET = 15
+
 type PreparedLevenshteinKind =
   | 'distance'
   | 'similarity'
@@ -958,9 +964,9 @@ function preparedDistanceWorthwhile(
  * which windows a pattern of any width, so the whole-query masks serve it
  * unchanged. What it will not do is fit a band wider than a word: the budget
  * has to satisfy `2 * budget + 1 <= 32`, or the kernel drops the part that does
- * not fit and answers too large. That bounds the budget at 15, which still
- * covers what `extract` asks for — a heap of the best few over short text
- * settles on a budget well inside it.
+ * not fit and answers too large. {@link MAX_BAND_BUDGET} is that bound, and the
+ * caller applies it — it still covers what `extract` asks for, since a heap of
+ * the best few over short text settles on a budget well inside it.
  *
  * The remaining bounds are the kernel's other two preconditions, plus a length
  * test that is only an early out.
@@ -974,7 +980,6 @@ function preparedBandWorthwhile(
   budget: number,
 ): boolean {
   if (!Number.isFinite(budget) || budget < 4) return false
-  if (2 * budget + 1 > 32) return false
 
   // Out of reach on length alone: `distance_` returns `budget + 1` for this
   // without touching a mask, so there is nothing to save.
@@ -1004,12 +1009,10 @@ function prepareLevenshtein(kind: PreparedLevenshteinKind): PrepareScorer {
       hint: number,
     ): number => {
       // A scorer with no cutoff runs with `cutoff` at `MAX_SAFE_INTEGER`, which
-      // is what `cdist` does, and this one comparison keeps it from paying for
-      // the rest of the band test. The bound is `preparedBandWorthwhile`'s own
-      // ceiling restated — raising it here without raising it there does not
-      // widen the band, it just moves the rejection one test later. Both are
-      // spelled out because only the callee's is load bearing.
-      if (cutoff < 16 && uniform && a.length > 0 && b.length > 0) {
+      // is what `cdist` does, and this comparison keeps it from paying for the
+      // rest of the band test. It is also the only place the band's width bound
+      // is applied, so `preparedBandWorthwhile` can take the budget as given.
+      if (cutoff < MAX_BAND_BUDGET + 1 && uniform && a.length > 0 && b.length > 0) {
         const budget = Math.floor(cutoff)
         if (preparedBandWorthwhile(a.length, b.length, budget)) {
           pattern ??= preparePattern(a, 0, a.length)

@@ -151,6 +151,9 @@ describe('applying an edit script to astral text', () => {
     ['BMP source, astral destination', 'xabcd', '\u{1F600}\u{1F601}abc'],
     ['every character astral', '\u{1F600}\u{1F601}\u{1F602}', '\u{1F602}\u{1F600}'],
     ['an astral character alone', '\u{1F600}', ''],
+    // The last operation is before the end, so the tail is copied by the loop
+    // that runs after the script rather than by one inside it.
+    ['an edit before an unchanged tail', '\u{1F600}abc', '\u{1F601}abc'],
     ['inserted into empty', '', '\u{1F600}\u{1F44D}'],
   ]
 

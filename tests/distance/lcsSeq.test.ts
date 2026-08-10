@@ -1,9 +1,9 @@
 // Ported from RapidFuzz tests/distance/test_LCSseq.py
 import { expect, it } from 'vitest'
 
-import { lcsSeqEditops } from '../../src/distance/lcsSeq.js'
+import { lcsSeqEditops, lcsSeqOpcodes } from '../../src/distance/lcsSeq.js'
 import { defaultProcess } from '../../src/utils.js'
-import { editopTuples } from '../common.js'
+import { editopTuples, opcodeTuples } from '../common.js'
 import { LCSseq } from './scorers.js'
 
 it('handles the basic cases', () => {
@@ -68,4 +68,12 @@ it('does not recover a NaN-to-NaN match from the alignment matrix', () => {
     ['insert', 0, 0],
     ['delete', 0, 1],
   ])
+})
+
+// Not ported — upstream tests `opcodes` through the shared `GenericScorer`
+// helpers, which this port's editops suite covers for Levenshtein alone.
+it('expresses the same alignment as blocks', () => {
+  expect(opcodeTuples(lcsSeqOpcodes('aaabaaa', 'abbaaabba'))).toEqual(
+    opcodeTuples(lcsSeqEditops('aaabaaa', 'abbaaabba').toOpcodes()),
+  )
 })

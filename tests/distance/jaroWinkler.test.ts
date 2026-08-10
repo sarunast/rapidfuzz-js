@@ -1,7 +1,11 @@
 // Ported from RapidFuzz tests/distance/test_JaroWinkler.py
 import { expect, it } from 'vitest'
 
+import { prepareScorerOf } from '../../src/_common.js'
+import { configure } from '../../src/configure.js'
+import { jaroWinklerSimilarity } from '../../src/distance/jaroWinkler.js'
 import { defaultProcess } from '../../src/utils.js'
+import { matrixScores } from '../matrix.js'
 import { JaroWinkler } from './scorers.js'
 
 it('handles sequences of numbers', () => {
@@ -84,4 +88,43 @@ it('is case insensitive with the default processor', () => {
       processor: defaultProcess,
     }),
   ).toBeCloseTo(1, 6)
+})
+
+// Not ported — upstream's `prefix_weight` is a keyword argument checked once
+// per call, where here it is also parsed when a query is prepared, and the
+// cutoff it derives has a case upstream's tests never reach.
+it('refuses a prefix weight outside 0 to 1', () => {
+  expect(() => jaroWinklerSimilarity('abcd', 'abce', { prefixWeight: 1.5 })).toThrow(
+    RangeError,
+  )
+  expect(() => jaroWinklerSimilarity('abcd', 'abce', { prefixWeight: -0.1 })).toThrow(
+    RangeError,
+  )
+})
+
+it('refuses a prefix weight the prepared path cannot use either', () => {
+  const prepare = prepareScorerOf(jaroWinklerSimilarity)
+  expect(prepare).not.toBeNull()
+  if (prepare === null) return
+
+  expect(() => prepare('abcd', { prefixWeight: 1.5 })).toThrow(RangeError)
+  expect(() => prepare('abcd', { prefixWeight: 'a lot' })).toThrow(TypeError)
+  expect(prepare('abcd', { prefixWeight: 0.2 })('abce', null, null)).toBeCloseTo(
+    jaroWinklerSimilarity('abcd', 'abce', { prefixWeight: 0.2 }),
+    12,
+  )
+})
+
+// Four matching characters at a weight of 0.25 is a full point of bonus, so
+// the Jaro cutoff the score has to clear collapses to the 0.7 floor rather
+// than being solved for.
+it('handles a prefix bonus that covers the whole score', () => {
+  const options = { prefixWeight: 0.25, scoreCutoff: 0.9 }
+  expect(jaroWinklerSimilarity('abcdx', 'abcdy', options)).toBeCloseTo(1, 12)
+  expect(
+    matrixScores(['abcdx'], ['abcdy'], {
+      scorer: configure(jaroWinklerSimilarity, { prefixWeight: 0.25 }),
+      scoreCutoff: 0.9,
+    })[0][0],
+  ).toBeCloseTo(1, 12)
 })

@@ -18,6 +18,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
+import { prepareScorerOf } from '../../src/_common.js'
 import {
   commonAffix,
   lcsSeqMatrix,
@@ -31,13 +32,23 @@ import {
   lcsLengthPrepared,
   lcsLengthPreparedBounded,
   lcsLengthRange,
+  levenshteinPrepared,
+  levenshteinSmallBand,
   levenshteinUniform,
+  osaManyWords,
   osaOneWord,
+  osaOneWordPrepared,
+  osaOneWordRange,
+  osaPrepared,
   preparePattern,
 } from '../../src/distance/_bitVector/index.js'
 import { damerauLevenshteinDistance } from '../../src/distance/damerauLevenshtein.js'
 import { jaroSimilarity } from '../../src/distance/jaro.js'
-import { lcsSeqEditops } from '../../src/distance/lcsSeq.js'
+import {
+  lcsSeqEditops,
+  lcsSeqLengthRange,
+  lcsSeqSimilarity,
+} from '../../src/distance/lcsSeq.js'
 import {
   levenshteinDistance,
   levenshteinEditops,
@@ -913,6 +924,95 @@ describe('weighted Levenshtein fast paths', () => {
     )
   })
 
+  // A cutoff narrows both generic kernels to a band around the diagonal, whose
+  // width comes from the cheapest of insertion and deletion. Long enough that
+  // the band is narrower than the row, so its two ends — the sentinel written
+  // past the band and the one written before it — are actually reached.
+  it('band the generic dynamic program without changing the result', () => {
+    const a = [...'the quick brown fox jumps over the lazy dog, twice'].map((c) =>
+      c.codePointAt(0),
+    )
+    const b = [...'the quick brown vox leaps over the hazy dig, twice'].map((c) =>
+      c.codePointAt(0),
+    )
+    const sets: readonly LevenshteinWeights[] = [
+      [1, 2, 3],
+      [3, 1, 2],
+      [0.5, 1.5, 1.75],
+      [2.5, 0.5, 2],
+    ]
+
+    for (const weights of sets) {
+      const exact = weightedLevenshteinReference(a, b, ...weights)
+      expect(levenshteinDistance(a, b, { weights })).toBe(exact)
+
+      for (const cutoff of [0, 1, 2, 3, 5, 8, exact, exact + 1]) {
+        if (cutoff < 0) continue
+        expect(
+          levenshteinDistance(a, b, { weights, scoreCutoff: cutoff }),
+          `${weights.join()} at ${cutoff}`,
+        ).toBe(exact <= cutoff ? exact : cutoff + 1)
+      }
+    }
+  })
+
+  // A free insertion or deletion draws no band at all: there is no cheapest
+  // edit to divide the cutoff by, so the whole row stays live however tight
+  // the cutoff is.
+  it('is exact when one of the two indel costs is free', () => {
+    const a = [0, 1, 2, 3, 0, 1, 2]
+    const b = [3, 2, 1, 0, 3, 2]
+    const sets: readonly LevenshteinWeights[] = [
+      [0, 1, 1],
+      [1, 0, 1],
+      [0, 2, 3],
+      [2, 0, 3],
+    ]
+
+    for (const weights of sets) {
+      const exact = weightedLevenshteinReference(a, b, ...weights)
+      expect(levenshteinDistance(a, b, { weights })).toBe(exact)
+      expect(levenshteinDistance(a, b, { weights, scoreCutoff: exact })).toBe(exact)
+    }
+  })
+
+  // Both sides of "substitution can never win", which is what decides between
+  // the LCS kernel and the generic dynamic program at equal indel costs.
+  it('routes equal indel costs by whether substitution can pay', () => {
+    const a = [0, 1, 2, 3, 0, 1]
+    const b = [3, 2, 1, 0, 3, 2, 1]
+    const sets: readonly LevenshteinWeights[] = [
+      [1, 1, 2],
+      [1, 1, 7],
+      [2, 2, 3],
+      [3, 3, 4],
+    ]
+
+    for (const weights of sets) {
+      const exact = weightedLevenshteinReference(a, b, ...weights)
+      expect(levenshteinDistance(a, b, { weights })).toBe(exact)
+      expect(levenshteinDistance(a, b, { weights, scoreCutoff: exact })).toBe(exact)
+      expect(levenshteinDistance(a, b, { weights, scoreCutoff: exact - 1 })).toBe(exact)
+    }
+  })
+
+  // A weighted cutoff keeps its fraction rather than being truncated, so the
+  // range check is its own rather than `canonicalRawCutoff`'s.
+  it('refuses a weighted cutoff that is no count', () => {
+    // Fractional, so the cutoff keeps its fraction rather than going through
+    // `canonicalRawCutoff`, which truncates.
+    const weights: LevenshteinWeights = [0.5, 1.5, 1.75]
+    expect(() => levenshteinDistance('ab', 'ac', { weights, scoreCutoff: -1 })).toThrow(
+      RangeError,
+    )
+    expect(() =>
+      levenshteinDistance('ab', 'ac', { weights, scoreCutoff: Number.NaN }),
+    ).toThrow(RangeError)
+    expect(() =>
+      levenshteinDistance('ab', 'ac', { weights, scoreCutoff: Number.POSITIVE_INFINITY }),
+    ).toThrow(RangeError)
+  })
+
   // A cost near the integer kernel's ceiling must either stay exact or hand
   // over to the float one — never wrap, and never collide with the sentinel.
   it('stay exact for weights close to the integer kernel ceiling', () => {
@@ -1543,5 +1643,366 @@ describe('an editops hint cannot change the alignment', () => {
     expect(editopTuples(levenshteinEditops(a, b, { scoreHint: 0 }))).toEqual(
       editopTuples(levenshteinEditops(a, b)),
     )
+  })
+})
+
+// The OSA kernels are exported one width at a time, and each states its own
+// bounds. Reached directly because the dispatcher above them picks by width and
+// so never asks a kernel a question outside the one it serves.
+describe('the exported OSA kernels answer for their own bounds', () => {
+  const pattern = [1, 2, 3, 4]
+  const prepared = preparePattern(pattern, 0, pattern.length)
+
+  it('answers a length for an empty side', () => {
+    expect(osaOneWordRange(pattern, 0, pattern.length, [], 0, 0)).toBe(pattern.length)
+    expect(osaOneWordPrepared(prepared, [])).toBe(pattern.length)
+    expect(osaOneWordPrepared(preparePattern([], 0, 0), [1, 2, 3])).toBe(3)
+    expect(osaPrepared(prepared, [])).toBe(pattern.length)
+    expect(osaPrepared(preparePattern([], 0, 0), [1, 2, 3])).toBe(3)
+  })
+
+  it('refuses a pattern wider than the word it holds', () => {
+    const wide = Array.from({ length: 33 }, (_, i) => i)
+    expect(() => osaOneWordRange(wide, 0, wide.length, wide, 0, wide.length)).toThrow(
+      RangeError,
+    )
+    expect(() => osaOneWordPrepared(preparePattern(wide, 0, wide.length), wide)).toThrow(
+      RangeError,
+    )
+  })
+
+  // Eight words of pattern or more, which is where the retained scratch has to
+  // grow rather than being allocated at its floor.
+  it('scores a pattern wider than its scratch was sized for', () => {
+    const alphabet = [1, 2, 3, 4, 5]
+    const wide = Array.from(
+      { length: 300 },
+      (_, i) => alphabet[(i * 3) % alphabet.length],
+    )
+    const text = Array.from(
+      { length: 340 },
+      (_, i) => alphabet[(i * 7) % alphabet.length],
+    )
+
+    expect(osaPrepared(preparePattern(wide, 0, wide.length), text)).toBe(
+      osaReference(wide, text),
+    )
+  })
+
+  it('agrees with the one-word kernel where both apply', () => {
+    const text = [4, 3, 2, 1, 4]
+    expect(osaManyWords(pattern, text)).toBe(osaOneWord(pattern, text))
+    expect(osaManyWords(pattern, text)).toBe(osaDistance(pattern, text))
+  })
+})
+
+// The alignment matrix keeps every row, and past 32 words per row it copies a
+// hot scratch vector out instead of reading the previous row back — a second
+// implementation of the same recurrence, reachable only past 1024 elements.
+describe('alignment matrices wider than 32 words', () => {
+  it('recover the same script the narrow ones do', () => {
+    const a = 'abcdefghij'.repeat(110)
+    const b = `${'abcdefghij'.repeat(109)}abcdefghiX`
+
+    expect(editopTuples(lcsSeqEditops(a, b))).toEqual([
+      ['insert', 1099, 1099],
+      ['delete', 1099, 1100],
+    ])
+    expect(levenshteinEditops(a, b).operations.length).toBe(1)
+  })
+
+  // Differences spread through the pair, so the affix trimming leaves the whole
+  // of it for the matrix rather than the last character.
+  it('recover a script over a pair that differs throughout', () => {
+    const [a, b] = scattered('abcdefgh', 1300, 29)
+
+    expect(lcsSeqEditops(a, b).operations.length).toBe(
+      2 * (a.length - lcsReference(a, b)),
+    )
+    expect(levenshteinEditops(a, b).operations.length).toBe(levenshteinReference(a, b))
+  })
+
+  // An element outside the span the pattern's own elements cover has no place
+  // in the table indexed by that span, and is answered out of the map beside it
+  // — or by nothing at all, when the pattern does not hold it either.
+  it('recover a script when the text ranges outside the pattern', () => {
+    const a = 'абвгд'.repeat(12)
+    const b = `${'абвгд'.repeat(6)}一丁丂${'абвгд'.repeat(5)}xy`
+
+    expect(lcsSeqEditops(a, b).operations.length).toBe(
+      a.length + b.length - 2 * lcsReference(a, b),
+    )
+    expect(levenshteinEditops(a, b).operations.length).toBe(levenshteinReference(a, b))
+  })
+
+  // The same variety inside one word's worth of rows, where the matrix keeps
+  // its state in the row itself rather than in a scratch vector.
+  it('recover a script over a narrow row of every region', () => {
+    const palette: readonly unknown[] = [97, 98, 0x410, 0x411, 'ab', { tag: 'x' }]
+    const a = Array.from({ length: 60 }, (_, i) => palette[i % palette.length])
+    const b = a.map((x, i) =>
+      i % 7 !== 0 ? x : i % 21 === 0 ? 0x4e00 : i % 14 === 0 ? Number.NaN : { tag: 'y' },
+    )
+
+    expect(lcsSeqEditops(a, b).operations.length).toBe(
+      a.length + b.length - 2 * lcsReference(a, b),
+    )
+    expect(levenshteinEditops(a, b).operations.length).toBe(levenshteinReference(a, b))
+  })
+
+  // Elements rather than characters, past the same width: the matrix reads an
+  // array by index and classifies each element separately from a string's code
+  // units, and an element that is no code point at all has no slot in either
+  // table.
+  it('recover a script over elements of every region', () => {
+    const palette: readonly unknown[] = [97, 98, 0x410, 0x411, 'ab', { tag: 'x' }]
+    const a = Array.from({ length: 1300 }, (_, i) => palette[i % palette.length])
+    const b = a.map((x, i) => {
+      if (i % 31 !== 0) return x
+      if (i % 93 === 0) return 0x4e00
+      if (i % 62 === 0) return Number.NaN
+      return { tag: 'y' }
+    })
+
+    expect(lcsSeqEditops(a, b).operations.length).toBe(
+      a.length + b.length - 2 * lcsReference(a, b),
+    )
+    expect(levenshteinEditops(a, b).operations.length).toBe(levenshteinReference(a, b))
+  })
+})
+
+// The banded row reader is asked about columns outside the band as a matter of
+// course, and answers for them rather than reading a neighbouring row.
+describe('reading a bit outside a banded row', () => {
+  it('answers false rather than another row bit', () => {
+    const rows = new Int32Array(2)
+    rows[0] = 1
+    rows[1] = 1
+
+    expect(shiftedRowBitSet(rows, 1, 0, 0, 0)).toBe(true)
+    expect(shiftedRowBitSet(rows, 1, 0, 0, -1)).toBe(false)
+    expect(shiftedRowBitSet(rows, 1, 0, 0, 32)).toBe(false)
+  })
+})
+
+// Past a megabyte of alignment matrix the editops recovery splits the problem
+// in half and re-solves each side from a prepared row — Hirschberg's method,
+// and a third implementation of the recurrence, with its own copy of the
+// element classification and its own reversed pattern.
+describe('the Hirschberg alignment path', () => {
+  const LENGTH = 2600
+
+  function edited(source: string, at: readonly number[]): string {
+    const out = [...source]
+    for (const i of at) out[i] = out[i] === 'z' ? 'q' : 'z'
+    return out.join('')
+  }
+
+  const AT = [3, 500, 1001, 1700, 2599]
+
+  it('recovers a script as long as the distance, over text', () => {
+    for (const alphabet of ['abcdefghij', 'абвгдежзий', 'ab абв 一丁']) {
+      const source = alphabet.repeat(Math.ceil(LENGTH / alphabet.length)).slice(0, LENGTH)
+      const destination = edited(source, AT)
+      const ops = levenshteinEditops(source, destination)
+
+      expect(ops.operations.length, alphabet).toBe(
+        levenshteinDistance(source, destination),
+      )
+      expect(ops.srcLen, alphabet).toBe(LENGTH)
+      expect(ops.apply(source, destination), alphabet).toBe(destination)
+    }
+  })
+
+  it('recovers a script as long as the distance, over elements', () => {
+    for (const palette of [
+      [97, 98, 0x410, 0x4e00, 'ab', { tag: 'x' }],
+      // Windowed rather than strayed, so the text below reaches the window for
+      // some of its elements and misses it for others.
+      [97, 98, 0x410, 0x411, 0x412, 0x413],
+    ]) {
+      const source = Array.from({ length: LENGTH }, (_, i) => palette[i % palette.length])
+      const destination = [...source]
+      for (const [n, i] of AT.entries()) {
+        destination[i] = [0x500, Number.NaN, 'changed', 0x4e00, 99][n]
+      }
+
+      const ops = levenshteinEditops(source, destination)
+      expect(ops.operations.length).toBe(levenshteinDistance(source, destination))
+      expect(ops.srcLen).toBe(LENGTH)
+      expect(ops.destLen).toBe(LENGTH)
+    }
+  })
+})
+
+/**
+ * Differences spread through a long pair rather than gathered at one end.
+ *
+ * Every kernel trims the common prefix and suffix first, so a long pair that
+ * differs only in the middle is a short pair by the time a kernel sees it —
+ * which is the opposite of what a test of the long kernels wants.
+ */
+function scattered(alphabet: string, length: number, every: number): [string, string] {
+  const source = alphabet.repeat(Math.ceil(length / alphabet.length)).slice(0, length)
+  const destination = [...source]
+  for (let i = 0; i < length; i += every) {
+    destination[i] = destination[i] === 'ю' ? 'я' : 'ю'
+  }
+  return [source, destination.join('')]
+}
+
+// The wide kernels count the distance down from the pattern's length as the row
+// advances, so a pair that is mostly equal is the only thing that makes it
+// count down rather than up — and a pair that is mostly equal has to differ in
+// scattered places, or the affix trimming leaves no wide pattern at all.
+describe('long pairs that are nearly equal', () => {
+  const WIDTHS = [129, 160, 200, 400, 1200]
+
+  it('score the same as the dynamic program, held and unheld', () => {
+    const prepare = prepareScorerOf(levenshteinDistance)
+    expect(prepare).not.toBeNull()
+    if (prepare === null) return
+
+    for (const width of WIDTHS) {
+      for (const alphabet of ['abcdefgh', 'абвгдежз']) {
+        const [source, destination] = scattered(alphabet, width, 17)
+        const expected = levenshteinReference(source, destination)
+
+        expect(levenshteinDistance(source, destination), `${alphabet} ${width}`).toBe(
+          expected,
+        )
+        expect(prepare(source, {})(destination, null, null), `${alphabet} ${width}`).toBe(
+          expected,
+        )
+        expect(lcsSeqSimilarity(source, destination), `${alphabet} ${width}`).toBe(
+          lcsReference(source, destination),
+        )
+      }
+    }
+  })
+
+  // A budget far below the real distance keeps the band from ever reaching the
+  // last word, which is the answer's own word — so the kernel has to report the
+  // miss rather than whatever the row still holds.
+  it('report a miss when a tight band never reaches the answer', () => {
+    for (const width of [200, 400, 1200]) {
+      const [source, destination] = scattered('abcdefgh', width, 3)
+      const expected = levenshteinReference(source, destination)
+
+      for (const cutoff of [0, 1, 2, 3, 4, 5, 16, 17, 40, 100]) {
+        expect(
+          levenshteinDistance(source, destination, { scoreCutoff: cutoff }),
+          `${width} at ${cutoff}`,
+        ).toBe(expected <= cutoff ? expected : cutoff + 1)
+      }
+    }
+  })
+})
+
+// The dispatcher never asks a kernel about an empty side — it answers those
+// itself — so the kernels' own answers are only reachable directly.
+describe('the exported Levenshtein kernels answer for an empty side', () => {
+  it('returns the other length', () => {
+    const pattern = preparePattern([1, 2, 3, 4], 0, 4)
+    const empty = preparePattern([], 0, 0)
+
+    expect(levenshteinPrepared(pattern, [], 0, 0)).toBe(4)
+    expect(levenshteinPrepared(empty, [1, 2, 3], 0, 3)).toBe(3)
+    expect(levenshteinSmallBand(pattern, 4, [], 0, 0, 4)).toBe(4)
+  })
+})
+
+// `levenshteinMbleven` answers budgets below four by enumerating edit scripts
+// rather than building any mask, and each budget is a table of its own.
+describe('the mbleven budgets', () => {
+  it('agree with the dynamic program at every budget below four', () => {
+    const pairs: ReadonlyArray<readonly [string, string]> = [
+      ['abcdefgh', 'abcdefgh'],
+      ['abcdefgh', 'abcdefgx'],
+      ['abcdefgh', 'abcdefghi'],
+      ['abcdefgh', 'abcdef'],
+      ['abcdefgh', 'xbcdefgx'],
+      ['abcdefgh', 'abcdefghij'],
+      ['abcdefgh', 'abcd'],
+      ['a', 'b'],
+      ['a', 'ab'],
+      ['ab', 'ba'],
+    ]
+
+    for (const [a, b] of pairs) {
+      const expected = levenshteinReference(a, b)
+      for (const cutoff of [0, 1, 2, 3]) {
+        expect(
+          levenshteinDistance(a, b, { scoreCutoff: cutoff }),
+          `${a}/${b} at ${cutoff}`,
+        ).toBe(expected <= cutoff ? expected : cutoff + 1)
+      }
+    }
+  })
+})
+
+// `levenshteinSmallBand` holds a diagonal band in one word and windows the
+// pattern's masks into it. The window is the part the dispatcher cannot reach
+// every corner of: it runs off both ends of the pattern as the band advances,
+// and past a one-word pattern it has a word index to bound as well.
+describe('the small-band Levenshtein kernel', () => {
+  function band(
+    pattern: readonly unknown[],
+    text: readonly unknown[],
+    budget: number,
+  ): number {
+    return levenshteinSmallBand(
+      preparePattern(pattern, 0, pattern.length),
+      pattern.length,
+      text,
+      0,
+      text.length,
+      budget,
+    )
+  }
+
+  it('agrees with the dynamic program wherever the dispatcher would use it', () => {
+    const alphabet = [1, 2, 3, 4, 0x410, 0x4e00]
+
+    for (const patternLength of [4, 8, 16, 31, 32, 33, 40, 64, 70]) {
+      const pattern = Array.from(
+        { length: patternLength },
+        (_, i) => alphabet[(i * 7) % alphabet.length],
+      )
+
+      for (const extra of [0, 1, 5, 20, 60]) {
+        const text = Array.from(
+          { length: patternLength + extra },
+          (_, i) => alphabet[(i * 5) % alphabet.length],
+        )
+
+        for (const budget of [4, 8, 15]) {
+          // The bounds the dispatcher checks before it chooses this kernel.
+          if (budget > pattern.length || budget > text.length) continue
+          if (text.length < pattern.length - budget) continue
+
+          const exact = levenshteinReference(pattern, text)
+          const what = `${patternLength}+${extra} at ${budget}`
+          expect(band(pattern, text, budget), what).toBe(
+            exact <= budget ? exact : budget + 1,
+          )
+        }
+      }
+    }
+  })
+})
+
+// The interior of `lcsLengthRange` refuses a target that the untrimmed middle
+// cannot reach even if every one of its elements matched.
+describe('a bounded LCS target the middle cannot reach', () => {
+  it('answers with the common affix alone', () => {
+    const a = 'abcdefghijklmnopqrst'
+    const b = 'abcXYZt'
+
+    for (const budget of [0, 1, 2]) {
+      expect(
+        lcsSeqLengthRange(a, 0, a.length, b, 0, b.length, budget),
+      ).toBeLessThanOrEqual(lcsReference(a, b))
+    }
   })
 })

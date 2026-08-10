@@ -30,7 +30,6 @@ import {
 } from '../_common.js'
 import { commonAffix, lcsSeqMatrix, rowBitSet } from './_bitParallel.js'
 import {
-  lcsLength,
   lcsLengthPrepared,
   lcsLengthPreparedBounded,
   lcsLengthRange,
@@ -43,16 +42,6 @@ import {
   type Editops,
   type Opcodes,
 } from './editops.js'
-
-/**
- * Length of the longest common subsequence.
- *
- * Hyyrö's bit-parallel LCS: O(|s1| * |s2| / 32) time, no allocation. See
- * `_bitVector/lcs.ts`.
- */
-export function lcsSeqLength(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
-  return lcsLength(s1, s2)
-}
 
 export {
   lcsLengthPrepared as lcsSeqLengthPrepared,
@@ -71,7 +60,6 @@ function boundedLength(
   s2: ArrayLike<unknown>,
   distanceCutoff: number,
 ): number {
-  if (!Number.isFinite(distanceCutoff)) return lcsSeqLength(s1, s2)
   const lengthDifference = Math.abs(s1.length - s2.length)
   const missBudget = Math.max(0, Math.floor(2 * distanceCutoff - lengthDifference))
   return lcsLengthRange(s1, 0, s1.length, s2, 0, s2.length, missBudget)
@@ -82,9 +70,10 @@ function preparedLengthWorthwhile(
   choiceLength: number,
   distanceCutoff: number,
 ): boolean {
-  const required = Number.isFinite(distanceCutoff)
-    ? Math.max(0, Math.ceil(Math.max(queryLength, choiceLength) - distanceCutoff))
-    : 0
+  const required = Math.max(
+    0,
+    Math.ceil(Math.max(queryLength, choiceLength) - distanceCutoff),
+  )
   const words = (queryLength + 31) >>> 5
   const fullBand = queryLength + choiceLength - 2 * required + 1
   const activeWords = Math.min(words, Math.floor(fullBand / 32) + 2)
@@ -269,9 +258,7 @@ function prepareLcs(kind: PreparedLcsKind): PrepareScorer {
         return boundedLength(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)
       }
       pattern ??= preparePattern(a, 0, a.length)
-      const required = Number.isFinite(cutoff)
-        ? Math.max(0, Math.ceil(maximum(a, b) - cutoff))
-        : 0
+      const required = Math.max(0, Math.ceil(maximum(a, b) - cutoff))
       return required > 0
         ? lcsLengthPreparedBounded(pattern, b, 0, b.length, required)
         : lcsLengthPrepared(pattern, b, 0, b.length)

@@ -47,7 +47,7 @@ import type { FuzzInput, FuzzOptions } from './types.js'
 
 /** `100 - 100 * dist / lensum`, gated on `scoreCutoff`. Port of `_norm_distance`. */
 function normDistance(dist: number, lensum: number, scoreCutoff: number): number {
-  const score = lensum ? 100 - (100 * dist) / lensum : 100
+  const score = 100 - (100 * dist) / lensum
   return score >= scoreCutoff ? score : 0
 }
 

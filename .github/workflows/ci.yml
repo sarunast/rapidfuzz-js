@@ -36,9 +36,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
 
-      # `pnpm check` already ran the tests; this re-runs them instrumented,
-      # purely to produce coverage/lcov.info for the upload below.
-      - run: pnpm coverage
+      # `pnpm check` already ran the tests; this re-runs them instrumented, for
+      # the lcov.info the upload below wants. The 100% gate is
+      # `--coverage.thresholds.100` inside the script, so a laptop fails the way
+      # CI does. Codecov is not the gate — advisory, late, and tokenless on a
+      # fork.
+      - name: Test coverage (fails below 100%)
+        run: pnpm coverage
 
       - uses: codecov/codecov-action@v7
         with:

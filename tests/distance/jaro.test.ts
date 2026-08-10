@@ -79,3 +79,26 @@ it('is case insensitive with the default processor', () => {
     Jaro.similarity('new york mets', 'new YORK mets', { processor: defaultProcess }),
   ).toBeCloseTo(1, 6)
 })
+
+// Not ported — the flag buffers Jaro keeps between calls start at 32 words and
+// grow, so a pattern past a thousand elements is the only thing that widens
+// them. Twice, because the second call is the one that reuses what the first
+// allocated.
+it('scores a pattern wider than its retained flag buffers', () => {
+  const a = 'abcdefghij'.repeat(200)
+  const b = `${'abcdefghij'.repeat(199)}abcdefghix`
+
+  expect(Jaro.similarity(a, a)).toBe(1)
+  expect(Jaro.similarity(a, b)).toBeGreaterThan(0.99)
+  expect(Jaro.similarity(a, b)).toBeLessThan(1)
+
+  // Wider again, so the buffers grow rather than being reused, and then narrow
+  // again, so the grown ones are reused rather than replaced. Differing
+  // throughout, because a pair that differs in one place is trimmed to one
+  // element before any buffer is sized.
+  const wider = 'abcdefghij'.repeat(600)
+  const widerEdited = [...wider].map((c, i) => (i % 11 === 0 ? 'z' : c)).join('')
+  expect(Jaro.similarity(wider, widerEdited)).toBeLessThan(1)
+  expect(Jaro.similarity(wider, widerEdited)).toBeGreaterThan(0.7)
+  expect(Jaro.similarity(a, b)).toBeLessThan(1)
+})

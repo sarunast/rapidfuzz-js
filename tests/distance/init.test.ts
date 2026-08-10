@@ -270,6 +270,221 @@ describe('malformed input is refused rather than acted on', () => {
   })
 })
 
+// Also not ported, and the other half of the same story: upstream's
+// `_list_to_editops` and `_list_to_opcodes` raise on each of these, and its
+// suite exercises none of them. Every rule gets both of its sub-conditions,
+// because each is a separate way for an alignment to be impossible.
+describe('operations that describe no alignment at all', () => {
+  it('refuses editops outside the lengths they claim', () => {
+    expect(() =>
+      Editops.fromOperations([{ tag: 'delete', srcPos: 8, destPos: 0 }], 7, 9),
+    ).toThrow('List of edit operations invalid')
+    expect(() =>
+      Editops.fromOperations([{ tag: 'delete', srcPos: 0, destPos: 10 }], 7, 9),
+    ).toThrow('List of edit operations invalid')
+  })
+
+  // Past the end of the source there is nothing left to delete or replace, and
+  // past the end of the destination nothing left to insert or replace.
+  it('refuses an editop at a position with nothing to edit', () => {
+    for (const tag of ['delete', 'replace'] as const) {
+      expect(() =>
+        Editops.fromOperations([{ tag, srcPos: 7, destPos: 0 }], 7, 9),
+      ).toThrow('List of edit operations invalid')
+    }
+    for (const tag of ['insert', 'replace'] as const) {
+      expect(() =>
+        Editops.fromOperations([{ tag, srcPos: 0, destPos: 9 }], 7, 9),
+      ).toThrow('List of edit operations invalid')
+    }
+  })
+
+  it('refuses opcodes outside the lengths they claim', () => {
+    expect(() =>
+      Opcodes.fromOperations(
+        [{ tag: 'equal', srcStart: 0, srcEnd: 4, destStart: 0, destEnd: 3 }],
+        3,
+        3,
+      ),
+    ).toThrow('List of edit operations invalid')
+    expect(() =>
+      Opcodes.fromOperations(
+        [{ tag: 'equal', srcStart: 0, srcEnd: 3, destStart: 0, destEnd: 4 }],
+        3,
+        3,
+      ),
+    ).toThrow('List of edit operations invalid')
+  })
+
+  it('refuses a block that ends before it starts', () => {
+    expect(() =>
+      Opcodes.fromOperations(
+        [{ tag: 'equal', srcStart: 2, srcEnd: 1, destStart: 0, destEnd: 1 }],
+        3,
+        3,
+      ),
+    ).toThrow('List of edit operations invalid')
+    expect(() =>
+      Opcodes.fromOperations(
+        [{ tag: 'equal', srcStart: 0, srcEnd: 1, destStart: 2, destEnd: 1 }],
+        3,
+        3,
+      ),
+    ).toThrow('List of edit operations invalid')
+  })
+
+  // Each tag constrains the two spans: `equal` and `replace` cover the same
+  // non-zero number of elements on both sides, `insert` covers none of the
+  // source and some of the destination, `delete` the other way round.
+  it('refuses a block whose spans contradict its tag', () => {
+    const malformed: readonly Opcode[] = [
+      { tag: 'equal', srcStart: 0, srcEnd: 2, destStart: 0, destEnd: 1 },
+      { tag: 'replace', srcStart: 0, srcEnd: 0, destStart: 0, destEnd: 0 },
+      { tag: 'insert', srcStart: 0, srcEnd: 1, destStart: 0, destEnd: 1 },
+      { tag: 'insert', srcStart: 0, srcEnd: 0, destStart: 0, destEnd: 0 },
+      { tag: 'delete', srcStart: 0, srcEnd: 0, destStart: 0, destEnd: 0 },
+      { tag: 'delete', srcStart: 0, srcEnd: 1, destStart: 0, destEnd: 1 },
+    ]
+
+    for (const op of malformed) {
+      expect(() => Opcodes.fromOperations([op], 3, 3), JSON.stringify(op)).toThrow(
+        'List of edit operations invalid',
+      )
+    }
+  })
+})
+
+// Upstream's `Editops.remove_subsequence`: given the operations that turn `a`
+// into `c` and the subset of them that turns `a` into `b`, the ones left over
+// turn `b` into `c`. The positions of what is left shift by what was removed —
+// an insertion that is gone leaves the source one element shorter than the
+// remaining operations expect, and a deletion one longer.
+describe('removing a subsequence of operations', () => {
+  const OPS: readonly Editop[] = [
+    { tag: 'insert', srcPos: 1, destPos: 1 },
+    { tag: 'delete', srcPos: 1, destPos: 2 },
+    { tag: 'replace', srcPos: 2, destPos: 3 },
+  ]
+  const all = (): Editops => Editops.fromOperations(OPS, 3, 4)
+
+  it('leaves everything when nothing is removed', () => {
+    expect(all().removeSubsequence(Editops.fromOperations([], 3, 4)).operations).toEqual(
+      OPS,
+    )
+  })
+
+  it('shifts what follows a removed insertion forwards', () => {
+    const removed = all().removeSubsequence(Editops.fromOperations([OPS[0]], 3, 4))
+    expect(removed.operations).toEqual([
+      { tag: 'delete', srcPos: 2, destPos: 2 },
+      { tag: 'replace', srcPos: 3, destPos: 3 },
+    ])
+  })
+
+  it('shifts what follows a removed deletion back', () => {
+    const removed = all().removeSubsequence(Editops.fromOperations([OPS[1]], 3, 4))
+    expect(removed.operations).toEqual([
+      { tag: 'insert', srcPos: 1, destPos: 1 },
+      { tag: 'replace', srcPos: 1, destPos: 3 },
+    ])
+  })
+
+  it('leaves the operations before and after a removed replacement alone', () => {
+    const removed = all().removeSubsequence(Editops.fromOperations([OPS[2]], 3, 4))
+    expect(removed.operations).toEqual([OPS[0], OPS[1]])
+  })
+
+  it('refuses a list that is not a subsequence', () => {
+    expect(() =>
+      all().removeSubsequence(
+        Editops.fromOperations(
+          [
+            { tag: 'insert', srcPos: 0, destPos: 0 },
+            { tag: 'insert', srcPos: 0, destPos: 1 },
+            { tag: 'insert', srcPos: 0, destPos: 2 },
+            { tag: 'insert', srcPos: 0, destPos: 3 },
+          ],
+          3,
+          4,
+        ),
+      ),
+    ).toThrow('subsequence is not a subsequence')
+    expect(() =>
+      all().removeSubsequence(
+        Editops.fromOperations([{ tag: 'delete', srcPos: 0, destPos: 0 }], 3, 4),
+      ),
+    ).toThrow('subsequence is not a subsequence')
+  })
+})
+
+describe('what equality and matching blocks answer at the edges', () => {
+  it('reports collections of different lengths as unequal', () => {
+    const ops = Editops.fromOperations([], 1, 1)
+    expect(ops.equals(Editops.fromOperations([], 2, 1))).toBe(false)
+    expect(ops.equals(Editops.fromOperations([], 1, 2))).toBe(false)
+
+    const blocks = Opcodes.fromOperations([], 1, 1)
+    expect(blocks.equals(Opcodes.fromOperations([], 2, 1))).toBe(false)
+    expect(blocks.equals(Opcodes.fromOperations([], 1, 2))).toBe(false)
+    expect(
+      blocks.equals(
+        Opcodes.fromOperations(
+          [
+            { tag: 'delete', srcStart: 0, srcEnd: 1, destStart: 0, destEnd: 0 },
+            { tag: 'insert', srcStart: 1, srcEnd: 1, destStart: 0, destEnd: 1 },
+          ],
+          1,
+          1,
+        ),
+      ),
+    ).toBe(false)
+  })
+
+  it('reports collections that differ in one operation as unequal', () => {
+    const a = Editops.fromOperations([{ tag: 'delete', srcPos: 0, destPos: 0 }], 2, 1)
+    const b = Editops.fromOperations([{ tag: 'delete', srcPos: 1, destPos: 0 }], 2, 1)
+    expect(a.equals(b)).toBe(false)
+
+    const c = levenshteinOpcodes('aaabaaa', 'abbaaabba')
+    const d = levenshteinOpcodes('aaabaaa', 'abbaaabbb')
+    expect(c.equals(d)).toBe(false)
+
+    // Same lengths and the same number of blocks, so the comparison has to
+    // reach the blocks themselves rather than stopping at the shape.
+    const deleteFirst = Opcodes.fromOperations(
+      [
+        { tag: 'delete', srcStart: 0, srcEnd: 1, destStart: 0, destEnd: 0 },
+        { tag: 'equal', srcStart: 1, srcEnd: 2, destStart: 0, destEnd: 1 },
+      ],
+      2,
+      1,
+    )
+    const deleteLast = Opcodes.fromOperations(
+      [
+        { tag: 'equal', srcStart: 0, srcEnd: 1, destStart: 0, destEnd: 1 },
+        { tag: 'delete', srcStart: 1, srcEnd: 2, destStart: 1, destEnd: 1 },
+      ],
+      2,
+      1,
+    )
+    expect(deleteFirst.equals(deleteLast)).toBe(false)
+  })
+
+  // The runs between two operations are only matching blocks when both sides
+  // advanced; an insertion followed by a deletion leaves one of them at zero.
+  it('drops a run that is empty on one side', () => {
+    const ops = Editops.fromOperations(
+      [
+        { tag: 'insert', srcPos: 0, destPos: 0 },
+        { tag: 'delete', srcPos: 0, destPos: 2 },
+      ],
+      1,
+      3,
+    )
+    expect(ops.toMatchingBlocks()).toEqual([{ srcStart: 1, destStart: 3, length: 0 }])
+  })
+})
+
 // Not ported — upstream's collections are mutable and its operations are
 // tuples, so neither of these is a question there. Here the collection is the
 // result a scorer hands back, and it says it does not change.

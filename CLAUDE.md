@@ -78,6 +78,41 @@ and the numeric DP loops in `src/distance/` would need a `!` or a `?? 0` on
 every single indexed read. Turning it off removes the need for the assertion
 rather than hiding it.
 
+## Coverage is 100%, and that is enforced
+
+`pnpm coverage` passes `--coverage.thresholds.100` and fails below it on all
+four metrics. CI runs the same script, so a laptop and a pull request refuse
+for the same reason. The threshold lives in the script rather than in
+`vitest.config.ts` because that file is hashed into all 155 benchmark baseline
+entries — see below.
+
+The number is only meaningful because unreachable code is **deleted rather than
+excused**. `src/` carries **no `/* v8 ignore */` at all**, and that is the state
+to keep it in: every line the coverage report counts is a line some test runs.
+
+So a new `v8 ignore` is a claim, and the claim has to be proved before it is
+written — and the audit that emptied `src/` of them suggests the proof will fail.
+Forty-seven were audited once by putting a `throw` on exactly the ignored
+condition and running the suite, the benchmark corpus, a randomised sweep over
+every entry point and an exhaustive driver over the kernel's own precondition
+grid. Three of the forty-seven turned out to be false. What that audit found, in
+order of how often it applied:
+
+- **It is a type-checker artefact, not dead logic.** Restructure so the proof
+  is visible. Sixteen `pool === null` guards became four accessors in
+  `_bitVector/shared.ts` that return the buffer instead of a nullable binding.
+  The last one to go was `identityOrder`'s: `compareElements` narrows with
+  `isObjectLike` while the runtime proof is still in scope, so the callee takes
+  `object` and needs no guard of its own. Narrowing at the call site is what an
+  `as object` inside the callee would have asserted, except checked.
+- **It is reachable, just not cheaply.** Add a seam and test it. The two stamp
+  wraps are two billion mask builds away, so `resetBitVectorScratch` and
+  `resetDamerauScratch` take a starting generation — the only reason either
+  takes an argument.
+- **It is genuinely dead.** Delete it, and say in a comment what makes it dead.
+  A branch that cannot run cannot be relied on, and one that is wrong when it
+  does run is worse — `jaroOneWord`'s mask reset was both.
+
 ## Library constraints
 
 These are load-bearing for bundle size — see README.md for the full rationale:

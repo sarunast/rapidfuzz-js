@@ -24,7 +24,7 @@ import {
   type NormalizedScorer,
   type Scorer,
 } from '../_common.js'
-import { preparePattern } from './_bitVector/index.js'
+import { preparePattern, type PatternMask } from './_bitVector/index.js'
 import { jaroSimilarity_, jaroSimilarityPrepared_ } from './jaro.js'
 
 export interface JaroWinklerOptions extends ScorerOptions {
@@ -41,13 +41,12 @@ function similarity_(
   s1: ArrayLike<unknown>,
   s2: ArrayLike<unknown>,
   prefixWeight: number,
-  scoreCutoff = 0,
-  prepared = preparePattern(s1, 0, s1.length),
+  scoreCutoff: number,
+  prepared: PatternMask,
 ): number {
-  if (prefixWeight > 1 || prefixWeight < 0) {
-    throw new RangeError('prefix_weight has to be in the range 0.0 - 1.0')
-  }
-
+  // No range test on `prefixWeight`: `prepareJaroWinkler` parses and checks it
+  // once per query, before it builds the pattern this takes. `directSimilarity`
+  // carries the test for the unprepared path, which has no such factory.
   const prefix = Math.min(commonPrefix(s1, s2), 4)
   let jaroCutoff = scoreCutoff
   if (jaroCutoff > 0.7) {

@@ -102,13 +102,51 @@ export const DIRECT_LOOKUP_MAX = 0x1_0000
  * and a builder that widens mid-pattern rereads it — see {@link widenDirect}.
  */
 
-export let maskPool: Int32Array | null = null
+let maskPool: Int32Array | null = null
 let vectorP: Int32Array | null = null
 let vectorN: Int32Array | null = null
-export let asciiSlot: Int32Array | null = null
-export let asciiStamp: Int32Array | null = null
-export let wideSlot: Map<unknown, number> | null = null
+let asciiSlot: Int32Array | null = null
+let asciiStamp: Int32Array | null = null
+let wideSlot: Map<unknown, number> | null = null
 let bandScores: Int32Array | null = null
+
+/**
+ * The shared table's two halves, its overflow map and the mask pool, allocated
+ * on first use.
+ *
+ * Reached through these rather than through the bindings themselves. A kernel
+ * that hoisted a binding held an `Int32Array | null` and had to re-establish
+ * what an earlier call had already guaranteed, and the only way to do that was
+ * a null test on a path nothing could reach — one per kernel, sixteen of them,
+ * each one a branch no test could ever cover. Returning the buffer proves it
+ * instead, and costs one call per kernel invocation rather than per element.
+ *
+ * The first-use allocation is what keeps the promise `"sideEffects": false`
+ * makes: importing this module still does no work.
+ */
+export function directSlots(): Int32Array {
+  return (asciiSlot ??= new Int32Array(directLimit))
+}
+
+/** The stamp half of the shared table — see {@link directSlots}. */
+export function directStamps(): Int32Array {
+  return (asciiStamp ??= new Int32Array(directLimit))
+}
+
+/** Masks for elements the shared table cannot index — see {@link directSlots}. */
+export function wideSlots(): Map<unknown, number> {
+  return (wideSlot ??= new Map<unknown, number>())
+}
+
+/**
+ * The multi-word mask pool — see {@link directSlots}.
+ *
+ * Born at 64 words rather than empty so that {@link grownPreserving} always has
+ * a size to double.
+ */
+export function maskPoolOf(): Int32Array {
+  return (maskPool ??= new Int32Array(64))
+}
 
 /**
  * How much of the symbol space the shared table currently covers.
@@ -147,13 +185,13 @@ function grown(buffer: Int32Array | null, needed: number): Int32Array {
 }
 
 /** Grow a scratch buffer without invalidating offsets into its existing data. */
-function grownPreserving(buffer: Int32Array | null, needed: number): Int32Array {
-  if (buffer !== null && buffer.length >= needed) return buffer
+function grownPreserving(buffer: Int32Array, needed: number): Int32Array {
+  if (buffer.length >= needed) return buffer
 
-  let size = buffer === null ? 64 : buffer.length
+  let size = buffer.length
   while (size < needed) size *= 2
   const next = new Int32Array(size)
-  if (buffer !== null) next.set(buffer)
+  next.set(buffer)
   return next
 }
 
@@ -191,18 +229,22 @@ export function clearRange(
  *
  * The old contents carry over. A builder that widens partway through a pattern
  * has already filed earlier elements under the narrower limit, and every one of
- * those was below it, so where they sit does not change.
+ * those was below it, so where they sit does not change. The caller passes the
+ * halves it is already holding, which is both the copy source and the proof
+ * that there is one.
  */
-function widenDirect(symbol: number): [Int32Array, Int32Array] {
+function widenDirect(
+  symbol: number,
+  heldSlots: Int32Array,
+  heldStamps: Int32Array,
+): [Int32Array, Int32Array] {
   let size = directLimit
   while (size <= symbol) size *= 2
 
   const slots = new Int32Array(size)
   const stamps = new Int32Array(size)
-  const heldSlots = asciiSlot
-  const heldStamps = asciiStamp
-  if (heldSlots !== null) slots.set(heldSlots)
-  if (heldStamps !== null) stamps.set(heldStamps)
+  slots.set(heldSlots)
+  stamps.set(heldStamps)
 
   asciiSlot = slots
   asciiStamp = stamps
@@ -210,13 +252,22 @@ function widenDirect(symbol: number): [Int32Array, Int32Array] {
   return [slots, stamps]
 }
 
+/**
+ * How far the generation counter runs before the stamps are cleared and it
+ * starts again.
+ *
+ * A stamp is an `Int32Array` cell, so the counter cannot exceed what one holds.
+ * Reaching the ceiling takes two billion mask builds in a single process, which
+ * no test is going to sit through — {@link resetBitVectorScratch} takes a
+ * starting generation so that the wrap can be driven directly instead.
+ */
+const GENERATION_LIMIT = 0x7fff_ffff
+
 /** Stamps start at 0 and generations at 1, so a stale slot can never match. */
 function nextGeneration(): number {
-  const stamps = asciiStamp
-
   generation++
-  if (generation >= 0x7fff_ffff) {
-    if (stamps !== null) stamps.fill(0)
+  if (generation >= GENERATION_LIMIT) {
+    directStamps().fill(0)
     generation = 1
   }
 
@@ -243,12 +294,6 @@ function clearWide(wide: Map<unknown, number>): void {
   if (wide.size !== 0) wide.clear()
 }
 
-export function popcount(word: number): number {
-  let bits = word - ((word >>> 1) & 0x5555_5555)
-  bits = (bits & 0x3333_3333) + ((bits >>> 2) & 0x3333_3333)
-  return (((bits + (bits >>> 4)) & 0x0f0f_0f0f) * 0x0101_0101) >>> 24
-}
-
 /**
  * Match masks for a single-word pattern: each distinct element maps to a
  * bitmask of the positions it occupies.
@@ -259,11 +304,10 @@ export function buildWordMasks(
   length: number,
 ): number {
   const stamp = nextGeneration()
-  let slots = asciiSlot
-  let stamps = asciiStamp
-  const wide = wideSlot
+  let slots = directSlots()
+  let stamps = directStamps()
+  const wide = wideSlots()
 
-  if (slots === null || stamps === null || wide === null) return stamp
   clearWide(wide)
   let limit = directLimit
   const stringPattern = typeof pattern === 'string'
@@ -287,7 +331,7 @@ export function buildWordMasks(
       (symbol | 0) === symbol
     ) {
       if (symbol >= limit) {
-        const widened = widenDirect(symbol)
+        const widened = widenDirect(symbol, slots, stamps)
         slots = widened[0]
         stamps = widened[1]
         limit = directLimit
@@ -315,14 +359,13 @@ export function buildBlockMasks(
   words: number,
 ): number {
   const stamp = nextGeneration()
-  let slots = asciiSlot
-  let stamps = asciiStamp
-  const wide = wideSlot
+  let slots = directSlots()
+  let stamps = directStamps()
+  const wide = wideSlots()
 
-  if (slots === null || stamps === null || wide === null) return stamp
   clearWide(wide)
 
-  let pool = maskPool
+  let pool = maskPoolOf()
   let distinct = 0
   let limit = directLimit
   const stringPattern = typeof pattern === 'string'
@@ -335,7 +378,7 @@ export function buildBlockMasks(
     for (let i = 0; i < length; i++) {
       const symbol = pattern.charCodeAt(start + i)
       if (symbol >= limit) {
-        const widened = widenDirect(symbol)
+        const widened = widenDirect(symbol, slots, stamps)
         slots = widened[0]
         stamps = widened[1]
         limit = directLimit
@@ -352,10 +395,8 @@ export function buildBlockMasks(
         distinct++
       }
 
-      if (pool !== null) {
-        const word = offset + (i >>> WORD_SHIFT)
-        pool[word] = pool[word] | (1 << (i & WORD_MASK))
-      }
+      const word = offset + (i >>> WORD_SHIFT)
+      pool[word] = pool[word] | (1 << (i & WORD_MASK))
     }
 
     return stamp
@@ -372,7 +413,7 @@ export function buildBlockMasks(
     // As in `buildWordMasks`: only an element already known to belong in the
     // table asks whether the table is wide enough for it yet.
     if (direct && symbol >= limit) {
-      const widened = widenDirect(symbol)
+      const widened = widenDirect(symbol, slots, stamps)
       slots = widened[0]
       stamps = widened[1]
       limit = directLimit
@@ -404,7 +445,6 @@ export function buildBlockMasks(
       distinct++
     }
 
-    if (pool === null) continue
     const word = offset + (i >>> WORD_SHIFT)
     pool[word] = pool[word] | (1 << (i & WORD_MASK))
   }
@@ -465,12 +505,6 @@ export function blockMasksFor(
   }
 
   return maskGeneration
-}
-
-export function ensureScratch(): void {
-  if (asciiSlot === null) asciiSlot = new Int32Array(directLimit)
-  if (asciiStamp === null) asciiStamp = new Int32Array(directLimit)
-  if (wideSlot === null) wideSlot = new Map<unknown, number>()
 }
 
 /** Longest input the single-word kernels can take as their pattern. */
@@ -597,8 +631,13 @@ export function bandVector(words: number): Int32Array {
  * `src` calls it — the benchmark harness does, so that a case which runs after
  * a 16,384-element pair does not measure faster for the allocation that pair
  * already paid.
+ *
+ * `startGeneration` is the one thing here that is not about allocation. The
+ * counter is otherwise only reachable one build at a time, and the wrap at
+ * {@link GENERATION_LIMIT} is two billion builds away; starting near it is what
+ * lets that wrap be driven and its stale-stamp clearing checked.
  */
-export function resetBitVectorScratch(): void {
+export function resetBitVectorScratch(startGeneration = 0): void {
   maskPool = null
   vectorP = null
   vectorN = null
@@ -607,7 +646,7 @@ export function resetBitVectorScratch(): void {
   wideSlot = null
   bandScores = null
   directLimit = DIRECT_LOOKUP_LIMIT
-  generation = 0
+  generation = startGeneration
 
   maskPattern = null
   maskStart = -1

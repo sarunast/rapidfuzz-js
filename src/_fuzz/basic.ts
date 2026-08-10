@@ -100,7 +100,11 @@ export function indelNormSimHeld(
   scoreCutoff: number,
 ): number {
   const maximum = patternLength + textLength
-  if (maximum === 0) return 1 >= scoreCutoff ? 1 : 0
+  // Two empty inputs are identical, and the division below would answer `NaN`.
+  // Not weighed against the cutoff: every caller scales a percentage into
+  // `[0, 1]` and answers 0 above 100 before reaching this, so no cutoff that
+  // gets here is above the 1 it would be compared against.
+  if (maximum === 0) return 1
 
   const ceiling = 1 - Math.abs(patternLength - textLength) / maximum
   if (ceiling < scoreCutoff) return 0
@@ -294,13 +298,19 @@ function partialRatioScan(
     return 2 * (len1 - lcs)
   }
 
-  /** Windows running off the start of `s2`, shorter than the pattern. */
-  const scanPrefix = (): boolean => {
+  /**
+   * Windows running off the start of `s2`, shorter than the pattern.
+   *
+   * Nothing to stop early for, unlike the other two scans. A window of `i < len1`
+   * elements has `maximum = len1 + i` and at most `i` elements in common, so its
+   * normalised similarity is at most `2i / (len1 + i) < 1` — it can raise the
+   * running best but never end the search.
+   */
+  const scanPrefix = (): void => {
     for (let i = 1; i < len1; i++) {
       if (!charSet.has(s2[i - 1])) continue
-      if (consider(0, i)) return true
+      consider(0, i)
     }
-    return false
   }
 
   /** Windows running off the end of `s2`, likewise shorter. */
@@ -395,9 +405,12 @@ function partialRatioScan(
   // a score, which no order can change; `partialRatioAlignment` returns the
   // positions, and there upstream's Python order is the one to match.
   if (scoreOnly) {
-    if (scanInterior() || scanPrefix() || scanSuffix()) return res
-  } else if (scanPrefix() || scanInterior() || scanSuffix()) {
-    return res
+    if (scanInterior()) return res
+    scanPrefix()
+    if (scanSuffix()) return res
+  } else {
+    scanPrefix()
+    if (scanInterior() || scanSuffix()) return res
   }
 
   res.score *= 100

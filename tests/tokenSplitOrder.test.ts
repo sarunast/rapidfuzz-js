@@ -113,3 +113,46 @@ describe('token scorers agree regardless of which forms they build', () => {
     }
   })
 })
+
+// `difference` and `UniqueTokenSet.has` are exported, and the production
+// callers reach them only after `intersects` has answered false — so the
+// shared-token half of each is unreachable *through a scorer* and reachable
+// through the export. The test above already drives the packed half that way;
+// these drive the mixed half, and `has` for a packed key, which only a caller
+// walking `packed` itself would ask about.
+describe('the token set accessors answer for a shared token', () => {
+  const shared = { tag: 'shared' }
+  const onlyLeft = { tag: 'left' }
+  const onlyRight = { tag: 'right' }
+
+  /** One token per element, so a set is the bag of elements it was built from. */
+  function setOf(elements: readonly unknown[]): UniqueTokenSet {
+    const sequence: unknown[] = []
+    for (const element of elements) {
+      if (sequence.length > 0) sequence.push(' ')
+      sequence.push(element)
+    }
+    return uniqueOf(tokenViewOf(convSequence(sequence)))
+  }
+
+  it('drops a mixed token both sides hold', () => {
+    const left = setOf([shared, onlyLeft])
+    const right = setOf([shared, onlyRight])
+
+    expect(difference(left, right)).toEqual([[onlyLeft]])
+    expect(difference(right, left)).toEqual([[onlyRight]])
+    expect(intersects(left, right)).toBe(true)
+  })
+
+  it('answers `has` for a packed key as well as a mixed one', () => {
+    const packed = setOf([97, 98])
+    const mixed = setOf([shared])
+    const packedKey = [...packed.packed.keys()][0]
+    const mixedKey = [...mixed.mixed.keys()][0]
+
+    expect(packed.has(packedKey, [97])).toBe(true)
+    expect(packed.has('no such key', [122])).toBe(false)
+    expect(mixed.has(mixedKey, [shared])).toBe(true)
+    expect(mixed.has(mixedKey, [onlyLeft])).toBe(false)
+  })
+})

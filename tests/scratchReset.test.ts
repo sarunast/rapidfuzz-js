@@ -132,3 +132,50 @@ describe('benchmark scratch resets', () => {
     expect(workload()).toStrictEqual(cold)
   })
 })
+
+// The shared symbol table starts at Latin-1 and widens permanently, so which
+// builder does the widening depends on what ran before it. After a reset the
+// first comparison is the one that widens, and a multi-word pattern reaches a
+// different builder from a single-word one.
+describe('widening the shared table from each mask builder', () => {
+  const cyrillic = 'привет мир как дела сегодня вечером друзья мои'
+  // Scattered rather than one edit: every kernel trims the common affix first,
+  // so a pair differing in one place is a one-element pair by the time a mask
+  // builder sees it — and the multi-word builder is the point of this.
+  const edited = [...cyrillic].map((c, i) => (i % 7 === 0 ? 'Ж' : c)).join('')
+
+  it('widens from a multi-word pattern', () => {
+    resetAll()
+
+    expect(cyrillic.length).toBeGreaterThan(32)
+    expect(levenshteinDistance(cyrillic, edited)).toBeGreaterThan(4)
+    expect(levenshteinDistance(cyrillic, edited)).toBe(
+      levenshteinDistance(edited, cyrillic),
+    )
+    expect(lcsSeqSimilarity(cyrillic, edited)).toBeGreaterThan(0)
+    expect(indelDistance(cyrillic, edited)).toBeGreaterThan(0)
+  })
+
+  // The multi-word builder keeps a loop of its own for a pattern that is not a
+  // string, and that loop widens the table separately.
+  it('widens from a multi-word pattern of elements', () => {
+    resetAll()
+
+    const source = [...cyrillic].map((c) => c.codePointAt(0))
+    const destination = [...edited].map((c) => c.codePointAt(0))
+
+    expect(levenshteinDistance(source, destination)).toBe(
+      levenshteinDistance(cyrillic, edited),
+    )
+    expect(lcsSeqSimilarity(source, destination)).toBe(lcsSeqSimilarity(cyrillic, edited))
+  })
+
+  it('widens from a single-word pattern', () => {
+    resetAll()
+
+    const short = cyrillic.slice(0, 20)
+    const shortEdited = edited.slice(0, 20)
+    expect(levenshteinDistance(short, shortEdited)).toBeGreaterThan(1)
+    expect(lcsSeqSimilarity(short, shortEdited)).toBeGreaterThan(0)
+  })
+})

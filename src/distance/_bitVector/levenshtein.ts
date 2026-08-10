@@ -17,19 +17,18 @@ import {
   affixLen1,
   affixLen2,
   affixPrefix,
-  asciiSlot,
-  asciiStamp,
+  directSlots,
+  directStamps,
   bandVector,
   blockMasksFor,
   buildWordMasks,
   clearRange,
   directLimit,
-  ensureScratch,
-  maskPool,
+  maskPoolOf,
   measureAffix,
   rowVector,
   rowVectorN,
-  wideSlot,
+  wideSlots,
 } from './shared.js'
 
 // Declared here rather than imported from `shared.ts`, which holds the
@@ -60,11 +59,9 @@ function levenshteinOneWord(
   textLength: number,
 ): number {
   const stamp = buildWordMasks(pattern, patternStart, patternLength)
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-
-  if (slots === null || stamps === null || wide === null) return patternLength
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   const top = 1 << (patternLength - 1)
 
@@ -237,14 +234,10 @@ function levenshteinTwoWords(
   textLength: number,
   stamp: number,
 ): number {
-  const pool = maskPool
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-
-  if (pool === null || slots === null || stamps === null || wide === null) {
-    return patternLength
-  }
+  const pool = maskPoolOf()
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   let vp0 = -1
   let vp1 = -1
@@ -302,14 +295,10 @@ function levenshteinThreeWords(
   textLength: number,
   stamp: number,
 ): number {
-  const pool = maskPool
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-
-  if (pool === null || slots === null || stamps === null || wide === null) {
-    return patternLength
-  }
+  const pool = maskPoolOf()
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   let vp0 = -1
   let vp1 = -1
@@ -380,14 +369,10 @@ function levenshteinFourWords(
   textLength: number,
   stamp: number,
 ): number {
-  const pool = maskPool
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-
-  if (pool === null || slots === null || stamps === null || wide === null) {
-    return patternLength
-  }
+  const pool = maskPoolOf()
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   let vp0 = -1
   let vp1 = -1
@@ -492,14 +477,10 @@ function levenshteinWideWords(
   clearRange(vp, -1, 0, words)
   clearRange(vn, 0, 0, words)
 
-  const pool = maskPool
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-
-  if (pool === null || slots === null || stamps === null || wide === null) {
-    return patternLength
-  }
+  const pool = maskPoolOf()
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   const lastWord = words - 1
   const top = 1 << ((patternLength - 1) & WORD_MASK)
@@ -545,8 +526,10 @@ function levenshteinWideWords(
       const hp = vnWord | ~(d0 | vpWord)
       const hn = d0 & vpWord
 
+      // No `distance--` beside it: with no match bits, `d0` is `vn` and `hn` is
+      // `vn & vp`, and a cell is never both ahead and behind — so the negative
+      // delta this word could carry is identically zero.
       if ((hp & top) !== 0) distance++
-      if ((hn & top) !== 0) distance--
 
       const shiftedP = (hp << 1) | carryP
       const shiftedN = (hn << 1) | carryN
@@ -635,14 +618,10 @@ function levenshteinManyWordsBanded(
   const vn = rowVectorN(words)
   const scores = bandVector(words)
 
-  const pool = maskPool
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-
-  if (pool === null || slots === null || stamps === null || wide === null) {
-    return patternLength
-  }
+  const pool = maskPoolOf()
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   const last = 1 << ((patternLength - 1) & WORD_MASK)
   const stringText = typeof text === 'string'
@@ -757,23 +736,20 @@ function levenshteinManyWordsBanded(
 
         const x = matches | carryN
         const d0 = ((((x & vpWord) + vpWord) | 0) ^ vpWord) | x | vnWord
-        const hp = vnWord | ~(d0 | vpWord)
-        const hn = d0 & vpWord
+        // `vp` was set to all ones two statements ago, so `~(d0 | vpWord)` is
+        // zero and with it `hp`: a word the band has only now reached has no
+        // positive horizontal delta to carry out of, whichever word it is. That
+        // leaves `hn` as `d0` and the shifted positive vector as the carry in.
+        const hn = d0
 
         const carriedP = carryP
         const carriedN = carryN
-        if (lastWord < words - 1) {
-          carryP = hp >>> 31
-          carryN = hn >>> 31
-        } else {
-          carryP = (hp & last) !== 0 ? 1 : 0
-          carryN = (hn & last) !== 0 ? 1 : 0
-        }
+        carryP = 0
+        carryN = lastWord < words - 1 ? hn >>> 31 : (hn & last) !== 0 ? 1 : 0
 
-        const shiftedP = (hp << 1) | carriedP
         const shiftedN = (hn << 1) | carriedN
-        vp[lastWord] = shiftedN | ~(d0 | shiftedP)
-        vn[lastWord] = shiftedP & d0
+        vp[lastWord] = shiftedN | ~(d0 | carriedP)
+        vn[lastWord] = carriedP & d0
 
         scores[lastWord] += carryP - carryN
       }
@@ -804,12 +780,11 @@ function levenshteinManyWordsBanded(
     if (lastWord < firstWord) return budget + 1
   }
 
-  // The answer sits in the last word. If the band never reached it, the
-  // distance is out of budget rather than whatever `scores` still holds.
-  if (lastWord < words - 1) return budget + 1
-
-  const distance = scores[words - 1]
-  return distance <= budget ? distance : budget + 1
+  // The answer sits in the last word, and the loop above has already returned
+  // `budget + 1` for every run that could not reach it or could not stay inside
+  // the budget: the band closes from both ends, and it closes before the last
+  // row when either would have happened.
+  return scores[words - 1]
 }
 
 /** Upstream's encoded Levenshtein mbleven models for budgets below four. */
@@ -848,9 +823,11 @@ function levenshteinMbleven(
 
   const lengthDifference = firstLength - secondLength
   if (budget === 0) return 1
-  if (budget === 1) {
-    return budget + (lengthDifference === 1 || firstLength !== 1 ? 1 : 0)
-  }
+  // A budget of one never succeeds here. `bounded` is only called with a budget
+  // below the longer trimmed input, so `firstLength` is at least two — and two
+  // sequences whose ends have already been trimmed apart cannot be one edit
+  // from each other unless one of them is a single element.
+  if (budget === 1) return 2
 
   const scripts =
     LEVENSHTEIN_MBLEVEN_OPS[(budget + budget * budget) / 2 + lengthDifference - 1]
@@ -891,12 +868,9 @@ export function levenshteinPreparedRow(
   textStep: number,
   out: Uint32Array,
 ): void {
+  // No bounds test and no empty-pattern case: `out` is sized from
+  // `prepared.length` by the only caller, which never prepares an empty pattern.
   const words = prepared.words
-  if (out.length < prepared.length + 1) throw new RangeError('row buffer is too small')
-  if (words === 0) {
-    out[0] = textLength
-    return
-  }
   const vp = rowVector(words)
   const vn = rowVectorN(words)
   clearRange(vp, -1, 0, words)
@@ -1488,8 +1462,9 @@ function preparedWideWords(
       const hp = vnWord | ~(d0 | vpWord)
       const hn = d0 & vpWord
 
+      // See the sibling kernel: with no match bits `hn` is `vn & vp`, which is
+      // zero, so there is no negative delta here to take back off.
       if ((hp & top) !== 0) distance++
-      if ((hn & top) !== 0) distance--
 
       const shiftedP = (hp << 1) | carryP
       const shiftedN = (hn << 1) | carryN
@@ -1657,13 +1632,12 @@ function smallBandOneWord(
     }
     const mask = base < 0 ? 0 : masks[base]
     // The window the helper computes, with the width resolved: there is no word
-    // above to blend in, and a position past the word holds nothing.
-    const matches =
-      startPosition < 0
-        ? mask << -startPosition
-        : startPosition < WORD_BITS
-          ? mask >>> startPosition
-          : 0
+    // above to blend in. No "past the word" case either, unlike the loop below:
+    // `startPosition` opens at `maximum + 1 - WORD_BITS` and rises by one a row
+    // for the `patternLength - maximum` rows of the diagonal, ending at
+    // `patternLength - WORD_BITS` — at most zero for a pattern inside one word,
+    // which is the only kind this kernel takes.
+    const matches = startPosition < 0 ? mask << -startPosition : mask >>> startPosition
     const d0 = (((matches & vp) + vp) ^ vp) | matches | vn
     const hp = vn | ~(d0 | vp)
     const hn = d0 & vp
@@ -1798,12 +1772,12 @@ export function levenshteinUniform(
   if (s1.length === 0) return s2.length
   if (s2.length === 0) return s1.length
 
-  // `ensureScratch` is deferred to the three kernels that read the shared
-  // table, rather than paid by every comparison. `measureAffix` compares the
-  // two sequences directly, and the outcomes reachable before those kernels —
+  // Allocating the shared table is deferred to the three kernels that read it,
+  // rather than paid by every comparison. `measureAffix` compares the two
+  // sequences directly, and the outcomes reachable before those kernels —
   // an identical pair, a length rejection, `levenshteinMbleven`, and
   // `levenshteinSmallBand` over a pattern of its own — read no shared state at
-  // all. It costs about 2.4ns, which is 5% of an eight-element comparison, and
+  // all. It cost about 2.4ns, which is 5% of an eight-element comparison, and
   // `extract` over short choices is made of those.
   //
   // Load bearing where it survives: `buildWordMasks` and `buildBlockMasks`
@@ -1824,8 +1798,9 @@ export function levenshteinUniform(
   // measured: the difference does not clear the noise, in the suite or in
   // isolation, so the dispatcher keeps the order that reads in one direction.
   let bandPattern: PatternMask | null = null
+  // Every budget below is at least `lengthDifference`: the dispatcher rejected
+  // a larger difference above, and `hinted` opens at the difference itself.
   const bounded = (budget: number): number => {
-    if (lengthDifference > budget) return budget + 1
     if (budget < 4 && (budget | 0) === budget) {
       return levenshteinMbleven(s1, prefix, len1, s2, prefix, len2, budget)
     }
@@ -1850,7 +1825,6 @@ export function levenshteinUniform(
     }
     // The band is set by the budget rather than by the lengths, so the work is
     // rows times band width: the shorter input is the one worth streaming.
-    ensureScratch()
     return len1 >= len2
       ? levenshteinManyWordsBanded(s1, prefix, len1, s2, prefix, len2, budget)
       : levenshteinManyWordsBanded(s2, prefix, len2, s1, prefix, len1, budget)
@@ -1873,7 +1847,6 @@ export function levenshteinUniform(
   // Budgets under four keep going: `levenshteinMbleven` answers those by
   // comparing elements directly, without building a mask at all.
   if (Math.min(len1, len2) <= WORD_BITS && cutoff >= 4) {
-    ensureScratch()
     const distance =
       len1 <= len2
         ? levenshteinOneWord(s1, prefix, len1, s2, prefix, len2)
@@ -1902,8 +1875,7 @@ export function levenshteinUniform(
     while (hinted < cutoff) {
       const result = bounded(hinted)
       if (result <= hinted) return result
-      const wider = hinted * 2 + 1
-      hinted = Math.min(cutoff, wider > hinted ? wider : cutoff)
+      hinted = Math.min(cutoff, hinted * 2 + 1)
     }
   }
   if (cutoff < longest) return bounded(cutoff)
@@ -1917,7 +1889,6 @@ export function levenshteinUniform(
   const patternLength = firstIsPattern ? len1 : len2
   const textLength = firstIsPattern ? len2 : len1
 
-  ensureScratch()
   return patternLength <= WORD_BITS
     ? levenshteinOneWord(pattern, prefix, patternLength, text, prefix, textLength)
     : levenshteinManyWords(pattern, prefix, patternLength, text, prefix, textLength)

@@ -10,12 +10,11 @@
 
 import { preparePattern, type PatternMask } from './pattern.js'
 import {
-  asciiSlot,
-  asciiStamp,
+  directSlots,
+  directStamps,
   buildWordMasks,
   directLimit,
-  ensureScratch,
-  wideSlot,
+  wideSlots,
 } from './shared.js'
 
 // Declared here rather than imported — see the note in `shared.ts`, which holds
@@ -57,13 +56,10 @@ export function osaOneWordRange(
   }
   if (textLength === 0) return patternLength
 
-  ensureScratch()
   const stamp = buildWordMasks(pattern, patternStart, patternLength)
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-
-  if (slots === null || stamps === null || wide === null) return patternLength
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   const top = 1 << (patternLength - 1)
 

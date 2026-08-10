@@ -15,18 +15,17 @@ import {
   affixLen1,
   affixLen2,
   affixPrefix,
-  asciiSlot,
-  asciiStamp,
+  directSlots,
+  directStamps,
   blockMasksFor,
   buildWordMasks,
   clearRange,
   directLimit,
-  ensureScratch,
-  maskPool,
+  maskPoolOf,
   measureAffix,
   rowVector,
   UNBOUNDED_MISSES,
-  wideSlot,
+  wideSlots,
 } from './shared.js'
 
 // Declared here rather than imported — see the note in `shared.ts`, which holds
@@ -80,11 +79,9 @@ function lcsOneWordStamped(
   textStart: number,
   textLength: number,
 ): number {
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-
-  if (slots === null || stamps === null || wide === null) return 0
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   let s = -1
   const limit = directLimit
@@ -146,12 +143,10 @@ function lcsFourWordsStamped(
   textStart: number,
   textLength: number,
 ): number {
-  const pool = maskPool
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-
-  if (pool === null || slots === null || stamps === null || wide === null) return 0
+  const pool = maskPoolOf()
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   let s0 = -1
   let s1 = -1
@@ -229,12 +224,11 @@ function lcsManyWordsStamped(
   const row = rowVector(words)
   clearRange(row, -1, 0, words)
 
-  const pool = maskPool
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
+  const pool = maskPoolOf()
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
-  if (pool === null || slots === null || stamps === null || wide === null) return 0
   const limit = directLimit
   const stringText = typeof text === 'string'
 
@@ -370,11 +364,10 @@ function lcsManyWordsBanded(
   const stamp = blockMasksFor(pattern, patternStart, patternLength, words)
   const row = rowVector(words)
   clearRange(row, -1, 0, words)
-  const pool = maskPool
-  const slots = asciiSlot
-  const stamps = asciiStamp
-  const wide = wideSlot
-  if (pool === null || slots === null || stamps === null || wide === null) return 0
+  const pool = maskPoolOf()
+  const slots = directSlots()
+  const stamps = directStamps()
+  const wide = wideSlots()
 
   const left = patternLength - required
   const right = textLength - required
@@ -424,8 +417,14 @@ function lcsManyWordsBanded(
     }
 
     if (i > right) firstWord = Math.floor((i - right) / WORD_BITS)
+    // The window for the *next* row, whose highest reachable pattern position
+    // is `i + 1 + left` — so the last word is the one that position falls in,
+    // and `lastWord` is exclusive. Written as `ceil((i + 1 + left) / 32)` it is
+    // one word short whenever that position is the first bit of a word, which
+    // drops the match there: two 65-element sequences at `required = 65` lost
+    // the match at position 32 and were reported as unreachable.
     if (i + 1 + left <= patternLength) {
-      lastWord = Math.ceil((i + 1 + left) / WORD_BITS)
+      lastWord = Math.min(words, ((i + 1 + left) >>> WORD_SHIFT) + 1)
     }
   }
 
@@ -546,7 +545,6 @@ export function lcsLengthRange(
   // allows, and the caller has already rejected the pair either way.
   if (budget < (len1 < len2 ? len2 - len1 : len1 - len2)) return 0
 
-  ensureScratch()
   measureAffix(s1, start1, len1, s2, start2, len2)
   const prefix = affixPrefix
   const middle1 = affixLen1
@@ -607,11 +605,11 @@ export function lcsLengthRange(
   const textStart = (firstIsPattern ? start2 : start1) + prefix
   const textLength = firstIsPattern ? middle2 : middle1
 
-  const requiredTotal = Number.isFinite(budget)
-    ? Math.max(0, Math.ceil((len1 + len2 - budget) / 2))
-    : 0
+  // `common` cancels out of both lengths, so this is `ceil((m1 + m2 - budget) / 2)`
+  // over the two middles — and that is at most the shorter of them exactly when
+  // their difference is within the budget, which the rejection above settled.
+  const requiredTotal = Math.max(0, Math.ceil((len1 + len2 - budget) / 2))
   const requiredMiddle = Math.max(0, requiredTotal - common)
-  if (requiredMiddle > Math.min(patternLength, textLength)) return common
   const fullBand = patternLength + textLength - 2 * requiredMiddle + 1
   const bandWords = Math.min(
     (patternLength + WORD_MASK) >>> WORD_SHIFT,
@@ -951,8 +949,10 @@ function lcsPreparedBanded(
     }
 
     if (i > right) firstWord = (i - right) >>> WORD_SHIFT
+    // See {@link lcsManyWordsBanded}: the word holding position `i + 1 + left`,
+    // not the count of words below it.
     if (i + 1 + left <= prepared.length) {
-      lastWord = Math.ceil((i + 1 + left) / WORD_BITS)
+      lastWord = Math.min(words, ((i + 1 + left) >>> WORD_SHIFT) + 1)
     }
   }
 

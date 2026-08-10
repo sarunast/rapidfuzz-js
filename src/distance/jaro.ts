@@ -262,9 +262,11 @@ function countTranspositionsWords(
         bits ^= lowest
         const i = (word << 5) + 31 - Math.clz32(lowest)
 
+        // No bound on `patternWord`: every match set one bit on each side, and
+        // `leading` masks the same prefix positions off both, so the two words
+        // hold the same number of set flags and the cursor cannot run out first.
         while (patternBits === 0) {
           patternWord++
-          if (patternWord >= patternWords) return transpositions
           patternBits = pFlag[patternWord]
         }
         const patternLowest = patternBits & -patternBits
@@ -288,9 +290,9 @@ function countTranspositionsWords(
       bits ^= lowest
       const i = (word << 5) + 31 - Math.clz32(lowest)
 
+      // See the string path above: the two sides carry equally many set flags.
       while (patternBits === 0) {
         patternWord++
-        if (patternWord >= patternWords) return transpositions
         patternBits = pFlag[patternWord]
       }
       const patternLowest = patternBits & -patternBits
@@ -432,13 +434,20 @@ function jaroOneWord(
       common++
     }
 
+    // Both masks shift without the wrap the multiword kernel needs, which moves
+    // a word instead. This one serves a single word: `high` stops below
+    // `patternLength <= 32`, and `low` rises at most to `textLength - bound`,
+    // which for a `textLength` of at most 32 is 17. Neither reaches a multiple
+    // of 32, and reopening the mask at one would be wrong here rather than
+    // merely unnecessary — a window past the only word matches nothing, which
+    // is what shifting the bits out already says.
     if (i >= bound) {
       low++
-      firstMask = (low & 31) === 0 ? -1 : firstMask << 1
+      firstMask <<= 1
     }
     if (high + 1 < patternLength) {
       high++
-      lastMask = (high & 31) === 0 ? 1 : (lastMask << 1) | 1
+      lastMask = (lastMask << 1) | 1
     }
   }
 

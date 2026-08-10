@@ -107,7 +107,7 @@
     "dev": "tsdown --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "coverage": "vitest run --coverage --coverage.reporter=text --coverage.reporter=lcov --testTimeout=30000",
+    "coverage": "vitest run --coverage --coverage.reporter=text --coverage.reporter=lcov --coverage.thresholds.100 --testTimeout=30000",
     "bench": "vitest bench --run",
     "bench:quick": "node bench/run.mjs",
     "bench:compare": "node bench/compare.mjs",

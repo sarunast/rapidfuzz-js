@@ -31,7 +31,6 @@ import {
 import type { Editops, Opcodes } from './editops.js'
 import {
   lcsSeqEditops,
-  lcsSeqLength,
   lcsSeqLengthPrepared,
   lcsSeqLengthPreparedBounded,
   lcsSeqLengthRange,
@@ -48,9 +47,15 @@ function distance_(
   s2: ArrayLike<unknown>,
   scoreCutoff = UNBOUNDED_MISSES,
 ): number {
-  const lcs = Number.isFinite(scoreCutoff)
-    ? lcsSeqLengthRange(s1, 0, s1.length, s2, 0, s2.length, Math.floor(scoreCutoff))
-    : lcsSeqLength(s1, s2)
+  const lcs = lcsSeqLengthRange(
+    s1,
+    0,
+    s1.length,
+    s2,
+    0,
+    s2.length,
+    Math.floor(scoreCutoff),
+  )
   return s1.length + s2.length - 2 * lcs
 }
 
@@ -59,9 +64,7 @@ function preparedDistanceWorthwhile(
   choiceLength: number,
   scoreCutoff: number,
 ): boolean {
-  const required = Number.isFinite(scoreCutoff)
-    ? Math.max(0, Math.ceil((queryLength + choiceLength - scoreCutoff) / 2))
-    : 0
+  const required = Math.max(0, Math.ceil((queryLength + choiceLength - scoreCutoff) / 2))
   const words = (queryLength + 31) >>> 5
   const fullBand = queryLength + choiceLength - 2 * required + 1
   const activeWords = Math.min(words, Math.floor(fullBand / 32) + 2)
@@ -74,9 +77,10 @@ function distanceFromPrepared(
   choice: ArrayLike<unknown>,
   scoreCutoff: number,
 ): number {
-  const required = Number.isFinite(scoreCutoff)
-    ? Math.max(0, Math.ceil((query.length + choice.length - scoreCutoff) / 2))
-    : 0
+  const required = Math.max(
+    0,
+    Math.ceil((query.length + choice.length - scoreCutoff) / 2),
+  )
   const lcs =
     required > 0
       ? lcsSeqLengthPreparedBounded(pattern, choice, 0, choice.length, required)

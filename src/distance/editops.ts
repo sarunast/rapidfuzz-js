@@ -257,8 +257,6 @@ function listToOpcodes(
   const head = blocks[0]
   const tail = blocks[blocks.length - 1]
 
-  if (head === undefined || tail === undefined) return blocks
-
   if (head.srcStart !== 0 || head.destStart !== 0) {
     throw new Error('List of edit operations does not start at position 0')
   }

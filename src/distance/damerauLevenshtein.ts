@@ -38,8 +38,24 @@ let bmpLastRow: Int32Array | null = null
 let bmpLastStamp: Int32Array | null = null
 let bmpGeneration = 0
 
-/** Drop the retained DP rows. Benchmark-only — see `resetSharedScratch`. */
-export function resetDamerauScratch(): void {
+/** The stamped last-occurrence rows, allocated on first use. */
+function bmpLastRows(): Int32Array {
+  return (bmpLastRow ??= new Int32Array(0x10000))
+}
+
+/** The stamp half of the table above. */
+function bmpLastStamps(): Int32Array {
+  return (bmpLastStamp ??= new Int32Array(0x10000))
+}
+
+/**
+ * Drop the retained DP rows. Benchmark-only — see `resetSharedScratch`.
+ *
+ * `startGeneration` is the exception: the counter is otherwise only reachable
+ * one comparison at a time, and the wrap at {@link BMP_GENERATION_LIMIT} is two
+ * billion of them away.
+ */
+export function resetDamerauScratch(startGeneration = 0): void {
   rowA = null
   rowB = null
   transposeRow = null
@@ -48,7 +64,7 @@ export function resetDamerauScratch(): void {
   shortTransposeRow = null
   bmpLastRow = null
   bmpLastStamp = null
-  bmpGeneration = 0
+  bmpGeneration = startGeneration
 }
 
 function grown(buffer: Int32Array | null, needed: number): Int32Array {
@@ -77,10 +93,21 @@ function isBmpCode(value: unknown): value is number {
   )
 }
 
+/**
+ * How far the generation counter runs before the stamps are cleared and it
+ * starts again.
+ *
+ * A stamp is an `Int32Array` cell, so the counter cannot exceed what one holds.
+ * Reaching the ceiling takes two billion comparisons in a single process, which
+ * no test is going to sit through — {@link resetDamerauScratch} takes a starting
+ * generation so that the wrap can be driven directly instead.
+ */
+const BMP_GENERATION_LIMIT = 0x7fff_ffff
+
 function nextBmpGeneration(): number {
   bmpGeneration++
-  if (bmpGeneration >= 0x7fff_ffff) {
-    if (bmpLastStamp !== null) bmpLastStamp.fill(0)
+  if (bmpGeneration >= BMP_GENERATION_LIMIT) {
+    bmpLastStamps().fill(0)
     bmpGeneration = 1
   }
   return bmpGeneration
@@ -153,10 +180,8 @@ function distance_(
   // whichever representation it arrived in. Deciding once per sequence would
   // send the ASCII majority of a converted astral string through the map
   // because one emoji shares the array with it.
-  if (bmpLastRow === null) bmpLastRow = new Int32Array(0x10000)
-  if (bmpLastStamp === null) bmpLastStamp = new Int32Array(0x10000)
-  const stampedRow = bmpLastRow
-  const stamps = bmpLastStamp
+  const stampedRow = bmpLastRows()
+  const stamps = bmpLastStamps()
   const directGeneration = nextBmpGeneration()
   // Built only if a wider code point, an object or some other arbitrary value
   // actually turns up, so the common cases never allocate one.

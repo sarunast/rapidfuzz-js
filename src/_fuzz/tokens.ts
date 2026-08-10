@@ -88,7 +88,6 @@ function isSpaceCodePoint(cp: number): boolean {
  * All of Python's whitespace is inside the BMP, so `charCodeAt` is enough.
  */
 function isSpaceElement(x: unknown): boolean {
-  if (typeof x === 'number') return isSpaceCodePoint(x)
   if (typeof x !== 'string' || x.length === 0) return false
 
   for (let i = 0; i < x.length; i++) {
@@ -168,9 +167,9 @@ export function joinTokens(tokens: readonly unknown[][]): unknown[] {
     for (let i = 0; i < token.length; i++) out[n++] = token[i]
   }
 
-  // An empty token would leave its separator unwritten. `splitSequence` never
-  // produces one, but the array must not be left with a hole if it ever does.
-  if (n !== out.length) out.length = n
+  // No trim afterwards: `splitSequence` opens a token by pushing an element
+  // into it, so no token is empty, so every separator this sized room for is
+  // written and `n` lands exactly on `out.length`.
   return out
 }
 
@@ -235,9 +234,8 @@ function identityOrdinal(x: object): number {
   return ordinal
 }
 
-function identityOrder(x: unknown, y: unknown): number {
-  if (!isObjectLike(x) || !isObjectLike(y)) return 0
-
+/** Order two objects or functions that nothing else separates. */
+function identityOrder(x: object, y: object): number {
   return identityOrdinal(x) - identityOrdinal(y)
 }
 
@@ -265,7 +263,13 @@ function symbolIdentityOrder(x: symbol, y: symbol): number {
 
 /** Total order over two elements, matching Python's ordering where it has one. */
 function compareElements(x: unknown, y: unknown): number {
-  if (x === y) return 0
+  // Narrow the rank-7 case while its runtime proof is still visible to
+  // TypeScript. Objects and functions sort after every primitive.
+  if (isObjectLike(x)) {
+    if (isObjectLike(y)) return identityOrder(x, y)
+    return typeOrder(x) - typeOrder(y)
+  }
+  if (isObjectLike(y)) return typeOrder(x) - typeOrder(y)
 
   const byType = typeOrder(x) - typeOrder(y)
   if (byType !== 0) return byType
@@ -275,8 +279,9 @@ function compareElements(x: unknown, y: unknown): number {
     // a `NaN` it reads as "equal". Giving it a place of its own past every
     // real number keeps the comparison total.
     if (Number.isNaN(x)) return Number.isNaN(y) ? 0 : 1
-    if (Number.isNaN(y)) return -1
-    return x < y ? -1 : 1
+    // `compareTokens` answers a pair of real numbers itself, so `y` is the
+    // `NaN` here and sorts after every real number.
+    return -1
   }
   if (typeof x === 'bigint' && typeof y === 'bigint') return x < y ? -1 : 1
   // `<` on strings orders by UTF-16 code unit, where Python orders by code
@@ -287,7 +292,6 @@ function compareElements(x: unknown, y: unknown): number {
   // raising `ValueError: chr() arg not in range(0x110000)`. All that is required
   // of the order is that it be total and stable, which `<` is.
   if (typeof x === 'string' && typeof y === 'string') return x < y ? -1 : 1
-  if (typeof x === 'boolean' && typeof y === 'boolean') return x ? 1 : -1
   if (typeof x === 'symbol' && typeof y === 'symbol') {
     const dx = String(x)
     const dy = String(y)
@@ -297,9 +301,9 @@ function compareElements(x: unknown, y: unknown): number {
     return symbolIdentityOrder(x, y)
   }
 
-  // `null` and `undefined` are singletons, so `x === y` has already settled
-  // them; what is left is two objects or two functions.
-  return identityOrder(x, y)
+  // What remains is two booleans. Equal `null` or `undefined` would also reach
+  // this line, but the caller filters equal elements before calling us.
+  return x ? 1 : -1
 }
 
 /** Elementwise comparison, matching Python's tuple and string ordering. */
