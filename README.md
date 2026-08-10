@@ -4,7 +4,7 @@ Fast fuzzy string matching for JavaScript and TypeScript, based on
 [RapidFuzz](https://github.com/rapidfuzz/RapidFuzz).
 
 - Compatible with RapidFuzz's scoring algorithms
-- Works in Node.js 20+, browsers, and edge runtimes
+- Works in Node.js 22+, browsers, and edge runtimes
 - Ships ESM and CommonJS builds with TypeScript declarations
 - Has no runtime dependencies
 - Supports tree-shaking

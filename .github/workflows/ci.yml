@@ -36,22 +36,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
 
-  # package.json declares engines.node >=20, so prove the floor still runs the
-  # library. Tests only: the build toolchain's own Node requirement is not the
-  # published package's, and conflating the two would force engines up to 22
-  # for a reason no consumer ever encounters. Node 24 is covered by `check`.
-  #
-  # Node 20 reached end of life on 2026-04-30 and is kept only because
-  # engines.node still admits it. Raising that floor is a breaking change for
-  # consumers, so it is a deliberate decision rather than a CI cleanup — drop
-  # this entry and the engines range in the same commit whenever it is made.
+  # package.json declares engines.node >=22, so prove the floor still runs the
+  # library. Tests only, because the build toolchain's Node requirement is not
+  # the published package's: tsdown loads its config through native TypeScript
+  # stripping and so needs 22+, which says nothing about what a consumer needs.
   test:
     name: test (node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 22, 26]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
