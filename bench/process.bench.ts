@@ -295,17 +295,32 @@ describe('prepared LCS bands', () => {
       scoreCutoff: 0.85,
     })
   })
-  // Why the gate still refuses the held pattern at these widths, now that the
-  // band it was standing in for exists. A candidate sharing 480 of its 512
-  // elements leaves the trimming kernel 32 to score, where a held pattern reads
-  // all 512 however narrow the band. Dropping either clause of
-  // `preparedLengthWorthwhile` was measured here at 3.2x slower — against 1.6x
-  // to 7.7x faster on the affix-free lists above, which is the whole difficulty:
-  // a tight cutoff produces a narrow band and a large affix alike, and lengths
-  // cannot tell the two apart. Any future relaxation has to beat this case.
+  // What the gate costs when it keeps the held pattern away. A candidate
+  // sharing 480 of its 512 elements leaves the trimming kernel 32 to score,
+  // where a held pattern reads all 512 however narrow the band. Dropping either
+  // clause of `preparedLengthWorthwhile` was measured here at 3.2x slower —
+  // against 1.6x to 7.7x faster on the affix-free lists above, which is the
+  // whole difficulty: a tight cutoff produces a narrow band and a large affix
+  // alike, and lengths cannot tell the two apart.
+  //
+  // `sharesAffix` is what now tells them apart, by looking at the elements
+  // instead of the lengths, and this case is the price of asking: about 5%,
+  // spent scanning a probe and then handing the pair to the trimming kernel
+  // anyway. That is what the 1.35x to 7.0x above is bought with, and it is the
+  // number a further relaxation has to improve on — 3.2x is history now, not
+  // the bar.
   measure('40 x 512 chars, 480 shared, cutoff 0.9', () => {
     scoreMatrix([affixQuery], affixChoices, {
       scorer: lcsSeqNormalizedSimilarity,
+      scoreCutoff: 0.9,
+    })
+  })
+  // The same shape through Indel, whose gate `sharesAffix` also relaxes. Its
+  // kernels are the LCS ones, but it reaches them through its own dispatch, so
+  // the case above does not stand for it.
+  measure('40 x 512 chars, 480 shared, Indel, cutoff 0.9', () => {
+    scoreMatrix([affixQuery], affixChoices, {
+      scorer: indelNormalizedSimilarity,
       scoreCutoff: 0.9,
     })
   })

@@ -22,6 +22,7 @@ import {
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
+  sharesAffix,
   type PrepareScorer,
   type PreparedScore,
   withPreparedFlags,
@@ -205,7 +206,7 @@ function prepareIndel(kind: PreparedIndelKind): PrepareScorer {
     if (a === null) throw new TypeError('expected a sequence')
     let pattern: import('./_bitVector/index.js').PatternMask | null = null
     const preparedDistance = (b: ArrayLike<unknown>, cutoff: number): number => {
-      if (!preparedDistanceWorthwhile(a.length, b.length, cutoff)) {
+      if (!preparedDistanceWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
         // The unprepared kernel trims a common affix, which compares the two
         // sequences elementwise, so they have to agree on how a character is
         // spelled. The held pattern below reads either representation.

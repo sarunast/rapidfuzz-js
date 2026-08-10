@@ -554,6 +554,84 @@ export function alignRepresentation(
   return typeof s === 'string' && typeof other !== 'string' ? convSequence(s) : s
 }
 
+/**
+ * Ceiling on the probe below, whatever an eighth of the inputs comes to.
+ *
+ * The pair the probe is most expensive for is the one it sends to the trimming
+ * kernel: an affix of 480 in 512 leaves that kernel 32 elements to score, so an
+ * unbounded eighth would spend more choosing than scoring. Thirty-two costs
+ * half of what an eighth of that pair would and reaches the same verdict, and
+ * it is still wider than the nineteen-element prefixes a near-copy list throws
+ * up at every width the suite measures — which is the confusion that matters,
+ * since calling those an affix would give back the whole win.
+ *
+ * Past this width the probe over-reports: an affix of exactly this many in a
+ * pair thousands long is called worth trimming when it removes almost nothing.
+ * That is the safe direction — over-reporting keeps the behaviour the length
+ * gate had on its own — and it is what bounds the cost.
+ *
+ * Halving it again to 16 was measured and is worse: it starts calling the
+ * near-copy prefixes an affix, which took the wins on those from 0.56x and
+ * 0.74x back to 0.65x and 0.84x, to save 2% on the affix-heavy shape.
+ */
+const AFFIX_PROBE_LIMIT = 32
+
+/**
+ * Whether the pair shares an affix long enough to be worth trimming.
+ *
+ * This is the content half of the dispatch each metric's length gate
+ * makes on lengths alone. The unprepared kernel's advantage over the held
+ * pattern is entirely that it removes a common prefix and suffix first, and a
+ * tight cutoff produces a narrow band and a large affix alike, so lengths
+ * cannot tell an affix-free pair from an affix-heavy one — which is why
+ * relaxing that gate on lengths measured 1.6x to 7.7x faster on one population
+ * and 3.2x slower on the other.
+ *
+ * Deliberately a lower bound rather than the affix itself: it answers "is there
+ * at least an eighth", not "how much", because measuring the affix itself would
+ * cost the whole scan the answer is meant to avoid.
+ *
+ * It does not make the affix-heavy case free, and is not meant to: scanning the
+ * probe and then handing the pair to a kernel with 32 elements left to score
+ * measures about 4% slower than not asking. What it buys for that 4% is 1.35x
+ * to 7.0x on the pairs the length gate was refusing, where the previous attempt
+ * — relaxing on lengths alone — cost 3.2x on this same shape.
+ *
+ * An eighth rather than a constant because what matters is the affix relative
+ * to the work it removes — nineteen shared elements out of 1024 is noise, and
+ * the near-copy corpus is full of exactly that. It also makes the probe pay for
+ * itself: it runs to completion only when the affix really is an eighth or
+ * more, and trimming then removes at least an eighth of the kernel's work,
+ * while an affix-free pair leaves at the first mismatch.
+ *
+ * Representation is a property of the pair, not of either side — a BMP string
+ * held as a string and a sequence converted to code points compare `'a'`
+ * against `97` and agree nowhere. A mixed pair therefore reports `true`, which
+ * is the conservative answer: it leaves the length gate deciding alone, exactly
+ * as it did before this probe existed.
+ */
+export function sharesAffix(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
+  const probe = Math.min(Math.min(a.length, b.length) >>> 3, AFFIX_PROBE_LIMIT)
+  const lastA = a.length - 1
+  const lastB = b.length - 1
+  if (typeof a === 'string') {
+    if (typeof b !== 'string') return true
+    let i = 0
+    while (i < probe && a.charCodeAt(i) === b.charCodeAt(i)) i++
+    if (i === probe) return true
+    let j = 0
+    while (j < probe && a.charCodeAt(lastA - j) === b.charCodeAt(lastB - j)) j++
+    return j === probe
+  }
+  if (typeof b === 'string') return true
+  let i = 0
+  while (i < probe && a[i] === b[i]) i++
+  if (i === probe) return true
+  let j = 0
+  while (j < probe && a[lastA - j] === b[lastB - j]) j++
+  return j === probe
+}
+
 /** Read a process-prepared sequence after validating its opaque record. */
 export function preparedScorerSequence(value: unknown): ArrayLike<unknown> | null {
   return isPreparedSequence(value) ? value.value : null

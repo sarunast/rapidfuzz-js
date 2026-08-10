@@ -402,6 +402,33 @@ describe('every mask region, under a cutoff', () => {
       }
     }
   })
+
+  // Indel and LCS have a banded kernel of their own, with its own copy of the
+  // classification, and this reaches it through the direct entry points rather
+  // than a held pattern. Deliberately not through the prepared path: which of
+  // the two kernels that picks is a dispatch decision — `sharesAffix` moved
+  // these very pairs onto the held pattern and took this copy's coverage with
+  // them — and a classification every kernel carries separately has to be
+  // covered whichever way the dispatch happens to go.
+  it('scores Indel and LCS exactly inside the bound', () => {
+    for (const { what, s1, s2 } of PAIRS) {
+      const lcs = lcsReference(s1, s2)
+      const indel = s1.length + s2.length - 2 * lcs
+      for (const cutoff of [0, 1, 3, 8, 32, indel - 1, indel, indel + 1]) {
+        if (cutoff < 0) continue
+        expect(
+          indelDistance(s1, s2, { scoreCutoff: cutoff }),
+          `${what} at ${cutoff}`,
+        ).toBe(indel <= cutoff ? indel : cutoff + 1)
+      }
+      for (const cutoff of [0, 1, 8, lcs, lcs + 1]) {
+        expect(
+          lcsSeqSimilarity(s1, s2, { scoreCutoff: cutoff }),
+          `${what} at ${cutoff}`,
+        ).toBe(lcs >= cutoff ? lcs : 0)
+      }
+    }
+  })
 })
 
 // A held pattern under a cutoff is a third set again: the bounded and banded

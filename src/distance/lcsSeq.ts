@@ -22,6 +22,7 @@ import {
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
+  sharesAffix,
   type PrepareScorer,
   type PreparedScore,
   withPreparedFlags,
@@ -251,7 +252,7 @@ function prepareLcs(kind: PreparedLcsKind): PrepareScorer {
     if (a === null) throw new TypeError('expected a sequence')
     let pattern: import('./_bitVector/index.js').PatternMask | null = null
     const length = (b: ArrayLike<unknown>, cutoff: number): number => {
-      if (!preparedLengthWorthwhile(a.length, b.length, cutoff)) {
+      if (!preparedLengthWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
         // The unprepared kernel trims a common affix, which compares the two
         // sequences elementwise, so they have to agree on how a character is
         // spelled. The held pattern below reads either representation.
