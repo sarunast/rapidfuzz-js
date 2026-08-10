@@ -1,6 +1,9 @@
 # rapidfuzz-js
 
 [![CI](https://github.com/sarunast/rapidfuzz-js/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sarunast/rapidfuzz-js/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/rapidfuzz-js)](https://www.npmjs.com/package/rapidfuzz-js)
+[![bundle size](https://img.shields.io/bundlejs/size/rapidfuzz-js@latest)](https://bundlejs.com/?q=rapidfuzz-js)
+[![license](https://img.shields.io/npm/l/rapidfuzz-js)](./LICENSE)
 
 Fast fuzzy string matching for JavaScript and TypeScript, based on
 [RapidFuzz](https://github.com/rapidfuzz/RapidFuzz).
