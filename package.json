@@ -220,7 +220,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
-    "@types/node": "26.1.2",
+    "@types/node": "26.2.0",
     "fast-check": "4.9.0",
     "oxfmt": "0.62.0",
     "oxlint": "1.77.0",
