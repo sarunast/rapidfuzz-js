@@ -1,0 +1,15 @@
+# pnpm 11 reads its settings from here. Only auth and registry settings are
+# still read from .npmrc, so the save-exact=true that pins every devDependency
+# to an exact version has to be restated as saveExact below — left in .npmrc
+# alone it would be silently ignored, and the next `pnpm add` would quietly
+# write a caret range.
+saveExact: true
+
+# Replaces onlyBuiltDependencies and ignoredBuiltDependencies, both removed in
+# v11. esbuild arrives as a transitive dependency of vite, vitest and tsdown,
+# and ships its platform binary as an optional dependency rather than fetching
+# it from a build script — so that script has never run here, and the whole
+# suite passes without it. `false` records the decision pnpm 10 was making
+# silently; v11 refuses to install until it is written down.
+allowBuilds:
+  esbuild: false
