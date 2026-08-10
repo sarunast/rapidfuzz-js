@@ -26,6 +26,7 @@ import { asSequence, isNone } from '../_common.js'
 import type { PatternMask } from '../distance/_bitVector/index.js'
 import { lcsSeqLengthRange } from '../distance/lcsSeq.js'
 import {
+  type CharSet,
   convertProcessedPair,
   indelNormSimHeld,
   partialAlignmentConverted,
@@ -386,7 +387,7 @@ export function partialTokenRatioConverted(
   // can never be prepared. Thunks rather than values because the shared-word
   // shortcut above returns before either is wanted.
   preparedSortedPatternA?: () => PatternMask,
-  preparedSortedCharSetA?: () => ReadonlySet<unknown>,
+  preparedSortedCharSetA?: () => CharSet,
 ): number {
   // The most expensive of these guards to have had behind its defaults: a split,
   // a dedupe, an outer-array copy, a sort and a join on the `a` side alone, all

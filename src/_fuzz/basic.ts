@@ -181,25 +181,94 @@ export function ratio_impl(
 }
 
 /**
- * The distinct elements of `s1`, which the window scan uses to reject a window
- * whose last element the needle does not hold at all.
+ * The distinct elements of a needle, in the form the window scan probes them.
+ *
+ * Port of upstream's `detail::CharSet`, which is a direct-indexed table for
+ * narrow characters and a hash set for the rest. The table is the point: a
+ * plain `Set` has to be probed with `s2[i]`, and indexing a string allocates a
+ * one-character string per probe — the whole cost for Latin-1 text, and an
+ * uncached allocation above it. `charCodeAt` into a `Uint8Array` allocates
+ * nothing, which measured 0.54x of the `Set` scan on ASCII and 0.09x on
+ * Cyrillic.
+ *
+ * Unlike a {@link PatternMask} this cannot be shared across representations:
+ * the scan compares with `===`, and `'a' !== 97`. What *is* shared is the
+ * numbering — {@link wide} holds code units for a string needle and element
+ * values otherwise, and those two agree throughout the BMP, which is as far as
+ * a string-backed needle reaches.
+ */
+export interface CharSet {
+  /** Elements below 256, by code unit for a string needle or by value for a number. */
+  readonly direct: Uint8Array
+  /**
+   * Everything {@link direct} cannot address: code units at or above 256 for a
+   * string needle, element values otherwise. Null when the needle has none,
+   * which is every pure Latin-1 input.
+   */
+  readonly wide: ReadonlySet<unknown> | null
+}
+
+/**
+ * Build the pruning set for `s`.
  *
  * Split out so a caller scoring one query against many candidates can build it
- * once. Unlike a {@link PatternMask}, this cannot be shared across
- * representations: the scan compares with `===`, and `'a' !== 97`.
+ * once.
  *
- * `NaN` is kept, deliberately. A `Set` matches it against itself where the
- * kernels refuse to, so a window anchored on one is scanned and scores nothing —
- * dropping it here would prune that window instead. That is a *stronger* filter
- * than the one this is documented to be, and it decides which of two equal
+ * `NaN` is kept, deliberately. It fails the numeric test below and lands in
+ * {@link CharSet.wide}, where `Set` matches it against itself although the
+ * kernels refuse to — so a window anchored on one is scanned and scores
+ * nothing. Dropping it would prune that window instead: a *stronger* filter
+ * than this is documented to be, and one that decides which of two equal
  * windows gets reported, so it could move an alignment. Upstream has no `NaN`
- * element to check the answer against, and the input it would speed up is one no
- * caller has: the trade is a real tie-breaking risk for an unreachable win.
+ * element to check the answer against, and the input it would speed up is one
+ * no caller has.
  */
-export function charSetOf(s: ArrayLike<unknown>): ReadonlySet<unknown> {
-  const set = new Set<unknown>()
-  for (let i = 0; i < s.length; i++) set.add(s[i])
-  return set
+export function charSetOf(s: ArrayLike<unknown>): CharSet {
+  let wide: Set<unknown> | null = null
+
+  // Hoisted, because a needle is one representation throughout and the test is
+  // otherwise paid per element. A string yields one-character strings, which
+  // `charCodeAt` reads without allocating either — and it is the one form whose
+  // table is worth allocating up front, since text without a single character
+  // below U+0100 is rarer than the null test to defer it would cost.
+  if (typeof s === 'string') {
+    const direct = new Uint8Array(256)
+    for (let i = 0; i < s.length; i++) {
+      const code = s.charCodeAt(i)
+      if (code < 256) direct[code] = 1
+      else (wide ??= new Set<unknown>()).add(code)
+    }
+    return { direct, wide }
+  }
+
+  // A sequence of objects fills no table at all, and allocating one anyway was
+  // the whole of that input's cost: 337ns against a 1246ns build, which showed
+  // up as 1.11x on `partialRatio` over object elements. The probe needs a table
+  // either way, so an empty one stands in rather than a null to test for.
+  let direct: Uint8Array | null = null
+  for (let i = 0; i < s.length; i++) {
+    const value = s[i]
+    if (typeof value === 'number' && value >= 0 && value < 256 && (value | 0) === value) {
+      ;(direct ??= new Uint8Array(256))[value] = 1
+    } else {
+      ;(wide ??= new Set<unknown>()).add(value)
+    }
+  }
+
+  return { direct: direct ?? emptyTable(), wide }
+}
+
+/**
+ * The all-zero table a needle with nothing to put in one shares.
+ *
+ * Retained rather than allocated per call, and built on demand rather than at
+ * module scope: `sideEffects: false` promises that importing this module does
+ * no work. Never written — {@link charSetOf} allocates its own the moment it
+ * has a narrow element to record.
+ */
+let shared: Uint8Array | null = null
+function emptyTable(): Uint8Array {
+  return (shared ??= new Uint8Array(256))
 }
 
 /** Port of `_partial_ratio_impl`. Assumes `s1.length <= s2.length`. */
@@ -209,7 +278,7 @@ export function partialRatioImpl(
   scoreCutoff: number,
   prepared: PatternMask = prepareLcsPattern(s1, 0, s1.length),
   scoreOnly = false,
-  preparedCharSet?: ReadonlySet<unknown>,
+  preparedCharSet?: CharSet,
 ): ScoreAlignment {
   // `s1` is the pattern for every alignment below, so its match masks are built
   // once here instead of once per window. Nothing between the hold and the
@@ -232,7 +301,7 @@ function partialRatioScan(
   scoreCutoff: number,
   pattern: PatternMask,
   scoreOnly: boolean,
-  preparedCharSet?: ReadonlySet<unknown>,
+  preparedCharSet?: CharSet,
 ): ScoreAlignment {
   const len1 = s1.length
   const len2 = s2.length
@@ -261,6 +330,40 @@ function partialRatioScan(
   }
 
   const charSet = preparedCharSet ?? charSetOf(s1)
+  const direct = charSet.direct
+  const wide = charSet.wide
+
+  // The needle and the text always share a representation — `conv` returns a
+  // pair, and `alignRepresentation` is applied to both sides — so this settles
+  // which store `charSetOf` filled, once per comparison rather than per window.
+  const text = typeof s2 === 'string' ? s2 : null
+
+  /**
+   * Whether the needle holds the element of `s2` at `index`.
+   *
+   * One closure rather than one per representation, although the test above is
+   * then repeated per probe. Splitting it gives the three scans below two
+   * function identities to call, which costs them their inline caches: measured
+   * 1.17x against this on a sequence of objects, where the split was supposed to
+   * help most. The branch itself is loop-invariant and predicted.
+   */
+  const holds = (index: number): boolean => {
+    if (text === null) {
+      const value = s2[index]
+      if (
+        typeof value === 'number' &&
+        value >= 0 &&
+        value < 256 &&
+        (value | 0) === value
+      ) {
+        return direct[value] !== 0
+      }
+      return wide !== null && wide.has(value)
+    }
+
+    const code = text.charCodeAt(index)
+    return code < 256 ? direct[code] !== 0 : wide !== null && wide.has(code)
+  }
 
   const res = {
     score: 0,
@@ -308,7 +411,7 @@ function partialRatioScan(
    */
   const scanPrefix = (): void => {
     for (let i = 1; i < len1; i++) {
-      if (!charSet.has(s2[i - 1])) continue
+      if (!holds(i - 1)) continue
       consider(0, i)
     }
   }
@@ -316,7 +419,7 @@ function partialRatioScan(
   /** Windows running off the end of `s2`, likewise shorter. */
   const scanSuffix = (): boolean => {
     for (let i = len2 - len1; i < len2; i++) {
-      if (!charSet.has(s2[i])) continue
+      if (!holds(i)) continue
       if (consider(i, len2)) return true
     }
     return false
@@ -389,7 +492,7 @@ function partialRatioScan(
       }
     } else {
       for (let i = 0; i < len2 - len1; i++) {
-        if (!charSet.has(s2[i + len1 - 1])) continue
+        if (!holds(i + len1 - 1)) continue
         if (consider(i, i + len1)) return true
       }
     }
@@ -455,7 +558,7 @@ export function partialAlignmentConverted(
   cutoff: number,
   scoreOnly = false,
   preparedA?: PatternMask,
-  preparedCharSetA?: ReadonlySet<unknown>,
+  preparedCharSetA?: CharSet,
 ): ScoreAlignment | null {
   // No alignment can score above 100, so a cutoff past it rejects every pair —
   // including two empty inputs, whose perfect score is awarded below without

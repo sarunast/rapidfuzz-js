@@ -42,6 +42,7 @@ import {
   prepareLcsPattern,
 } from '../distance/lcsSeq.js'
 import {
+  type CharSet,
   charSetOf,
   partialAlignmentConverted,
   partialRatioConverted,
@@ -190,8 +191,8 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
     // where `partialRatio` needs two: a sorted form is always the array
     // `joinTokens` built, never a string, so `alignRepresentation` has nothing
     // to expand and both sides already agree.
-    let sortedCharSet: ReadonlySet<unknown> | null = null
-    const sortedCharSetOf = (): ReadonlySet<unknown> =>
+    let sortedCharSet: CharSet | null = null
+    const sortedCharSetOf = (): CharSet =>
       (sortedCharSet ??= charSetOf(sortedOf(queryTokens)))
     // The window scan's pruning set, which upstream's `CachedPartialRatio` also
     // holds beside its cached ratio. Rebuilt per candidate before this, which on
@@ -202,10 +203,10 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
     // the scan either `a` itself or its code points depending on what the
     // *candidate* turned out to be, so both spellings can be asked for across one
     // query's candidates, and each is built at most once.
-    let nativeCharSet: ReadonlySet<unknown> | null = null
-    const nativeCharSetOf = (): ReadonlySet<unknown> => (nativeCharSet ??= charSetOf(a))
-    let convertedCharSet: ReadonlySet<unknown> | null = null
-    const convertedCharSetOf = (): ReadonlySet<unknown> =>
+    let nativeCharSet: CharSet | null = null
+    const nativeCharSetOf = (): CharSet => (nativeCharSet ??= charSetOf(a))
+    let convertedCharSet: CharSet | null = null
+    const convertedCharSetOf = (): CharSet =>
       (convertedCharSet ??= charSetOf(convSequence(a)))
 
     const score: PreparedScore = (rawChoice, rawCutoff) => {
