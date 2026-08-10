@@ -95,11 +95,17 @@ jobs:
             npm publish --access public --ignore-scripts
           fi
 
-      # Prefer the CHANGELOG section changesets wrote for this version — it was
-      # composed when the change was made, by whoever made it. --generate-notes
-      # is the fallback, and a poor one here: it builds from merged pull
-      # requests, and this repository commits straight to main, so both times it
-      # has run it produced nothing but a compare link.
+      # Notes are the commits since the previous tag. --generate-notes would be
+      # the obvious choice, but it builds from merged pull requests and this
+      # repository commits straight to main, so both times it ran it produced
+      # nothing but a compare link.
+      #
+      # Anything written in the tag's own message leads the notes, so
+      #
+      #   git tag -a v0.3.0 -m "Speeds up token scorers on long inputs."
+      #
+      # puts that sentence above the list. Editing the release afterwards works
+      # too — this only writes the body once, when the release is created.
       - name: Create the GitHub release
         run: |
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
@@ -107,24 +113,28 @@ jobs:
             exit 0
           fi
 
-          version="${GITHUB_REF_NAME#v}"
-          notes=''
-          if [ -f CHANGELOG.md ]; then
-            notes="$(awk -v heading="## $version" '
-              $0 == heading { found = 1; next }
-              found && /^## / { exit }
-              found { print }
-            ' CHANGELOG.md)"
+          notes="$RUNNER_TEMP/notes.md"
+          : > "$notes"
+
+          # A tag made with `-m v0.3.0` carries nothing but its own name; only a
+          # real message is worth putting in the body.
+          message="$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")"
+          if [ -n "$message" ] && [ "$message" != "$GITHUB_REF_NAME" ]; then
+            printf '%s\n\n' "$message" >> "$notes"
           fi
 
-          if [ -n "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
-            printf '%s\n' "$notes" > "$RUNNER_TEMP/notes.md"
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
-              --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+          previous="$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)"
+          if [ -n "$previous" ]; then
+            printf '## Changes since %s\n\n' "$previous" >> "$notes"
+            git log --no-merges --pretty='- %s (%h)' "$previous..$GITHUB_REF_NAME" >> "$notes"
+            printf '\n**Full changelog**: %s/compare/%s...%s\n' \
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$previous" "$GITHUB_REF_NAME" >> "$notes"
           else
-            echo "::notice::no CHANGELOG.md entry for $version — falling back to generated notes"
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
-              --generate-notes --verify-tag
+            printf '## Changes\n\n' >> "$notes"
+            git log --no-merges --pretty='- %s (%h)' "$GITHUB_REF_NAME" >> "$notes"
           fi
+
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
+            --notes-file "$notes" --verify-tag
         env:
           GH_TOKEN: ${{ github.token }}
