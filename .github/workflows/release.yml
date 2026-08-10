@@ -3,8 +3,14 @@ name: Release
 # Cutting a release is one command: push a tag whose name matches
 # package.json's version.
 #
-#   git tag -a v0.1.0 -m v0.1.0 && git push origin v0.1.0
+#   git tag -a v0.2.0 -m v0.2.0 && git push origin v0.2.0
 #
+# Authentication is npm trusted publishing (OIDC) — there is no NPM_TOKEN
+# secret to store or rotate. It does mean the package must already exist on
+# the registry with a trusted publisher configured for this repo and this
+# workflow file; npm cannot grant one to a name that has never been
+# published. Publish the very first version by hand, then set it up at
+# https://www.npmjs.com/package/rapidfuzz-js/access
 on:
   push:
     tags: ['v*']
@@ -16,13 +22,11 @@ concurrency:
 
 permissions:
   contents: write # create the GitHub release
-  id-token: write # sign the npm package with provenance
+  id-token: write # mint the OIDC token npm authenticates against
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -35,6 +39,14 @@ jobs:
           node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm >= 11.5.1. Whether the runner's bundled
+      # npm already clears that bar changes with the image, and the failure it
+      # produces is an opaque auth error rather than a version complaint.
+      - name: Ensure npm is new enough for OIDC
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       # A tag that disagrees with package.json publishes the wrong version
       # under the right name, which cannot be taken back. Check it first.
@@ -55,15 +67,9 @@ jobs:
       # --ignore-scripts rather than paying for the whole suite twice.
       - run: pnpm check
 
+      # No --provenance: publishing over OIDC attaches provenance on its own.
       - name: Publish to npm
-        if: env.NPM_TOKEN != ''
-        run: npm publish --provenance --access public --ignore-scripts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Note a skipped publish
-        if: env.NPM_TOKEN == ''
-        run: echo "::warning::NPM_TOKEN is not set — tagging the GitHub release only, nothing published to npm"
+        run: npm publish --access public --ignore-scripts
 
       - name: Create the GitHub release
         run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
