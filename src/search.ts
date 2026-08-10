@@ -390,6 +390,13 @@ export function prepareChoices<T>(
   // shows end to end wherever a scorer is cheap enough for two loads to matter
   // and every choice is admitted — 1.04-1.05x on a drained `extractIter` over
   // `ratio`, and nothing at all on the default `wRatio` at any limit. Paid.
+  //
+  // That figure is also the ceiling for buying it back. Leaving both unfrozen
+  // and scoring off private copies re-measured at 1.05x on the same drained
+  // `extractIter`, 1.03x on `levenshtein` and `tokenSortRatio`, and 1.00x on
+  // every `extractOne` and every `extract(limit: 5)` — so a scheme that keeps
+  // the public arrays frozen and duplicates them for the loops would pay two
+  // arrays per index, permanently, for at most that.
   Object.freeze(values)
   Object.freeze(keys)
   Object.freeze(index)
@@ -537,7 +544,17 @@ function queryAsSequence(query: unknown): Sequence {
   throw new TypeError('expected a string or an array-like sequence')
 }
 
-/** Call the scorer the way upstream does: query, processed choice, cutoff. */
+/**
+ * Call the scorer the way upstream does: query, processed choice, cutoff.
+ *
+ * One function for both shapes, including an index — where `state.processor` is
+ * always `null`, so the first test is known false before the loop starts.
+ * Resolving both tests once per call instead, and running the indexed loops off
+ * a hoisted `preparedScore`, was measured over 2000 choices on `ratio`,
+ * `levenshteinDistance`, `tokenSortRatio` and `wRatio` across `extractOne`,
+ * `extract(limit: 5)` and a drained `extractIter`: 0.99-1.03x, no consistent
+ * sign, both orders. Four duplicated loops for nothing measurable.
+ */
 function score<T>(state: Prepared, choice: T, scoreCutoff: number | null): number {
   const processed =
     state.processor != null ? state.processor(queryAsSequence(choice)) : choice
@@ -1054,6 +1071,15 @@ export function scoreMatrix(
   const applyProcessor = (value: unknown): unknown =>
     processor != null && !isNone(value) ? processor(queryAsSequence(value)) : value
 
+  // Both passes run even with no processor, where `applyProcessor` is identity
+  // and the two arrays are copies. Skipping them then was measured over 200
+  // 4x6 matrices — the shape where per-call setup is a share of the work rather
+  // than a rounding error — at 1.03x on `hammingDistance`, 1.01x on `ratio` and
+  // `prefixSimilarity`, and 1.00x on a 50x200. Inside the noise floor even at
+  // the cheapest scorer there is, for a nested ternary on both bindings. So is
+  // the cell loop below: hoisting `i * cols` out of it, and splitting it in two
+  // so the invariant `integral` test does not run per cell, came to 0.99-1.02x
+  // over the same matrices with no consistent sign.
   const processedChoices = choices.map(applyProcessor)
   const sameInput = Object.is(queries, choices)
   const processedQueries = sameInput ? processedChoices : queries.map(applyProcessor)
