@@ -196,6 +196,31 @@ export function osaManyWords(
 /** OSA against immutable query masks for repeated process scoring. */
 let osaScratch = new Int32Array(0)
 
+/**
+ * The eight rolling vectors, as views onto {@link osaScratch}.
+ *
+ * Eight `subarray` calls is eight object allocations per scored pair, and a
+ * `process` row scores one pair per choice — so they are cached across calls.
+ *
+ * The cache key is `stride`, not whether the backing array had to grow. Those
+ * are different questions: the scratch is grown to a power of two and never
+ * shrinks, so a later query with a *shorter* pattern leaves it untouched while
+ * moving all eight boundaries. Keying on the allocation would hand that query
+ * the previous query's windows, which overlap each other and silently corrupt
+ * the recurrence. `osaViewStride` starts at a width no `stride` can take —
+ * `stride` is `words + 1`, and `words === 0` returns before this point — so the
+ * first call builds them.
+ */
+let osaViewStride = 0
+let osaViewVp = new Int32Array(0)
+let osaViewVn = new Int32Array(0)
+let osaViewD0 = new Int32Array(0)
+let osaViewPm = new Int32Array(0)
+let osaViewVp2 = new Int32Array(0)
+let osaViewVn2 = new Int32Array(0)
+let osaViewD02 = new Int32Array(0)
+let osaViewPm2 = new Int32Array(0)
+
 export function osaPrepared(
   prepared: PatternMask,
   text: ArrayLike<unknown>,
@@ -211,15 +236,28 @@ export function osaPrepared(
     let size = Math.max(64, osaScratch.length)
     while (size < needed) size *= 2
     osaScratch = new Int32Array(size)
+    // The views point into the array that was just replaced.
+    osaViewStride = 0
   }
-  const oldVp = osaScratch.subarray(0, stride)
-  const oldVn = osaScratch.subarray(stride, stride * 2)
-  const oldD0 = osaScratch.subarray(stride * 2, stride * 3)
-  const oldPm = osaScratch.subarray(stride * 3, stride * 4)
-  const newVp = osaScratch.subarray(stride * 4, stride * 5)
-  const newVn = osaScratch.subarray(stride * 5, stride * 6)
-  const newD0 = osaScratch.subarray(stride * 6, stride * 7)
-  const newPm = osaScratch.subarray(stride * 7, stride * 8)
+  if (osaViewStride !== stride) {
+    osaViewStride = stride
+    osaViewVp = osaScratch.subarray(0, stride)
+    osaViewVn = osaScratch.subarray(stride, stride * 2)
+    osaViewD0 = osaScratch.subarray(stride * 2, stride * 3)
+    osaViewPm = osaScratch.subarray(stride * 3, stride * 4)
+    osaViewVp2 = osaScratch.subarray(stride * 4, stride * 5)
+    osaViewVn2 = osaScratch.subarray(stride * 5, stride * 6)
+    osaViewD02 = osaScratch.subarray(stride * 6, stride * 7)
+    osaViewPm2 = osaScratch.subarray(stride * 7, stride * 8)
+  }
+  const oldVp = osaViewVp
+  const oldVn = osaViewVn
+  const oldD0 = osaViewD0
+  const oldPm = osaViewPm
+  const newVp = osaViewVp2
+  const newVn = osaViewVn2
+  const newD0 = osaViewD02
+  const newPm = osaViewPm2
   osaScratch.fill(0, 0, needed)
   oldVp.fill(-1)
   newVp.fill(-1)
