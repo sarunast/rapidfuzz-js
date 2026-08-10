@@ -14,7 +14,7 @@ import {
   isNone,
   asSequence,
   isSequence,
-  PREPARE_CHOICE,
+  withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
@@ -190,7 +190,7 @@ type PreparedJaroWinklerKind =
   | 'normalizedSimilarity'
 
 function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PrepareScorer {
-  return (query, kwargs) => {
+  const prepare: PrepareScorer = (query, kwargs) => {
     const rawPrefixWeight = Reflect.get(kwargs, 'prefixWeight')
     const prefixWeight = rawPrefixWeight == null ? 0.1 : rawPrefixWeight
     if (typeof prefixWeight !== 'number')
@@ -242,9 +242,9 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PrepareScorer {
           return normSimCutoff(similarity, rawCutoff)
       }
     }
-    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
+  return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
 // Scorer flags let `process` tell distances from similarities.

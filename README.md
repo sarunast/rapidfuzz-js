@@ -127,6 +127,53 @@ Available formats are `'f64'`, `'f32'`, `'i32'`, `'i16'`, `'i8'`, `'u32'`,
 
 All search functions are synchronous.
 
+### Prepare choices once for many queries
+
+`extract*` prepares the query and streams the choices, which is right for one
+call and wasteful for a run of them: the processor runs over every choice every
+time, and the token scorers split, deduplicate, sort and rejoin every choice
+every time. `prepareChoices` moves that to a single pass, and the resulting
+index is passed to `extract*` in place of the collection it was built from:
+
+```ts
+import { extractOne, prepareChoices, tokenSortRatio } from 'rapidfuzz-js'
+
+const index = prepareChoices(titles, {
+  scorer: tokenSortRatio,
+  processor: defaultProcess,
+})
+
+for (const query of queries) extractOne(query, index)
+```
+
+The scorer and the processor are baked in, because they decide what a prepared
+choice may hold; naming a different one on a later call is a `TypeError`.
+`scoreCutoff`, `scoreHint` and `limit` are unaffected and stay per-call, and the
+results — score, `choice` and `key` alike — are identical to those of the
+collection, given the two things an index has to assume:
+
+- **The choices do not change after it is built.** Not the collection, and not
+  the contents of a choice that is itself mutable — pushing to an array choice
+  or rewriting an element of one leaves the prepared state describing what that
+  choice used to be, while the result still hands you the array. Strings, being
+  immutable, cannot hit this.
+- **The processor is deterministic.** `extract` runs it once per choice per
+  query and an index runs it once per choice, so a processor that counts calls
+  or reads a clock sees a different sequence and is entitled to answer
+  differently.
+
+Worth it for a list queried more than once. On 2000 five-word choices with
+`defaultProcess`, the default `wRatio` runs at `0.48` of its unindexed time and
+`tokenSortRatio` at `0.17`; without a processor, `0.56` and `0.25`. Building the
+index costs well under one query at that size. A scorer with nothing per-choice
+to cache — `ratio` over plain strings and no processor — is unchanged rather
+than faster.
+
+The index holds its choices, so it keeps them alive, and it grows a little as
+queries ask for derived forms. Build one per list you query repeatedly, not one
+per call. It is frozen once built — `values` and `keys` are there to be read,
+and choices that change need a new index rather than an edited one.
+
 ### Configure a scorer
 
 Use `configure` when a search operation needs scorer-specific options:
@@ -222,6 +269,7 @@ prefix, such as `levenshteinDistance` and `jaroSimilarity`.
 - `extract`
 - `extractOne`
 - `extractIter`
+- `prepareChoices`
 - `scoreMatrix`
 - `scorePairs`
 
@@ -260,6 +308,9 @@ Other differences to keep in mind:
   pandas integration.
 - A raw `scoreCutoff` must be finite. Fractional distance cutoffs are truncated,
   matching RapidFuzz's C++ extension.
+- `prepareChoices` has no counterpart. RapidFuzz caches the query side of a
+  scorer and nothing else; this prepares the choice side, which is the half a
+  run of queries pays repeatedly.
 
 The implementation is tested against RapidFuzz 3.14.5. Where RapidFuzz's C++
 and pure-Python implementations disagree, this package follows the public C++

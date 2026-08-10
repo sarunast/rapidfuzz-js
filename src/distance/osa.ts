@@ -17,7 +17,7 @@ import {
   isNone,
   asSequence,
   isSequence,
-  PREPARE_CHOICE,
+  withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
@@ -174,7 +174,7 @@ type PreparedOsaKind =
   | 'normalizedSimilarity'
 
 function prepareOsa(kind: PreparedOsaKind): PrepareScorer {
-  return (query) => {
+  const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
     if (a === null) throw new TypeError('expected a sequence')
     const pattern = preparePattern(a, 0, a.length)
@@ -222,9 +222,9 @@ function prepareOsa(kind: PreparedOsaKind): PrepareScorer {
           return normSimCutoff(1 - normalize(distance, max), rawCutoff)
       }
     }
-    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
+  return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
 // Scorer flags let `process` tell distances from similarities.

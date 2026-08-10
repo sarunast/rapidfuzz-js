@@ -12,12 +12,15 @@ import {
   configureOptionsOf,
   isBuiltInScorer,
   NO_OPTIONS,
+  PREPARE_CHOICE,
   prepareScorerOf,
   registerScorer,
   scorerFlagsOf,
   stableFlags,
   toRecord,
+  withChoicePreparer,
   type Flagged,
+  type PrepareScorer,
   type ScorerOptions,
 } from './_common.js'
 
@@ -96,18 +99,30 @@ export function configure<I, O extends ScorerOptions>(
   // processor runs once per choice however the cutoff moves, and never sees it.
   const inner = Reflect.get(baked, 'processor') == null ? prepareScorerOf(scorer) : null
 
+  // `configure` is the only supplier of a prepared factory's second argument
+  // now. It still has to be honoured rather than replaced, because configuring
+  // an already-configured scorer arrives here as exactly that: an outer set of
+  // options handed to an inner factory that has its own. Merging keeps the
+  // prepared path agreeing with the direct call, where the outer options win the
+  // same way.
+  //
+  // The wrapper has to carry the inner factory's choice preparer over as well.
+  // It used to arrive by itself, back when the hook hung off the prepared score
+  // this returns; now it hangs off the factory, and a wrapper that dropped it
+  // would leave a configured built-in preparing no choices — in `scoreMatrix`,
+  // which has always prepared them, as much as in `prepareChoices`. Baking
+  // options changes what a choice scores against, never what it is.
+  let prepare: PrepareScorer | undefined = undefined
+  if (inner !== null) {
+    const wrapped: PrepareScorer = (query, options) =>
+      inner(query, options === NO_OPTIONS ? baked : { ...baked, ...options })
+    const prepareChoice = inner[PREPARE_CHOICE]
+    prepare =
+      prepareChoice === undefined ? wrapped : withChoicePreparer(wrapped, prepareChoice)
+  }
+
   return registerScorer(call, flags, {
-    // `configure` is the only supplier of a prepared factory's second argument
-    // now. It still has to be honoured rather than replaced, because
-    // configuring an already-configured scorer arrives here as exactly that: an
-    // outer set of options handed to an inner factory that has its own. Merging
-    // keeps the prepared path agreeing with the direct call, where the outer
-    // options win the same way.
-    prepare:
-      inner === null
-        ? undefined
-        : (query, options) =>
-            inner(query, options === NO_OPTIONS ? baked : { ...baked, ...options }),
+    prepare,
     configuredFlags:
       resolveFlags === null
         ? undefined

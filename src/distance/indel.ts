@@ -18,7 +18,7 @@ import {
   asSequence,
   type EditopsOptions,
   isSequence,
-  PREPARE_CHOICE,
+  withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
@@ -201,7 +201,7 @@ type PreparedIndelKind =
   | 'normalizedSimilarity'
 
 function prepareIndel(kind: PreparedIndelKind): PrepareScorer {
-  return (query) => {
+  const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
     if (a === null) throw new TypeError('expected a sequence')
     let pattern: import('./_bitVector/index.js').PatternMask | null = null
@@ -249,9 +249,9 @@ function prepareIndel(kind: PreparedIndelKind): PrepareScorer {
         }
       }
     }
-    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
+  return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
 // Scorer flags let `process` tell distances from similarities.

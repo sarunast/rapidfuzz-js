@@ -12,10 +12,12 @@ import {
   isSequence,
   NO_OPTIONS,
   PREPARE_CHOICE,
+  PREPARED_CHOICES,
   prepareScorerOf,
   scorerFlagsOf,
   type ErasedScorer,
   type MaybeSequence,
+  type PrepareChoice,
   type PreparedScore,
   type Processor,
   type Sequence,
@@ -194,6 +196,243 @@ function isIterable<T>(choices: Choices<T>): choices is Iterable<T> {
   return typeof Reflect.get(choices, Symbol.iterator) === 'function'
 }
 
+/** The two options an index bakes in, because they decide what it may hold. */
+export interface PrepareChoicesOptions {
+  /**
+   * Applied to every choice once, here, instead of once per query. `extract*`
+   * still applies it to the query — the index remembers which one it was.
+   */
+  readonly processor?: Processor | undefined
+  /**
+   * The scorer the index is for. Defaults to {@link wRatio}, as `extract*`
+   * does, and every later call has to name the same one.
+   */
+  readonly scorer?: SearchScorer | undefined
+}
+
+/**
+ * Choices normalised, processed and scorer-prepared once, for reuse across
+ * queries. Built by {@link prepareChoices} and passed to `extract*` in place of
+ * the collection it was built from.
+ *
+ * What it exposes is what a caller can use: how many choices survived, which
+ * ones, under which keys, and what it was prepared for. What it does not expose
+ * is the prepared state itself — that is the scorer's, its shape is the
+ * scorer's business, and it is positionally tied to `values` in a way nothing
+ * outside this module can be expected to maintain. It lives in
+ * {@link indexPayloads} instead, which is also what {@link isIndex} asks.
+ *
+ * The brand is the same claim at the type level: it is keyed by a symbol no
+ * other module can name, so an object literal cannot be passed where an index
+ * is expected and then silently scored as a plain-object collection.
+ *
+ * The value and both arrays are frozen, so the `readonly` above holds at run
+ * time too. Read them freely; to change the choices, build another index.
+ */
+export interface PreparedChoices<T, K> {
+  readonly [PREPARED_CHOICES]: true
+  /** The scorer this index was built for. */
+  readonly scorer: SearchScorer
+  /** The processor already applied to every choice. */
+  readonly processor: Processor | null
+  /** The choices, in enumeration order, with missing values dropped. */
+  readonly values: readonly T[]
+  /** Their keys, positionally matching {@link values}. */
+  readonly keys: readonly K[]
+  /** How many choices the index holds, after dropping missing values. */
+  readonly size: number
+}
+
+/**
+ * Each index's prepared choices, positionally matching its `values`.
+ *
+ * Off the value for two reasons. It is internal scorer state — converted code
+ * points, a tokenisation memo, the choice untouched — that no caller has a use
+ * for, and `readonly` in the type is a promise to TypeScript that JavaScript
+ * never hears. And membership is a stronger claim than shape: it says this
+ * module built the thing, which is what the scoring loops are actually
+ * trusting when they pair `prepared[i]` with `values[i]`.
+ */
+const indexPayloads = new WeakMap<object, readonly unknown[]>()
+
+/**
+ * The prepared choices of an index, or a `TypeError` naming what went wrong.
+ *
+ * The failure is not hypothetical, which is why it is a message rather than an
+ * assertion: `{ ...index }` copies the brand — a spread copies symbol-keyed own
+ * properties — and copies `values` and `keys`, but cannot copy an entry in a
+ * table it cannot reach. Such a copy is branded, so it type-checks and reaches
+ * the scoring loops, and without this it would be scored against prepared state
+ * that is not there. Saying so beats scoring it wrong.
+ */
+function payloadOf(index: PreparedChoices<unknown, unknown>): readonly unknown[] {
+  const prepared = indexPayloads.get(index)
+  if (prepared === undefined) {
+    throw new TypeError('a prepared choice index cannot be copied; pass the original')
+  }
+  return prepared
+}
+
+/**
+ * Prepare `choices` once so a run of queries does not redo the per-choice work.
+ *
+ * `extract*` prepares the *query* and streams the choices, which is right for
+ * one call and wasteful for a hundred over the same list: the processor runs on
+ * every choice every time, every choice is converted every time, and for the
+ * token scorers every choice is split, deduplicated, sorted and rejoined every
+ * time. An index moves all of that to one pass.
+ *
+ * ```ts
+ * const index = prepareChoices(titles, { scorer: tokenSortRatio })
+ * for (const query of queries) extractOne(query, index)
+ * ```
+ *
+ * Three things follow from what it holds, and all three are checked rather than
+ * documented and hoped for:
+ *
+ * - **The scorer is baked in**, because what a prepared choice holds is the
+ *   scorer's own business. `extract*` on this index either names the same
+ *   scorer or names none.
+ * - **The processor is baked in** and already applied. `extract*` still needs
+ *   it for the query, and takes it from here rather than making the caller
+ *   repeat it.
+ * - **The cutoff, the hint and the limit are not**, because none of them
+ *   changes a choice. They stay per-call, where they were.
+ *
+ * It is a snapshot, and the two things that follow from that are the caller's
+ * to keep. **The choices must not change after it is built** — not the
+ * collection, and not the contents of a choice that is itself mutable, since
+ * rewriting an element of an array choice leaves the prepared state describing
+ * what that choice used to be while the result still names the array. And **the
+ * processor must be deterministic**: `extract` runs it once per choice per
+ * query, an index runs it once per choice, so one that counts its calls is
+ * entitled to disagree. Neither can be enforced without deep-freezing or
+ * copying user values, and both would change what the results are.
+ *
+ * Missing choices are dropped as they are found rather than at every query,
+ * which is why `values` can be shorter than the collection. Nothing else is
+ * observable: `extract*` skips them anyway, and the position they held only
+ * ever mattered against another position.
+ *
+ * The index holds the choices, so it keeps them alive; it also memoises derived
+ * forms as queries ask for them, so it grows a little on first use and then
+ * settles. Build one per list you query repeatedly, not one per call — a single
+ * `extract` over a fresh index is slower than passing the list.
+ */
+export function prepareChoices<K, V>(
+  choices: ReadonlyMap<K, V>,
+  options?: PrepareChoicesOptions,
+): PreparedChoices<V, K>
+export function prepareChoices<T>(
+  choices: readonly T[] | Iterable<T>,
+  options?: PrepareChoicesOptions,
+): PreparedChoices<T, number>
+export function prepareChoices<C extends Readonly<Record<string, unknown>>>(
+  choices: C,
+  options?: PrepareChoicesOptions,
+): PreparedChoices<ObjectValue<C>, ObjectKey<C>>
+export function prepareChoices<T>(
+  choices: Choices<T>,
+  options?: PrepareChoicesOptions,
+): PreparedChoices<T, unknown>
+export function prepareChoices<T>(
+  choices: Choices<T>,
+  options: PrepareChoicesOptions = {},
+): PreparedChoices<T, unknown> {
+  const scorer = options.scorer ?? wRatio
+  const processor = options.processor ?? null
+
+  const values: T[] = []
+  const keys: unknown[] = []
+  const prepared: unknown[] = []
+
+  // The same two shapes the scoring loops separate, for the same reason: a list
+  // is what this is given in practice, and `entriesOf` puts a generator frame
+  // and a tuple between every choice and this loop.
+  if (Array.isArray(choices)) {
+    for (let key = 0; key < choices.length; key++) {
+      const choice = choices[key]
+      if (isNone(choice)) continue
+      values.push(choice)
+      keys.push(key)
+      prepared.push(processor != null ? processor(queryAsSequence(choice)) : choice)
+    }
+  } else {
+    for (const [key, choice] of entriesOf(choices)) {
+      if (isNone(choice)) continue
+      values.push(choice)
+      keys.push(key)
+      prepared.push(processor != null ? processor(queryAsSequence(choice)) : choice)
+    }
+  }
+
+  const prepareChoice = choicePreparerOf(scorer)
+  if (prepareChoice !== null) {
+    for (let i = 0; i < prepared.length; i++) prepared[i] = prepareChoice(prepared[i])
+  }
+
+  const index: PreparedChoices<T, unknown> = {
+    [PREPARED_CHOICES]: true,
+    scorer,
+    processor,
+    values,
+    keys,
+    size: values.length,
+  }
+  // `readonly` is a promise to the type checker and nothing else, and these four
+  // are the last publicly reachable things that can drift out of step with the
+  // hidden payload: `values[i]` names what `prepared[i]` was built from, and
+  // `scorer` names what it was built for. A write to either is scored correctly
+  // and reported wrongly, silently. Freezing is what the type already claims.
+  //
+  // The value is free to freeze. The two arrays are not: their elements move to
+  // `PACKED_FROZEN_ELEMENTS`, whose loads measured 1.68x in a read loop, which
+  // shows end to end wherever a scorer is cheap enough for two loads to matter
+  // and every choice is admitted — 1.04-1.05x on a drained `extractIter` over
+  // `ratio`, and nothing at all on the default `wRatio` at any limit. Paid.
+  Object.freeze(values)
+  Object.freeze(keys)
+  Object.freeze(index)
+  indexPayloads.set(index, prepared)
+  return index
+}
+
+/**
+ * The per-choice hook a scorer offers, or `null` for one that offers none.
+ *
+ * A scorer that registers no factory has none — a third-party scorer, or one
+ * `configure` refused to prepare because a processor was baked into it. So does
+ * a scorer that caches a query and still wants its choices as they came. Both
+ * get an index; it holds the processed choices and stops there.
+ */
+function choicePreparerOf(scorer: SearchScorer): PrepareChoice | null {
+  return prepareScorerOf(scorer)?.[PREPARE_CHOICE] ?? null
+}
+
+/**
+ * Whether `choices` is an index rather than a collection.
+ *
+ * The brand is checked, not the shape: every field an index exposes is one a
+ * plain object could have, and a collection of choices is exactly where an
+ * object with arbitrary fields turns up. Provenance is then established a
+ * second time, by {@link payloadOf} — this says "meant as an index", that says
+ * "built here".
+ */
+function isIndex<T>(
+  choices: Choices<T> | PreparedChoices<T, unknown>,
+): choices is PreparedChoices<T, unknown> {
+  return typeof choices === 'object' && choices !== null && PREPARED_CHOICES in choices
+}
+
+/** The scorer a call runs, which an index supplies when the options do not. */
+function scorerFor<T>(
+  options: SearchOptions,
+  choices: Choices<T> | PreparedChoices<T, unknown>,
+): SearchScorer {
+  if (options.scorer !== undefined) return options.scorer
+  return isIndex(choices) ? choices.scorer : wRatio
+}
+
 interface Prepared {
   scorer: SearchScorer
   optimalScore: number
@@ -223,14 +462,32 @@ interface Prepared {
   builtIn: boolean
 }
 
-function prepare(query: MaybeSequence, options: SearchOptions): Prepared | null {
-  const scorer = options.scorer ?? wRatio
+function prepare<T>(
+  query: MaybeSequence,
+  options: SearchOptions,
+  choices: Choices<T> | PreparedChoices<T, unknown>,
+): Prepared | null {
+  const scorer = scorerFor(options, choices)
+  const index = isIndex(choices) ? choices : null
+  if (index !== null) {
+    // Before the `isNone` return below, so a mismatched call is refused whatever
+    // the query is. Both are identity tests on purpose: two scorers that do the
+    // same thing still prepare a choice differently, and an index cannot say
+    // whether a second processor would agree with the one it already applied.
+    if (options.scorer !== undefined && options.scorer !== index.scorer) {
+      throw new TypeError('scorer differs from the one this index was prepared for')
+    }
+    if (options.processor != null && options.processor !== index.processor) {
+      throw new TypeError('processor differs from the one this index was prepared for')
+    }
+  }
   const { worstScore, optimalScore } = scorerFlagsOf(scorer)
   const lowestScoreWorst = optimalScore > worstScore
 
   if (isNone(query)) return null
 
-  const processor = options.processor ?? null
+  // An index took its processor from `prepareChoices`, and applied it there.
+  const processor = options.processor ?? index?.processor ?? null
   const raw =
     processor != null ? processor(queryAsSequence(query)) : queryAsSequence(query)
   const factory = prepareScorerOf(scorer)
@@ -243,7 +500,9 @@ function prepare(query: MaybeSequence, options: SearchOptions): Prepared | null 
     scoreCutoff: options.scoreCutoff ?? null,
     admits: options.scoreCutoff ?? worstScore,
     query: raw,
-    processor,
+    // The choices in an index are processed already; only the query above was
+    // still owed it. Holding `null` is what keeps {@link score} one function.
+    processor: index === null ? processor : null,
     scoreHint: options.scoreHint ?? null,
     preparedScore,
     builtIn,
@@ -279,6 +538,11 @@ function score<T>(state: Prepared, choice: T, scoreCutoff: number | null): numbe
  *
  * Results arrive in the order the choices do, unsorted.
  */
+export function extractIter<T, K>(
+  query: MaybeSequence,
+  choices: PreparedChoices<T, K>,
+  options?: SearchOptions,
+): Generator<ExtractResult<T, K>>
 export function extractIter<K, V>(
   query: MaybeSequence,
   choices: ReadonlyMap<K, V>,
@@ -296,15 +560,31 @@ export function extractIter<C extends Readonly<Record<string, unknown>>>(
 ): Generator<ExtractResult<ObjectValue<C>, ObjectKey<C>>>
 export function extractIter<T>(
   query: MaybeSequence,
-  choices: Choices<T>,
+  choices: Choices<T> | PreparedChoices<T, unknown>,
   options?: SearchOptions,
 ): Generator<ExtractResult<T>>
 export function* extractIter<T>(
   query: MaybeSequence,
-  choices: Choices<T>,
+  choices: Choices<T> | PreparedChoices<T, unknown>,
   options: SearchOptions = {},
 ): Generator<ExtractResult<T>> {
-  const state = prepare(query, options)
+  if (isIndex(choices)) {
+    const state = prepare(query, options, choices)
+    if (state === null) return
+
+    const { values, keys } = choices
+    const prepared = payloadOf(choices)
+    for (let i = 0; i < values.length; i++) {
+      const value = score(state, prepared[i], state.scoreCutoff)
+      const admitted = state.lowestScoreWorst
+        ? value >= state.admits
+        : value <= state.admits
+      if (admitted) yield { choice: values[i], score: value, key: keys[i] }
+    }
+    return
+  }
+
+  const state = prepare(query, options, choices)
   if (state === null) return
 
   // A list skips `entriesOf`, which would otherwise put a second generator
@@ -340,6 +620,11 @@ export function* extractIter<T>(
  * Tightens the cutoff as it goes and stops early on a perfect score, so it is
  * cheaper than `extract(..., { limit: 1 })`.
  */
+export function extractOne<T, K>(
+  query: MaybeSequence,
+  choices: PreparedChoices<T, K>,
+  options?: SearchOptions,
+): ExtractResult<T, K> | undefined
 export function extractOne<K, V>(
   query: MaybeSequence,
   choices: ReadonlyMap<K, V>,
@@ -357,15 +642,44 @@ export function extractOne<C extends Readonly<Record<string, unknown>>>(
 ): ExtractResult<ObjectValue<C>, ObjectKey<C>> | undefined
 export function extractOne<T>(
   query: MaybeSequence,
-  choices: Choices<T>,
+  choices: Choices<T> | PreparedChoices<T, unknown>,
   options?: SearchOptions,
 ): ExtractResult<T> | undefined
 export function extractOne<T>(
   query: MaybeSequence,
-  choices: Choices<T>,
+  choices: Choices<T> | PreparedChoices<T, unknown>,
   options: SearchOptions = {},
 ): ExtractResult<T> | undefined {
-  const state = prepare(query, options)
+  if (isIndex(choices)) {
+    const state = prepare(query, options, choices)
+    if (state === null) return undefined
+
+    let cutoff = state.scoreCutoff
+    let admits = state.admits
+    let result: ExtractResult<T> | undefined = undefined
+    const { values, keys } = choices
+    const prepared = payloadOf(choices)
+
+    for (let i = 0; i < values.length; i++) {
+      const value = score(state, prepared[i], cutoff)
+      if (state.lowestScoreWorst) {
+        if (value >= admits && (result === undefined || value > result.score)) {
+          cutoff = value
+          admits = value
+          result = { choice: values[i], score: value, key: keys[i] }
+        }
+      } else if (value <= admits && (result === undefined || value < result.score)) {
+        cutoff = value
+        admits = value
+        result = { choice: values[i], score: value, key: keys[i] }
+      }
+
+      if (value === state.optimalScore) break
+    }
+    return result
+  }
+
+  const state = prepare(query, options, choices)
   if (state === null) return undefined
 
   // The running best tightens both at once: `cutoff` is what the scorer is
@@ -423,6 +737,11 @@ export function extractOne<T>(
 }
 
 /** The best `limit` matches, ordered best first. */
+export function extract<T, K>(
+  query: MaybeSequence,
+  choices: PreparedChoices<T, K>,
+  options?: ExtractOptions,
+): ExtractResult<T, K>[]
 export function extract<K, V>(
   query: MaybeSequence,
   choices: ReadonlyMap<K, V>,
@@ -440,12 +759,12 @@ export function extract<C extends Readonly<Record<string, unknown>>>(
 ): ExtractResult<ObjectValue<C>, ObjectKey<C>>[]
 export function extract<T>(
   query: MaybeSequence,
-  choices: Choices<T>,
+  choices: Choices<T> | PreparedChoices<T, unknown>,
   options?: ExtractOptions,
 ): ExtractResult<T>[]
 export function extract<T>(
   query: MaybeSequence,
-  choices: Choices<T>,
+  choices: Choices<T> | PreparedChoices<T, unknown>,
   options: ExtractOptions = {},
 ): ExtractResult<T>[] {
   const limit = options.limit === undefined ? 5 : options.limit
@@ -462,27 +781,36 @@ export function extract<T>(
     return best === undefined ? [] : [best]
   }
 
-  const scorer = options.scorer ?? wRatio
-  const { worstScore, optimalScore } = scorerFlagsOf(scorer)
-  const lowestScoreWorst = optimalScore > worstScore
-
+  // The scorer's direction is not read here. `prepare` resolves it from the same
+  // flags on the way to building the state, and both branches below have that
+  // state in hand before they need to know — so asking `scorerFlagsOf` twice per
+  // call bought a binding that was already about to exist.
   if (limit == null) {
     // Not `[...extractIter(...)]`. Every choice would cross a generator
     // boundary twice — once out of `entriesOf`, once out of `extractIter` — and
     // carry a two-element tuple with it, to build a list this function then
     // sorts in place anyway. An array of choices is the shape `process` is
     // given in practice, so it gets the plain loop `extractOne` already has.
-    const unlimited = prepare(query, options)
+    const unlimited = prepare(query, options, choices)
     if (unlimited === null) return []
 
     const results: ExtractResult<T>[] = []
     const { scoreCutoff, admits, lowestScoreWorst: keepHigh } = unlimited
 
-    // Written out twice rather than through a shared closure. One call per
+    // Written out three times rather than through a shared closure. One call per
     // choice is what this branch exists to remove, and routing the map case
     // through a closure to save six lines measured 1.03x — giving back more
     // than the generator it replaced had cost.
-    if (Array.isArray(choices)) {
+    if (isIndex(choices)) {
+      const { values, keys } = choices
+      const prepared = payloadOf(choices)
+      for (let i = 0; i < values.length; i++) {
+        const value = score(unlimited, prepared[i], scoreCutoff)
+        if (keepHigh ? value >= admits : value <= admits) {
+          results.push({ choice: values[i], score: value, key: keys[i] })
+        }
+      }
+    } else if (Array.isArray(choices)) {
       for (let key = 0; key < choices.length; key++) {
         const choice = choices[key]
         if (isNone(choice)) continue
@@ -501,11 +829,14 @@ export function extract<T>(
       }
     }
 
-    results.sort((a, b) => (lowestScoreWorst ? b.score - a.score : a.score - b.score))
+    results.sort((a, b) => (keepHigh ? b.score - a.score : a.score - b.score))
     return results
   }
 
   if (limit <= 0) return []
+
+  const state = prepare(query, options, choices)
+  if (state === null) return []
 
   interface HeapEntry {
     choice: T
@@ -513,6 +844,11 @@ export function extract<T>(
     key: unknown
     position: number
   }
+
+  // Read once into a local: `worse` runs on every sift step of every insertion,
+  // and a property load per comparison is what the old duplicate flags lookup
+  // was really buying.
+  const lowestScoreWorst = state.lowestScoreWorst
 
   // The root is the worst retained item. Equal scores prefer the earlier
   // iterable position, which preserves stable-sort behaviour.
@@ -549,50 +885,72 @@ export function extract<T>(
     }
   }
 
-  const state = prepare(query, options)
-  if (state === null) return []
-
-  const consider = (choice: T, key: unknown, position: number): void => {
-    if (isNone(choice)) return
+  // Scoring is split from placement, and neither half is given the choice or the
+  // key. `extract` rejects almost everything — a heap of five over two thousand
+  // — and on an index those two are loads from frozen arrays that only a winner
+  // needs; fetching them per choice measured 1.15x on `ratio` over short
+  // strings. So a driver reads them once `wins` has said the candidate earned
+  // them. `winningScore` carries the one value across, rather than a second
+  // return or a tuple to allocate.
+  let winningScore = 0
+  const wins = (scored: unknown, position: number): boolean => {
     // A full heap replaces both the bound and the comparison with the score at
     // its root; short of that they part company, because "no cutoff" is a
     // number to compare against but not one to hand a scorer.
     const tightened = state.builtIn && heap.length === limit
     const activeCutoff = tightened ? heap[0].score : state.scoreCutoff
     const admits = tightened ? heap[0].score : state.admits
-    const value = score(state, choice, activeCutoff)
+    const value = score(state, scored, activeCutoff)
     const passes = state.lowestScoreWorst ? value >= admits : value <= admits
-    if (!passes) return
-
-    if (heap.length < limit) {
-      heap.push({ choice, score: value, key, position })
-      siftUp(heap.length - 1)
-      return
-    }
+    if (!passes) return false
+    winningScore = value
+    if (heap.length < limit) return true
 
     // `worse(heap[0], entry)` with the entry not yet built. Clearing the cutoff
     // is not the same as beating the heap: a score equal to the root passes
     // `admits` and then loses this test, since a later position never displaces
     // an earlier one at the same score.
     const root = heap[0]
-    const beaten =
-      root.score === value
-        ? root.position > position
-        : lowestScoreWorst
-          ? root.score < value
-          : root.score > value
-    if (beaten) {
-      heap[0] = { choice, score: value, key, position }
-      siftDown(0)
-    }
+    return root.score === value
+      ? root.position > position
+      : lowestScoreWorst
+        ? root.score < value
+        : root.score > value
   }
 
-  if (Array.isArray(choices)) {
-    for (let i = 0; i < choices.length; i++) consider(choices[i], i, i)
+  // Reached only for a candidate `wins` accepted, so the heap being full is the
+  // whole of the push-or-replace question by this point.
+  const place = (choice: T, key: unknown, position: number): void => {
+    const entry = { choice, score: winningScore, key, position }
+    if (heap.length < limit) {
+      heap.push(entry)
+      siftUp(heap.length - 1)
+      return
+    }
+    heap[0] = entry
+    siftDown(0)
+  }
+
+  // `scored` is what the scorer is handed and `choice` is what a result names.
+  // They are the same value everywhere but an index, where the first is the
+  // choice as the scorer's own hook left it and the second is what the caller
+  // put in the collection. An index has no missing choices left to test for —
+  // they were dropped when it was built.
+  if (isIndex(choices)) {
+    const { values, keys } = choices
+    const prepared = payloadOf(choices)
+    for (let i = 0; i < values.length; i++) {
+      if (wins(prepared[i], i)) place(values[i], keys[i], i)
+    }
+  } else if (Array.isArray(choices)) {
+    for (let i = 0; i < choices.length; i++) {
+      const choice = choices[i]
+      if (!isNone(choice) && wins(choice, i)) place(choice, i, i)
+    }
   } else {
     let position = 0
     for (const [key, choice] of entriesOf(choices)) {
-      consider(choice, key, position)
+      if (!isNone(choice) && wins(choice, position)) place(choice, key, position)
       position++
     }
   }
@@ -674,22 +1032,26 @@ export function scoreMatrix(
   const factory = prepareScorerOf(scorer)
   let cachedPrepared: PreparedScore | null = null
   let cachedPreparedIndex = -1
+  // Hoisting the per-choice conversion out of the row loop is only possible if
+  // the scorer's factory offers a hook. It always did while every prepared
+  // scorer was a built-in; a configured one with a baked-in processor registers
+  // no factory at all, and a third-party one may prepare a query and still want
+  // its choices as they came — so the absence is real, and `preparedChoices`
+  // has to fall back to the unconverted choices rather than to a default
+  // converter that would disagree with what the scorer expects.
+  let prepareMatrixChoice: PrepareChoice | null = null
   if (factory !== null) {
     for (let i = 0; i < processedQueries.length; i++) {
       const query = processedQueries[i]
       if (isNone(query)) continue
       cachedPrepared = factory(queryAsSequence(query), NO_OPTIONS)
       cachedPreparedIndex = i
+      // Read here rather than beside `factory`, so that a matrix whose every
+      // query is missing prepares no choice: there would be nothing to read it.
+      prepareMatrixChoice = factory[PREPARE_CHOICE] ?? null
       break
     }
   }
-  // Hoisting the per-choice conversion out of the row loop is only possible if
-  // the prepared scorer offered a hook. It always did while every prepared
-  // scorer was a built-in; a configured one with a baked-in processor is the
-  // case that has none, so the absence is now real and `preparedChoices` has to
-  // fall back to the unconverted choices rather than to a default converter
-  // that would disagree with what the scorer expects.
-  const prepareMatrixChoice = cachedPrepared?.[PREPARE_CHOICE] ?? null
   const preparedChoices =
     prepareMatrixChoice !== null
       ? processedChoices.map(prepareMatrixChoice)

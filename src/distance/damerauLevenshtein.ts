@@ -10,7 +10,7 @@ import {
   type ScorerOptions,
   type Sequence,
   isSequence,
-  PREPARE_CHOICE,
+  withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
@@ -314,7 +314,7 @@ type PreparedDamerauKind =
   | 'normalizedSimilarity'
 
 function prepareDamerau(kind: PreparedDamerauKind): PrepareScorer {
-  return (query) => {
+  const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
     if (a === null) throw new TypeError('expected a sequence')
     const score: PreparedScore = (rawChoice, rawCutoff) => {
@@ -353,9 +353,9 @@ function prepareDamerau(kind: PreparedDamerauKind): PrepareScorer {
         }
       }
     }
-    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
+  return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
 function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {

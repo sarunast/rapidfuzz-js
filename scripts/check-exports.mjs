@@ -30,6 +30,7 @@ const EXPECTED = {
     'extractIter',
     'scoreMatrix',
     'scorePairs',
+    'prepareChoices',
     'ratio',
     'wRatio',
     'levenshteinDistance',
@@ -38,7 +39,14 @@ const EXPECTED = {
     'Opcodes',
   ],
   './fuzz': ['ratio', 'partialRatio', 'wRatio', 'qRatio', 'tokenSortRatio'],
-  './search': ['extract', 'extractOne', 'extractIter', 'scoreMatrix', 'scorePairs'],
+  './search': [
+    'extract',
+    'extractOne',
+    'extractIter',
+    'scoreMatrix',
+    'scorePairs',
+    'prepareChoices',
+  ],
   './match': ['matchScore', 'isMatch'],
   './utils': ['defaultProcess'],
   // The namespace barrel mirroring Python's `rapidfuzz.distance` package, so

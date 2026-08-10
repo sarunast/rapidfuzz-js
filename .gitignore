@@ -7,3 +7,4 @@ coverage/
 .DS_Store
 *.log
 test-report.junit.xml
+plan.md

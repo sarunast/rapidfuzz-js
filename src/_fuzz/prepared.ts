@@ -27,7 +27,7 @@ import {
   convSequence,
   isNone,
   isSequence,
-  PREPARE_CHOICE,
+  withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
@@ -159,7 +159,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
     ? tokenChoicePreparer()
     : prepareScorerChoice
 
-  return (query) => {
+  const prepare: PrepareScorer = (query) => {
     const queryTokenChoice = usesTokens ? preparedTokenChoice(prepareChoice(query)) : null
     const heldQuery = usesTokens
       ? queryTokenChoice === null
@@ -418,7 +418,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
         }
       }
     }
-    score[PREPARE_CHOICE] = prepareChoice
     return score
   }
+  return withChoicePreparer(prepare, prepareChoice)
 }

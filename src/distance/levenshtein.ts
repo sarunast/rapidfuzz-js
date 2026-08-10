@@ -17,7 +17,7 @@ import {
   asSequence,
   type EditopsOptions,
   isSequence,
-  PREPARE_CHOICE,
+  withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
@@ -993,7 +993,7 @@ function preparedBandWorthwhile(
 }
 
 function prepareLevenshtein(kind: PreparedLevenshteinKind): PrepareScorer {
-  return (query, kwargs) => {
+  const prepare: PrepareScorer = (query, kwargs) => {
     const weights = parseWeights(Reflect.get(kwargs, 'weights'))
     const a = preparedScorerSequence(prepareScorerChoice(query))
     if (a === null) throw new TypeError('expected a sequence')
@@ -1090,9 +1090,9 @@ function prepareLevenshtein(kind: PreparedLevenshteinKind): PrepareScorer {
         }
       }
     }
-    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
+  return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
 /**

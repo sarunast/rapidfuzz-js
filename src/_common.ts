@@ -189,6 +189,15 @@ export interface Flagged {
 /** Internal hook used by process functions to cache the query side of a scorer. */
 export const PREPARE_SCORER: unique symbol = Symbol('rapidfuzz.prepareScorer')
 export const PREPARE_CHOICE: unique symbol = Symbol('rapidfuzz.prepareChoice')
+/**
+ * Brand on the choice index `search.prepareChoices` returns.
+ *
+ * Here rather than in `search.ts` for the reason above: the index type is
+ * public, so its key has to be a `unique symbol` an external caller cannot
+ * name — which is what makes the type unforgeable — and that has to be an
+ * exported binding for the emitted declarations to refer to it.
+ */
+export const PREPARED_CHOICES: unique symbol = Symbol('rapidfuzz.preparedChoices')
 
 const PREPARED_SEQUENCE = Symbol('rapidfuzz.preparedSequence')
 
@@ -201,24 +210,45 @@ export type PrepareChoice = (choice: unknown) => unknown
 
 export interface PreparedScore {
   (choice: unknown, scoreCutoff: number | null, scoreHint: number | null): number
-  /**
-   * Writable, and assigned rather than defined.
-   *
-   * Every factory attaches this to the closure it just built, so it is paid
-   * once per prepared query — once per row of a `scoreMatrix`. Measured,
-   * `Object.defineProperty` costs **109 ns** there against **1.4 ns** for an
-   * assignment, which was 78% of the whole `ratio` factory. The property
-   * descriptor bought nothing to lose: the key is a symbol, so it is already
-   * absent from `Object.keys`, `for...in` and `JSON.stringify`, and the only
-   * reader is `scoreMatrix`.
-   */
+}
+
+/**
+ * A scorer's query-preparation factory, carrying the policy it applies to a
+ * *choice*.
+ *
+ * The hook is on the factory rather than on each prepared score because that is
+ * where the fact belongs: how a scorer wants a choice prepared is a property of
+ * the scorer, not of the query it was last handed. It used to be assigned to
+ * every prepared score, which meant a caller could only reach it by preparing a
+ * query first — fine for `scoreMatrix`, which prepares one anyway, and a hack
+ * for `prepareChoices`, which has no query at all and had to fabricate one from
+ * the first choice to read a value that never varied with it.
+ *
+ * Absent is a real answer: a scorer may cache a query and still want its
+ * choices untouched.
+ *
+ * Writable, and assigned rather than defined. `Object.defineProperty` was
+ * measured at **109 ns** against **1.4 ns** for an assignment when this ran per
+ * prepared query; it now runs once per scorer, so the difference no longer
+ * shows — but the descriptor still buys nothing, since a symbol key is already
+ * absent from `Object.keys`, `for...in` and `JSON.stringify`.
+ */
+export interface PrepareScorer {
+  (query: Sequence, kwargs: Readonly<Record<string, unknown>>): PreparedScore
   [PREPARE_CHOICE]?: PrepareChoice
 }
 
-export type PrepareScorer = (
-  query: Sequence,
-  kwargs: Readonly<Record<string, unknown>>,
-) => PreparedScore
+/**
+ * Attach a factory's choice-preparation policy, at the point the factory is
+ * built. Every built-in goes through here, so the two cannot drift apart.
+ */
+export function withChoicePreparer(
+  prepare: PrepareScorer,
+  prepareChoice: PrepareChoice,
+): PrepareScorer {
+  prepare[PREPARE_CHOICE] = prepareChoice
+  return prepare
+}
 
 export type PreparedMetricKind =
   | 'distance'
@@ -281,7 +311,7 @@ export function prepareMetric(
   maximum: (query: ArrayLike<unknown>, choice: ArrayLike<unknown>) => number,
   parseKwargs: (kwargs: Readonly<Record<string, unknown>>) => unknown = () => null,
 ): PrepareScorer {
-  return (query, kwargs) => {
+  const prepare: PrepareScorer = (query, kwargs) => {
     const preparedQuery = preparedScorerSequence(prepareScorerChoice(query))
     if (preparedQuery === null) throw new TypeError('expected a sequence')
     const parsedKwargs = parseKwargs(kwargs)
@@ -319,9 +349,9 @@ export function prepareMetric(
           return normSimCutoff(1 - normalize(dist, max), rawCutoff)
       }
     }
-    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
+  return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
 export interface Preparable {
