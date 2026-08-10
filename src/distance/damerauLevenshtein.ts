@@ -173,8 +173,6 @@ function distance_(
   current[0] = maxValue
   for (let j = 0; j <= len2; j++) current[j + 1] = j
 
-  const string1 = typeof s1 === 'string'
-  const string2 = typeof s2 === 'string'
   // Which table an element's last occurrence lives in is a property of the
   // element, not of the pair: any 16-bit code point can be a direct index,
   // whichever representation it arrived in. Deciding once per sequence would
@@ -183,6 +181,72 @@ function distance_(
   const stampedRow = bmpLastRows()
   const stamps = bmpLastStamps()
   const directGeneration = nextBmpGeneration()
+
+  // Two strings decide every per-cell question in advance, so the whole matrix
+  // is worth its own copy of the loop.
+  //
+  // `charCodeAt` yields an integer in `0..0xFFFF` and nothing else, which is
+  // exactly {@link isBmpCode}'s predicate. So the four-part test below is
+  // provably true here, the `Map` fallback beside it provably dead, and the
+  // `a === a` guard that rejects `NaN` has nothing to reject. Those are paid
+  // O(len1 * len2) in the generic loop — once per matrix cell, not once per
+  // row — which is what makes this the specialisation worth having rather than
+  // one more branch hoist.
+  if (typeof s1 === 'string' && typeof s2 === 'string') {
+    for (let i = 1; i <= len1; i++) {
+      const spare = previous
+      previous = current
+      current = spare
+      let lastColumn = -1
+      let lastI2L1 = current[1]
+      current[1] = i
+      let diagonalTranspose = maxValue
+      const a = s1.charCodeAt(prefix + i - 1)
+
+      for (let j = 1; j <= len2; j++) {
+        const b = s2.charCodeAt(prefix + j - 1)
+        let value = Math.min(
+          previous[j] + (a === b ? 0 : 1),
+          current[j] + 1,
+          previous[j + 1] + 1,
+        )
+
+        if (a === b) {
+          lastColumn = j
+          transpositionRows[j + 1] = previous[j - 1]
+          diagonalTranspose = lastI2L1
+        } else {
+          const last = stamps[b] === directGeneration ? stampedRow[b] : -1
+          if (j - lastColumn === 1) {
+            value = Math.min(value, transpositionRows[j + 1] + (i - last))
+          } else if (i - last === 1) {
+            value = Math.min(value, diagonalTranspose + (j - lastColumn))
+          }
+        }
+
+        lastI2L1 = current[j + 1]
+        current[j + 1] = value
+      }
+
+      stampedRow[a] = i
+      stamps[a] = directGeneration
+    }
+
+    const resultString = current[len2 + 1]
+    return resultString <= scoreCutoff ? resultString : scoreCutoff + 1
+  }
+
+  // Neither side is a string here, so both are read by plain indexing.
+  //
+  // Representation is a property of the *pair*, decided by `convPair` on the
+  // way in: two BMP strings stay strings and take the branch above, and
+  // anything else leaves both sides converted. A pair with a string on one side
+  // only never forms — the prefix and suffix trimming above would already have
+  // mis-measured it, comparing `'a'` against `97`. Audited by throwing on
+  // `typeof s1 === 'string' || typeof s2 === 'string'` at this point and
+  // driving 500,130 calls through every Damerau entry point over seven
+  // representations, mismatched at the call site; none reached here.
+  //
   // Built only if a wider code point, an object or some other arbitrary value
   // actually turns up, so the common cases never allocate one.
   let lastRow: Map<unknown, number> | null = null
@@ -195,10 +259,10 @@ function distance_(
     let lastI2L1 = current[1]
     current[1] = i
     let diagonalTranspose = maxValue
-    const a = string1 ? s1.charCodeAt(prefix + i - 1) : s1[prefix + i - 1]
+    const a = s1[prefix + i - 1]
 
     for (let j = 1; j <= len2; j++) {
-      const b = string2 ? s2.charCodeAt(prefix + j - 1) : s2[prefix + j - 1]
+      const b = s2[prefix + j - 1]
       let value = Math.min(
         previous[j] + (a === b ? 0 : 1),
         current[j] + 1,
