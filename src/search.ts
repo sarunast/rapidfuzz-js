@@ -564,12 +564,25 @@ export function extract<T>(
     const passes = state.lowestScoreWorst ? value >= admits : value <= admits
     if (!passes) return
 
-    const entry = { choice, score: value, key, position }
     if (heap.length < limit) {
-      heap.push(entry)
+      heap.push({ choice, score: value, key, position })
       siftUp(heap.length - 1)
-    } else if (worse(heap[0], entry)) {
-      heap[0] = entry
+      return
+    }
+
+    // `worse(heap[0], entry)` with the entry not yet built. Clearing the cutoff
+    // is not the same as beating the heap: a score equal to the root passes
+    // `admits` and then loses this test, since a later position never displaces
+    // an earlier one at the same score.
+    const root = heap[0]
+    const beaten =
+      root.score === value
+        ? root.position > position
+        : lowestScoreWorst
+          ? root.score < value
+          : root.score > value
+    if (beaten) {
+      heap[0] = { choice, score: value, key, position }
       siftDown(0)
     }
   }
@@ -794,6 +807,11 @@ export function scorePairs(
   // built and then thrown away every iteration. Measured over 4000 title-like
   // pairs that made `ratio` 2.2x and `tokenSortRatio` 2.4x slower than calling
   // the scorer directly, with every scorer tested slower and none faster.
+  // Specialising this loop was measured and dropped: a shared options object for
+  // built-in scorers, plus separate no-processor and non-integral loops, came to
+  // 0.985-0.992x over 4000 pairs on every scorer tried — under the ±3% noise
+  // floor, for two duplicated loops. The scorer call is the cost here, not the
+  // boundary around it.
   for (let i = 0; i < length; i++) {
     const value = callScorer(
       scorer,
