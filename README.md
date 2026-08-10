@@ -5,7 +5,7 @@ Fast fuzzy string matching for JavaScript and TypeScript, based on
 
 - Compatible with RapidFuzz's scoring algorithms
 - Works in Node.js 22+, browsers, and edge runtimes
-- Ships ESM and CommonJS builds with TypeScript declarations
+- Ships an ESM build with TypeScript declarations
 - Has no runtime dependencies
 - Supports tree-shaking
 
@@ -44,10 +44,15 @@ fuzz.tokenSortRatio('red green blue', 'blue red green')
 search.scoreMatrix(['alpha'], ['alfa'])
 ```
 
-CommonJS is supported:
+The package is ESM only. CommonJS callers reach it through dynamic `import`,
+which is asynchronous — a `require` will not work, and neither will a top-level
+`await` in a `.cjs` file:
 
 ```js
-const { ratio } = require('rapidfuzz-js')
+async function main() {
+  const { ratio } = await import('rapidfuzz-js')
+  ratio('this is a test', 'this is a test!')
+}
 ```
 
 ## Usage
