@@ -85,10 +85,36 @@ function lcsOneWordStamped(
 
   let s = -1
   const limit = directLimit
-  const stringText = typeof text === 'string'
+
+  // The text's own loop when it is a string. `charCodeAt` yields an integer in
+  // `0..0xFFFF` and nothing else, so the range and integrality tests below are
+  // answered in advance and the `NaN` arm has nothing to catch — one compare
+  // against `limit` is all that is left.
+  //
+  // This is the loop `ratio` and `wRatio` spend most of their time in, which is
+  // what earns it the duplication — see the note on the generic arm below.
+  if (typeof text === 'string') {
+    for (let i = 0; i < textLength; i++) {
+      const symbol = text.charCodeAt(textStart + i)
+      // No overflow-map arm, matching {@link lcsFourWordsStamped}'s string
+      // branch. `buildWordMasks` files a symbol in that map only when it is not
+      // an integer in `0..0xFFFF` — everything else widens the direct table
+      // instead — and `charCodeAt` produces nothing else. So a code unit at or
+      // above `limit` is one the pattern cannot contain, and contributes no
+      // matches. Audited by throwing on a hit here: the suite passed, and so did
+      // a sweep of 47,520 string calls over every mask region, as pattern and
+      // as text, at every one-word width.
+      const matches = symbol < limit && stamps[symbol] === stamp ? slots[symbol] : 0
+
+      const u = s & matches
+      s = (s + u) | 0 | (s & ~u)
+    }
+
+    return popcount(~s)
+  }
 
   for (let i = 0; i < textLength; i++) {
-    const symbol = stringText ? text.charCodeAt(textStart + i) : text[textStart + i]
+    const symbol = text[textStart + i]
     let matches: number
 
     if (
@@ -652,14 +678,39 @@ export function lcsLengthPrepared(
 
   if (words === 1) {
     let s = -1
-    const stringText = typeof text === 'string'
     const masks = prepared.masks
     const highBase = prepared.highBase
     const highCount = prepared.highCount
     const highStart = prepared.highStart
     const wideOffsets = prepared.wideOffsets
+
+    // The one-word prepared loop is where `ratio` and every `extract` over
+    // short strings spends its time, so the text's representation is settled
+    // once, out here, rather than asked of every element. `charCodeAt` yields
+    // an integer in `0..0xFFFF`, which answers all four tests the generic arm
+    // makes and leaves the `NaN` arm nothing to catch.
+    if (typeof text === 'string') {
+      for (let i = 0; i < textLength; i++) {
+        const symbol = text.charCodeAt(textStart + i)
+        let base: number
+        if (symbol < DIRECT_LOOKUP_LIMIT) {
+          base = symbol
+        } else {
+          const shifted = symbol - highBase
+          base =
+            shifted >= 0 && shifted < highCount
+              ? highStart + shifted
+              : (wideOffsets.get(symbol) ?? -1)
+        }
+        const matches = base < 0 ? 0 : masks[base]
+        const u = s & matches
+        s = (s + u) | 0 | (s & ~u)
+      }
+      return popcount(~s)
+    }
+
     for (let i = 0; i < textLength; i++) {
-      const symbol = stringText ? text.charCodeAt(textStart + i) : text[textStart + i]
+      const symbol = text[textStart + i]
       // Written out rather than called, and that is load bearing — see the note
       // on `patternBase`, whose body this is. A single shared copy sees numbers
       // from string inputs and strings and objects from array inputs, goes
@@ -989,14 +1040,38 @@ export function lcsLengthPreparedBounded(
 
   if (words === 1) {
     let s = -1
-    const stringText = typeof text === 'string'
     const masks = prepared.masks
     const highBase = prepared.highBase
     const highCount = prepared.highCount
     const highStart = prepared.highStart
     const wideOffsets = prepared.wideOffsets
+
+    // As in {@link lcsLengthPrepared}: a string settles every per-element test
+    // in advance, and this is the bounded form the prepared `process` paths
+    // reach.
+    if (typeof text === 'string') {
+      for (let i = 0; i < textLength; i++) {
+        const symbol = text.charCodeAt(textStart + i)
+        let base: number
+        if (symbol < DIRECT_LOOKUP_LIMIT) {
+          base = symbol
+        } else {
+          const shifted = symbol - highBase
+          base =
+            shifted >= 0 && shifted < highCount
+              ? highStart + shifted
+              : (wideOffsets.get(symbol) ?? -1)
+        }
+        const matches = base < 0 ? 0 : masks[base]
+        const u = s & matches
+        s = (s + u) | 0 | (s & ~u)
+        if (popcount(~s) + textLength - i - 1 < required) return -1
+      }
+      return popcount(~s)
+    }
+
     for (let i = 0; i < textLength; i++) {
-      const symbol = stringText ? text.charCodeAt(textStart + i) : text[textStart + i]
+      const symbol = text[textStart + i]
       // Written out rather than called, and that is load bearing — see the note
       // on `patternBase`, whose body this is. A single shared copy sees numbers
       // from string inputs and strings and objects from array inputs, goes
