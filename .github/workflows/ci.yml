@@ -40,7 +40,7 @@ jobs:
       # purely to produce coverage/lcov.info for the upload below.
       - run: pnpm coverage
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         with:
           files: ./coverage/lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
