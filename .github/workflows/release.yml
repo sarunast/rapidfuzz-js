@@ -83,7 +83,31 @@ jobs:
             npm publish --access public --ignore-scripts
           fi
 
+      # Prefer the CHANGELOG section changesets wrote for this version — it was
+      # composed when the change was made, by whoever made it. --generate-notes
+      # is the fallback, and a poor one here: it builds from merged pull
+      # requests, and this repository commits straight to main, so both times it
+      # has run it produced nothing but a compare link.
       - name: Create the GitHub release
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes=''
+          if [ -f CHANGELOG.md ]; then
+            notes="$(awk -v heading="## $version" '
+              $0 == heading { found = 1; next }
+              found && /^## / { exit }
+              found { print }
+            ' CHANGELOG.md)"
+          fi
+
+          if [ -n "$(printf '%s' "$notes" | tr -d '[:space:]')" ]; then
+            printf '%s\n' "$notes" > "$RUNNER_TEMP/notes.md"
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
+              --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+          else
+            echo "::notice::no CHANGELOG.md entry for $version — falling back to generated notes"
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
+              --generate-notes --verify-tag
+          fi
         env:
           GH_TOKEN: ${{ github.token }}

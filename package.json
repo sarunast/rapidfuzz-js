@@ -117,6 +117,9 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
+    "changeset": "changeset",
+    "changeset:status": "changeset status",
+    "changeset:version": "changeset version",
     "check:exports": "node scripts/check-exports.mjs",
     "check:pkg": "publint && attw --pack . --profile esm-only",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run check:exports && npm run check:pkg",
@@ -124,6 +127,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
+    "@changesets/cli": "2.31.1",
     "@types/node": "26.2.0",
     "fast-check": "4.9.0",
     "oxfmt": "0.62.0",
