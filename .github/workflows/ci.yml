@@ -36,24 +36,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
 
-  # package.json declares engines.node >=22, so prove the floor still runs the
-  # library. Tests only, because the build toolchain's Node requirement is not
-  # the published package's: tsdown loads its config through native TypeScript
-  # stripping and so needs 22+, which says nothing about what a consumer needs.
-  test:
-    name: test (node ${{ matrix.node }})
+  # package.json declares engines.node >=22, so prove the source tests still
+  # pass on the minimum supported runtime. The full check job above validates
+  # the build and package exports on Node 24.
+  compatibility:
+    name: compatibility (node 22)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [22, 24]
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile

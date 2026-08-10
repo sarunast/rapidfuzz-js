@@ -27,6 +27,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Configure this environment with required reviewers and a v* deployment
+    # branch/tag rule. Use the same name in npm's trusted-publisher settings.
+    environment: npm
     steps:
       - uses: actions/checkout@v7
         with:
@@ -45,7 +48,7 @@ jobs:
       # produces is an opaque auth error rather than a version complaint.
       - name: Ensure npm is new enough for OIDC
         run: |
-          npm install -g npm@latest
+          npm install -g npm@11.19.0
           npm --version
 
       # A tag that disagrees with package.json publishes the wrong version
@@ -59,6 +62,15 @@ jobs:
             exit 1
           fi
           echo "releasing $pkg"
+
+      # A version tag must identify a commit that was reviewed and merged to
+      # main, not merely any commit someone with tag-push access can reach.
+      - name: Verify the tagged commit belongs to main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME does not point to a commit on main"
+            exit 1
+          fi
 
       - run: pnpm install --frozen-lockfile
 
@@ -90,6 +102,11 @@ jobs:
       # has run it produced nothing but a compare link.
       - name: Create the GitHub release
         run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "::notice::GitHub release $GITHUB_REF_NAME already exists — skipping creation"
+            exit 0
+          fi
+
           version="${GITHUB_REF_NAME#v}"
           notes=''
           if [ -f CHANGELOG.md ]; then
