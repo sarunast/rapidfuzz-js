@@ -14,6 +14,7 @@
 // effect checked.
 import { describe, expect, it } from 'vitest'
 
+import { resetPartialRatioScratch } from '../../src/_fuzz/basic.js'
 import { resetBitVectorScratch } from '../../src/distance/_bitVector/shared.js'
 import {
   damerauLevenshteinDistance,
@@ -22,6 +23,7 @@ import {
 import { indelDistance } from '../../src/distance/indel.js'
 import { lcsSeqSimilarity } from '../../src/distance/lcsSeq.js'
 import { levenshteinDistance } from '../../src/distance/levenshtein.js'
+import { partialRatio, partialRatioAlignment } from '../../src/fuzz.js'
 
 /** One before the counter's ceiling, so the next build but one wraps it. */
 const NEAR_LIMIT = 0x7fff_fffd
@@ -79,6 +81,55 @@ describe('the shared mask table across its stamp wrap', () => {
     expect(levenshteinDistance('abcdef', 'mnopqr')).toBe(6)
 
     resetBitVectorScratch()
+  })
+})
+
+// `partialRatio`'s window bisection keeps the same kind of table for a different
+// question — "has this window been scored yet" rather than "does the pattern
+// hold this element" — and a stale stamp there is read as a distance the
+// current haystack never produced.
+describe('the window bisection across its stamp wrap', () => {
+  const needle = 'abcdefghijklmnopqrstuvwxyz'.repeat(3).slice(0, 64)
+  // Padding chosen twice over: past 64 interior windows so the bisection runs
+  // at all rather than the linear scan, and past 256 so the held buffers have
+  // to grow rather than being born big enough.
+  const planted = 'q'.repeat(300) + needle + 'z'.repeat(300)
+  const nearby = `${'q'.repeat(300) + needle.slice(0, 40)}xxxx${needle.slice(44)}${'z'.repeat(300)}`
+
+  it('keeps answering exactly while the counter turns over', () => {
+    resetPartialRatioScratch(NEAR_LIMIT)
+
+    // Four passes, so comparisons land either side of the wrap and a haystack
+    // scored before it is scored again after.
+    for (let pass = 0; pass < 4; pass++) {
+      expect(partialRatio(needle, planted)).toBe(100)
+      expect(partialRatio(needle, nearby)).toBeCloseTo(93.75, 5)
+    }
+
+    resetPartialRatioScratch()
+  })
+
+  it('does not carry a scored window across the wrap', () => {
+    resetPartialRatioScratch(NEAR_LIMIT)
+    const beforeWrap = partialRatioAlignment(needle, nearby)
+    // The second bisection is the one that turns the counter over.
+    const afterWrap = partialRatioAlignment(needle, nearby)
+
+    resetPartialRatioScratch()
+    expect(afterWrap).toEqual(partialRatioAlignment(needle, nearby))
+    expect(beforeWrap).toEqual(afterWrap)
+  })
+
+  // Above the retention cap the scan allocates its own pair, whose stamps are
+  // zeroes rather than a live generation — the same "nothing scored yet" state
+  // the held buffers reach by counting.
+  it('scores a haystack past the retention cap', () => {
+    resetPartialRatioScratch(NEAR_LIMIT)
+    const huge = needle + 'z'.repeat(70_000)
+
+    expect(partialRatio(needle, huge)).toBe(100)
+
+    resetPartialRatioScratch()
   })
 })
 

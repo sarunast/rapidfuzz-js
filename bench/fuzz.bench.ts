@@ -163,6 +163,17 @@ describe('partialRatio window scan', () => {
   measure('many interior windows', () => {
     for (let i = 0; i < 32; i++) partialRatio(needle, longHaystack)
   })
+  // The bisection's book-keeping is sized on the haystack while the search
+  // reads a handful of windows, so a long haystack whose first window is a
+  // perfect match is where that gap is widest — the scan stops immediately and
+  // everything else it prepared was waste. Composed here from `partialNeedle`
+  // rather than added to `_corpus.ts`, which is hashed into all 155 baseline
+  // entries where this file is hashed only into its own.
+  const plantedAtStart = needle + 'z'.repeat(8_000)
+
+  measure('perfect first window in an 8k haystack', () => {
+    for (let i = 0; i < 32; i++) partialRatio(needle, plantedAtStart)
+  })
 })
 
 // A 33-64 element pattern spans exactly two words, the width a specialised

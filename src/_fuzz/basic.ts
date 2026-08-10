@@ -271,6 +271,104 @@ function emptyTable(): Uint8Array {
   return (shared ??= new Uint8Array(256))
 }
 
+/**
+ * Scratch for the window bisection, which is sized on the haystack but reads
+ * almost none of it.
+ *
+ * The search visits O(log) of its windows; the array indexing them is
+ * `len2 - len1` long. So the `fill` that marked every entry unknown cost more
+ * than the search it prepared for, and it was paid per candidate. A generation
+ * stamp answers "has this window been scored" without writing to a cell the
+ * search never reaches, which drops both the fill and the allocation.
+ *
+ * Re-entrancy is what makes module scratch safe here, and the scan has none:
+ * the processor and every conversion run before it, and from the moment it
+ * starts it reads only strings, converted sequences, masks and its own sets.
+ * Nothing it calls can re-enter it.
+ *
+ * Held only up to {@link BISECTION_SCRATCH_LIMIT} windows. Above that a single
+ * comparison against a huge haystack would keep megabytes reachable for as long
+ * as nothing else was scored, which is the trade `MASK_PATTERN_LIMIT` draws for
+ * the same reason.
+ */
+const BISECTION_SCRATCH_LIMIT = 1 << 16
+let bisectionScores: Uint32Array | null = null
+let bisectionStamps: Int32Array | null = null
+let bisectionWindows: number[] = []
+let bisectionNextWindows: number[] = []
+let bisectionGeneration = 0
+
+/**
+ * A stamp is an `Int32Array` cell, so the counter cannot exceed what one holds.
+ * Reaching the ceiling takes two billion bisections in a single process, which
+ * no test is going to sit through — {@link resetPartialRatioScratch} takes a
+ * starting generation so the wrap can be driven directly instead.
+ */
+const BISECTION_GENERATION_LIMIT = 0x7fff_ffff
+
+/** Stamps start at 0 and generations at 1, so a stale slot can never match. */
+function nextBisectionGeneration(): number {
+  bisectionGeneration++
+  if (bisectionGeneration >= BISECTION_GENERATION_LIMIT) {
+    // Dropped rather than cleared. A fresh buffer is zeroes, which is the state
+    // a clearing fill would have written, and dropping needs no test for a
+    // buffer that may not have been built yet — the wrap is reachable on the
+    // very first bisection after a reset that starts the counter near it.
+    bisectionStamps = null
+    bisectionGeneration = 1
+  }
+
+  return bisectionGeneration
+}
+
+/**
+ * The two buffers, grown to `size`.
+ *
+ * Grown independently, which is safe in the one direction that matters: a fresh
+ * stamp buffer is all zeroes and so matches no live generation, leaving every
+ * window unscored. That is the conservative answer, and the only one a caller
+ * could act on wrongly is the opposite.
+ */
+function bisectionScoresFor(size: number): Uint32Array {
+  const held = bisectionScores
+  if (held !== null && held.length >= size) return held
+
+  // Sized from the floor rather than from what is already there: growth is
+  // rare, and starting the doubling at the existing length only spells the same
+  // answer with a branch on a buffer that may not exist.
+  let next = 256
+  while (next < size) next *= 2
+  bisectionScores = new Uint32Array(next)
+  return bisectionScores
+}
+
+function bisectionStampsFor(size: number): Int32Array {
+  const held = bisectionStamps
+  if (held !== null && held.length >= size) return held
+
+  let next = 256
+  while (next < size) next *= 2
+  bisectionStamps = new Int32Array(next)
+  return bisectionStamps
+}
+
+/**
+ * Drop the bisection's scratch.
+ *
+ * Correctness does not depend on it: a dropped buffer only costs the next
+ * bisection an allocation, and a dropped generation is answered by stamps that
+ * match nothing. `startGeneration` is the exception, and the reason this takes
+ * an argument at all — the wrap at {@link BISECTION_GENERATION_LIMIT} is two
+ * billion bisections away, so starting near it is what lets that path run.
+ */
+export function resetPartialRatioScratch(startGeneration = 0): void {
+  bisectionScores = null
+  bisectionStamps = null
+  bisectionWindows = []
+  bisectionNextWindows = []
+  bisectionGeneration = startGeneration
+}
+
 /** Port of `_partial_ratio_impl`. Assumes `s1.length <= s2.length`. */
 export function partialRatioImpl(
   s1: ArrayLike<unknown>,
@@ -463,34 +561,43 @@ function partialRatioScan(
       // within a tolerance. Its `sim >= scoreCutoff` guard is the `score >=
       // cutoff` test already made below. Routing through `consider` therefore
       // ran the kernel a second time over the window it had just scored.
-      const unknown = 0xffff_ffff
-      const scores = new Uint32Array(lastInterior + 1)
-      scores.fill(unknown)
+      const windowCount = lastInterior + 1
+      const held = windowCount <= BISECTION_SCRATCH_LIMIT
+      const generation = nextBisectionGeneration()
+      // A local pair above the cap. Its stamps are zeroes, which match no live
+      // generation, so it starts entirely unscored exactly as the held pair does.
+      const scores = held ? bisectionScoresFor(windowCount) : new Uint32Array(windowCount)
+      const stamps = held ? bisectionStampsFor(windowCount) : new Int32Array(windowCount)
       // From the running best rather than the caller's cutoff: on the alignment
       // path the shorter windows have already been scanned, and whatever they
       // found is a tighter bound than the one asked for.
       let distanceToBeat =
         Math.floor(2 * len1 * (1 - cutoff) + Number.EPSILON * 2 * len1) + 1
-      let windows = [0, lastInterior]
-      let nextWindows: number[] = []
+      let windows = held ? bisectionWindows : []
+      let nextWindows = held ? bisectionNextWindows : []
+      windows.length = 0
+      nextWindows.length = 0
+      windows.push(0, lastInterior)
 
       while (windows.length !== 0) {
         for (let window = 0; window < windows.length; window += 2) {
           const first = windows[window]
           const last = windows[window + 1]
 
-          if (scores[first] === unknown) {
+          if (stamps[first] !== generation) {
             const distance = windowDistance(first)
             scores[first] = distance
+            stamps[first] = generation
             const score = 1 - distance / (2 * len1)
             if (distance < distanceToBeat && score >= cutoff) {
               distanceToBeat = distance
               if (acceptKnownScore(score, first, first + len1)) return true
             }
           }
-          if (scores[last] === unknown) {
+          if (stamps[last] !== generation) {
             const distance = windowDistance(last)
             scores[last] = distance
+            stamps[last] = generation
             const score = 1 - distance / (2 * len1)
             if (distance < distanceToBeat && score >= cutoff) {
               distanceToBeat = distance
