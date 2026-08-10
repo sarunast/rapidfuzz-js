@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.venv/
+bench/comparison/last-run.json
+coverage/
+*.tgz
+.DS_Store
+*.log

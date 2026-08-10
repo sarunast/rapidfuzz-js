@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+
+    "strict": true,
+    // Off by design: see CLAUDE.md. With it on, every indexed read in the
+    // distance DP loops would need a `!` assertion, which the project bans.
+    "noUncheckedIndexedAccess": false,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    // Every exported scorer is annotated rather than inferred, so the emitted
+    // .d.ts never names an internal `*_impl`. This flag is what keeps it that
+    // way, and it lets the bundler generate declarations without a type-check.
+    "isolatedDeclarations": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // `declaration` is on only to satisfy `isolatedDeclarations`, which is a
+    // constraint on declaration emit. `noEmit` still means nothing is written;
+    // tsdown produces the shipped .d.ts files.
+    "declaration": true,
+    "noEmit": true
+  },
+  "include": ["src", "tests", "bench", "*.config.ts"]
+}
