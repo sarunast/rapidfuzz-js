@@ -7,3 +7,24 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+
+  # Every dependency here is a dev dependency — the package ships none — so an
+  # update is a change to the toolchain rather than to what users install.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # pnpm 11 refuses to install a release younger than 1440 minutes unless the
+    # version is written into `minimumReleaseAgeExclude`. Dependabot cannot
+    # write that list, so without a cooldown a pull request raised against a
+    # same-day release would fail `pnpm install` in CI and need the exemption
+    # added by hand. Three days clears the window with room for a weekend.
+    cooldown:
+      default-days: 3
+    # One pull request for the toolchain rather than eight. A lockfile is a
+    # single file, and eight branches touching it means seven rebases.
+    groups:
+      dev-dependencies:
+        patterns:
+          - '*'
