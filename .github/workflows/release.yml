@@ -25,7 +25,21 @@ permissions:
   id-token: write # mint the OIDC token npm authenticates against
 
 jobs:
+  # The whole of CI, run against the tagged commit rather than trusted from
+  # whenever main last went green: check on Node 24, the tests again on Node 22,
+  # and `pnpm coverage` with its 100% threshold. Coverage is the part the
+  # release job's own `pnpm check` does not cover — `check` runs the tests
+  # uninstrumented — so without this a release could ship below the line CI
+  # holds every other day.
+  #
+  # `secrets: inherit` is for the Codecov upload inside it; nothing else there
+  # reads a secret, and the job cannot see the npm environment's.
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
   release:
+    needs: ci
     runs-on: ubuntu-latest
     # Configure this environment with required reviewers and a v* deployment
     # branch/tag rule. Use the same name in npm's trusted-publisher settings.
@@ -74,10 +88,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # typecheck, lint, format:check, test, build, check:exports, check:pkg.
-      # This is exactly what prepublishOnly runs, so the publish below passes
-      # --ignore-scripts rather than paying for the whole suite twice.
-      - run: pnpm check
+      # Only the build, not the whole of `pnpm check`. The `ci` job above ran
+      # check on this very commit — both jobs check out the same tag — so
+      # repeating typecheck, lint, tests, check:exports and check:pkg here would
+      # be a second opinion on an identical tree. What does not survive that job
+      # is its working directory, and `npm publish` needs a dist/ in this one.
+      #
+      # It follows that `needs: ci` is the gate rather than a formality: with
+      # --ignore-scripts below skipping prepublishOnly, this job validates
+      # nothing on its own.
+      - run: pnpm build
 
       # No --provenance: publishing over OIDC attaches provenance on its own.
       #
