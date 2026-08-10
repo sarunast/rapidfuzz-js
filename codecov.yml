@@ -1,0 +1,101 @@
+# Codecov configuration. Validate a change to this file before pushing it:
+#
+#   curl -X POST --data-binary @codecov.yml https://codecov.io/validate
+#
+# Codecov is not the coverage gate — `pnpm coverage` is, and it fails below
+# 100% on a laptop and in CI alike. What Codecov adds is the diff view: which
+# lines a pull request left uncovered, annotated in the files tab, before the
+# threshold has to explain it in a log.
+codecov:
+  # Do not post a status until the upload has arrived. Without this a pull
+  # request can show a stale pass from the base branch.
+  require_ci_to_pass: true
+  notify:
+    # One upload per commit, from the `check` job. Waiting for a second one
+    # would hold every status open until the timeout.
+    after_n_builds: 1
+
+coverage:
+  precision: 2
+  round: down
+  # The bar chart in the UI spans the range it is given. 100...100 makes any
+  # drop visible rather than a barely shorter bar.
+  range: '100...100'
+
+  status:
+    project:
+      default:
+        target: 100%
+        # No slack. The local threshold allows none either, so a Codecov status
+        # that tolerated a fraction of a percent would disagree with the run
+        # that actually failed.
+        threshold: 0%
+        if_ci_failed: error
+    patch:
+      default:
+        target: 100%
+        threshold: 0%
+
+# Only `src/` is instrumented (see vitest.config.ts), but a path that is never
+# reported still shows up in the UI as unknown. Naming them keeps the file tree
+# to the library itself.
+ignore:
+  - bench/**
+  - scripts/**
+  - tests/**
+  - dist/**
+  - '**/*.config.ts'
+  - '**/*.bench.ts'
+
+# A breakdown per area, so a pull request that drops coverage says where. These
+# carry no statuses of their own: the project status above already fails on any
+# drop, and a second failing check per component would say the same thing five
+# times.
+component_management:
+  individual_components:
+    - component_id: distance
+      name: distance kernels
+      paths:
+        - src/distance/**
+    - component_id: fuzz
+      name: fuzz scorers
+      paths:
+        - src/_fuzz/**
+        - src/fuzz.ts
+    - component_id: search
+      name: search
+      paths:
+        - src/search.ts
+        - src/_scoreArray.ts
+        - src/match.ts
+    - component_id: shared
+      name: shared
+      paths:
+        - src/_common.ts
+        - src/utils.ts
+        - src/configure.ts
+
+comment:
+  layout: 'header, diff, components, flags, files, footer'
+  behavior: default
+  # Nothing changed means nothing to say. A comment on every push trains people
+  # to skip it.
+  require_changes: true
+
+github_checks:
+  # Inline annotations on the uncovered lines, which is the whole point of
+  # uploading to a service that already has a passing threshold behind it.
+  annotations: true
+
+# Bundle analysis, uploaded from the same job after `pnpm build`.
+#
+# Read it as "what does the published package weigh", not "what will a consumer
+# ship". tsdown builds with `unbundle: true`, so dist/ is one file per source
+# module and these are the sizes npm serves. A consumer's bundler tree-shakes
+# across those boundaries — measuring that needs a real bundle over a real
+# entry point, which is what the README's badge does.
+bundle_analysis:
+  # Fail the status on growth rather than merely mentioning it. 5% of a module
+  # is a deliberate change to it, not drift.
+  status: true
+  warning_threshold: '5%'

@@ -53,6 +53,30 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
+      # Sizes of the published files, so a pull request that grows one says so.
+      # `pnpm check` above already built dist/.
+      #
+      # This measures what npm serves, not what a consumer ships: tsdown builds
+      # with `unbundle: true`, so dist/ is one file per source module and a
+      # bundler tree-shakes across those boundaries afterwards.
+      #
+      # Skipped without a token, which is the case on a pull request from a
+      # fork — the CLI has nowhere to upload and would fail the job over a
+      # measurement. The check is in the script rather than an `if:` because a
+      # step's own `env` is not in scope for its own condition.
+      - name: Bundle sizes
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          if [ -z "$CODECOV_TOKEN" ]; then
+            echo "::notice::no CODECOV_TOKEN — skipping bundle analysis"
+            exit 0
+          fi
+          pnpm exec bundle-analyzer ./dist \
+            --bundle-name=rapidfuzz-js-dist \
+            --upload-token="$CODECOV_TOKEN" \
+            --ignore-patterns "**/*.map" "**/*.d.ts"
+
   # package.json declares engines.node >=22, so prove the source tests still
   # pass on the minimum supported runtime. The full check job above validates
   # the build and package exports on Node 24.

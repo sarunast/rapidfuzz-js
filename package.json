@@ -119,12 +119,14 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check:exports": "node scripts/check-exports.mjs",
+    "bundle:sizes": "bundle-analyzer ./dist --dry-run --bundle-name=rapidfuzz-js-dist --ignore-patterns \"**/*.map\" \"**/*.d.ts\"",
     "check:pkg": "publint && attw --pack . --profile esm-only",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run check:exports && npm run check:pkg",
     "prepublishOnly": "npm run check"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
+    "@codecov/bundle-analyzer": "2.0.1",
     "@types/node": "26.2.0",
     "@vitest/coverage-v8": "4.1.10",
     "fast-check": "4.9.0",
