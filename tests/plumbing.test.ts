@@ -143,6 +143,48 @@ describe('a distance scorer through each extract path', () => {
     expect(kept.map((r) => r.choice)).toEqual(['abc', 'abd'])
   })
 
+  // A list and a keyed collection reach the same comparison down separate
+  // loops: `extractIter` and `extract`'s unlimited branch each take an array
+  // straight, rather than through `entriesOf`. Both need a distance scorer to
+  // see the direction the tests above only exercise on the keyed shape.
+  it('keeps everything within the cutoff from a list', () => {
+    const list = ['aaa', 'abc', 'abd']
+    expect(
+      [...extractIter('abc', list, { scorer, scoreCutoff: 1 })].map((r) => [
+        r.choice,
+        r.key,
+      ]),
+    ).toEqual([
+      ['abc', 1],
+      ['abd', 2],
+    ])
+  })
+
+  it('orders an unlimited extract over a list lowest first', () => {
+    const list = ['aaa', 'abc', 'abd']
+    expect(
+      extract('abc', list, { scorer, limit: null, scoreCutoff: 1 }).map((r) => [
+        r.choice,
+        r.score,
+      ]),
+    ).toEqual([
+      ['abc', 0],
+      ['abd', 1],
+    ])
+  })
+
+  it('orders an unlimited extract over a keyed collection lowest first', () => {
+    expect(
+      extract('abc', CHOICES, { scorer, limit: null, scoreCutoff: 1 }).map((r) => [
+        r.choice,
+        r.key,
+      ]),
+    ).toEqual([
+      ['abc', 'b'],
+      ['abd', 'c'],
+    ])
+  })
+
   it('orders a limited extract lowest first', () => {
     expect(extract('abc', CHOICES, { scorer, limit: 2 }).map((r) => r.choice)).toEqual([
       'abc',
@@ -193,6 +235,41 @@ describe('a distance scorer through each extract path', () => {
       key: 0,
     })
   })
+})
+
+// The unlimited paths — `extractIter`, and `extract` with `limit: null` — run a
+// separate loop per collection shape, so each shape needs both scorer
+// directions and a missing choice of its own. A `null` choice is skipped
+// wherever it appears, and skipped before it is scored.
+describe('every unlimited path, both directions, with a gap', () => {
+  const LIST = ['aaa', null, 'abc']
+  const KEYED = { a: 'aaa', b: null, c: 'abc' }
+
+  for (const [what, scorer, best] of [
+    ['a similarity scorer', ratio, 'abc'],
+    ['a distance scorer', levenshteinDistance, 'abc'],
+  ] as const) {
+    it(`skips a missing choice in a list under ${what}`, () => {
+      expect([...extractIter('abc', LIST, { scorer })].map((r) => r.choice)).toEqual([
+        'aaa',
+        'abc',
+      ])
+      const all = extract('abc', LIST, { scorer, limit: null })
+      expect(all.map((r) => r.choice)).toEqual([best, 'aaa'])
+      expect(all.map((r) => r.key)).toEqual([2, 0])
+    })
+
+    it(`skips a missing choice in a keyed collection under ${what}`, () => {
+      expect([...extractIter('abc', KEYED, { scorer })].map((r) => r.key)).toEqual([
+        'a',
+        'c',
+      ])
+      expect(extract('abc', KEYED, { scorer, limit: null }).map((r) => r.key)).toEqual([
+        'c',
+        'a',
+      ])
+    })
+  }
 })
 
 describe('a query that is missing', () => {
