@@ -1,0 +1,71 @@
+name: Release
+
+# Cutting a release is one command: push a tag whose name matches
+# package.json's version.
+#
+#   git tag -a v0.1.0 -m v0.1.0 && git push origin v0.1.0
+#
+on:
+  push:
+    tags: ['v*']
+
+# Never let two releases publish at once, and never cancel one part-way.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the GitHub release
+  id-token: write # sign the npm package with provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # --generate-notes needs the history and prior tags
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # A tag that disagrees with package.json publishes the wrong version
+      # under the right name, which cannot be taken back. Check it first.
+      - name: Verify the tag matches package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $pkg"
+            exit 1
+          fi
+          echo "releasing $pkg"
+
+      - run: pnpm install --frozen-lockfile
+
+      # typecheck, lint, format:check, test, build, check:exports, check:pkg.
+      # This is exactly what prepublishOnly runs, so the publish below passes
+      # --ignore-scripts rather than paying for the whole suite twice.
+      - run: pnpm check
+
+      - name: Publish to npm
+        if: env.NPM_TOKEN != ''
+        run: npm publish --provenance --access public --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Note a skipped publish
+        if: env.NPM_TOKEN == ''
+        run: echo "::warning::NPM_TOKEN is not set — tagging the GitHub release only, nothing published to npm"
+
+      - name: Create the GitHub release
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
