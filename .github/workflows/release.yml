@@ -68,8 +68,20 @@ jobs:
       - run: pnpm check
 
       # No --provenance: publishing over OIDC attaches provenance on its own.
+      #
+      # Skipping a version already on the registry keeps this step honest in
+      # the two cases where it would otherwise fail on something that is not a
+      # problem: the first release, whose npm publish has to happen by hand
+      # because a trusted publisher cannot be granted to a name that does not
+      # exist yet, and a re-run after a later step failed.
       - name: Publish to npm
-        run: npm publish --access public --ignore-scripts
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if npm view "rapidfuzz-js@$version" version > /dev/null 2>&1; then
+            echo "::notice::rapidfuzz-js@$version is already on npm — skipping publish"
+          else
+            npm publish --access public --ignore-scripts
+          fi
 
       - name: Create the GitHub release
         run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
