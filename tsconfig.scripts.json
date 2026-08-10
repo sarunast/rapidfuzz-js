@@ -1,21 +1,19 @@
 // The plain-JavaScript tooling: `bench/*.mjs` and `scripts/*.mjs`.
 //
-// Separate from `tsconfig.json` because these files are checked on different
-// terms. They are `.mjs` on purpose — `bench/compare.mjs` sets environment
-// variables around a child process, so it cannot be a `.ts` file that needs
-// compiling first, and it must stay outside the set `compare.mjs` fingerprints.
+// Separate from the TypeScript development config because these files are
+// checked on different terms. They are `.mjs` on purpose —
+// `bench/compare.mjs` sets environment variables around a child process, so it
+// cannot be a `.ts` file that first needs compilation. It also must stay
+// outside the set `compare.mjs` fingerprints.
 // Their types live in JSDoc, checked by `checkJs`.
 //
-// `isolatedDeclarations` is off here and nowhere else: it constrains declaration
-// emit for the published library, and nothing in this project ships a `.d.ts`
-// for a build script.
+// Like the rest of the development tooling, these scripts do not emit public
+// declarations.
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.dev.json",
   "compilerOptions": {
     "allowJs": true,
-    "checkJs": true,
-    "declaration": false,
-    "isolatedDeclarations": false
+    "checkJs": true
   },
   "include": ["bench/**/*.mjs", "scripts/**/*.mjs"],
   // `bench/comparison` is excluded because its imports are six fuzzy-matching

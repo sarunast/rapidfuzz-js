@@ -32,169 +32,73 @@
   ],
   "type": "module",
   "sideEffects": false,
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./fuzz": {
-      "import": {
-        "types": "./dist/fuzz.d.ts",
-        "default": "./dist/fuzz.js"
-      },
-      "require": {
-        "types": "./dist/fuzz.d.cts",
-        "default": "./dist/fuzz.cjs"
-      }
+      "types": "./dist/fuzz.d.ts",
+      "import": "./dist/fuzz.js"
     },
     "./search": {
-      "import": {
-        "types": "./dist/search.d.ts",
-        "default": "./dist/search.js"
-      },
-      "require": {
-        "types": "./dist/search.d.cts",
-        "default": "./dist/search.cjs"
-      }
+      "types": "./dist/search.d.ts",
+      "import": "./dist/search.js"
     },
     "./match": {
-      "import": {
-        "types": "./dist/match.d.ts",
-        "default": "./dist/match.js"
-      },
-      "require": {
-        "types": "./dist/match.d.cts",
-        "default": "./dist/match.cjs"
-      }
+      "types": "./dist/match.d.ts",
+      "import": "./dist/match.js"
     },
     "./utils": {
-      "import": {
-        "types": "./dist/utils.d.ts",
-        "default": "./dist/utils.js"
-      },
-      "require": {
-        "types": "./dist/utils.d.cts",
-        "default": "./dist/utils.cjs"
-      }
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js"
     },
     "./distance": {
-      "import": {
-        "types": "./dist/distance/index.d.ts",
-        "default": "./dist/distance/index.js"
-      },
-      "require": {
-        "types": "./dist/distance/index.d.cts",
-        "default": "./dist/distance/index.cjs"
-      }
+      "types": "./dist/distance/index.d.ts",
+      "import": "./dist/distance/index.js"
     },
     "./distance/Indel": {
-      "import": {
-        "types": "./dist/distance/namespaces/Indel.d.ts",
-        "default": "./dist/distance/namespaces/Indel.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/Indel.d.cts",
-        "default": "./dist/distance/namespaces/Indel.cjs"
-      }
+      "types": "./dist/distance/namespaces/Indel.d.ts",
+      "import": "./dist/distance/namespaces/Indel.js"
     },
     "./distance/LCSseq": {
-      "import": {
-        "types": "./dist/distance/namespaces/LCSseq.d.ts",
-        "default": "./dist/distance/namespaces/LCSseq.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/LCSseq.d.cts",
-        "default": "./dist/distance/namespaces/LCSseq.cjs"
-      }
+      "types": "./dist/distance/namespaces/LCSseq.d.ts",
+      "import": "./dist/distance/namespaces/LCSseq.js"
     },
     "./distance/Levenshtein": {
-      "import": {
-        "types": "./dist/distance/namespaces/Levenshtein.d.ts",
-        "default": "./dist/distance/namespaces/Levenshtein.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/Levenshtein.d.cts",
-        "default": "./dist/distance/namespaces/Levenshtein.cjs"
-      }
+      "types": "./dist/distance/namespaces/Levenshtein.d.ts",
+      "import": "./dist/distance/namespaces/Levenshtein.js"
     },
     "./distance/DamerauLevenshtein": {
-      "import": {
-        "types": "./dist/distance/namespaces/DamerauLevenshtein.d.ts",
-        "default": "./dist/distance/namespaces/DamerauLevenshtein.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/DamerauLevenshtein.d.cts",
-        "default": "./dist/distance/namespaces/DamerauLevenshtein.cjs"
-      }
+      "types": "./dist/distance/namespaces/DamerauLevenshtein.d.ts",
+      "import": "./dist/distance/namespaces/DamerauLevenshtein.js"
     },
     "./distance/OSA": {
-      "import": {
-        "types": "./dist/distance/namespaces/OSA.d.ts",
-        "default": "./dist/distance/namespaces/OSA.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/OSA.d.cts",
-        "default": "./dist/distance/namespaces/OSA.cjs"
-      }
+      "types": "./dist/distance/namespaces/OSA.d.ts",
+      "import": "./dist/distance/namespaces/OSA.js"
     },
     "./distance/Hamming": {
-      "import": {
-        "types": "./dist/distance/namespaces/Hamming.d.ts",
-        "default": "./dist/distance/namespaces/Hamming.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/Hamming.d.cts",
-        "default": "./dist/distance/namespaces/Hamming.cjs"
-      }
+      "types": "./dist/distance/namespaces/Hamming.d.ts",
+      "import": "./dist/distance/namespaces/Hamming.js"
     },
     "./distance/Jaro": {
-      "import": {
-        "types": "./dist/distance/namespaces/Jaro.d.ts",
-        "default": "./dist/distance/namespaces/Jaro.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/Jaro.d.cts",
-        "default": "./dist/distance/namespaces/Jaro.cjs"
-      }
+      "types": "./dist/distance/namespaces/Jaro.d.ts",
+      "import": "./dist/distance/namespaces/Jaro.js"
     },
     "./distance/JaroWinkler": {
-      "import": {
-        "types": "./dist/distance/namespaces/JaroWinkler.d.ts",
-        "default": "./dist/distance/namespaces/JaroWinkler.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/JaroWinkler.d.cts",
-        "default": "./dist/distance/namespaces/JaroWinkler.cjs"
-      }
+      "types": "./dist/distance/namespaces/JaroWinkler.d.ts",
+      "import": "./dist/distance/namespaces/JaroWinkler.js"
     },
     "./distance/Prefix": {
-      "import": {
-        "types": "./dist/distance/namespaces/Prefix.d.ts",
-        "default": "./dist/distance/namespaces/Prefix.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/Prefix.d.cts",
-        "default": "./dist/distance/namespaces/Prefix.cjs"
-      }
+      "types": "./dist/distance/namespaces/Prefix.d.ts",
+      "import": "./dist/distance/namespaces/Prefix.js"
     },
     "./distance/Postfix": {
-      "import": {
-        "types": "./dist/distance/namespaces/Postfix.d.ts",
-        "default": "./dist/distance/namespaces/Postfix.js"
-      },
-      "require": {
-        "types": "./dist/distance/namespaces/Postfix.d.cts",
-        "default": "./dist/distance/namespaces/Postfix.cjs"
-      }
+      "types": "./dist/distance/namespaces/Postfix.d.ts",
+      "import": "./dist/distance/namespaces/Postfix.js"
     },
     "./package.json": "./package.json"
   },
@@ -209,12 +113,12 @@
     "bench:compare:quick": "node bench/compare.mjs --quick",
     "bench:baseline": "node bench/compare.mjs --record",
     "bench:libraries": "node bench/comparison/run.mjs",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.dev.json && tsc -p tsconfig.scripts.json",
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check:exports": "node scripts/check-exports.mjs",
-    "check:pkg": "publint && attw --pack . --profile node16",
+    "check:pkg": "publint && attw --pack . --profile esm-only",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run check:exports && npm run check:pkg",
     "prepublishOnly": "npm run check"
   },

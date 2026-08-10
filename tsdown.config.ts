@@ -6,7 +6,6 @@ const config: UserConfig = defineConfig({
     'src/fuzz.ts',
     'src/search.ts',
     'src/match.ts',
-    'src/configure.ts',
     'src/utils.ts',
     'src/distance/index.ts',
     'src/distance/namespaces/Indel.ts',
@@ -20,16 +19,14 @@ const config: UserConfig = defineConfig({
     'src/distance/namespaces/Prefix.ts',
     'src/distance/namespaces/Postfix.ts',
   ],
-  format: ['esm', 'cjs'],
+  root: 'src',
+  format: 'esm',
   dts: true,
-  // Emit one output file per source file so consumers can drop what they
-  // don't import. A single bundled index.js defeats tree-shaking for
-  // anyone whose bundler can't re-analyse our output.
+  // Preserve source-module boundaries so subpath imports stay narrow and
+  // browser bundlers can tree-shake at module granularity.
   unbundle: true,
   target: 'es2022',
   platform: 'neutral',
-  clean: true,
-  treeshake: true,
   sourcemap: true,
 })
 

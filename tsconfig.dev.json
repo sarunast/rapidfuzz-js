@@ -1,0 +1,11 @@
+// Node-based development code. Kept separate from the published library so
+// `src` cannot accidentally depend on Node globals such as `process` or Buffer.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "declaration": false,
+    "isolatedDeclarations": false
+  },
+  "include": ["tests", "bench/**/*.ts", "*.config.ts"]
+}
