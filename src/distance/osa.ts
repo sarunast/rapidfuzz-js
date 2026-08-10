@@ -222,7 +222,7 @@ function prepareOsa(kind: PreparedOsaKind): PrepareScorer {
           return normSimCutoff(1 - normalize(distance, max), rawCutoff)
       }
     }
-    Object.defineProperty(score, PREPARE_CHOICE, { value: prepareScorerChoice })
+    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
 }

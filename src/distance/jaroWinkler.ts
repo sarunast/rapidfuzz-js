@@ -242,7 +242,7 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PrepareScorer {
           return normSimCutoff(similarity, rawCutoff)
       }
     }
-    Object.defineProperty(score, PREPARE_CHOICE, { value: prepareScorerChoice })
+    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
 }

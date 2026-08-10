@@ -418,7 +418,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
         }
       }
     }
-    Object.defineProperty(score, PREPARE_CHOICE, { value: prepareChoice })
+    score[PREPARE_CHOICE] = prepareChoice
     return score
   }
 }

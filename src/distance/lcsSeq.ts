@@ -298,7 +298,7 @@ function prepareLcs(kind: PreparedLcsKind): PrepareScorer {
         }
       }
     }
-    Object.defineProperty(score, PREPARE_CHOICE, { value: prepareScorerChoice })
+    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
 }

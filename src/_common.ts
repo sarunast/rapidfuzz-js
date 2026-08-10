@@ -201,7 +201,18 @@ export type PrepareChoice = (choice: unknown) => unknown
 
 export interface PreparedScore {
   (choice: unknown, scoreCutoff: number | null, scoreHint: number | null): number
-  readonly [PREPARE_CHOICE]?: PrepareChoice
+  /**
+   * Writable, and assigned rather than defined.
+   *
+   * Every factory attaches this to the closure it just built, so it is paid
+   * once per prepared query — once per row of a `scoreMatrix`. Measured,
+   * `Object.defineProperty` costs **109 ns** there against **1.4 ns** for an
+   * assignment, which was 78% of the whole `ratio` factory. The property
+   * descriptor bought nothing to lose: the key is a symbol, so it is already
+   * absent from `Object.keys`, `for...in` and `JSON.stringify`, and the only
+   * reader is `scoreMatrix`.
+   */
+  [PREPARE_CHOICE]?: PrepareChoice
 }
 
 export type PrepareScorer = (
@@ -308,7 +319,7 @@ export function prepareMetric(
           return normSimCutoff(1 - normalize(dist, max), rawCutoff)
       }
     }
-    Object.defineProperty(score, PREPARE_CHOICE, { value: prepareScorerChoice })
+    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
 }

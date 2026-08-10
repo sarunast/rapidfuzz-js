@@ -524,7 +524,7 @@ export function prepareJaro(kind: PreparedJaroKind): PrepareScorer {
           return normSimCutoff(similarity, rawCutoff)
       }
     }
-    Object.defineProperty(score, PREPARE_CHOICE, { value: prepareScorerChoice })
+    score[PREPARE_CHOICE] = prepareScorerChoice
     return score
   }
 }
