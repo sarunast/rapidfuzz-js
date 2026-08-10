@@ -36,6 +36,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
 
+      # `pnpm check` already ran the tests; this re-runs them instrumented,
+      # purely to produce coverage/lcov.info for the upload below.
+      - run: pnpm coverage
+
+      - uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
   # package.json declares engines.node >=22, so prove the source tests still
   # pass on the minimum supported runtime. The full check job above validates
   # the build and package exports on Node 24.

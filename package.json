@@ -107,6 +107,7 @@
     "dev": "tsdown --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "coverage": "vitest run --coverage --coverage.reporter=text --coverage.reporter=lcov",
     "bench": "vitest bench --run",
     "bench:quick": "node bench/run.mjs",
     "bench:compare": "node bench/compare.mjs",
@@ -125,6 +126,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@types/node": "26.2.0",
+    "@vitest/coverage-v8": "4.1.10",
     "fast-check": "4.9.0",
     "oxfmt": "0.62.0",
     "oxlint": "1.77.0",
