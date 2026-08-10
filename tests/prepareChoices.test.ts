@@ -187,6 +187,30 @@ describe('an index refuses a call it was not prepared for', () => {
   it('accepts the scorer it was prepared for, named again', () => {
     expect(extract('abc', index, { scorer: ratio })).toEqual(extract('abc', index, {}))
   })
+
+  it('refuses a limit that asks for nothing', () => {
+    // `limit <= 0` returns an empty array without scoring anything, which is a
+    // reason to skip the work and not a reason to accept the call: the options
+    // disagree with the index either way.
+    for (const limit of [0, -1]) {
+      expect(() => extract('abc', index, { scorer: tokenSortRatio, limit })).toThrow(
+        /prepared for/,
+      )
+      expect(() => extract('abc', index, { processor: defaultProcess, limit })).toThrow(
+        /prepared for/,
+      )
+    }
+  })
+
+  it('accepts a limit that asks for nothing when the options agree', () => {
+    expect(extract('abc', index, { scorer: ratio, limit: 0 })).toEqual([])
+    expect(extract('abc', index, { limit: -1 })).toEqual([])
+  })
+
+  it('leaves a plain collection alone at the same limits', () => {
+    expect(extract('abc', ['abc'], { scorer: tokenSortRatio, limit: 0 })).toEqual([])
+    expect(extract('abc', ['abc'], { processor: defaultProcess, limit: -1 })).toEqual([])
+  })
 })
 
 describe('an index defaults to what extract does', () => {
@@ -241,8 +265,21 @@ describe('an index that was copied rather than passed', () => {
   it('is refused by every entry point', () => {
     expect(() => extract('abc', copy, {})).toThrow(/cannot be copied/)
     expect(() => extract('abc', copy, { limit: null })).toThrow(TypeError)
+    expect(() => extract('abc', copy, { limit: 1 })).toThrow(TypeError)
     expect(() => extractOne('abc', copy, {})).toThrow(TypeError)
     expect(() => [...extractIter('abc', copy, {})]).toThrow(TypeError)
+  })
+
+  it('is refused before the query and before the limit', () => {
+    // The two paths that would otherwise return early with nothing to score: a
+    // missing query, and a limit asking for no results. Provenance is a fact
+    // about the index, so neither is a reason to stop asking about it.
+    expect(() => extract(null, copy, {})).toThrow(/cannot be copied/)
+    expect(() => extract('abc', copy, { limit: 0 })).toThrow(/cannot be copied/)
+    expect(() => extract('abc', copy, { limit: -1 })).toThrow(/cannot be copied/)
+    expect(() => extract('abc', copy, { scorer: ratio, limit: 0 })).toThrow(
+      /cannot be copied/,
+    )
   })
 
   it('leaves the original working', () => {

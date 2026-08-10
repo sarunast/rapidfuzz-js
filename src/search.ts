@@ -424,6 +424,37 @@ function isIndex<T>(
   return typeof choices === 'object' && choices !== null && PREPARED_CHOICES in choices
 }
 
+/**
+ * Refuse a call that disagrees with the index it names, or names an index this
+ * module did not build. A collection is not an index and has nothing to check.
+ *
+ * Separate from {@link prepare} because one path has to run it without ever
+ * preparing anything: `extract` returns `[]` for `limit <= 0` before it has a
+ * query, a processor call or a scorer state, and a call that is wrong about its
+ * index is wrong whether or not it asked for any results back. Two identity
+ * tests and a `WeakMap` lookup is the whole cost, so that path pays nothing it
+ * would not have paid at `limit: 1`.
+ */
+function checkIndex<T>(
+  options: SearchOptions,
+  choices: Choices<T> | PreparedChoices<T, unknown>,
+): void {
+  if (!isIndex(choices)) return
+
+  // Both are identity tests on purpose: two scorers that do the same thing
+  // still prepare a choice differently, and an index cannot say whether a
+  // second processor would agree with the one it already applied.
+  if (options.scorer !== undefined && options.scorer !== choices.scorer) {
+    throw new TypeError('scorer differs from the one this index was prepared for')
+  }
+  if (options.processor != null && options.processor !== choices.processor) {
+    throw new TypeError('processor differs from the one this index was prepared for')
+  }
+  // Provenance on the same footing as the two above: a copy is refused for what
+  // it is, before anything asks it for prepared state it does not have.
+  payloadOf(choices)
+}
+
 /** The scorer a call runs, which an index supplies when the options do not. */
 function scorerFor<T>(
   options: SearchOptions,
@@ -469,18 +500,9 @@ function prepare<T>(
 ): Prepared | null {
   const scorer = scorerFor(options, choices)
   const index = isIndex(choices) ? choices : null
-  if (index !== null) {
-    // Before the `isNone` return below, so a mismatched call is refused whatever
-    // the query is. Both are identity tests on purpose: two scorers that do the
-    // same thing still prepare a choice differently, and an index cannot say
-    // whether a second processor would agree with the one it already applied.
-    if (options.scorer !== undefined && options.scorer !== index.scorer) {
-      throw new TypeError('scorer differs from the one this index was prepared for')
-    }
-    if (options.processor != null && options.processor !== index.processor) {
-      throw new TypeError('processor differs from the one this index was prepared for')
-    }
-  }
+  // Before the `isNone` return below, so a bad index is refused whatever the
+  // query is.
+  checkIndex(options, choices)
   const { worstScore, optimalScore } = scorerFlagsOf(scorer)
   const lowestScoreWorst = optimalScore > worstScore
 
@@ -833,7 +855,14 @@ export function extract<T>(
     return results
   }
 
-  if (limit <= 0) return []
+  // An empty result is still this index's answer, so the call still has to be
+  // one the index accepts — a mismatched scorer is a mistake at `limit: 0` for
+  // the same reason it is at `limit: 5`. Checked rather than prepared: no
+  // processor runs and no query is built for a call that asked for nothing.
+  if (limit <= 0) {
+    checkIndex(options, choices)
+    return []
+  }
 
   const state = prepare(query, options, choices)
   if (state === null) return []
