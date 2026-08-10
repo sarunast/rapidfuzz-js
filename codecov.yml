@@ -87,6 +87,15 @@ github_checks:
   # uploading to a service that already has a passing threshold behind it.
   annotations: true
 
+# Per-test results, uploaded as JUnit XML from the same job. The reporter is
+# on `pnpm coverage` rather than in vitest.config.ts, for the same reason the
+# 100% threshold is: that file is hashed into every benchmark baseline entry.
+test_analytics:
+  # A test that fails and passes on one commit is the expensive kind, because
+  # the run that catches it looks exactly like a real break. Detecting it needs
+  # history, which is the one thing a local run does not have.
+  flake_detection: true
+
 # Bundle analysis, uploaded from the same job after `pnpm build`.
 #
 # Read it as "what does the published package weigh", not "what will a consumer
