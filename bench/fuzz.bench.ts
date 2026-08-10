@@ -46,6 +46,27 @@ const partialHaystacks = sentences(50, 80, 0x71a1_5eed)
 const partialHaystacksFew = partialHaystacks.slice(0, 8)
 const partialHaystacksSome = partialHaystacks.slice(0, 16)
 
+// Haystacks that actually contain the needle, which none of the above do:
+// `partialNeedle` is repeated alphabet and the corpus is random sentences, so
+// every case built from the two scores badly everywhere and the bisection
+// improves on its running best only a handful of times. That is the shape a
+// scan is *cheapest* on, and the opposite of what `extract` sees — there the
+// haystack holds a near-match, the running best keeps improving, and every
+// improvement is an endpoint the search has to do something about. Composed
+// here rather than in `_corpus.ts`, which is hashed into all 155 baseline
+// entries; this file is hashed into its own.
+const plantedHaystacks = partialHaystacksFew.map((haystack) => {
+  const at = Math.floor(haystack.length / 3)
+  return haystack.slice(0, at) + partialNeedle + haystack.slice(at + partialNeedle.length)
+})
+// The same, with every fourth element of the planted copy replaced, so the best
+// window is a near-match rather than an exact one and no scan can stop early.
+const nearHaystacks = partialHaystacksFew.map((haystack) => {
+  const at = Math.floor(haystack.length / 3)
+  const near = Array.from(partialNeedle, (c, i) => (i % 4 === 0 ? 'z' : c)).join('')
+  return haystack.slice(0, at) + near + haystack.slice(at + near.length)
+})
+
 // Each case inlines its own loop rather than sharing a `run(data, fn)` helper —
 // V8's inline caches live on the function literal, so one helper would leave
 // every scorer here sharing a megamorphic call site.
@@ -85,6 +106,12 @@ describe('partialRatio', () => {
     for (const haystack of partialHaystacksFew) {
       partialRatio(partialNeedle, haystack, { scoreCutoff: 90 })
     }
+  })
+  measure('128 chars planted in long haystack', () => {
+    for (const haystack of plantedHaystacks) partialRatio(partialNeedle, haystack)
+  })
+  measure('128 chars near-matched in long haystack', () => {
+    for (const haystack of nearHaystacks) partialRatio(partialNeedle, haystack)
   })
 })
 

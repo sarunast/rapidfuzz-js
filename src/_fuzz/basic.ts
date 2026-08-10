@@ -374,16 +374,20 @@ function partialRatioScan(
   }
   let cutoff = scoreCutoff
 
-  /** Returns true once a perfect alignment is found and the search can stop. */
-  const consider = (start: number, end: number): boolean => {
-    // Scored as a range of `s2` against the held pattern: the window is only
-    // ever read, so neither copying it out nor rebuilding `s1`'s masks — both
-    // of which cost more than the scoring itself — is necessary.
-    const lsRatio = indelNormSimHeld(pattern, len1, s2, start, end - start, cutoff)
-    if (lsRatio <= res.score) return false
+  /**
+   * Take `score` as the window's, without scoring it.
+   *
+   * Returns true once a perfect alignment is found and the search can stop.
+   *
+   * Split from {@link consider} for the bisection, which has already run the
+   * kernel over the window and worked the score out from what came back. See
+   * {@link scanInterior} for why the two agree to the last bit.
+   */
+  const acceptKnownScore = (score: number, start: number, end: number): boolean => {
+    if (score <= res.score) return false
 
-    res.score = lsRatio
-    cutoff = lsRatio
+    res.score = score
+    cutoff = score
     res.destStart = start
     res.destEnd = end
 
@@ -393,6 +397,15 @@ function partialRatioScan(
     }
 
     return false
+  }
+
+  /** Score the window `[start, end)` of `s2`, and take it if it is the best yet. */
+  const consider = (start: number, end: number): boolean => {
+    // Scored as a range of `s2` against the held pattern: the window is only
+    // ever read, so neither copying it out nor rebuilding `s1`'s masks — both
+    // of which cost more than the scoring itself — is necessary.
+    const lsRatio = indelNormSimHeld(pattern, len1, s2, start, end - start, cutoff)
+    return acceptKnownScore(lsRatio, start, end)
   }
 
   /** Exact indel distance for a full-length window. */
@@ -437,6 +450,19 @@ function partialRatioScan(
       // window by one position can change its indel distance by at most two.
       // Distances at both endpoints therefore provide a lower bound for every
       // window between them, allowing unpromising ranges to be discarded.
+      //
+      // Endpoints reach `acceptKnownScore` rather than `consider`, because the
+      // score below *is* the one `consider` would arrive at, to the last bit —
+      // not an estimate of it. `windowDistance` and `indelNormSimHeld` run the
+      // same `lcsSeqLengthPrepared` over the same range, and for a full-length
+      // window the two arithmetics coincide: `indelNormSimHeld`'s `maximum` is
+      // `2 * len1`, its length-difference ceiling is 1 and so never rejects,
+      // and its `1 - (maximum - 2 * lcs) / maximum` is this `1 - distance /
+      // (2 * len1)` with `distance` substituted. Every intermediate is a small
+      // integer and exact, so the two are the same double, not merely equal to
+      // within a tolerance. Its `sim >= scoreCutoff` guard is the `score >=
+      // cutoff` test already made below. Routing through `consider` therefore
+      // ran the kernel a second time over the window it had just scored.
       const unknown = 0xffff_ffff
       const scores = new Uint32Array(lastInterior + 1)
       scores.fill(unknown)
@@ -459,7 +485,7 @@ function partialRatioScan(
             const score = 1 - distance / (2 * len1)
             if (distance < distanceToBeat && score >= cutoff) {
               distanceToBeat = distance
-              if (consider(first, first + len1)) return true
+              if (acceptKnownScore(score, first, first + len1)) return true
             }
           }
           if (scores[last] === unknown) {
@@ -468,7 +494,7 @@ function partialRatioScan(
             const score = 1 - distance / (2 * len1)
             if (distance < distanceToBeat && score >= cutoff) {
               distanceToBeat = distance
-              if (consider(last, last + len1)) return true
+              if (acceptKnownScore(score, last, last + len1)) return true
             }
           }
 
