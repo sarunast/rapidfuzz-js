@@ -10,7 +10,12 @@ import * as levenshtein from '../src/algorithms/levenshtein/index.js'
 import * as osa from '../src/algorithms/osa/index.js'
 import * as postfix from '../src/algorithms/postfix/index.js'
 import * as prefix from '../src/algorithms/prefix/index.js'
-import { withPublicScoreObserver } from '../src/core/scorer.js'
+import {
+  allocateScores,
+  roundHalfAwayFromZero,
+  scoreArrayFactory,
+} from '../src/batch/scoreArray.js'
+import { scorerCompilation, withPublicScoreObserver } from '../src/core/scorer.js'
 import * as fuzz from '../src/fuzz/index.js'
 import {
   bestMatch,
@@ -49,6 +54,19 @@ describe('0.6 metrics and scorers', () => {
     expect(osa.distance('ab', 'ba')).toBe(1)
     expect(damerau.distance('ab', 'ba')).toBe(1)
     expect(hamming.distance('abc', 'axc')).toBe(1)
+    for (const metric of [
+      fuzz.partialSimilarity,
+      fuzz.tokenSortSimilarity,
+      fuzz.tokenSetSimilarity,
+      fuzz.tokenSimilarity,
+      fuzz.partialTokenSortSimilarity,
+      fuzz.partialTokenSetSimilarity,
+      fuzz.partialTokenSimilarity,
+      fuzz.fuzzySimilarity,
+    ]) {
+      expect(metric('new york mets', 'new york mets')).toBeGreaterThanOrEqual(0)
+    }
+    expect(fuzz.partialSimilarityAlignment('abc', 'zabc')?.score).toBe(100)
   })
 
   test('scorer metadata, configuration, freezing, and thresholds are scale aware', () => {
@@ -73,6 +91,7 @@ describe('0.6 metrics and scorers', () => {
     for (const threshold of [Number.NaN, Infinity, -Infinity]) {
       expect(() => fuzzy.score('a', 'a', { threshold })).toThrow(RangeError)
     }
+    expect(fuzzy.score('a', 'a', { threshold: 101 })).toBeUndefined()
   })
 
   test('missing and invalid inputs follow the scorer direction', () => {
@@ -117,6 +136,18 @@ describe('0.6 metrics and scorers', () => {
       }),
     ).toEqual({ item: 'a', key: 0, score: 5 })
     expect(calls).toBe(2)
+
+    for (const result of [Number.NaN, Infinity, -1]) {
+      const broken = createScorer(() => result, {
+        direction: 'similarity',
+        bounds: [0, 1],
+        symmetric: true,
+      })
+      expect(() => broken.score('a', 'b')).toThrow(RangeError)
+    }
+    expect(() =>
+      Reflect.apply(createScorer, undefined, [() => 1, { direction: 'similarity' }]),
+    ).toThrow(TypeError)
   })
 
   test('scoreIfMatch and isMatch use scorer thresholds', () => {
@@ -125,6 +156,8 @@ describe('0.6 metrics and scorers', () => {
     expect(scoreIfMatch(scorer, 'abc', 'axc', { threshold: 0.8 })).toBeUndefined()
     expect(isMatch(scorer, 'abc', 'axc', { threshold: 0.6 })).toBe(true)
     expect(isMatch(scorer, 'abc', 'axc', { threshold: 0.8 })).toBe(false)
+    expect(isMatch(scorer, 'abc', 'axc', { threshold: 0 })).toBe(true)
+    expect(() => Reflect.apply(scorerCompilation, undefined, [{}])).toThrow(TypeError)
   })
 })
 
@@ -182,6 +215,45 @@ describe('0.6 search and matrices', () => {
     )
   })
 
+  test('every fuzzy scorer supports prepared repeated search', () => {
+    const metrics = [
+      fuzz.similarity,
+      fuzz.partialSimilarity,
+      fuzz.tokenSortSimilarity,
+      fuzz.tokenSetSimilarity,
+      fuzz.tokenSimilarity,
+      fuzz.partialTokenSortSimilarity,
+      fuzz.partialTokenSetSimilarity,
+      fuzz.partialTokenSimilarity,
+      fuzz.fuzzySimilarity,
+    ]
+    for (const metric of metrics) {
+      const prepared = createMatcher(
+        ['new york mets', 'the wonderful new york mets', 'mets new york', ''],
+        { scorer: createScorer(metric) },
+      )
+      expect(
+        prepared.search('new york mets', { threshold: 0, limit: null }),
+      ).toHaveLength(4)
+    }
+  })
+
+  test('missing queries and streamed collections retain new search semantics', () => {
+    const matcher = createMatcher(['alpha', 'beta'], { scorer })
+    expect(matcher.best(null)).toEqual({ item: 'alpha', key: 0, score: 0 })
+    expect(matcher.search(undefined, { limit: null })).toEqual([
+      { item: 'alpha', key: 0, score: 0 },
+      { item: 'beta', key: 1, score: 0 },
+    ])
+    function* values(): Generator<string> {
+      yield 'beta'
+      yield 'alpha'
+    }
+    expect(
+      search('alpha', values(), { scorer, limit: null }).map((match) => match.key),
+    ).toEqual([1, 0])
+  })
+
   test('Matcher candidate drivers never access the public score method', () => {
     let accesses = 0
     const observed = withPublicScoreObserver(scorer, () => {
@@ -191,6 +263,8 @@ describe('0.6 search and matrices', () => {
     expect(matcher.best('alpha')?.score).toBe(100)
     expect(matcher.search('alpha')).toHaveLength(2)
     expect(accesses).toBe(0)
+    expect(observed.score('alpha', 'alpha')).toBe(100)
+    expect(accesses).toBe(1)
   })
 
   test('matrix operations consume Scorer objects', () => {
@@ -219,6 +293,31 @@ describe('0.6 search and matrices', () => {
     ])
     expect([...bytes].every((row) => row.buffer === bytes.data.buffer)).toBe(true)
     expect(() => bytes.at(-1, 0)).toThrow(RangeError)
+
+    for (const [into, constructor] of [
+      ['f64', Float64Array],
+      ['f32', Float32Array],
+      ['i32', Int32Array],
+      ['i16', Int16Array],
+      ['i8', Int8Array],
+      ['u32', Uint32Array],
+      ['u16', Uint16Array],
+      ['u8', Uint8Array],
+      ['u8c', Uint8ClampedArray],
+    ] as const) {
+      expect(scorePairs(['a'], ['a'], { scorer: normalized, into })).toBeInstanceOf(
+        constructor,
+      )
+      const matrix = scoreMatrix(['a'], ['a'], { scorer: normalized, into })
+      expect([...matrix][0]).toBeInstanceOf(constructor)
+    }
+    expect(roundHalfAwayFromZero(-0.5)).toBe(-1)
+    expect(roundHalfAwayFromZero(-0.1)).toBe(0)
+    expect(() => Reflect.apply(scoreArrayFactory, undefined, ['nope'])).toThrow(
+      RangeError,
+    )
+    expect(() => allocateScores('u8', -1, 'test')).toThrow(RangeError)
+    expect(() => allocateScores('u8', 2 ** 32, 'test')).toThrow(RangeError)
   })
 
   test('collection policies and call limits are validated', () => {
