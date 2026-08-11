@@ -2,7 +2,7 @@ import type { PreparedKernel } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
-import { collectionEntries } from './collection.js'
+import { assertCollection, collectionEntries } from './collection.js'
 import { pushHeap, replaceHeapRoot } from './internal/heap.js'
 import type { Match, ScoredEntry } from './results.js'
 import {
@@ -93,7 +93,10 @@ export function bestMatch<T, D extends Direction>(
   items: Items<T>,
   options: MatcherOptions<T, D> & BestOptions,
 ): Match<T, unknown> | undefined {
+  // Argument shape is checked before any semantic exit: an impossible
+  // threshold must not turn an invalid collection into an empty result.
   const threshold = optionalThreshold(options.threshold)
+  assertCollection(items)
   const compilation = scorerCompilation(options.scorer)
   const normalized = normalizeQuery(query, options.normalize)
   const stableOptions: MatcherOptions<T, Direction> = options
@@ -194,13 +197,16 @@ export function search<T, D extends Direction>(
   items: Items<T>,
   options: MatcherOptions<T, D> & SearchOptions,
 ): readonly Match<T, unknown>[] {
+  // Argument shape is checked before any semantic exit: `limit: 0` must not
+  // excuse an invalid collection or a non-finite threshold.
   const limit = resultLimit(options.limit)
+  const threshold = optionalThreshold(options.threshold)
+  assertCollection(items)
   if (limit === 0) return []
   if (limit === 1) {
     const match = bestMatch(query, items, options)
     return match === undefined ? [] : [match]
   }
-  const threshold = optionalThreshold(options.threshold)
   const compilation = scorerCompilation(options.scorer)
   const normalized = normalizeQuery(query, options.normalize)
   const stableOptions: MatcherOptions<T, Direction> = options
@@ -244,6 +250,14 @@ export function search<T, D extends Direction>(
   const results: ScoredEntry<T, unknown>[] = []
   const heapWorse = (left: ScoredEntry<T, unknown>, right: ScoredEntry<T, unknown>) =>
     worse(compilation.direction, left, right)
+  // Once a full heap holds nothing but optimal scores, later candidates can
+  // only tie, and a tie loses on order — so the scan is finished. The Matcher
+  // drivers stop on the same condition.
+  const optimal = compilation.trusted
+    ? compilation.direction === 'similarity'
+      ? compilation.bounds[1]
+      : compilation.bounds[0]
+    : null
   let cutoff = activeThreshold
   let order = 0
 
@@ -258,10 +272,14 @@ export function search<T, D extends Direction>(
           results.push({ item, key, score, order })
         } else if (results.length < limit) {
           pushHeap(results, { item, key, score, order }, heapWorse)
-          if (results.length === limit) cutoff = results[0].score
+          if (results.length === limit) {
+            cutoff = results[0].score
+            if (optimal !== null && cutoff === optimal) break
+          }
         } else if (better(compilation.direction, score, results[0].score)) {
           replaceHeapRoot(results, { item, key, score, order }, heapWorse)
           cutoff = results[0].score
+          if (optimal !== null && cutoff === optimal) break
         }
       }
       order++
@@ -276,7 +294,10 @@ export function search<T, D extends Direction>(
           results.push({ item: entry.item, key: entry.key, score, order })
         } else if (results.length < limit) {
           pushHeap(results, { item: entry.item, key: entry.key, score, order }, heapWorse)
-          if (results.length === limit) cutoff = results[0].score
+          if (results.length === limit) {
+            cutoff = results[0].score
+            if (optimal !== null && cutoff === optimal) break
+          }
         } else if (better(compilation.direction, score, results[0].score)) {
           replaceHeapRoot(
             results,
@@ -284,6 +305,7 @@ export function search<T, D extends Direction>(
             heapWorse,
           )
           cutoff = results[0].score
+          if (optimal !== null && cutoff === optimal) break
         }
       }
       order++
@@ -323,6 +345,7 @@ export function* searchIter<T, D extends Direction>(
   options: MatcherOptions<T, D> & SearchIterOptions,
 ): IterableIterator<Match<T, unknown>> {
   const threshold = optionalThreshold(options.threshold)
+  assertCollection(items)
   const compilation = scorerCompilation(options.scorer)
   const normalized = normalizeQuery(query, options.normalize)
   const stableOptions: MatcherOptions<T, Direction> = options

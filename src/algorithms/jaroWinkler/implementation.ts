@@ -5,6 +5,7 @@ import {
   alignRepresentation,
   asSequence,
   convPair,
+  type ConfigurationCanonicalizer,
   normDistCutoff,
   normSimCutoff,
   type MaybeSequence,
@@ -164,15 +165,39 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparedScorerFactor
   return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
+/**
+ * Settle `prefixWeight` once, when a scorer is compiled.
+ *
+ * Every later path reads the weight from the record this returns, so they can
+ * no longer disagree about what a widened value means: the prepared factory
+ * rejected a non-number that {@link directSimilarity}'s numeric comparisons
+ * quietly coerced, and `NaN` passed both of their range tests to poison every
+ * score with `NaN`. Testing for the range rather than against it rejects `NaN`
+ * with the same comparison.
+ */
+const jaroWinklerConfigurationCanonicalizer: ConfigurationCanonicalizer = (options) => {
+  const prefixWeight = Reflect.get(options, 'prefixWeight')
+  if (prefixWeight == null) return options
+  if (typeof prefixWeight !== 'number') {
+    throw new TypeError('prefixWeight must be a number')
+  }
+  if (!(prefixWeight >= 0 && prefixWeight <= 1)) {
+    throw new RangeError('prefix_weight has to be in the range 0.0 - 1.0')
+  }
+  return options
+}
+
 export const jaroWinklerSimilarity: NormalizedScorer<JaroWinklerOptions> =
   /* @__PURE__ */ withPreparedFlags(
     jaroWinklerSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,
     prepareJaroWinkler('similarity'),
+    { configurationCanonicalizer: jaroWinklerConfigurationCanonicalizer },
   )
 export const jaroWinklerDistance: NormalizedScorer<JaroWinklerOptions> =
   /* @__PURE__ */ withPreparedFlags(
     jaroWinklerDistance_impl,
     NORMALIZED_DISTANCE_FLAGS,
     prepareJaroWinkler('distance'),
+    { configurationCanonicalizer: jaroWinklerConfigurationCanonicalizer },
   )

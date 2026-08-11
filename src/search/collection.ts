@@ -5,7 +5,7 @@ export interface SourceEntry<T, K = unknown> {
   readonly key: K
 }
 
-function assertCollection(value: unknown): void {
+export function assertCollection(value: unknown): void {
   if (typeof value === 'string') {
     throw new TypeError('items must be a collection, not a single string')
   }

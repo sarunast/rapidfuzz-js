@@ -20,7 +20,7 @@ import {
   type ScorerOptions,
 } from './scorerSupport.js'
 
-interface BuiltInMetricOptions<D extends Direction, Config extends object> {
+interface BuiltInMetricOptions<D extends Direction> {
   readonly implementation: PreparedErasedScorer
   readonly directImplementation?:
     | ((a: MaybeSequence, b: MaybeSequence) => number)
@@ -28,7 +28,6 @@ interface BuiltInMetricOptions<D extends Direction, Config extends object> {
   readonly direction: D
   readonly bounds: readonly [number, number]
   readonly configurationKeys?: readonly string[] | undefined
-  readonly canonicalize?: ((configuration: Config) => Config) | undefined
 }
 
 function configurationRecord<D extends Direction>(
@@ -61,7 +60,7 @@ function configurationRecord<D extends Direction>(
 }
 
 export function builtInMetric<D extends Direction, Config extends object>(
-  options: BuiltInMetricOptions<D, Config>,
+  options: BuiltInMetricOptions<D>,
 ): Metric<D, Config> {
   // Keep this as a normal direct call: `Reflect.apply` measured 5-7% slower
   // over short-string comparisons.
@@ -81,8 +80,7 @@ export function builtInMetric<D extends Direction, Config extends object>(
       return implementation(a, b)
     })
   const compile = (given: Config | undefined): MetricCompilation<D> => {
-    const canonical: object =
-      given === undefined ? {} : (options.canonicalize?.(given) ?? given)
+    const canonical: object = given ?? {}
     const { record: initial, missing } = configurationRecord(
       canonical,
       options.direction,

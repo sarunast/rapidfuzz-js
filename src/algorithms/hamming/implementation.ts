@@ -17,6 +17,7 @@ import {
   type NormalizedScorer,
   type ScorerOptions,
   type Sequence,
+  type ConfigurationCanonicalizer,
   prepareMetric,
   withPreparedFlags,
   DISTANCE_FLAGS,
@@ -252,27 +253,45 @@ export function hammingOpcodes(
   return hammingEditops(s1, s2, options).toOpcodes()
 }
 
+/**
+ * Settle `pad` once, when a scorer is compiled.
+ *
+ * The direct paths read it as `options.pad ?? true` and the prepared one as
+ * `Boolean(pad)`, so anything but a boolean is two spellings of a default
+ * rather than one meaning. Compilation is the last point at which the caller's
+ * value is still visible, so it is where the disagreement is worth ending.
+ */
+const hammingConfigurationCanonicalizer: ConfigurationCanonicalizer = (options) => {
+  const pad = Reflect.get(options, 'pad')
+  if (pad == null || typeof pad === 'boolean') return options
+  throw new TypeError('pad must be a boolean')
+}
+
 export const hammingDistance: NormalizedScorer<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingDistance_impl,
     DISTANCE_FLAGS,
     prepareMetric('distance', preparedHammingDistance, maximum, parsedPad),
+    { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )
 export const hammingSimilarity: NormalizedScorer<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingSimilarity_impl,
     SIMILARITY_FLAGS,
     prepareMetric('similarity', preparedHammingDistance, maximum, parsedPad),
+    { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )
 export const hammingNormalizedDistance: NormalizedScorer<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingNormalizedDistance_impl,
     NORMALIZED_DISTANCE_FLAGS,
     prepareMetric('normalizedDistance', preparedHammingDistance, maximum, parsedPad),
+    { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )
 export const hammingNormalizedSimilarity: NormalizedScorer<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,
     prepareMetric('normalizedSimilarity', preparedHammingDistance, maximum, parsedPad),
+    { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )

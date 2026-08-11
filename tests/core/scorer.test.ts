@@ -299,6 +299,46 @@ describe('Metric and Scorer contracts', () => {
     ).toThrow(TypeError)
   })
 
+  test('built-in configuration values are settled at compilation', () => {
+    // A widened value used to reach the kernels and mean two different things
+    // there: Jaro-Winkler's direct path coerced `'0.2'` through its numeric
+    // comparisons while preparation refused it, so `scorer.score` and a Matcher
+    // built on the same scorer disagreed. `NaN` cleared both of their range
+    // tests and poisoned every score instead.
+    for (const metric of [jaroWinkler.similarity, jaroWinkler.distance]) {
+      expect(() =>
+        Reflect.apply(createScorer, undefined, [metric, { prefixWeight: '0.2' }]),
+      ).toThrow(TypeError)
+      expect(() =>
+        Reflect.apply(createScorer, undefined, [metric, { prefixWeight: Number.NaN }]),
+      ).toThrow(RangeError)
+      expect(() =>
+        Reflect.apply(createScorer, undefined, [metric, { prefixWeight: 1.5 }]),
+      ).toThrow(RangeError)
+    }
+    const winkler = createScorer(jaroWinkler.similarity, { prefixWeight: 0.2 })
+    expect(createMatcher(['abce'], { scorer: winkler }).best('abcd')?.score).toBeCloseTo(
+      winkler.score('abcd', 'abce') ?? 0,
+      12,
+    )
+
+    for (const metric of [
+      hamming.distance,
+      hamming.similarity,
+      hamming.normalizedDistance,
+      hamming.normalizedSimilarity,
+    ]) {
+      expect(() =>
+        Reflect.apply(createScorer, undefined, [metric, { pad: 'yes' }]),
+      ).toThrow(TypeError)
+    }
+    const strict = createScorer(hamming.distance, { pad: false })
+    expect(strict.score('abc', 'abd')).toBe(1)
+    expect(() => createMatcher(['abcd'], { scorer: strict }).best('abc')).toThrow(
+      'Sequences are not the same length.',
+    )
+  })
+
   test('scoreIfMatch and isMatch use scorer thresholds', () => {
     const scorer = createScorer(levenshtein.normalizedSimilarity)
     expect(scoreIfMatch(scorer, 'abc', 'axc', { threshold: 0.6 })).toBeCloseTo(2 / 3)

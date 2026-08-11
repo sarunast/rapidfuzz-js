@@ -130,8 +130,8 @@ export function createMatcher<T, D extends Direction>(
     call?: SearchOptions,
   ): readonly Match<T, unknown>[] => {
     const limit = resultLimit(call?.limit)
-    if (limit === 0) return []
     const threshold = optionalThreshold(call?.threshold)
+    if (limit === 0) return []
     const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
       const missingScore = compilation.score(query, '', threshold)

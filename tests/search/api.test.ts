@@ -410,6 +410,102 @@ describe('one-shot search and Matcher', () => {
     expect(matcher.search('alpha', { threshold: 101 })).toEqual([])
   })
 
+  test('cheap arguments are checked before an early exit answers', () => {
+    // `limit: 0` and an out-of-bounds threshold are answers, not excuses. A
+    // call that names a bare string as its collection, or a threshold that is
+    // not a number, is wrong at every limit — the pre-redesign `extract`
+    // checked the same three things ahead of its own empty-limit return.
+    expect(() =>
+      Reflect.apply(search, undefined, [
+        'query',
+        'not a collection',
+        { scorer, limit: 0 },
+      ]),
+    ).toThrow(TypeError)
+    expect(() =>
+      search('query', ['alpha'], { scorer, limit: 0, threshold: Number.NaN }),
+    ).toThrow(RangeError)
+    expect(() =>
+      Reflect.apply(bestMatch, undefined, [
+        'query',
+        'not a collection',
+        { scorer, threshold: 101 },
+      ]),
+    ).toThrow(TypeError)
+    expect(() => [
+      ...Reflect.apply(searchIter, undefined, [
+        'query',
+        'not a collection',
+        { scorer, threshold: 101 },
+      ]),
+    ]).toThrow(TypeError)
+    const matcher = createMatcher(['alpha'], { scorer })
+    expect(() => matcher.search('alpha', { limit: 0, threshold: Number.NaN })).toThrow(
+      RangeError,
+    )
+  })
+
+  test('a finite one-shot heap stops once it holds only optimal scores', () => {
+    // What the specialized Matcher drivers already do: ties lose on source
+    // order, so a full heap of optimal scores cannot be displaced by anything
+    // still ahead. `getText` counts how far the scan actually got.
+    let reads = 0
+    const counted = (item: string): string => {
+      reads++
+      return item
+    }
+    expect(
+      search('match', ['match', 'match', 'match', 'match'], {
+        scorer,
+        getText: counted,
+        limit: 2,
+      }),
+    ).toEqual([
+      { item: 'match', key: 0, score: 100 },
+      { item: 'match', key: 1, score: 100 },
+    ])
+    expect(reads).toBe(2)
+
+    reads = 0
+    expect(
+      search('match', ['zeta', 'yotta', 'match', 'match', 'match'], {
+        scorer,
+        getText: counted,
+        limit: 2,
+      }),
+    ).toEqual([
+      { item: 'match', key: 2, score: 100 },
+      { item: 'match', key: 3, score: 100 },
+    ])
+    expect(reads).toBe(4)
+
+    reads = 0
+    const keyed = new Map([
+      ['a', 'match'],
+      ['b', 'match'],
+      ['c', 'match'],
+    ])
+    expect(search('match', keyed, { scorer, getText: counted, limit: 2 })).toEqual([
+      { item: 'match', key: 'a', score: 100 },
+      { item: 'match', key: 'b', score: 100 },
+    ])
+    expect(reads).toBe(2)
+
+    reads = 0
+    const displaced = new Map([
+      ['a', 'zeta'],
+      ['b', 'yotta'],
+      ['c', 'match'],
+      ['d', 'match'],
+      ['e', 'match'],
+    ])
+    expect(search('match', displaced, { scorer, getText: counted, limit: 2 })).toEqual([
+      { item: 'match', key: 'c', score: 100 },
+      { item: 'match', key: 'd', score: 100 },
+    ])
+    expect(reads).toBe(4)
+  })
+
   test('one-shot keyed heaps retain only the best finite result set', () => {
     const numeric = createScorer((_query, choice) => Number(choice), {
       direction: 'similarity',
