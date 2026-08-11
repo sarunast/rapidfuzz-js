@@ -1,0 +1,43 @@
+---
+title: rapidfuzz-js
+description: Fast fuzzy matching for JavaScript and TypeScript, powered by the algorithms of RapidFuzz.
+template: splash
+hero:
+  tagline: Fast fuzzy matching for JavaScript and TypeScript, powered by the algorithms of RapidFuzz.
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+    - text: API reference
+      link: /api/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+:::note
+These pages track the unreleased 0.6.0 API. The latest version on npm is 0.5.1,
+which has a different, pre-redesign API.
+:::
+
+<CardGrid stagger>
+	<Card title="Runs everywhere" icon="rocket">
+		Node.js 22+, browsers, and edge runtimes. ESM with strict TypeScript
+		declarations and no runtime dependencies.
+	</Card>
+	<Card title="One composition model" icon="puzzle">
+		Metric → Scorer object → Matcher. Import metrics from algorithm subpaths
+		and orchestration from the package root.
+	</Card>
+	<Card title="Tree-shakeable" icon="seti:javascript">
+		Eleven algorithm subpaths — Levenshtein, Indel, LCS, OSA,
+		Damerau-Levenshtein, Hamming, Jaro, Jaro-Winkler, prefix, postfix — plus
+		the fuzz similarity family. Import only what you use.
+	</Card>
+	<Card title="RapidFuzz parity" icon="approve-check">
+		A port of the battle-tested
+		<a href="https://github.com/rapidfuzz/RapidFuzz">RapidFuzz</a> algorithms:
+		same algorithms, same numeric results for the same inputs.
+	</Card>
+</CardGrid>
