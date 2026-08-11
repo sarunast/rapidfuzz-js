@@ -1,8 +1,7 @@
-// @ts-check
 import process from 'node:process'
 
-import { tokenSortSimilarity } from '../dist/fuzz/index.js'
-import { createMatcher, createScorer } from '../dist/index.js'
+import { tokenSortSimilarity } from '../../dist/fuzz/index.js'
+import { createMatcher, createScorer } from '../../dist/index.js'
 
 const count = Number(process.argv[2] ?? 50_000)
 if (!Number.isSafeInteger(count) || count <= 0) {

@@ -1,5 +1,3 @@
-import { describe } from 'vitest'
-
 import { damerauLevenshteinDistance } from '../src/algorithms/damerauLevenshtein/implementation.js'
 import {
   indelDistance,
@@ -14,6 +12,7 @@ import { levenshteinEditops } from '../src/algorithms/levenshtein/editops.js'
 import {
   levenshteinDistance,
   levenshteinNormalizedSimilarity,
+  levenshteinSimilarity,
 } from '../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../src/algorithms/osa/implementation.js'
 import {
@@ -23,8 +22,8 @@ import {
   similarPairs,
   words,
   WORD_BOUNDARY_LENGTHS,
-} from './_corpus.js'
-import { measure } from './_harness.js'
+} from './tooling/corpus.js'
+import { describe, measure } from './tooling/harness.js'
 
 // Three length classes, because the algorithms have different crossover
 // points: short strings are dominated by setup cost, long ones by the inner
@@ -53,7 +52,7 @@ const weightedDissimilar = pairs(words(8, 512, 0x2718_2818))
 // Prefixes of the corpora above, for the scorers that cost enough per pair to
 // push a whole-corpus sample past a millisecond or two. Past that a sample is
 // long enough to contain a garbage collection every time, and the median stops
-// being able to reject the disturbed ones — see `_harness.ts`. These are the
+// being able to reject the disturbed ones — see `tooling/harness.ts`. These are the
 // same pairs in the same order, so the inputs stay reproducible.
 const veryLongFew = veryLong.slice(0, 8)
 const veryLongOne = veryLong.slice(0, 1)
@@ -257,17 +256,15 @@ describe('lcsSeqEditops', () => {
 // the caller supplies any cutoff at all — including the `0` that `process`
 // substitutes for "no cutoff" on a similarity. `levenshteinDistance` above only
 // sees a finite budget when the caller asks for one, so it never covers this.
-describe('levenshteinNormalizedSimilarity', () => {
+describe('levenshteinSimilarity', () => {
   measure('128 chars, cutoff 0', () => {
-    for (const [a, b] of long) levenshteinNormalizedSimilarity(a, b, { scoreCutoff: 0 })
+    for (const [a, b] of long) levenshteinSimilarity(a, b, { scoreCutoff: 0 })
   })
   measure('1024 chars, cutoff 0', () => {
-    for (const [a, b] of veryLong)
-      levenshteinNormalizedSimilarity(a, b, { scoreCutoff: 0 })
+    for (const [a, b] of veryLong) levenshteinSimilarity(a, b, { scoreCutoff: 0 })
   })
   measure('4096 chars, cutoff 0', () => {
-    for (const [a, b] of hugeOne)
-      levenshteinNormalizedSimilarity(a, b, { scoreCutoff: 0 })
+    for (const [a, b] of hugeOne) levenshteinSimilarity(a, b, { scoreCutoff: 0 })
   })
 })
 

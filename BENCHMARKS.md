@@ -388,17 +388,18 @@ this library faster or slower than its stored baseline. It covers distance
 metrics, edit operations, fuzzy scorers, search, matrices, cutoffs, prepared
 inputs, and Unicode cases.
 
-`bench/compare.mjs` normalizes every result against control workloads measured
-before and after the suite. This reduces distortion from CPU frequency,
-background load, and thermal changes.
+`bench/tooling/compare.ts` normalizes every result against control workloads
+measured before and after the suite. This reduces distortion from CPU
+frequency, background load, and thermal changes.
 
-Important fields in [`bench/baseline.json`](bench/baseline.json):
+Important fields in
+[`bench/tooling/baseline.json`](bench/tooling/baseline.json):
 
 | Field                | Meaning                                                   |
 | -------------------- | --------------------------------------------------------- |
 | `median`             | Median case time in milliseconds                          |
-| `anchor`             | Control timing for the same run                           |
-| `normalised`         | Case time divided by its control anchor                   |
+| `machine`            | Control timings for the same session, by control name     |
+| `normalised`         | Case time divided by that session's machine speed         |
 | `noise`              | Relative spread across repeated normalized measurements   |
 | `samples`            | Number of samples collected                               |
 | `source`             | Fingerprint of the benchmark and shared measurement files |

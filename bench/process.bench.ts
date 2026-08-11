@@ -1,5 +1,3 @@
-import { describe } from 'vitest'
-
 import {
   distance as levenshteinDistance,
   normalizedDistance as levenshteinNormalizedDistance,
@@ -21,8 +19,8 @@ import {
   search,
   searchIter,
 } from '../src/index.js'
-import { sentences, words } from './_corpus.js'
-import { measure } from './_harness.js'
+import { sentences, words } from './tooling/corpus.js'
+import { describe, measure } from './tooling/harness.js'
 
 const choices = words(2_000, 12)
 const symmetricChoices = choices.slice(0, 200)

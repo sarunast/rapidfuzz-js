@@ -1,37 +1,44 @@
 #!/usr/bin/env node
-// @ts-check
 /**
  * Run the benchmark suite several times and compare the result against
- * `bench/baseline.json`.
+ * `bench/tooling/baseline.json`.
  *
  * ## What a baseline stores
  *
- * Not a time. Every repeat brackets the suite with `bench/control.bench.ts` —
- * work this library cannot change — and every case in that repeat is divided by
- * the middle of those control timings. What is stored is that dimensionless
- * ratio: *this case, in units of how fast the machine was while it ran*.
- * Comparing two of them is comparing two machines' worth of work against the
- * same yardstick.
+ * Not a bare time. Every repeat brackets the suite with
+ * `bench/control.bench.ts` — four workloads this library cannot change — and
+ * stores what each of them measured, by name. That vector is the session's
+ * yardstick, and a case's stored number is its median divided by how fast the
+ * machine was while it ran: *this case, in units of that machine*.
+ *
+ * Two sessions are compared by dividing their yardsticks control by control
+ * and taking the middle ratio. Per control, and dimensionless: the alternative
+ * — one number per session, the median of four absolute timings — is really
+ * "whichever control happens to sit in the middle of the ordering", so one
+ * control having a bad run changes which one that is and the anchor jumps by
+ * the gap between two unrelated workloads. Same workload over same workload,
+ * one bad control is one outvoted ratio.
  *
  * That one decision is what makes the rest safe:
  *
  * - **A run on a slower day is still comparable.** Thermal state, background
  *   load and CPU frequency shift a whole run at once; one measured run was 4%
- *   slower than baseline in every single case. The anchor moves with it.
+ *   slower than baseline in every single case. The yardstick moves with it.
  * - **Repeats are corrected individually.** If repeat 2 was the slow one, it is
- *   divided by repeat 2's anchor, not by an average of both.
+ *   divided by repeat 2's factor, not by an average of both.
  * - **A pass that drifts while it runs is visible.** The controls are timed
  *   before *and* after each pass. A machine that warms up over a multi-minute
- *   suite does so identically every repeat, so anchors compared only against
- *   each other agree perfectly while the cases that ran first were measured on
- *   a different machine from the ones that ran last.
+ *   suite does so identically every repeat, so the factors compared only
+ *   against each other agree perfectly while the cases that ran first were
+ *   measured on a different machine from the ones that ran last.
  * - **A partial re-record cannot lie.** Recording one file measures a new
- *   anchor. If the untouched cases were normalised later, against that anchor,
- *   they would each shift by however much the machine differed that day — an
- *   unchanged case reporting as several percent faster. Each case instead
- *   carries the anchor from its own recording session, so re-recording one
- *   file cannot move another file's numbers. Controls never become cases: they
- *   are measured in their own passes and survive only as those anchors.
+ *   yardstick. If the untouched cases were normalised later, against that
+ *   yardstick, they would each shift by however much the machine differed that
+ *   day — an unchanged case reporting as several percent faster. Each case
+ *   instead carries the yardstick from its own recording session, so
+ *   re-recording one file cannot move another file's numbers. Controls never
+ *   become cases: they are measured in their own passes and survive only as
+ *   those yardsticks.
  *
  * The suite's own geometric mean is still computed, and reported as how far the
  * whole suite moved. Estimating drift from *that* — the obvious approach —
@@ -39,18 +46,16 @@
  * slower", and divides out the second along with the first. Measured against
  * the controls it stays visible, and fails `--fail-on-regression`.
  *
- * ## The rest of what this does that `vitest bench --compare` does not
+ * ## The rest of what this does that a stock benchmark runner does not
  *
- * - **Compares medians, not means.** `--compare` reports `current.hz /
- *   baseline.hz`, and `hz` is `1000 / mean`. One garbage collection in a
- *   thousand samples moved a case's mean by 43% in testing. Its median did not
- *   move.
+ * - **Compares medians, not means.** One garbage collection in a thousand
+ *   samples moved a case's mean by 43% in testing. Its median did not move.
  * - **Measures the noise before judging a move.** Each case is timed in every
  *   repeat; the deviation across those repeats is that case's noise band, and a
  *   move inside its own band is not reported as a change.
- * - **Keys cases by name.** `--compare` pairs a run against a baseline by
- *   position, so inserting a case silently compares every later one against the
- *   wrong entry. Names survive reordering.
+ * - **Keys cases by name.** Pairing a run against a baseline by position means
+ *   inserting a case silently compares every later one against the wrong
+ *   entry. Names survive reordering.
  * - **Refuses to compare what is not comparable.** A baseline recorded on a
  *   different Node, under different flags, on another machine, or against a
  *   different version of the benchmark definitions is reported as such rather
@@ -58,7 +63,7 @@
  *
  * ## Usage
  *
- * See {@link USAGE}, or `node bench/compare.mjs --help`.
+ * See {@link USAGE}, or `node bench/tooling/compare.ts --help`.
  */
 
 import { spawnSync } from 'node:child_process'
@@ -68,7 +73,6 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
-  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -77,110 +81,168 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-import {
-  assertVitestInstalled,
-  EXPOSE_GC,
-  needsShell,
-  PROJECT_DIR,
-  QUICK_ENV,
-  vitestBin,
-} from './_vitest.mjs'
+const TOOLING_DIR = dirname(fileURLToPath(import.meta.url))
+const BENCH_DIR = dirname(TOOLING_DIR)
+const PROJECT_DIR = dirname(BENCH_DIR)
+const DEFAULT_BASELINE = join(TOOLING_DIR, 'baseline.json')
 
-const BENCH_DIR = dirname(fileURLToPath(import.meta.url))
-const DEFAULT_BASELINE = join(BENCH_DIR, 'baseline.json')
+/** The measurement child: bundles with esbuild, measures in bare node. */
+const RUNNER = join(TOOLING_DIR, 'runner.ts')
+
+interface Options {
+  /** Write the baseline instead of comparing. */
+  record: boolean
+  /** Short windows; see `harness.ts`. */
+  quick: boolean
+  /** Widened windows; see `harness.ts`. */
+  confirm: boolean
+  /** Passes over the suite. */
+  repeats: number
+  failOnRegression: boolean
+  allowEnvironmentChange: boolean
+  baseline: string
+  /** Canonical bench paths; empty means all. */
+  files: string[]
+  /** `-t` regexp source, or null for no filter. */
+  name: string | null
+  help: boolean
+  /** Let the child's reporter reach the terminal. */
+  verbose: boolean
+}
+
+/** One case, as the runner reported it. */
+interface Timing {
+  /** Milliseconds per call. */
+  median: number
+  /** Milliseconds per call. */
+  min: number
+  samples: number
+  /** Calls per timed sample. */
+  batch: number
+  /** Milliseconds spent in the timed phase. */
+  measuredTime: number
+  /** Ended on agreeing blocks, rather than on the window. */
+  stoppedStable: boolean
+  /** The block spread it ended at. */
+  stability: number | null
+}
+
+/** Everything outside the code under test that changes what a number means. */
+interface Environment {
+  node: string
+  esbuild: string
+  platform: string
+  cpu: string
+  nodeOptions: string
+  /** {@link MEASUREMENT_VERSION} */
+  measurement: number
+}
 
 /**
- * The shapes this script passes around. Written down because `baseline.json`
- * is a file on disk that outlives any one run: {@link CaseRecord} is the only
- * description of what is in it, and a field quietly added or dropped here is a
- * baseline that a later version reads differently.
+ * One entry in `baseline.json`, which is a file on disk that outlives any one
+ * run — this interface is the only description of what is in it, and a field
+ * quietly added or dropped here is a baseline a later version reads
+ * differently.
  *
- * @typedef {object} Options
- * @property {boolean} record          write the baseline instead of comparing
- * @property {boolean} quick           short windows; see `_harness.ts`
- * @property {number} repeats          passes over the suite
- * @property {boolean} failOnRegression
- * @property {boolean} allowEnvironmentChange
- * @property {string} baseline         path to the baseline file
- * @property {string[]} files          canonical bench paths; empty means all
- * @property {string | null} name      `-t` regexp source, or null for no filter
- * @property {boolean} help
- * @property {boolean} verbose         let the child's reporter reach the terminal
- *
- * @typedef {object} Timing            one case, as vitest reported it
- * @property {number} median           milliseconds
- * @property {number} min              milliseconds
- * @property {number} samples
- *
- * @typedef {object} Environment
- * @property {string} node
- * @property {string} vitest
- * @property {string} tinybench
- * @property {string} platform
- * @property {string} cpu
- * @property {string} nodeOptions
- * @property {number} measurement      {@link MEASUREMENT_VERSION}
- *
- * @typedef {Environment & {
- *   normalised: number,
- *   noise: number,
- *   median: number,
- *   anchor: number,
- *   min: number,
- *   samples: number,
- *   repeats: number,
- *   source: string,
- *   controls: string,
- *   recordedAt: string,
- * }} CaseRecord                       one entry in `baseline.json`
- *
- * @typedef {{ cases: Record<string, CaseRecord> }} Baseline
- *
- * @typedef {object} Benchmark         vitest's `--outputJson` leaf
- * @property {string} name
- * @property {number} median
- * @property {number} min
- * @property {number} sampleCount
- *
- * @typedef {{
- *   files: Array<{ groups: Array<{ fullName: string, benchmarks: Benchmark[] }> }>
- * }} VitestReport
- *
- * @typedef {object} Pass              one repeat: controls, suite, controls
- * @property {VitestReport} report
- * @property {number} anchor           geometric mean of the two control timings
- * @property {number} slope            after / before, i.e. drift across the pass
- *
- * @typedef {object} RunOptions        what one `vitest bench` child needs
- * @property {boolean} quick
- * @property {string | null} [name]
- * @property {boolean} [verbose]
+ * `normalised` is the case's median in milliseconds, corrected to its
+ * session's average machine speed. `machine` is that session's yardstick: the
+ * per-control median, in milliseconds, keyed by control name.
  */
+interface CaseRecord extends Environment {
+  normalised: number
+  noise: number
+  median: number
+  machine: Record<string, number>
+  min: number
+  samples: number
+  batch: number
+  /** The shortest timed sample any repeat took, in milliseconds. */
+  sample: number
+  repeats: number
+  source: string
+  controls: string
+  recordedAt: string
+}
+
+interface Baseline {
+  cases: Record<string, CaseRecord>
+}
+
+/** The runner's `--outputJson` leaf. */
+interface Benchmark {
+  name: string
+  median: number
+  min: number
+  sampleCount: number
+  batch: number
+  measuredTime: number
+  stoppedStable: boolean
+  stability: number | null
+}
+
+interface RunnerReport {
+  files: { groups: { fullName: string; benchmarks: Benchmark[] }[] }[]
+}
+
+/** One repeat: controls, suite, controls. */
+interface Pass {
+  report: RunnerReport
+  /** Per control, sqrt(pre × post) in milliseconds. */
+  controls: Record<string, number>
+  /** post / pre, i.e. drift across the pass. */
+  slope: number
+}
+
+/** What the adaptive stop did, over a run. */
+interface MeasurementStats {
+  /** Case-repeats measured. */
+  cases: number
+  /** Fraction that stopped on agreeing blocks. */
+  stable: number
+  /** Median block spread at the stop. */
+  spread: number | null
+  /** The 95th percentile of that spread. */
+  worst: number | null
+  /** Seconds spent inside timed phases. */
+  timed: number
+}
+
+/** What one runner child needs. */
+interface RunOptions {
+  quick: boolean
+  confirm: boolean
+  reverse: boolean
+  name: string | null
+  verbose: boolean
+  bundleDir: string
+}
 
 const USAGE = `
-  node bench/compare.mjs [options] [file …]
+  node bench/tooling/compare.ts [options] [file …]
 
-  Compare the benchmark suite against bench/baseline.json. A file may be named
-  by any substring of its path. With no file, the whole suite runs;
+  Compare the benchmark suite against bench/tooling/baseline.json. A file may
+  be named by any substring of its path. With no file, the whole suite runs;
   bench/control.bench.ts is the anchor and always runs either way, whatever is
   filtered.
 
     --record                     (re)write the baseline instead of comparing
-    --quick                      tenth-length windows, ±15% threshold, 1 repeat
+    --quick                      short windows, ±15% threshold, 1 repeat
+    --confirm                    widened windows, ±1.5% floor, 4 repeats — for
+                                 re-measuring the case a normal run flagged
     --repeat=N                   passes over the suite (default 2; 1 quick)
     -t, --name=<pattern>         only cases whose name matches this regexp
     --baseline=<path>            compare against or record to another file
     --fail-on-regression         exit non-zero on a regression or a bad run
-    --allow-environment-change   compare across Node/CPU/vitest versions anyway
-    --verbose                    let vitest's own reporter through while it runs
+    --allow-environment-change   compare across Node/CPU/esbuild versions anyway
+    --verbose                    stream the runner's per-case progress while it runs
     -h, --help                   this
 
   Examples
 
-    node bench/compare.mjs fuzz                    one file, by substring
-    node bench/compare.mjs -t 'partialRatio'       one group, any file
-    node bench/compare.mjs --quick -t '128 chars'  the fast look
-    node bench/compare.mjs --record bench/fuzz.bench.ts
+    node bench/tooling/compare.ts fuzz                 one file, by substring
+    node bench/tooling/compare.ts -t 'partialRatio'    one group, any file
+    node bench/tooling/compare.ts --quick -t '128 chars'  the fast look
+    node bench/tooling/compare.ts --record bench/fuzz.bench.ts
 
   For the edit loop, \`pnpm bench:quick\` skips the comparison entirely.
 `
@@ -207,16 +269,16 @@ const FLOOR = 0.03
 const QUICK_FLOOR = 0.15
 
 /** Beyond this much machine drift the run is too unlike the baseline's run to
- *  mean anything, whatever the anchor corrects for. */
+ *  mean anything, whatever the yardstick corrects for. */
 const DRIFT_LIMIT = 0.1
 
 /**
  * How far the machine may move between repeats, or across a single pass.
  *
- * Each repeat is corrected by its own anchor, so drift between repeats is
+ * Each repeat is corrected by its own factor, so drift between repeats is
  * already handled — this is the point past which the correction stops being
  * believable. Drift across one pass is the more dangerous of the two: the
- * anchor is a single number for a window the cases were spread across, and if
+ * factor is a single number for a window the cases were spread across, and if
  * the machine changed inside that window it describes none of them well.
  *
  * Tighter than {@link DRIFT_LIMIT} because both are within one run, rather than
@@ -225,24 +287,25 @@ const DRIFT_LIMIT = 0.1
 const RUN_INSTABILITY_LIMIT = 0.05
 
 /**
- * Fewest controls an anchor may be built from.
+ * Fewest controls a yardstick may be built from.
  *
- * The whole case for taking their middle rather than their mean is that one
- * control having a bad run cannot drag it. With two there is no middle, and
- * with one there is nothing to be robust about.
+ * The whole case for taking the middle of the per-control ratios rather than
+ * their mean is that one control having a bad run cannot drag it. With two
+ * there is no middle, and with one there is nothing to be robust about.
  */
 const MIN_CONTROLS = 3
 
 /**
  * What a stored number means.
  *
- * The fingerprints below cover what was measured. This covers how: the anchor,
- * the aggregation, the flags the child runs under. Moving from raw medians to
- * per-repeat normalised medians changed every stored value's meaning without
- * changing a single benchmark, and nothing would have caught it. Increment this
- * when measurement or normalisation semantics change — not for output format.
+ * The fingerprints below cover what was measured. This covers how: the
+ * yardstick, the aggregation, the flags the child runs under. Moving from raw
+ * medians to per-repeat normalised medians changed every stored value's
+ * meaning without changing a single benchmark, and nothing would have caught
+ * it. Increment this when measurement or normalisation semantics change — not
+ * for output format.
  */
-const MEASUREMENT_VERSION = 1
+const MEASUREMENT_VERSION = 3
 
 /** How far the suite may move past the controls before that is a regression. */
 const BROAD_MOVE_LIMIT = 0.03
@@ -261,6 +324,14 @@ const BROAD_MOVE_LIMIT = 0.03
 const QUICK_BROAD_MOVE_LIMIT = QUICK_FLOOR
 
 /**
+ * The `--confirm` floor. Confirm mode exists to re-measure the one case a
+ * normal comparison flagged, with windows past the point of diminishing
+ * returns and more repeats, so its verdict is allowed to be finer than the
+ * everyday ±3%.
+ */
+const CONFIRM_FLOOR = 0.015
+
+/**
  * Fewest cases before "the suite as a whole moved" means anything.
  *
  * The broad detector has no noise band — it exists to catch a change too even
@@ -271,73 +342,75 @@ const QUICK_BROAD_MOVE_LIMIT = QUICK_FLOOR
 const MIN_BROAD_CASES = 5
 
 /**
- * A sample should be roughly half a millisecond to two milliseconds: short
- * enough that a garbage collection lands in some samples rather than all of
- * them, long enough that `performance.now()`'s resolution is not part of the
+ * A sample should be tens of microseconds to two milliseconds: short enough
+ * that a garbage collection lands in some samples rather than all of them,
+ * long enough that the harness's own cost per sample is not part of the
  * answer. Every claim this script makes rests on that, and nothing in
  * `measure()` can enforce it — the body decides how much work a sample is. So
  * it is checked here, against what was actually measured, and outside this
  * looser envelope the case is called out rather than quietly trusted.
+ *
+ * The lower bound was 0.25 ms under tinybench, whose async per-sample
+ * machinery cost single microseconds. `harness.ts` now spends two
+ * `hrtime.bigint()` reads and one array push per sample — comfortably under
+ * 200 ns — so a 20 µs sample keeps the harness below one percent of the
+ * number.
+ *
+ * A *sample*, not a call: the harness batches a body under 0.1 ms into a
+ * sample of several calls for this exact reason, so what is checked here is
+ * `median × batch`. Checking the per-call figure would report every batched
+ * case as too short, which is the arrangement that fixed it.
  */
-const SAMPLE_TOO_SHORT = 0.25
+const SAMPLE_TOO_SHORT = 0.02
 const SAMPLE_TOO_LONG = 5
-
-/**
- * `--expose-gc` is what lets `_harness.ts` collect between cases, so one case's
- * garbage is not collected on the next one's time. It is the only flag passed:
- * enlarging the semi-space would cut scavenge noise, but it would also hide the
- * allocation regressions this library cares about, and a ~1 ms sample plus a
- * median already discards the samples a scavenge lands in.
- */
-const NODE_FLAGS = EXPOSE_GC
 
 /**
  * Everything a case's timing depends on besides `src` and its own bench file.
  *
- * `vitest.config.ts` is in here because pooling, isolation and setup files are
- * decided there, and changing any of them changes what a stored number means
+ * `bench/tooling/runner.ts` is in here because the bundling options are decided
+ * there, and changing any of them changes what a stored number means
  * without touching a benchmark. {@link MEASUREMENT_VERSION} covers a deliberate
  * change of method; this covers forgetting to bump it.
  */
-const SHARED_SOURCES = ['bench/_corpus.ts', 'bench/_harness.ts', 'vitest.config.ts']
+const SHARED_SOURCES = [
+  'bench/tooling/corpus.ts',
+  'bench/tooling/harness.ts',
+  'bench/tooling/runner.ts',
+]
 
 /**
  * A path argument in the one spelling everything downstream compares against.
  *
- * Stored case names begin with the path vitest reports — `bench/fuzz.bench.ts`,
+ * Stored case names begin with the path the runner reports — `bench/fuzz.bench.ts`,
  * project-relative and slash-separated — and that string is the identity behind
  * three separate things: which baseline entries a partial `--record` replaces,
  * which ones `candidates` considers, and which file gets fingerprinted. Left
  * raw, `./bench/fuzz.bench.ts` and an absolute path each name the same file and
  * match none of them, so a re-record would quietly keep the stale entries it
  * was run to remove. Normalising here means there is only ever one namespace.
- *
- * @param {string} arg
- * @returns {string}
  */
-function canonicalFile(arg) {
-  return relative(PROJECT_DIR, resolve(arg)).split(sep).join('/')
+function canonicalFile(arg: string): string {
+  // Resolved against the project, not the process's cwd: `bench/fuzz.bench.ts`
+  // has to name the same file whichever directory the command was typed in,
+  // and the runner canonicalises its own arguments the same way.
+  return relative(PROJECT_DIR, resolve(PROJECT_DIR, arg)).split(sep).join('/')
 }
 
-/**
- * @param {string[]} argv
- * @returns {Options}
- */
-function parseArgs(argv) {
+function parseArgs(argv: readonly string[]): Options {
   // `repeats` is the one field that is not final until parsing is done: its
   // default depends on `--quick`, which may appear after `--repeat=`. Null
   // means "not asked for", which `--repeat=0` is not — that is an error, and
   // a sentinel like 0 could not tell the two apart.
-  /** @type {Omit<Options, 'repeats'> & { repeats: number | null }} */
-  const options = {
+  const options: Omit<Options, 'repeats'> & { repeats: number | null } = {
     record: false,
     quick: false,
+    confirm: false,
     repeats: null,
     failOnRegression: false,
     allowEnvironmentChange: false,
     baseline: DEFAULT_BASELINE,
     files: [],
-    // A regexp over case names, handed to vitest as `-t`. Null rather than an
+    // A regexp over case names, handed to the runner as `-t`. Null rather than an
     // empty string: an empty pattern matches everything, which is what no
     // filter means, but the two have to stay distinguishable — the checks
     // below are about whether a filter was *asked for*.
@@ -350,12 +423,13 @@ function parseArgs(argv) {
   }
 
   // Indexed rather than `for…of` because `-t` takes the argument after it.
-  // Spelling it `-t` is not a free choice: it is what vitest calls the same
-  // filter, and this script's whole job is to run vitest.
+  // Spelling it `-t` is not a free choice: it is the spelling every bench
+  // script here has always taken, and muscle memory is part of the interface.
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === '--record') options.record = true
     else if (arg === '--quick') options.quick = true
+    else if (arg === '--confirm') options.confirm = true
     else if (arg === '--fail-on-regression') options.failOnRegression = true
     else if (arg === '--allow-environment-change') options.allowEnvironmentChange = true
     else if (arg === '-h' || arg === '--help') options.help = true
@@ -382,8 +456,6 @@ function parseArgs(argv) {
   }
   if (options.help) return { ...options, repeats: 1 }
 
-  // Three to compare, two to record.
-  //
   // Two, for recording and for comparing alike.
   //
   // The argument for a third was that a baseline's noise band is frozen into
@@ -393,16 +465,28 @@ function parseArgs(argv) {
   // `max(current + baseline, FLOOR)`. The third repeat refines a number the
   // floor then discards in almost every case.
   //
-  // What it does cost is the whole suite again, and a full comparison is about
-  // ten minutes a pass. Two-thirds of that is the reason to stop at two: the
-  // run has to be cheap enough to sit through, or it stops being run at all.
+  // What it does cost is the whole suite again. The run has to be cheap enough
+  // to sit through, or it stops being run at all.
   //
   // Two, not one: a single repeat measures no spread, which is stored as a zero
   // band and called out as stale on every later comparison. Two is the fewest
   // that still measures one — and it measures it from two samples, so a case
   // whose band matters is one to re-run, or to record on its own with
   // `--repeat=`.
-  const repeats = options.repeats ?? (options.quick ? 1 : 2)
+  //
+  // Confirm mode exists to spend precision on one flagged case, so it takes
+  // more repeats by default; everything else stays at two.
+  const repeats = options.repeats ?? (options.quick ? 1 : options.confirm ? 4 : 2)
+
+  if (options.quick && options.confirm) {
+    throw new Error('--quick and --confirm are opposites')
+  }
+  // Confirm windows are wider than the ones the baseline was recorded under;
+  // the adaptive stop converges on the same median, but a baseline should
+  // only ever hold numbers taken one way.
+  if (options.confirm && options.record) {
+    throw new Error('--confirm is for re-measuring against a baseline, not recording one')
+  }
 
   // Quick numbers come from shorter windows than the baseline's, so recording
   // them would store values that every later full run disagrees with — and
@@ -424,8 +508,8 @@ function parseArgs(argv) {
     )
   }
   if (options.name !== null) {
-    // vitest would report this from inside a worker, several seconds and one
-    // stack trace later.
+    // The runner would report this from inside the measured child, seconds and
+    // one stack trace later.
     try {
       new RegExp(options.name)
     } catch (error) {
@@ -441,11 +525,7 @@ function parseArgs(argv) {
   return { ...options, repeats }
 }
 
-/**
- * @param {readonly number[]} values
- * @returns {number}
- */
-function median(values) {
+function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b)
   const middle = sorted.length >> 1
   return sorted.length % 2 === 1
@@ -453,20 +533,13 @@ function median(values) {
     : (sorted[middle - 1] + sorted[middle]) / 2
 }
 
-/**
- * @param {readonly number[]} ratios
- * @returns {number}
- */
-function geometricMean(ratios) {
+function geometricMean(ratios: readonly number[]): number {
   if (ratios.length === 0) return 1
   return Math.exp(ratios.reduce((total, r) => total + Math.log(r), 0) / ratios.length)
 }
 
-/** The middle of a set of ratios, which one bad member cannot drag. *
- * @param {readonly number[]} ratios
- * @returns {number}
- */
-function geometricMedian(ratios) {
+/** The middle of a set of ratios, which one bad member cannot drag. */
+function geometricMedian(ratios: readonly number[]): number {
   return Math.exp(median(ratios.map(Math.log)))
 }
 
@@ -482,12 +555,7 @@ function geometricMedian(ratios) {
  * converges on the real spread instead.
  */
 const MAD_TO_SIGMA = 1.4826
-/**
- * @param {readonly number[]} values
- * @param {number} centre
- * @returns {number}
- */
-function relativeSpread(values, centre) {
+function relativeSpread(values: readonly number[], centre: number): number {
   if (centre <= 0) return 0
   const deviations = values.map((value) => Math.abs(value - centre))
   return (MAD_TO_SIGMA * median(deviations)) / centre
@@ -502,79 +570,53 @@ function relativeSpread(values, centre) {
  * the bench file and everything it shares, so any such edit is visible as an
  * edit rather than as a result.
  */
-const fingerprints = new Map()
-/**
- * @param {string} benchFile
- * @returns {string}
- */
-function fingerprint(benchFile) {
-  if (!fingerprints.has(benchFile)) {
-    const hash = createHash('sha256')
-    for (const name of [benchFile, ...SHARED_SOURCES]) {
-      const path = join(PROJECT_DIR, name)
-      // Treating a missing file as empty content would fingerprint every case
-      // by the shared helpers alone, and then editing a fixture would no longer
-      // invalidate anything. If the path a case's name implies is not there,
-      // the assumption behind these names has broken and the fingerprint is
-      // worth nothing.
-      if (!existsSync(path)) {
-        throw new Error(`cannot fingerprint benchmark source: ${path}`)
-      }
-      hash.update(readFileSync(path))
+const fingerprints = new Map<string, string>()
+function fingerprint(benchFile: string): string {
+  const cached = fingerprints.get(benchFile)
+  if (cached !== undefined) return cached
+
+  const hash = createHash('sha256')
+  for (const name of [benchFile, ...SHARED_SOURCES]) {
+    const path = join(PROJECT_DIR, name)
+    // Treating a missing file as empty content would fingerprint every case
+    // by the shared helpers alone, and then editing a fixture would no longer
+    // invalidate anything. If the path a case's name implies is not there,
+    // the assumption behind these names has broken and the fingerprint is
+    // worth nothing.
+    if (!existsSync(path)) {
+      throw new Error(`cannot fingerprint benchmark source: ${path}`)
     }
-    fingerprints.set(benchFile, hash.digest('hex').slice(0, 12))
+    hash.update(readFileSync(path))
   }
-  return fingerprints.get(benchFile)
+  const digest = hash.digest('hex').slice(0, 12)
+  fingerprints.set(benchFile, digest)
+  return digest
 }
 
 /**
- * The versions actually installed, not the ranges asked for.
+ * The version actually installed, not the range asked for.
  *
- * A declaration can say `^4.0.0` while two checkouts run 4.0.6 and 4.0.12, and
- * the measurement layer is exactly where that difference shows up: tinybench
- * owns the sampling loop, and vitest owns the statistics read out of it.
- *
- * @param {string} name
- * @returns {string}
+ * A declaration can say `^0.28.0` while two checkouts run 0.28.1 and 0.28.4,
+ * and the measurement layer is exactly where that difference shows up: esbuild
+ * decides the shape of the bundle every case executes as.
  */
-function installedVersion(name) {
-  /** @type {(path: string) => string | null} */
-  const read = (path) =>
-    existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')).version : null
-
-  const direct = read(join(PROJECT_DIR, 'node_modules', name, 'package.json'))
-  if (direct !== null) return direct
-
-  // A transitive dependency such as tinybench is not linked at the top level.
-  // npm and yarn nest it under the dependent; pnpm gives each package a private
-  // directory whose siblings are exactly its own dependencies. Either way the
-  // point is to find the copy vitest is running rather than whichever version
-  // the tree happens to hold first — with two tinybench versions installed,
-  // only one of them is taking the samples.
-  const owner = join(PROJECT_DIR, 'node_modules', 'vitest')
-  if (!existsSync(owner)) return 'unknown'
-
-  const nested = read(join(owner, 'node_modules', name, 'package.json'))
-  if (nested !== null) return nested
-
-  const sibling = read(join(dirname(realpathSync(owner)), name, 'package.json'))
-  return sibling ?? 'unknown'
+function installedVersion(name: string): string {
+  const path = join(PROJECT_DIR, 'node_modules', name, 'package.json')
+  if (!existsSync(path)) return 'unknown'
+  const manifest: { version: string } = JSON.parse(readFileSync(path, 'utf8'))
+  return manifest.version
 }
 
 /**
- * Everything outside the code under test that changes what a number means.
- *
  * `NODE_OPTIONS` is inherited from whoever invoked this, and a `--jitless` or a
  * heap flag in there would produce a baseline that looks like any other. It is
  * recorded rather than stripped, so a run under deliberate flags is still
  * possible and still labelled.
  */
-/** @returns {Environment} */
-function environment() {
+function environment(): Environment {
   return {
     node: process.version,
-    vitest: installedVersion('vitest'),
-    tinybench: installedVersion('tinybench'),
+    esbuild: installedVersion('esbuild'),
     platform: `${process.platform}-${process.arch}`,
     cpu: cpus()[0]?.model ?? 'unknown',
     nodeOptions: (process.env['NODE_OPTIONS'] ?? '').trim(),
@@ -593,10 +635,14 @@ function environment() {
  * else, and no amount of willingness makes two different quantities
  * comparable. So it is checked separately, and refused unconditionally.
  */
-/** @type {Array<keyof Environment>} */
-const ENVIRONMENT_KEYS = ['node', 'vitest', 'tinybench', 'platform', 'cpu', 'nodeOptions']
-/** @type {(record: Partial<Environment>) => string} */
-const describeEnvironment = (record) =>
+const ENVIRONMENT_KEYS: (keyof Environment)[] = [
+  'node',
+  'esbuild',
+  'platform',
+  'cpu',
+  'nodeOptions',
+]
+const describeEnvironment = (record: Partial<Environment>): string =>
   ENVIRONMENT_KEYS.map((key) => `${key}=${record[key] ?? '?'}`).join(' ')
 
 /**
@@ -604,7 +650,7 @@ const describeEnvironment = (record) =>
  * controls.
  *
  * Resolved to real paths, rather than passed through. A positional argument is
- * a *substring* to vitest, so `compare.mjs fuzz` runs `bench/fuzz.bench.ts`
+ * a *substring* to the runner, so `compare.ts fuzz` runs `bench/fuzz.bench.ts`
  * perfectly well — and then every later use of that argument is comparing the
  * string "fuzz" against a stored case named `bench/fuzz.bench.ts > …`, which
  * matches nothing. Recording is where that bites: the entries the re-record
@@ -615,15 +661,12 @@ const describeEnvironment = (record) =>
  *
  * The controls are timed on their own either side of the pass rather than
  * inside it, so they are never in this list.
- *
- * @param {readonly string[]} filters
- * @returns {string[]}
  */
-function suiteFiles(filters) {
+function suiteFiles(filters: readonly string[]): string[] {
   const all = readdirSync(BENCH_DIR)
     .filter((entry) => entry.endsWith('.bench.ts'))
     // Interpolated, not `join`ed. What is being built here is an identity — the
-    // same string vitest puts in a case's name and `baseline.json` stores — and
+    // same string the runner puts in a case's name and `baseline.json` stores — and
     // identities do not have a platform. `join` would spell it
     // `bench\fuzz.bench.ts` on Windows, where it would match neither
     // {@link CONTROL_FILE} on the next line, so the anchor would be measured as
@@ -638,9 +681,8 @@ function suiteFiles(filters) {
   if (filters.length === 0) return all
 
   const chosen = all.filter((file) => filters.some((filter) => file.includes(filter)))
-  // Reported here rather than as an empty run. Vitest treats a filter matching
-  // no file as a run of nothing and exits 0, so without this the failure
-  // surfaces minutes later as a report with no cases in it.
+  // Reported here rather than as an empty run: a filter matching no file would
+  // otherwise surface minutes later as a report with no cases in it.
   if (chosen.length === 0) {
     throw new Error(
       `no benchmark file matched ${filters.join(', ')}. Known files: ${all.join(', ')}`,
@@ -649,19 +691,30 @@ function suiteFiles(filters) {
   return chosen
 }
 
-/** The child's environment, with {@link QUICK_ENV} decided rather than inherited. *
- * @param {boolean} quick
- * @returns {NodeJS.ProcessEnv}
+/**
+ * Build every bundle the run needs, once, before anything is timed.
+ *
+ * esbuild is CPU work, and CPU work inside a pass heats the machine the
+ * controls exist to describe. Doing it here also means repeat 1 and repeat 2
+ * execute literally the same bytes rather than two builds that merely should
+ * be identical.
  */
-function quickEnv(quick) {
-  /** @type {NodeJS.ProcessEnv} */
-  const env = {
-    ...process.env,
-    NODE_OPTIONS: `${process.env['NODE_OPTIONS'] ?? ''} ${NODE_FLAGS}`.trim(),
+function prebundle(bundleDir: string, files: readonly string[]): void {
+  const result = spawnSync(
+    process.execPath,
+    [RUNNER, '--prepare', `--bundleDir=${bundleDir}`, CONTROL_FILE, ...files],
+    { cwd: PROJECT_DIR, encoding: 'utf8' },
+  )
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) {
+    process.stderr.write(result.stdout ?? '')
+    process.stderr.write(result.stderr ?? '')
+    throw new Error(
+      result.status === null
+        ? `bundling was killed by signal ${result.signal}`
+        : `bundling exited with status ${result.status}`,
+    )
   }
-  if (quick) env[QUICK_ENV] = '1'
-  else delete env[QUICK_ENV]
-  return env
 }
 
 /**
@@ -671,91 +724,108 @@ function quickEnv(quick) {
  * because the controls run through this same function, and the one thing that
  * must differ between them and the suite is the name filter. A `null` in
  * argument four would be easy to add by accident and impossible to read.
- *
- * @param {string} outputPath
- * @param {readonly string[]} files
- * @param {RunOptions} run
- * @returns {VitestReport}
  */
-function runSuite(outputPath, files, { quick, name = null, verbose = false }) {
+function runSuite(
+  outputPath: string,
+  files: readonly string[],
+  { quick, confirm, reverse, name, verbose, bundleDir }: RunOptions,
+): RunnerReport {
   const result = spawnSync(
-    vitestBin(),
+    process.execPath,
     [
-      'bench',
-      '--run',
+      RUNNER,
       `--outputJson=${outputPath}`,
-      // `--testNamePattern=` rather than `-t x`: on Windows this has to be
-      // spawned through cmd.exe, which re-splits the command line, and a
-      // pattern with a space in it is ordinary. Joined, it survives as one
-      // token. See {@link nameFilterWarning} for what cmd.exe still mangles.
+      // Modes travel as flags rather than environment variables so the runner
+      // clears anything a parent shell left set — a full run is the only kind
+      // `--record` will store, and an env var nobody passed is exactly how a
+      // quick one would masquerade as it.
+      ...(quick ? ['--quick'] : []),
+      ...(confirm ? ['--confirm'] : []),
+      ...(reverse ? ['--reverse'] : []),
+      // This run prepared that directory moments ago, in `prebundle`, and owns
+      // it until the scratch tree is deleted — the one situation in which
+      // trusting a bundle that is already there is a claim anyone can make.
+      `--bundleDir=${bundleDir}`,
+      '--reusePrepared',
+      ...(verbose ? ['--progress'] : []),
+      // One token, so a pattern with a space in it survives on every platform.
       ...(name === null ? [] : [`--testNamePattern=${name}`]),
       ...files,
     ],
     {
       cwd: PROJECT_DIR,
       encoding: 'utf8',
-      shell: needsShell,
       // Piped, the child says nothing until it exits — which for a full pass is
-      // three minutes of a terminal that looks hung. The data still comes from
-      // the JSON either way; `--verbose` only decides whether vitest's own
-      // reporter reaches the terminal while it works. Inheriting also means
+      // a minute of a terminal that looks hung. The data still comes from
+      // the JSON either way; `--verbose` only decides whether the runner's own
+      // progress reaches the terminal while it works. Inheriting also means
       // there is nothing left to re-print on failure, because it was printed.
-      ...(verbose
-        ? { stdio: 'inherit' }
-        : {
-            // A growing suite can overrun the default buffer, and spawnSync
-            // reports that as a failure with no explanation.
-            maxBuffer: 64 * 1024 * 1024,
-          }),
-      // Read by `_harness.ts`, which owns the windows every case runs under.
-      // Set *and* cleared, never merely added: inherited from a parent shell it
-      // would put a run on quick windows while this script believed it was a
-      // full one — and a full run is the only kind `--record` will store. The
-      // whole point of refusing `--quick --record` is that the two must not be
-      // confusable, and an env var nobody passed is exactly how they would be.
-      env: quickEnv(quick),
+      stdio: verbose ? 'inherit' : 'pipe',
+      // A growing suite can overrun the default buffer, and spawnSync reports
+      // that as a failure with no explanation.
+      maxBuffer: 64 * 1024 * 1024,
     },
   )
 
+  // A spawn that failed outright never produced a status; surfacing the OS
+  // error beats reporting "exited with status null".
+  if (result.error !== undefined) throw result.error
   if (result.status !== 0) {
     // Under `--verbose` these are null: the child wrote straight to the
     // terminal, so the failure is already above this line.
     process.stderr.write(result.stdout ?? '')
     process.stderr.write(result.stderr ?? '')
-    throw new Error(`vitest exited with status ${result.status}`)
+    throw new Error(
+      result.status === null
+        ? `bench runner was killed by signal ${result.signal}`
+        : `bench runner exited with status ${result.status}`,
+    )
   }
 
-  return JSON.parse(readFileSync(outputPath, 'utf8'))
+  const report: RunnerReport = JSON.parse(readFileSync(outputPath, 'utf8'))
+  return report
 }
 
 /**
  * One repeat: time the controls, measure the suite, time the controls again.
  *
- * The anchor is the geometric mean of the two, so it describes the middle of
- * the window the cases were measured in rather than one end of it. `slope` is
- * what the two ends say about each other — a machine that warms up over a
- * multi-minute pass shows here and nowhere else, because it does the same thing
- * every repeat and so leaves the anchors themselves in perfect agreement.
- *
- * @param {string} scratch
- * @param {number} index
- * @param {readonly string[]} files
- * @param {Options} options
- * @returns {Pass}
+ * Per control, the yardstick entry is the geometric mean of the two, so it
+ * describes the middle of the window the cases were measured in rather than
+ * one end of it. `slope` is what the two ends say about each other — a machine
+ * that warms up over a multi-minute pass shows here and nowhere else, because
+ * it does the same thing every repeat and so leaves the factors themselves in
+ * perfect agreement.
  */
-function runPass(scratch, index, files, options) {
+function runPass(
+  scratch: string,
+  bundleDir: string,
+  index: number,
+  files: readonly string[],
+  options: Options,
+): Pass {
+  // Every second repeat runs its files, and the cases inside them, in reverse.
+  // Cases in one process are never independent — each inherits the V8 state
+  // the ones before it produced — and a machine drifting across a pass biases
+  // early and late cases in opposite directions. Alternating the order makes
+  // both effects push each case both ways instead of the same way twice, so
+  // they largely cancel in the median across repeats.
+  const reverse = index % 2 === 0
+
   // Unfiltered on purpose, and not an oversight to be tidied up later. `-t`
   // chooses what is being judged; the controls are the yardstick it is judged
   // against, and there is no pattern for which "the machine was this fast"
   // means something different. A pattern that reached them would filter them to
-  // nothing and leave `anchorOf` with no anchor to build.
-  /** @type {(label: string) => number} */
-  const control = (label) =>
-    anchorOf(
+  // nothing and leave `controlVector` with no yardstick to build.
+  const control = (label: string): Map<string, number> =>
+    controlVector(
       collect(
         runSuite(join(scratch, `${label}-${index}.json`), [CONTROL_FILE], {
           quick: options.quick,
+          confirm: options.confirm,
+          reverse,
+          name: null,
           verbose: options.verbose,
+          bundleDir,
         }),
       ),
     )
@@ -764,34 +834,52 @@ function runPass(scratch, index, files, options) {
   // each phase before starting it is the whole of what this can do: a pass is
   // three children and the middle one is minutes long, and without this the
   // difference between "measuring" and "hung" is invisible.
-  /** @type {(label: string) => void} */
-  const phase = (label) => out(options.verbose ? `\n  ${label} …\n` : dim(` ${label}`))
+  const phase = (label: string): void =>
+    out(options.verbose ? `\n  ${label} …\n` : dim(` ${label}`))
 
   phase('anchor')
   const before = control('pre')
   phase('suite')
   const report = runSuite(join(scratch, `run-${index}.json`), files, {
     quick: options.quick,
+    confirm: options.confirm,
+    reverse,
     name: options.name,
     verbose: options.verbose,
+    bundleDir,
   })
   phase('anchor')
   const after = control('post')
 
-  return { report, anchor: Math.sqrt(before * after), slope: after / before }
+  // Per control, the midpoint of its two observations describes the middle of
+  // the window the suite was measured in; the slope is what the two ends say
+  // about each other, taken as the middle of the per-control ratios so one
+  // control's bad run cannot masquerade as machine drift.
+  const controls: Record<string, number> = {}
+  const slopes: number[] = []
+  // Set equality, not merely "everything before it also ran after": a control
+  // that appeared only in the second timing would leave the pass anchored to a
+  // yardstick built from a different set of workloads than the one it reports.
+  for (const name of sameControls([...before.keys()], [...after.keys()])) {
+    const pre = before.get(name)
+    const post = after.get(name)
+    if (pre === undefined || post === undefined) {
+      throw new Error(`control ${name} lost a timing between the two anchors`)
+    }
+    controls[name] = Math.sqrt(pre * post)
+    slopes.push(post / pre)
+  }
+  return { report, controls, slope: geometricMedian(slopes) }
 }
 
 /**
- * Flatten a vitest report to `name -> timing`.
+ * Flatten a runner report to `name -> timing`.
  *
  * `group.fullName` already reads `bench/distance.bench.ts > indelDistance`, so
  * it carries the file without the absolute path the report's `filepath` has.
- *
- * @param {VitestReport} report
- * @returns {Map<string, Timing>}
  */
-function collect(report) {
-  const timings = new Map()
+function collect(report: RunnerReport): Map<string, Timing> {
+  const timings = new Map<string, Timing>()
   for (const file of report.files) {
     for (const group of file.groups) {
       for (const benchmark of group.benchmarks) {
@@ -803,6 +891,10 @@ function collect(report) {
           median: benchmark.median,
           min: benchmark.min,
           samples: benchmark.sampleCount,
+          batch: benchmark.batch,
+          measuredTime: benchmark.measuredTime,
+          stoppedStable: benchmark.stoppedStable,
+          stability: benchmark.stability,
         })
       }
     }
@@ -810,49 +902,142 @@ function collect(report) {
   return timings
 }
 
-/** @type {(name: string) => boolean} */
-const isControl = (name) => name.startsWith(`${CONTROL_FILE} > `)
+const isControl = (name: string): boolean => name.startsWith(`${CONTROL_FILE} > `)
 
 /**
- * How fast the machine was, in milliseconds of control work.
+ * The machine's yardstick: each control's median, in milliseconds, by name.
  *
- * The middle control rather than the average of them: with four, one having a
- * bad run shifts a geometric mean by a couple of percent, which is the size of
- * the smallest change this script reports. The middle two ignore it.
- *
- * @param {Map<string, Timing>} timings
- * @returns {number}
+ * Named rather than collapsed to one number, because the controls are four
+ * *different* workloads. A median of their absolute times is really "whichever
+ * control happens to sit in the middle of the ordering", and one control
+ * having a bad run can change which one that is — the anchor then jumps by
+ * the gap between adjacent controls, which has nothing to do with how noisy
+ * any of them was. Meaningful robustness comes later, from taking the middle
+ * of the per-control *ratios* between two of these vectors: dimensionless,
+ * same workload over same workload, where one bad control is one outvoted
+ * ratio.
  */
-function anchorOf(timings) {
-  const controls = [...timings]
-    .filter(([name]) => isControl(name))
-    .map(([, timing]) => timing.median)
-  if (controls.length < MIN_CONTROLS) {
+function controlVector(timings: Map<string, Timing>): Map<string, number> {
+  const controls = new Map<string, number>(
+    [...timings]
+      .filter(([name]) => isControl(name))
+      .map(([name, timing]) => [name, timing.median]),
+  )
+  if (controls.size < MIN_CONTROLS) {
     throw new Error(
-      `only ${controls.length} control(s) ran, fewer than the ${MIN_CONTROLS} an ` +
-        `anchor needs. Nothing would anchor these numbers to the machine.`,
+      `only ${controls.size} control(s) ran, fewer than the ${MIN_CONTROLS} a ` +
+        `yardstick needs. Nothing would anchor these numbers to the machine.`,
     )
   }
-  return geometricMedian(controls)
+  return controls
 }
 
 /**
- * Normalise each repeat against its own anchor, then take the middle of the
- * repeats.
- *
- * @param {readonly Pass[]} passes
- * @returns {{
- *   cases: Record<string, CaseRecord>,
- *   anchorNoise: { between: number, within: number },
- * }}
+ * The middle of the per-control ratios between two yardsticks: how much
+ * slower (>1) or faster (<1) the machine described by `numerator` was than
+ * the one described by `denominator`.
  */
-function aggregate(passes) {
+function machineRatio(
+  numerator: Record<string, number>,
+  denominator: Record<string, number>,
+): number {
+  // The same controls on both sides, or none of it means anything. An
+  // intersection would still produce a number — a plausible one, from three
+  // controls where four were expected — and nothing downstream could tell it
+  // from a yardstick. The fingerprint catches a changed *definition*; this
+  // catches the runtime data disagreeing with it.
+  const names = sameControls(Object.keys(numerator), Object.keys(denominator))
+  return geometricMedian(names.map((name) => numerator[name] / denominator[name]))
+}
+
+/**
+ * The control names two yardsticks agree on, or a refusal to compare them.
+ */
+function sameControls(left: readonly string[], right: readonly string[]): string[] {
+  const ours = [...left].sort()
+  const theirs = [...right].sort()
+  if (
+    ours.length !== theirs.length ||
+    ours.some((name, index) => name !== theirs[index])
+  ) {
+    throw new Error(
+      `control yardsticks name different controls: ${ours.join(', ')} ` +
+        `vs ${theirs.join(', ')}`,
+    )
+  }
+  return ours
+}
+
+/**
+ * What the adaptive stop did across every case of every repeat.
+ *
+ * The stop rule cannot be tuned by reasoning about it — whether `minTime` is
+ * generous or the window is doing all the work is a property of these cases on
+ * this machine. This is the evidence: how often a case ended because its block
+ * medians agreed, how closely they agreed, and how much of the wall clock went
+ * into timed phases at all.
+ */
+function measurementStats(collected: readonly Map<string, Timing>[]): MeasurementStats {
+  const timings = collected.flatMap((repeat) => [...repeat.values()])
+  const spreads = timings
+    .map((timing) => timing.stability)
+    .filter((value) => value !== null)
+    .sort((a, b) => a - b)
+  return {
+    cases: timings.length,
+    stable:
+      timings.length === 0
+        ? 0
+        : timings.filter((timing) => timing.stoppedStable).length / timings.length,
+    spread: spreads.length === 0 ? null : median(spreads),
+    // Nearest-rank, so it names a spread one case actually reported rather
+    // than an interpolation between two.
+    worst:
+      spreads.length === 0
+        ? null
+        : spreads[Math.min(spreads.length - 1, Math.ceil(0.95 * spreads.length) - 1)],
+    timed: timings.reduce((total, timing) => total + timing.measuredTime, 0) / 1000,
+  }
+}
+
+/**
+ * Normalise each repeat against its own machine factor, then take the middle
+ * of the repeats.
+ *
+ * The session's yardstick is the per-control middle across the passes; a
+ * pass's factor is the middle of its per-control *ratios* against that
+ * yardstick, which is dimensionless and outvotes one control having a bad
+ * pass. A case's normalised value is therefore its median in milliseconds, as
+ * it would have measured on the session's average machine.
+ */
+function aggregate(passes: readonly Pass[]): {
+  cases: Record<string, CaseRecord>
+  measurement: MeasurementStats
+  anchorNoise: { between: number; within: number }
+} {
   const collected = passes.map((pass) => collect(pass.report))
-  const anchors = passes.map((pass) => pass.anchor)
+
+  const observed = new Map<string, number[]>()
+  for (const pass of passes) {
+    for (const [name, value] of Object.entries(pass.controls)) {
+      const values = observed.get(name) ?? []
+      values.push(value)
+      observed.set(name, values)
+    }
+  }
+  const machine: Record<string, number> = {}
+  for (const [name, values] of observed) {
+    if (values.length !== passes.length) {
+      throw new Error(
+        `control ${name} ran in ${values.length} of ${passes.length} repeats`,
+      )
+    }
+    machine[name] = geometricMedian(values)
+  }
+  const factors = passes.map((pass) => machineRatio(pass.controls, machine))
 
   const names = new Set(collected.flatMap((timings) => [...timings.keys()]))
-  /** @type {Record<string, CaseRecord>} */
-  const cases = {}
+  const cases: Record<string, CaseRecord> = {}
   const stamp = {
     ...environment(),
     recordedAt: new Date().toISOString(),
@@ -873,7 +1058,7 @@ function aggregate(passes) {
     }
 
     const raw = timings.map((timing) => timing.median)
-    const normalised = raw.map((value, i) => value / anchors[i])
+    const normalised = raw.map((value, i) => value / factors[i])
     const centre = median(normalised)
 
     cases[name] = {
@@ -882,51 +1067,53 @@ function aggregate(passes) {
       // Kept in milliseconds for the sample-size envelope and for display; the
       // comparison never reads it.
       median: median(raw),
-      anchor: geometricMedian(anchors),
+      machine,
       min: Math.min(...timings.map((timing) => timing.min)),
       samples: Math.min(...timings.map((timing) => timing.samples)),
+      // Kept so a case that crosses the batching threshold between two runs
+      // can be pointed out: its measurement regime changed, not just its time.
+      batch: Math.min(...timings.map((timing) => timing.batch)),
+      // Taken per repeat and then reduced, so the figure the envelope judges
+      // is one a repeat actually measured — a median from one repeat times a
+      // batch from another is a sample nothing took.
+      sample: Math.min(...timings.map((timing) => timing.median * timing.batch)),
       repeats: passes.length,
       source: fingerprint(fileOf(name)),
       ...stamp,
     }
   }
   // Two different ways the machine can fail to hold still. Each repeat is
-  // corrected by its own anchor, so neither is an error by itself — they are
-  // the evidence for whether that anchor described the repeat it came from.
+  // corrected by its own factor, so neither is an error by itself — they are
+  // the evidence for whether that factor described the repeat it came from.
   //
   // `between` is drift from one repeat to the next. `within` is the machine
-  // moving *during* a repeat, which the anchors alone cannot show: a run that
-  // starts cool and heats up does so identically every repeat, so the anchors
+  // moving *during* a repeat, which the factors alone cannot show: a run that
+  // starts cool and heats up does so identically every repeat, so the factors
   // agree perfectly while the cases that ran first were measured on a different
   // machine from the ones that ran last. It is visible only because the
   // controls are timed both before and after each pass.
-  const between = (Math.max(...anchors) - Math.min(...anchors)) / median(anchors)
+  const between = (Math.max(...factors) - Math.min(...factors)) / median(factors)
   const within = Math.max(...passes.map((pass) => Math.abs(pass.slope - 1)))
 
-  return { cases, anchorNoise: { between, within } }
+  return {
+    cases,
+    measurement: measurementStats(collected),
+    anchorNoise: { between, within },
+  }
 }
 
-/**
- * @param {number} value
- * @returns {string}
- */
-function percent(value) {
+function percent(value: number): string {
   return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`
 }
 
 const COLOUR = process.stdout.isTTY && !process.env['NO_COLOR']
-/** @type {(code: number, text: string) => string} */
-const paint = (code, text) => (COLOUR ? `\u001B[${code}m${text}\u001B[0m` : text)
-/** @type {(text: string) => string} */
-const dim = (text) => paint(2, text)
-/** @type {(text: string) => string} */
-const green = (text) => paint(32, text)
-/** @type {(text: string) => string} */
-const red = (text) => paint(31, text)
-/** @type {(text: string) => string} */
-const yellow = (text) => paint(33, text)
-/** @type {(text: string) => void} */
-const out = (text) => {
+const paint = (code: number, text: string): string =>
+  COLOUR ? `\u001B[${code}m${text}\u001B[0m` : text
+const dim = (text: string): string => paint(2, text)
+const green = (text: string): string => paint(32, text)
+const red = (text: string): string => paint(31, text)
+const yellow = (text: string): string => paint(33, text)
+const out = (text: string): void => {
   process.stdout.write(text)
 }
 
@@ -935,8 +1122,8 @@ const out = (text) => {
  *
  * Selected by the same two filters the run itself applies, so this picks
  * exactly the cases a filtered run will produce — which is what lets the
- * environment be checked before spending ten minutes measuring, without
- * rejecting a run over some unrelated file recorded on another Node.
+ * environment be checked before spending minutes measuring, without rejecting
+ * a run over some unrelated file recorded on another Node.
  *
  * `files` is the resolved list from {@link suiteFiles}, not the raw arguments.
  * It is only consulted when a filter was actually given: with none, every
@@ -949,21 +1136,20 @@ const out = (text) => {
  * need not be the session that recorded the cases under test. Judging a
  * comparison by them would let a partial re-record on another Node reject a
  * pairing that is perfectly valid — each case already carries the environment
- * and the anchor it was measured under.
- *
- * @param {Baseline} baseline
- * @param {Options} options
- * @param {readonly string[]} files resolved bench paths this run will measure
- * @returns {string[]}
+ * and the yardstick it was measured under.
  */
-function candidates(baseline, options, files) {
+function candidates(
+  baseline: Baseline,
+  options: Options,
+  files: readonly string[],
+): string[] {
   let names = Object.keys(baseline.cases).filter((name) => !isControl(name))
   if (options.files.length > 0) {
     const selected = new Set(files)
     names = names.filter((name) => selected.has(fileOf(name)))
   }
   if (options.name !== null) {
-    // No flags, because vitest builds its own the same way.
+    // No flags, because the runner builds its own the same way.
     const pattern = new RegExp(options.name)
     names = names.filter((name) => pattern.test(taskName(name)))
   }
@@ -971,70 +1157,41 @@ function candidates(baseline, options, files) {
 }
 
 /**
- * The string vitest matches `-t` against.
+ * The string the `-t` filter matches against.
  *
- * Not the name this script stores. Vitest joins a task's suite path and its
+ * Not the name this script stores. The filter sees a case's group path and its
  * name with single spaces and never sees the file, so `bench/fuzz.bench.ts >
  * ratio > 8 chars` is `ratio 8 chars` to a pattern. Predicting the filter with
  * the stored name instead would quietly disagree with the run — `-t '^ratio'`
  * matches every case here and none there.
- *
- * @param {string} name
- * @returns {string}
  */
-function taskName(name) {
+function taskName(name: string): string {
   return name.slice(name.indexOf(' > ') + 3).replaceAll(' > ', ' ')
 }
 
-/** The bench file a stored case came from — the first segment of its name. *
- * @param {string} name
- * @returns {string}
- */
-function fileOf(name) {
+/** The bench file a stored case came from — the first segment of its name. */
+function fileOf(name: string): string {
   return name.slice(0, name.indexOf(' > '))
-}
-
-/**
- * Say so when the shell is going to see the pattern before vitest does.
- *
- * On Windows the runner is a `.cmd` shim, so `spawnSync` has to go through
- * cmd.exe, and Node does not escape arguments for it. A regexp alternation or
- * a group — `-t 'ratio|wRatio'`, `-t '(8|32) chars'` — contains characters
- * cmd.exe reads as its own. Escaping them here would mean writing a cmd
- * quoting rule for one flag on the platform this suite is least run on; saying
- * which patterns are affected is the honest amount of effort.
- *
- * @param {Options} options
- * @returns {void}
- */
-function nameFilterWarning(options) {
-  if (!needsShell || options.name === null) return
-  if (!/[|()<>^&"]/.test(options.name)) return
-  out(
-    `  ${yellow('!')} on Windows this pattern reaches cmd.exe unescaped — quote it,\n` +
-      `    or expect ${JSON.stringify(options.name)} to be read as shell syntax\n`,
-  )
 }
 
 /**
  * Refuse to compare a baseline recorded somewhere else.
  *
  * A V8 release moves individual microbenchmarks by different amounts, which no
- * anchor can repair, and a different CPU is not a comparison at all.
- *
- * @param {Baseline} baseline
- * @param {readonly string[]} names
- * @param {boolean} allow
- * @param {boolean} [quiet]
- * @returns {void}
+ * yardstick can repair, and a different CPU is not a comparison at all.
  */
-function checkEnvironment(baseline, names, allow, quiet = false) {
+function checkEnvironment(
+  baseline: Baseline,
+  names: readonly string[],
+  allow: boolean,
+  quiet = false,
+): void {
   // Checked first, and not waivable. A stored number under another measurement
   // version is a different quantity — a raw median where this expects one in
-  // units of the anchor, say — and diffing the two produces a percentage that
+  // units of the machine, say — and diffing the two produces a percentage that
   // looks exactly like every other percentage here. `--allow-environment-change`
   // is for a machine that differs, not for arithmetic that does not apply.
-  const versions = new Set()
+  const versions = new Set<number | string>()
   for (const name of names) {
     const record = baseline.cases[name]
     if (record !== undefined && record.measurement !== MEASUREMENT_VERSION) {
@@ -1050,7 +1207,7 @@ function checkEnvironment(baseline, names, allow, quiet = false) {
   }
 
   const now = describeEnvironment(environment())
-  const mismatched = new Set()
+  const mismatched = new Set<string>()
   for (const name of names) {
     const record = baseline.cases[name]
     if (record !== undefined && describeEnvironment(record) !== now) {
@@ -1080,21 +1237,19 @@ function checkEnvironment(baseline, names, allow, quiet = false) {
  * reports describes something other than what it claims to, which is worth
  * knowing before believing a ratio next to it.
  *
- * @param {Record<string, CaseRecord>} current
- * @returns {void}
+ * The figure judged is the timed sample, not the per-call median, because
+ * batching a fast body up to a workable sample is exactly the thing that puts
+ * it inside the envelope.
  */
-function reportSampleSizes(current) {
-  /** @type {Array<[string, number]>} */
-  const long = []
-  /** @type {Array<[string, number]>} */
-  const short = []
+function reportSampleSizes(current: Record<string, CaseRecord>): void {
+  const long: [string, number][] = []
+  const short: [string, number][] = []
   for (const [name, record] of Object.entries(current)) {
-    if (record.median > SAMPLE_TOO_LONG) long.push([name, record.median])
-    else if (record.median < SAMPLE_TOO_SHORT) short.push([name, record.median])
+    if (record.sample > SAMPLE_TOO_LONG) long.push([name, record.sample])
+    else if (record.sample < SAMPLE_TOO_SHORT) short.push([name, record.sample])
   }
 
-  /** @type {Array<[string, Array<[string, number]>]>} */
-  const outsized = [
+  const outsized: [string, [string, number][]][] = [
     [
       `over ${SAMPLE_TOO_LONG}ms — long enough that a scheduler or collector` +
         ` pause is hard to isolate from the work`,
@@ -1109,7 +1264,7 @@ function reportSampleSizes(current) {
 
   for (const [label, entries] of outsized) {
     if (entries.length === 0) continue
-    out(`\n  ${yellow('!')} ${entries.length} case(s) ${label}:\n`)
+    out(`\n  ${yellow('!')} ${entries.length} sample(s) ${label}:\n`)
     for (const [name, value] of entries) {
       out(`    ${dim(`${value.toFixed(4)}ms  ${name}`)}\n`)
     }
@@ -1117,14 +1272,47 @@ function reportSampleSizes(current) {
 }
 
 /**
- * @param {Record<string, CaseRecord>} current
- * @param {Baseline} baseline
- * @param {{ between: number, within: number }} anchorNoise
- * @param {Options} options
- * @param {readonly string[]} files resolved bench paths this run measured
- * @returns {number} the process exit code
+ * How the adaptive stop behaved over the whole run.
+ *
+ * Printed on every run, recording included, because it is the only evidence
+ * for whether the windows in `harness.ts` are the right ones: a suite that
+ * mostly stops on stability is one whose `minTime` could come down, and one
+ * that mostly runs out of window is one where the stop rule is buying nothing.
  */
-function report(current, baseline, anchorNoise, options, files) {
+function reportMeasurement(stats: MeasurementStats): void {
+  const spread =
+    stats.spread === null || stats.worst === null
+      ? 'no case completed its blocks'
+      : `block spread ±${(stats.spread * 100).toFixed(2)}% median, ` +
+        `±${(stats.worst * 100).toFixed(2)}% p95`
+  out(
+    dim(
+      `  measurement: ${(stats.stable * 100).toFixed(0)}% of ${stats.cases} case-runs ` +
+        `stopped on stability, ${spread}, ${stats.timed.toFixed(0)}s timed\n`,
+    ),
+  )
+}
+
+interface NoteRow {
+  name: string
+  note: string
+}
+interface MeasuredRow {
+  name: string
+  ratio: number
+  moved: boolean
+  noise: number
+  median: number
+}
+
+/** @returns the process exit code */
+function report(
+  current: Record<string, CaseRecord>,
+  baseline: Baseline,
+  anchorNoise: { between: number; within: number },
+  options: Options,
+  files: readonly string[],
+): number {
   const shared = Object.keys(current).filter((name) => baseline.cases[name] !== undefined)
 
   // A case whose fixture — or whose controls, which every stored number is in
@@ -1137,8 +1325,16 @@ function report(current, baseline, anchorNoise, options, files) {
     ),
   )
 
-  /** @type {(name: string) => number} */
-  const ratioOf = (name) => baseline.cases[name].normalised / current[name].normalised
+  // Both sides are milliseconds in units of their own session's machine, so
+  // one of them has to be converted before they can be divided. `drift` is how
+  // much slower this machine is than the one the baseline was recorded on, so
+  // dividing today's normalised value by it puts it in the baseline's units;
+  // the ratio is then baseline over current, above 1 for faster now.
+  const ratioOf = (name: string): number => {
+    const before = baseline.cases[name]
+    const drift = machineRatio(current[name].machine, before.machine)
+    return (before.normalised * drift) / current[name].normalised
+  }
   const measured = shared.filter((name) => !isControl(name) && !changed.has(name))
   const broadMove =
     measured.length < MIN_BROAD_CASES ? null : geometricMean(measured.map(ratioOf))
@@ -1147,28 +1343,29 @@ function report(current, baseline, anchorNoise, options, files) {
   // baseline entry belongs to whichever session recorded it last.
   checkEnvironment(baseline, measured, options.allowEnvironmentChange)
 
-  // How much slower or faster the machine was, from each case's *own* stored
-  // anchor rather than from today's control entries — that anchor was measured
-  // in the session that produced the case's baseline number, which is the only
-  // machine a comparison against it is really between.
+  // How much slower or faster the machine is than the one each case was
+  // recorded on, from that case's *own* stored yardstick — the controls
+  // measured in the session that produced its baseline number, which is the
+  // only machine a comparison against it is really between.
   //
   // Grouped by that session rather than pooled, because a baseline may hold
   // several. One session recorded when the machine was 20% off would be a fifth
   // of the cases needing a correction past anything worth trusting, and a
   // median across all of them would report the other four fifths and say the
   // run was fine.
-  const sessions = new Map()
+  const sessions = new Map<string, { drift: number; cases: number }>()
   for (const name of measured) {
     const before = baseline.cases[name]
-    if (before.anchor == null || current[name].anchor == null) continue
-    const session = sessions.get(before.recordedAt) ?? { drift: 0, cases: 0 }
-    session.drift = before.anchor / current[name].anchor
+    const session = sessions.get(before.recordedAt) ?? {
+      drift: machineRatio(current[name].machine, before.machine),
+      cases: 0,
+    }
     session.cases++
     sessions.set(before.recordedAt, session)
   }
 
-  const floor = options.quick ? QUICK_FLOOR : FLOOR
-  const rows = []
+  const floor = options.quick ? QUICK_FLOOR : options.confirm ? CONFIRM_FLOOR : FLOOR
+  const rows: (NoteRow | MeasuredRow)[] = []
   let regressions = 0
   let improvements = 0
 
@@ -1197,13 +1394,12 @@ function report(current, baseline, anchorNoise, options, files) {
 
   // A case's full name is `<file> > <group> > <case>`; only the last part varies
   // within a group, so the first two become a heading and the rows line up.
-  /** @type {(name: string) => [string, string]} */
-  const split = (name) => {
+  const split = (name: string): [string, string] => {
     const at = name.lastIndexOf(' > ')
     return [name.slice(0, at), name.slice(at + 3)]
   }
   const width = Math.max(...rows.map((row) => split(row.name)[1].length))
-  let heading = null
+  let heading: string | null = null
 
   out(
     `\n  ${'case'.padEnd(width)}  ${'median'.padStart(10)}  ${'vs base'.padStart(8)}  noise\n`,
@@ -1217,7 +1413,7 @@ function report(current, baseline, anchorNoise, options, files) {
     }
 
     const label = name.padEnd(width)
-    if (row.note !== undefined) {
+    if ('note' in row) {
       out(`  ${label}  ${dim(`${'—'.padStart(10)}  ${row.note}`)}\n`)
       continue
     }
@@ -1245,6 +1441,30 @@ function report(current, baseline, anchorNoise, options, files) {
     )
   }
 
+  // A case that crossed the 0.1 ms batching threshold since the baseline was
+  // recorded is being measured a different way than the number it is compared
+  // against: one call per timed sample rather than several, or the reverse.
+  // That is not a reason to distrust the ratio, but it is the first thing to
+  // know about a suspicious one on a tiny case.
+  //
+  // Crossed, not merely moved. The batch is calibrated per run from a probe,
+  // so a case sitting near a boundary reports x8 one day and x9 the next
+  // without anything having happened. What is worth a line is a body that
+  // stopped needing a batch, started needing one, or halved or doubled.
+  const rebatched = measured.filter((name) => {
+    const then = baseline.cases[name].batch
+    const now = current[name].batch
+    return (then === 1) !== (now === 1) || Math.max(then, now) >= 2 * Math.min(then, now)
+  })
+  if (rebatched.length > 0) {
+    out(`\n  ${yellow('!')} ${rebatched.length} case(s) changed batching regime:\n`)
+    for (const name of rebatched) {
+      out(
+        `    ${dim(`x${baseline.cases[name].batch} → x${current[name].batch}  ${name}`)}\n`,
+      )
+    }
+  }
+
   // Quick mode measures nothing at the size the envelope describes, so the
   // sizes it reports would all be its own.
   if (!options.quick) reportSampleSizes(current)
@@ -1254,7 +1474,7 @@ function report(current, baseline, anchorNoise, options, files) {
 
   if (anchorNoise.between > RUN_INSTABILITY_LIMIT) {
     out(
-      `  ${red('!')} the anchor moved ${percent(anchorNoise.between)} between repeats — the machine did not hold still\n`,
+      `  ${red('!')} the machine moved ${percent(anchorNoise.between)} between repeats — it did not hold still\n`,
     )
     inconclusive = true
   }
@@ -1267,7 +1487,7 @@ function report(current, baseline, anchorNoise, options, files) {
   }
 
   if (sessions.size === 0) {
-    out(dim('  machine vs baseline: unknown — no compared case stored an anchor\n'))
+    out(dim('  machine vs baseline: unknown — no case was comparable\n'))
   } else {
     const drifts = [...sessions.values()].map((session) => session.drift)
     const range =
@@ -1275,7 +1495,7 @@ function report(current, baseline, anchorNoise, options, files) {
         ? percent(drifts[0] - 1)
         : `${percent(Math.min(...drifts) - 1)} … ${percent(Math.max(...drifts) - 1)}`
     out(`  machine vs baseline, over ${sessions.size} recording session(s): ${range}`)
-    out(dim(' (already divided out)\n'))
+    out(dim(' (positive is slower now, and already divided out)\n'))
 
     for (const [recordedAt, session] of sessions) {
       if (Math.abs(Math.log(session.drift)) <= Math.log(1 + DRIFT_LIMIT)) continue
@@ -1327,11 +1547,11 @@ function report(current, baseline, anchorNoise, options, files) {
   // this suite and immediately comparing against it flagged eleven cases at
   // 0.94-0.97x, and the identical comparison run again flagged none of them.
   // So a flag is a place to look, not a finding — and the cheapest way to tell
-  // the two apart is to ask again.
+  // the two apart is to ask again, with `--confirm`.
   if (regressions > 0 || improvements > 0) {
     out(
       dim('  a band covers the spread within one run, not between two — confirm\n') +
-        dim('  anything flagged here by running that file again before believing it\n'),
+        dim('  anything flagged here with --confirm before believing it\n'),
     )
   }
   out('\n')
@@ -1354,19 +1574,17 @@ function report(current, baseline, anchorNoise, options, files) {
   return options.failOnRegression && failed ? 1 : 0
 }
 
-/** @returns {number} the process exit code */
-function main() {
+/** @returns the process exit code */
+function main(): number {
   const options = parseArgs(process.argv.slice(2))
   if (options.help) {
     out(USAGE)
     return 0
   }
-  assertVitestInstalled()
-  nameFilterWarning(options)
   // Quick mode is one repeat by definition, and says so in its own banner.
   if (options.repeats < 2 && !options.quick) {
     out(
-      `  ${yellow('!')} one repeat measures no spread, so every noise band falls back to the ±${((options.quick ? QUICK_FLOOR : FLOOR) * 100).toFixed(0)}% floor\n`,
+      `  ${yellow('!')} one repeat measures no spread, so every noise band falls back to the ±${(FLOOR * 100).toFixed(0)}% floor\n`,
     )
   }
 
@@ -1377,7 +1595,7 @@ function main() {
 
   // Read the baseline, and check what this run could compare against, before
   // spending minutes measuring.
-  const baseline = options.record
+  const baseline: Baseline | null = options.record
     ? null
     : JSON.parse(readFileSync(options.baseline, 'utf8'))
   if (baseline !== null) {
@@ -1397,13 +1615,15 @@ function main() {
   }
 
   const scratch = mkdtempSync(join(tmpdir(), 'rapidfuzz-bench-'))
-  const passes = []
+  const bundleDir = join(scratch, 'bundles')
+  const passes: Pass[] = []
 
   try {
+    prebundle(bundleDir, files)
     for (let repeat = 1; repeat <= options.repeats; repeat++) {
       const started = Date.now()
       out(`  run ${repeat}/${options.repeats} …`)
-      const pass = runPass(scratch, repeat, files, options)
+      const pass = runPass(scratch, bundleDir, repeat, files, options)
       passes.push(pass)
       out(
         ` ${((Date.now() - started) / 1000).toFixed(0)}s` +
@@ -1414,9 +1634,9 @@ function main() {
     rmSync(scratch, { recursive: true, force: true })
   }
 
-  const { cases, anchorNoise } = aggregate(passes)
+  const { cases, measurement, anchorNoise } = aggregate(passes)
 
-  // A pattern matching nothing is not an error to vitest — it skips every case
+  // A pattern matching nothing is not an error to the runner — it skips every case
   // and exits 0 — so without this the run reports on a suite of no cases, and
   // `report` divides by a column width taken from an empty list. The likeliest
   // cause is the shape of the string being matched, so say what that is.
@@ -1428,14 +1648,18 @@ function main() {
     )
   }
 
-  if (options.record) {
-    const previous = existsSync(options.baseline)
+  reportMeasurement(measurement)
+
+  // Null exactly when `--record` was asked for: nothing was read, because
+  // there is nothing to compare against.
+  if (baseline === null) {
+    const previous: Record<string, CaseRecord> = existsSync(options.baseline)
       ? JSON.parse(readFileSync(options.baseline, 'utf8')).cases
       : {}
     // Recording a file replaces that file, rather than merging into it.
     //
     // Other files' entries must survive — a partial re-record measures a new
-    // anchor, but every case stores the anchor from its own session, so
+    // yardstick, but every case stores the yardstick from its own session, so
     // rewriting one file cannot renormalise an untouched one. Entries from the
     // files being recorded must *not* survive: merging would leave a case that
     // was renamed or deleted sitting in the baseline under its old name, with
@@ -1452,8 +1676,8 @@ function main() {
     // and a per-file replacement would preserve every one of its cases forever.
     // A full record is a statement that this is the whole suite.
     const rewritten = new Set(files)
-    /** @type {(name: string) => boolean} */
-    const keep = (name) => options.files.length > 0 && !rewritten.has(fileOf(name))
+    const keep = (name: string): boolean =>
+      options.files.length > 0 && !rewritten.has(fileOf(name))
     const merged = {
       ...Object.fromEntries(Object.entries(previous).filter(([name]) => keep(name))),
       ...cases,

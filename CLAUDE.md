@@ -57,10 +57,9 @@ its ordinary use.
 
 `as` in a non-type sense is fine (`import * as ns from '...'`, `export { x as y }`).
 
-The same rule covers the JSDoc spellings, because the tooling under `bench/`
-and `scripts/` is plain `.mjs` — `compare.mjs` sets environment variables
-around a child process, so it cannot be a `.ts` file needing a build step, and
-it must stay outside the set it fingerprints. Those files carry `// @ts-check`
+The same rule covers the JSDoc spellings, because the tooling under `scripts/`
+is plain `.mjs`: each is a shell-invoked entry point that has to run against a
+checkout which may not have built anything. Those files carry `// @ts-check`
 and JSDoc types, checked by `tsconfig.scripts.json`; `pnpm typecheck` runs it
 alongside the main config. There:
 
@@ -71,6 +70,15 @@ alongside the main config. There:
   rule reads it. Convention is all that holds it.
 - `@ts-ignore`, `@ts-expect-error` and `@ts-nocheck` are banned for the same
   reason, and `typescript/ban-ts-comment` enforces all three.
+
+The benchmark tooling under `bench/tooling/` is TypeScript and checked by
+`tsconfig.dev.json` like everything else: Node runs those files directly by
+stripping the types, so being an entry point costs it nothing. Keep it that
+way — the case files are `bench/*.bench.ts` and the machinery that measures
+them is `bench/tooling/`, which is the only thing separating the two at a
+glance. Type stripping is on by default from Node 22.18, so that is the floor
+for running the benchmarks; `engines` stays at `>=22` because it describes
+what the published library needs, and the published library is plain JS.
 
 When a runtime check proves something the checker cannot see, restructure so
 the proof is visible — `filter((x) => x !== undefined)` narrows where
@@ -157,23 +165,24 @@ do not keep it for a removed API.
 
 ## Benchmarks
 
-The whole suite is 155 cases and about ten minutes. Almost nothing needs the
-whole suite. Both filters — a bench file, named by any substring of its path,
-and `-t` over case names — work on every script below, and they compose:
+The whole suite is 139 cases and about four minutes to compare. Almost nothing
+needs the whole suite. Both filters — a bench file, named by any substring of
+its path, and `-t` over case names — work on every script below, and they
+compose:
 
 ```sh
 pnpm bench:quick fuzz -t 'partialRatio'      # under a second; the edit loop
 pnpm bench:compare bench/fuzz.bench.ts       # before believing a number
 pnpm bench:compare:quick -t 'indelDistance'  # ~5s, ±15%: did I break it
+pnpm bench:confirm -t 'partialRatio 512'     # is that 4% real
 pnpm bench:baseline bench/fuzz.bench.ts      # re-record, after a real change
 ```
 
 **Detect with `bench:compare:quick`; spend a full `bench:compare` only on
-numbers that get written down.** A full suite run is 155 cases at 1.3s each,
-twice — about seven minutes — and reaching for it to answer "did that move?"
-burns whole stretches of a session. `--quick` is the same comparison against the
-same baseline at a tenth of the window and one pass: the whole suite in ~45s, a
-single filtered file in ~6s. Its ±15% band is wide, and real findings are
+numbers that get written down.** A full pass is ~100s, and a comparison is two
+of them plus four control runs. `--quick` is the same comparison against the
+same baseline at a tenth of the window and one pass: the whole suite in ~20s, a
+single filtered file in a few seconds. Its ±15% band is wide, and real findings are
 usually nowhere near it — a 2.43x regression and a set of 1.6-2x wins were all
 comfortably outside it. Escalate to the full run once, at the end, for the
 figures that go in the commit message. Never quote `--quick` as evidence of an
@@ -184,26 +193,36 @@ every pass whatever is filtered out — so it stays comparable to a baseline
 recorded from a full run. It gives up only the suite-wide move, which needs
 five comparable cases and reports `n/a` below that.
 
-`compare.mjs` spawns three children per pass and shows only which one is
-running; `--verbose` lets vitest's own reporter through when a pass looks
-stuck. `node bench/compare.mjs --help` lists the rest. Six rules that are not
-guessable from the code:
+The suite does not run under vitest: `bench/tooling/runner.ts` bundles each
+bench file once with esbuild and measures it in bare `node --expose-gc`,
+because vite's transform layer added ~2.5x to every case body and did so
+asymmetrically across module layouts. One child per file, never one process
+for all of them — sharing a process made the fuzz cases 1.05-1.54x slower and
+their noise up to 52%. Each case is sampled adaptively: it stops once four
+consecutive 50 ms blocks agree to 1%, which is why a full pass is ~100s rather
+than the ~200s fixed windows cost. `compare.ts` spawns three runner children
+per pass and shows only which one is running; `--verbose` streams the per-case
+progress when a pass looks stuck. `node bench/tooling/compare.ts --help` lists
+the rest. Six rules that are not guessable from the code:
 
 - **Two passes, comparing and recording alike.** A third refines a spread the
   ±3% floor discards in almost every case, and costs the whole suite again — a
-  full comparison is about ten minutes a pass, and a run has to be cheap enough
+  full comparison is about two minutes a pass, and a run has to be cheap enough
   to sit through or it stops being run. `--repeat=N` still takes more, which is
   what a case with a genuinely wide band is worth. Two is the floor: one measures
   no spread at all, stores a zero band, and is reported as stale forever after.
-- **`pnpm bench` and `pnpm bench:quick` are not baseline-comparable.** They run
-  without `--expose-gc` and, quick, at a tenth of the window; `--quick` widens
-  its threshold to ±15% and refuses to record. They answer "did I break
-  something", never "is this 4% faster".
+  `pnpm bench:confirm` is the other direction: widened windows and four repeats
+  over the one case a normal run flagged, with a ±1.5% floor.
+- **`pnpm bench` and `pnpm bench:quick` are not baseline-comparable.** They
+  measure one run with no controls around it, and quick mode shortens every
+  window to a tenth; `--quick` widens its threshold to ±15% and refuses to
+  record. They answer "did I break something", never "is this 4% faster".
 - **A flag is a place to look, not a finding.** A noise band covers the spread
-  within one run, not between two. Re-run the file before believing anything
-  the report highlighted.
-- **`bench/_harness.ts`, `bench/_corpus.ts` and `vitest.config.ts` are hashed
-  into every one of the 155 baseline entries.** Editing any of them — a comment
+  within one run, not between two. Re-measure with `pnpm bench:confirm` before
+  believing anything the report highlighted.
+- **`bench/tooling/harness.ts`, `bench/tooling/corpus.ts` and
+  `bench/tooling/runner.ts` are hashed into every one of the baseline
+  entries.** Editing any of them — a comment
   counts — marks the entire baseline "definition changed" and costs a full
   `pnpm bench:baseline` to recover. Batch such edits with a re-record you were
   going to do anyway; do not touch them in passing.
@@ -216,7 +235,7 @@ guessable from the code:
   entries from a bench file that no longer exists.
 - **A baseline recorded under another `MEASUREMENT_VERSION` is refused**, and
   `--allow-environment-change` does not waive it. That flag is for a machine
-  that differs — Node, CPU, vitest — not for stored numbers that mean something
+  that differs — Node, CPU, esbuild — not for stored numbers that mean something
   else. Bump the constant only when the anchor or the aggregation changes, and
   expect a full re-record to be part of the same commit.
 

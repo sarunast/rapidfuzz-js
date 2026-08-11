@@ -9,7 +9,7 @@
  * node bench/comparison/run.mjs --python=/path/to/venv/bin/python
  * ```
  *
- * Two things separate this from `bench/compare.mjs`, and they are the reason it
+ * Two things separate this from `bench/tooling/compare.ts`, and they are the reason it
  * is a second script rather than more cases in the first:
  *
  *   - **It measures `dist/`, not `src/`.** Every contender is installed from

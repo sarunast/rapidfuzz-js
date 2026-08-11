@@ -1,7 +1,7 @@
 /**
  * Control cases: work that this library's code cannot change.
  *
- * `compare.mjs` estimates how much faster or slower the machine itself was —
+ * `compare.ts` estimates how much faster or slower the machine itself was —
  * thermal state, background load, CPU frequency — and divides it out of every
  * other case's ratio. Estimating that from the suite's own cases cannot work:
  * if every kernel really did get ten percent slower, the estimate absorbs it
@@ -13,9 +13,7 @@
  * a `charCodeAt` scan, which is how every scorer here reads its input.
  */
 
-import { describe } from 'vitest'
-
-import { measure } from './_harness.js'
+import { describe, measure } from './tooling/harness.js'
 
 /**
  * Somewhere for a result to go that the optimiser cannot prove is dead. Without
