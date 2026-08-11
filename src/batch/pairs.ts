@@ -12,11 +12,10 @@ import type { BatchOptions } from './types.js'
 
 function normalizeInputs(
   values: readonly Sequence[],
-  normalize: Normalizer | undefined,
+  normalize: Normalizer,
 ): readonly Sequence[] {
   return values.map((value) => {
     const sequence = validateSequence(value)
-    if (normalize === undefined) return sequence
     const normalized = normalize(sequence)
     if (normalized == null) throw new TypeError('normalize returned a missing value')
     return validateSequence(normalized)
@@ -46,6 +45,15 @@ export function scorePairs<D extends Direction>(
   const integral = kind !== 'f64' && kind !== 'f32'
   const compilation = scorerCompilation(options.scorer)
   const sameInput = Object.is(queries, choices)
+  if (options.normalize === undefined) {
+    for (let i = 0; i < queries.length; i++) {
+      const query = validateSequence(queries[i])
+      const choice = sameInput ? query : validateSequence(choices[i])
+      const score = compilation.rawScore(query, choice, null)
+      scores[i] = integral ? roundHalfAwayFromZero(score) : score
+    }
+    return scores
+  }
   const normalizedQueries = normalizeInputs(queries, options.normalize)
   const normalizedChoices = sameInput
     ? normalizedQueries

@@ -19,11 +19,13 @@ export const distance: Metric<'distance', HammingDistanceConfiguration> =
     implementation: hammingDistance,
     direction: 'distance',
     bounds: [0, Number.POSITIVE_INFINITY],
+    configurationKeys: ['pad'],
   })
 export const similarity: Metric<'similarity', HammingSimilarityConfiguration> =
   /* @__PURE__ */ builtInMetric({
     implementation: hammingNormalizedSimilarity,
     direction: 'similarity',
     bounds: [0, 1],
+    configurationKeys: ['pad'],
   })
 export { hammingEditops as editops, hammingOpcodes as opcodes }

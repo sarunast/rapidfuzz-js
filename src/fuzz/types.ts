@@ -5,7 +5,7 @@
  * and this one imports only algorithm-runtime types. Keeping it free of runtime
  * logic is what lets the scorer families below it stay unaware of each other.
  */
-import type { MaybeSequence, Processor } from '../algorithms/shared/scorerSupport.js'
+import type { MaybeSequence } from '../algorithms/shared/scorerSupport.js'
 import type { SimilarityConfiguration } from '../core/types.js'
 
 export type FuzzConfiguration = SimilarityConfiguration
@@ -19,8 +19,6 @@ export type FuzzConfiguration = SimilarityConfiguration
  * gets from this interface should say so.
  */
 export interface FuzzOptions {
-  /** Applied to both inputs before scoring. */
-  readonly processor?: Processor | undefined
   /** A threshold in `[0, 100]`. Scores below it are returned as `0`. */
   readonly scoreCutoff?: number | undefined
   /**

@@ -5,7 +5,7 @@ import {
   type Opcodes,
 } from '../shared/editops/index.js'
 import {
-  conv,
+  convPair,
   distanceCutoffFor,
   distCutoff,
   normalize,
@@ -16,11 +16,10 @@ import {
   withPreparedFlags,
   DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  type EditopsOptions,
   type Scorer,
 } from '../shared/scorerSupport.js'
 
-export interface HammingEditopsOptions extends EditopsOptions {
+export interface HammingEditopsOptions {
   /** See {@link HammingOptions.pad}. Defaults to `true`. */
   pad?: boolean | undefined
 }
@@ -91,7 +90,7 @@ function distance_(
  * Indexing a string yields a fresh one-character string per position, and
  * comparing two of those is a string comparison. Reading the code units instead
  * compares two integers. Both inputs share a representation by the time they
- * arrive here — `conv` on the direct path, `alignRepresentation` on the
+ * arrive here — `convPair` on the direct path, `alignRepresentation` on the
  * prepared one — so this only has to ask the question once.
  */
 function exactMismatches(
@@ -157,7 +156,7 @@ function hammingDistance_impl(
   s2: Sequence,
   options: HammingOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const cutoff = distanceCutoffFor('distance', options.scoreCutoff, maximum(a, b))
   return distCutoff(distance_(a, b, options.pad ?? true, cutoff), options.scoreCutoff)
 }
@@ -172,7 +171,7 @@ function hammingNormalizedSimilarity_impl(
   s2: Sequence,
   options: HammingOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
   const cutoff = distanceCutoffFor('normalizedSimilarity', options.scoreCutoff, max)
   const norm = normalize(distance_(a, b, options.pad ?? true, cutoff), max)
@@ -190,7 +189,7 @@ export function hammingEditops(
   s2: Sequence,
   options: HammingEditopsOptions = {},
 ): Editops {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
 
   if (options.pad === false && a.length !== b.length) {
     throw new Error('Sequences are not the same length.')

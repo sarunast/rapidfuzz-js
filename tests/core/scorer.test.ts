@@ -204,6 +204,7 @@ describe('Metric and Scorer contracts', () => {
       [Infinity, Infinity],
       [0, Number.NaN],
       [2, 1],
+      [0, 1, 2],
     ]) {
       expect(() =>
         Reflect.apply(createScorer, undefined, [
@@ -216,6 +217,45 @@ describe('Metric and Scorer contracts', () => {
         ]),
       ).toThrow(RangeError)
     }
+    expect(() =>
+      Reflect.apply(createScorer, undefined, [
+        () => 1,
+        {
+          direction: 'similarity',
+          bounds: [10, 100],
+          symmetric: true,
+        },
+      ]),
+    ).toThrow(RangeError)
+    const throwingBounds = createScorer(() => 10, {
+      direction: 'similarity',
+      bounds: [10, 100],
+      symmetric: true,
+      missing: 'throw',
+    })
+    expect(throwingBounds.score('a', 'a')).toBe(10)
+    expect(() =>
+      Reflect.apply(createScorer, undefined, [
+        () => 1,
+        {
+          direction: 'similarity',
+          bounds: [0, 1],
+          symmetric: true,
+          missing: 'nope',
+        },
+      ]),
+    ).toThrow(TypeError)
+    expect(() =>
+      Reflect.apply(createScorer, undefined, [
+        () => 1,
+        {
+          direction: 'similarity',
+          bounds: [0, 1],
+          symmetric: true,
+          extra: true,
+        },
+      ]),
+    ).toThrow(TypeError)
   })
 
   test('invalid built-in configuration is rejected at compilation', () => {
@@ -226,6 +266,20 @@ describe('Metric and Scorer contracts', () => {
       Reflect.apply(createScorer, undefined, [
         levenshtein.similarity,
         { missing: 'nope' },
+      ]),
+    ).toThrow(TypeError)
+    for (const key of ['processor', 'scoreCutoff', 'scoreHint']) {
+      expect(() =>
+        Reflect.apply(createScorer, undefined, [
+          levenshtein.distance,
+          { [key]: key === 'processor' ? (value: unknown) => value : 1 },
+        ]),
+      ).toThrow(TypeError)
+    }
+    expect(() =>
+      Reflect.apply(createScorer, undefined, [
+        levenshtein.distance,
+        { missing: 'compatible' },
       ]),
     ).toThrow(TypeError)
     expect(() =>

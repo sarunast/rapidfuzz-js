@@ -11,7 +11,7 @@ import type { Editops, Opcodes } from '../shared/editops/index.js'
 import {
   alignRepresentation,
   canonicalRawCutoff,
-  conv,
+  convPair,
   distCutoff,
   normalize,
   normSimCutoff,
@@ -19,7 +19,6 @@ import {
   type Sequence,
   DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  type EditopsOptions,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
@@ -104,7 +103,7 @@ function indelDistance_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const cutoff = canonicalRawCutoff(options.scoreCutoff)
   return distCutoff(distance_(a, b, cutoff ?? UNBOUNDED_MISSES), cutoff)
 }
@@ -120,7 +119,7 @@ function indelNormalizedSimilarity_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
   const cutoff =
     options.scoreCutoff == null ? UNBOUNDED_MISSES : (1 - options.scoreCutoff) * max
@@ -132,21 +131,13 @@ function indelNormalizedSimilarity_impl(
  * {@link import('./lcsSeq.js').lcsSeqEditops} — the Indel metric is the LCS
  * metric counted differently.
  */
-export function indelEditops(
-  s1: Sequence,
-  s2: Sequence,
-  options: EditopsOptions = {},
-): Editops {
-  return lcsSeqEditops(s1, s2, options)
+export function indelEditops(s1: Sequence, s2: Sequence): Editops {
+  return lcsSeqEditops(s1, s2)
 }
 
 /** {@link indelEditops} expressed as blocks. */
-export function indelOpcodes(
-  s1: Sequence,
-  s2: Sequence,
-  options: EditopsOptions = {},
-): Opcodes {
-  return lcsSeqEditops(s1, s2, options).toOpcodes()
+export function indelOpcodes(s1: Sequence, s2: Sequence): Opcodes {
+  return lcsSeqEditops(s1, s2).toOpcodes()
 }
 
 type PreparedIndelKind = 'distance' | 'normalizedSimilarity'

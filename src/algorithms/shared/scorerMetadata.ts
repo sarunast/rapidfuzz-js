@@ -70,7 +70,11 @@ export const FUZZ_FLAGS: ScorerFlags = {
   symmetric: true,
 }
 
-export type ErasedScorer = (left: never, right: never, options?: never) => number
+export type ErasedScorer = (
+  left: Sequence,
+  right: Sequence,
+  options?: ScorerOptions,
+) => number
 
 export interface PreparedErasedScorer extends ErasedScorer {
   readonly [PREPARE_SCORER]: PreparedScorerFactory

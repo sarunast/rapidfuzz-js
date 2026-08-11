@@ -94,6 +94,7 @@
     "coverage": "vitest run --coverage --coverage.reporter=text --coverage.reporter=lcov --coverage.thresholds.100 --testTimeout=30000 --reporter=default --reporter=junit --outputFile.junit=test-report.junit.xml",
     "bench": "vitest bench --run",
     "bench:quick": "node bench/run.mjs",
+    "bench:memory": "npm run build --silent && node --expose-gc bench/matcher-memory.mjs",
     "bench:compare": "node bench/compare.mjs",
     "bench:compare:quick": "node bench/compare.mjs --quick",
     "bench:baseline": "node bench/compare.mjs --record",

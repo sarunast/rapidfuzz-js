@@ -1,6 +1,6 @@
 import { commonPrefix } from '../shared/affix.js'
 import {
-  conv,
+  convPair,
   distCutoff,
   normalize,
   normSimCutoff,
@@ -32,7 +32,7 @@ function prefixDistance_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   return distCutoff(maximum(a, b) - commonPrefix(a, b), options.scoreCutoff)
 }
 
@@ -46,7 +46,7 @@ function prefixNormalizedSimilarity_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
   return normSimCutoff(1 - normalize(max - commonPrefix(a, b), max), options.scoreCutoff)
 }

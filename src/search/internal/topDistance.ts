@@ -19,10 +19,11 @@ export function topDistance<T, K>(
   score: RawPreparedScore,
   threshold: number | null,
   limit: number | null,
+  optimal: number | null,
 ): readonly Match<T, K>[] {
   if (limit === 0) return []
   if (limit === 1) {
-    const found = bestDistance(items, score, threshold, null)
+    const found = bestDistance(items, score, threshold, optimal)
     return found === undefined ? [] : [found]
   }
 
@@ -39,11 +40,15 @@ export function topDistance<T, K>(
       if (heap.length < limit) {
         const candidate = { item: entry.item, key: entry.key, score: value, order }
         pushHeap(heap, candidate, worse)
-        if (heap.length === limit) cutoff = heap[0].score
+        if (heap.length === limit) {
+          cutoff = heap[0].score
+          if (optimal !== null && cutoff === optimal) break
+        }
       } else if (value < heap[0].score) {
         const candidate = { item: entry.item, key: entry.key, score: value, order }
         replaceHeapRoot(heap, candidate, worse)
         cutoff = heap[0].score
+        if (optimal !== null && cutoff === optimal) break
       }
       order++
     }

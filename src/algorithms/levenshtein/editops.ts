@@ -4,27 +4,8 @@ import {
   type Editops,
   type Opcodes,
 } from '../shared/editops/index.js'
-import { conv, type EditopsOptions, type Sequence } from '../shared/scorerSupport.js'
+import { convPair, type Sequence } from '../shared/scorerSupport.js'
 import { alignHirschberg } from './internal/alignment.js'
-import { distance_, UNIFORM } from './internal/engine.js'
-
-/**
- * Options for {@link levenshteinEditops}, which alone among the metrics that
- * expose edit operations takes a hint — the others have no band to narrow.
- */
-export interface LevenshteinEditopsOptions extends EditopsOptions {
-  /**
-   * Estimate of the distance, which buys a narrower alignment band.
-   *
-   * It cannot change the *length* of the edit script. It can change which
-   * optimal script comes back, but only for inputs large enough to need the
-   * recursive path: a hint that pays for itself replaces the assumed distance
-   * with the real one, that shrinks the matrix the dispatch is sizing, and a
-   * pair that then fits takes the exact matrix instead of being split. Both
-   * answers are optimal; only one of them is upstream's.
-   */
-  scoreHint?: number | undefined
-}
 
 /**
  * Edit operations that turn `s1` into `s2`.
@@ -48,36 +29,18 @@ export interface LevenshteinEditopsOptions extends EditopsOptions {
  * still recovered a different script, because each half is then recovered from
  * its own matrix, whose row differences are not the ones upstream read.
  */
-export function levenshteinEditops(
-  s1: Sequence,
-  s2: Sequence,
-  options: LevenshteinEditopsOptions = {},
-): Editops {
-  const [full1, full2] = conv(s1, s2, options.processor)
+export function levenshteinEditops(s1: Sequence, s2: Sequence): Editops {
+  const [full1, full2] = convPair(s1, s2)
   const ops: Editop[] = []
-  let maximum = Math.max(full1.length, full2.length)
-
-  // A hint buys a narrower alignment band, but only by finding the distance
-  // first — so the alignment is computed twice over. Upstream takes that trade
-  // only when the hint promises to more than halve the second pass, and this
-  // follows it: without a hint nothing extra runs.
-  const hint =
-    options.scoreHint == null ? null : Math.max(31, Math.floor(options.scoreHint))
-  if (hint !== null && 2 * hint < maximum) {
-    maximum = distance_(full1, full2, UNIFORM, maximum, hint)
-  }
+  const maximum = Math.max(full1.length, full2.length)
 
   alignHirschberg(ops, full1, 0, full1.length, full2, 0, full2.length, maximum)
   return editopsFromValidated(ops, full1.length, full2.length)
 }
 
 /** {@link levenshteinEditops} expressed as blocks. */
-export function levenshteinOpcodes(
-  s1: Sequence,
-  s2: Sequence,
-  options: LevenshteinEditopsOptions = {},
-): Opcodes {
-  return levenshteinEditops(s1, s2, options).toOpcodes()
+export function levenshteinOpcodes(s1: Sequence, s2: Sequence): Opcodes {
+  return levenshteinEditops(s1, s2).toOpcodes()
 }
 
 export { levenshteinEditops as editops, levenshteinOpcodes as opcodes }

@@ -1,12 +1,10 @@
 import type {
   ErasedScorer,
   MaybeSequence,
-  Processor,
 } from '../../src/algorithms/shared/scorerSupport.js'
 
 interface MatrixTestOptions {
   readonly scorer: ErasedScorer
-  readonly processor?: Processor | undefined
   readonly scoreCutoff?: number | undefined
   readonly scoreHint?: number | undefined
 }

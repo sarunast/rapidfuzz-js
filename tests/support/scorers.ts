@@ -40,12 +40,34 @@ import {
   similarity as prefixSimilarity,
 } from '../../src/algorithms/prefix/index.js'
 import type { Metric } from '../../src/core/metric.js'
-import { createScorer } from '../../src/core/scorer.js'
+import { createScorer, type Scorer } from '../../src/core/scorer.js'
 import type { Sequence } from '../../src/core/types.js'
 import type { SimilarityConfiguration } from '../../src/core/types.js'
 
 interface ExecutionOptions {
   readonly threshold?: number | undefined
+}
+
+function isScorer(value: unknown): value is Scorer {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof Reflect.get(value, 'score') === 'function' &&
+    (Reflect.get(value, 'direction') === 'similarity' ||
+      Reflect.get(value, 'direction') === 'distance')
+  )
+}
+
+function compileForTest(metric: unknown, options: object | undefined): Scorer {
+  const configuration: Record<string, unknown> = {}
+  if (options !== undefined) {
+    for (const [key, value] of Object.entries(options)) {
+      if (key !== 'threshold') configuration[key] = value
+    }
+  }
+  const scorer: unknown = Reflect.apply(createScorer, undefined, [metric, configuration])
+  if (!isScorer(scorer)) throw new TypeError('createScorer returned an invalid scorer')
+  return scorer
 }
 
 class MetricHarness<DistanceConfig extends object, SimilarityConfig extends object> {
@@ -65,7 +87,7 @@ class MetricHarness<DistanceConfig extends object, SimilarityConfig extends obje
     b: Sequence,
     options?: DistanceConfig & ExecutionOptions,
   ): number | undefined {
-    const scorer = createScorer(this.#distance, options)
+    const scorer = compileForTest(this.#distance, options)
     return options?.threshold === undefined
       ? scorer.score(a, b)
       : scorer.score(a, b, { threshold: options.threshold })
@@ -76,7 +98,7 @@ class MetricHarness<DistanceConfig extends object, SimilarityConfig extends obje
     b: Sequence,
     options?: SimilarityConfig & ExecutionOptions,
   ): number | undefined {
-    const scorer = createScorer(this.#similarity, options)
+    const scorer = compileForTest(this.#similarity, options)
     return options?.threshold === undefined
       ? scorer.score(a, b)
       : scorer.score(a, b, { threshold: options.threshold })
@@ -137,7 +159,7 @@ class SimilarityHarness<Config extends object> {
     b: Sequence,
     options?: Config & ExecutionOptions,
   ): number | undefined {
-    const scorer = createScorer(this.#metric, options)
+    const scorer = compileForTest(this.#metric, options)
     return options?.threshold === undefined
       ? scorer.score(a, b)
       : scorer.score(a, b, { threshold: options.threshold })

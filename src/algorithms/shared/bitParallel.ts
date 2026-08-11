@@ -15,7 +15,7 @@
  * nothing between words, store a row by assignment, and never allocate the
  * per-word machinery the general case needs.
  *
- * @internal Inputs must already be normalized by `conv` / `convSequence`.
+ * @internal Inputs must already be normalized by `convPair` / `convSequence`.
  * In particular, raw strings would otherwise be indexed as UTF-16 code units.
  */
 
@@ -313,7 +313,7 @@ export interface LcsSeqMatrix {
  * two arrays and a copy of every element per call — on a divide-and-conquer
  * recovery, per leaf. Reading through an offset costs nothing.
  *
- * @internal Inputs must already be normalized by `conv` / `convSequence`.
+ * @internal Inputs must already be normalized by `convPair` / `convSequence`.
  */
 export function lcsSeqMatrix(
   s1: ArrayLike<unknown>,
@@ -481,7 +481,7 @@ function oneWordLcsSeqMatrix(
 /**
  * Port of `Levenshtein_py._matrix`. Returns the distance and the row vectors.
  *
- * @internal Inputs must already be normalized by `conv` / `convSequence`.
+ * @internal Inputs must already be normalized by `convPair` / `convSequence`.
  */
 export interface LevenshteinMatrix {
   readonly dist: number

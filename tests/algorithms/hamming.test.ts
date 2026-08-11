@@ -42,7 +42,7 @@ it('applies native distance thresholds', () => {
   expect(Hamming.distance('South Korea', 'North Korea', { threshold: 0 })).toBeUndefined()
 })
 
-it('is case insensitive with the default processor', () => {
+it('compares normalized text case-insensitively', () => {
   expect(
     Hamming.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)

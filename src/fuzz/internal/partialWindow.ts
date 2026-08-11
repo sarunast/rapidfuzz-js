@@ -6,8 +6,7 @@ import {
 import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
 /**
  * `ratio` and `partialRatio` — the two scorers that bottom out directly in
- * normalised Indel similarity, plus the processor plumbing every other family
- * builds on.
+ * normalised Indel similarity.
  *
  * ## This module must not tokenise
  *
@@ -17,20 +16,11 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * what makes the dependency graph readable. Token families and adaptive fuzzy
  * similarity sit above both, and a cycle would show up here first.
  *
- * The four helpers exported for those upper layers — {@link indelNormSimHeld},
- * {@link applyProcessor}, {@link convertProcessedPair} and
- * {@link ratioConverted} — live here rather than in a shared `common` module
+ * The two helpers exported for those upper layers — {@link indelNormSimHeld}
+ * and {@link ratioConverted} — live here rather than in a shared `common` module
  * precisely because this one is already upstream of everything that wants them.
  */
-import {
-  asSequence,
-  conv,
-  convSequence,
-  isMissing,
-  isSequence,
-  type Processor,
-  type Sequence,
-} from '../../algorithms/shared/scorerSupport.js'
+import { asSequence, convPair, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import type { FuzzInput, FuzzOptions, ScoreAlignment } from '../types.js'
 
 function indelNormSim(
@@ -115,45 +105,6 @@ export function indelNormSimHeld(
   return sim >= scoreCutoff ? sim : 0
 }
 
-/**
- * Run the processor, and hold its return to the type it declares.
- *
- * The annotation is `unknown` although {@link Processor} says `Sequence`,
- * because the function on the other side of this call is the caller's and may
- * be plain JavaScript. What made the check worth its cost is the shape of the
- * failure: `convSequence` reads a `length` off whatever it is handed, and
- * `new Array(undefined)` is `[undefined]` — so a processor returning a number
- * or an object turned two unrelated inputs into the same one-element sequence
- * and scored them 100. Upstream raises for every one of those returns.
- *
- * The scorers that reach {@link conv} instead are checked there; this is the
- * same boundary for the ones that process and convert in two steps.
- */
-export function applyProcessor(
-  s: Sequence,
-  processor: Processor | null | undefined,
-): Sequence {
-  if (processor == null) return s
-
-  const processed: unknown = processor(s)
-  if (!isSequence(processed)) {
-    throw new TypeError('processor must return a string or an array-like sequence')
-  }
-
-  return processed
-}
-
-export function convertProcessedPair(
-  s1: Sequence,
-  s2: Sequence,
-  processor: Processor | null | undefined,
-): [ArrayLike<unknown>, ArrayLike<unknown>] {
-  return [
-    convSequence(applyProcessor(s1, processor)),
-    convSequence(applyProcessor(s2, processor)),
-  ]
-}
-
 /** Normalised Indel similarity as a percentage, over converted inputs. */
 export function ratioConverted(
   a: ArrayLike<unknown>,
@@ -176,7 +127,7 @@ export function ratio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
   return ratioConverted(a, b, options.scoreCutoff ?? 0)
 }
 
@@ -327,7 +278,7 @@ function emptyTable(): Uint8Array {
  * search never reaches, which drops both the fill and the allocation.
  *
  * Re-entrancy is what makes module scratch safe here, and the scan has none:
- * the processor and every conversion run before it, and from the moment it
+ * input validation and every conversion run before it, and from the moment it
  * starts it reads only strings, converted sequences, masks and its own sets.
  * Nothing it calls can re-enter it.
  *
@@ -506,7 +457,7 @@ function partialRatioScan(
   const narrow = direct.length
   const wide = charSet.wide
 
-  // The needle and the text always share a representation — `conv` returns a
+  // The needle and the text always share a representation — `convPair` returns a
   // pair, and `alignRepresentation` is applied to both sides — so this settles
   // which store `charSetOf` filled, once per comparison rather than per window.
   const text = typeof s2 === 'string' ? s2 : null
@@ -779,10 +730,10 @@ export function partialRatioAlignment(
 ): ScoreAlignment | null {
   if (isMissing(s1) || isMissing(s2)) return null
 
-  // `conv` rather than `convertProcessedPair`: unlike the token scorers, nothing
+  // `convPair` rather than `convertProcessedPair`: unlike the token scorers, nothing
   // below needs code points specifically — it needs the two inputs to agree,
-  // which `conv` gives either way, keeping a pair of BMP strings as strings.
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
+  // which `convPair` gives either way, keeping a pair of BMP strings as strings.
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
 
   return partialAlignmentConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -870,6 +821,6 @@ export function partialRatio_impl(
   // Same work as `partialRatioAlignment`, minus its obligation to report *which*
   // alignment won — which is what lets the scan visit the windows in the order
   // that prunes best. See `partialRatioScan`.
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
   return partialAlignmentConverted(a, b, options.scoreCutoff ?? 0, true)?.score ?? 0
 }

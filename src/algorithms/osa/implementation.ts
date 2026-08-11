@@ -3,7 +3,7 @@ import { preparePattern } from '../shared/bitmask/pattern.js'
 import { commonAffix } from '../shared/bitParallel.js'
 import {
   alignRepresentation,
-  conv,
+  convPair,
   distanceCutoffFor,
   distCutoff,
   normalize,
@@ -97,7 +97,7 @@ function osaDistance_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const cutoff = distanceCutoffFor('distance', options.scoreCutoff, maximum(a, b))
   return distCutoff(distance_(a, b, cutoff), options.scoreCutoff)
 }
@@ -112,7 +112,7 @@ function osaNormalizedSimilarity_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
   const cutoff = distanceCutoffFor('normalizedSimilarity', options.scoreCutoff, max)
   return normSimCutoff(1 - normalize(distance_(a, b, cutoff), max), options.scoreCutoff)

@@ -17,28 +17,42 @@ import {
   PREPARE_CHOICE,
   PREPARE_SCORER,
   type PreparedErasedScorer,
+  type ScorerOptions,
 } from './scorerSupport.js'
 
 interface BuiltInMetricOptions<D extends Direction, Config extends object> {
   readonly implementation: PreparedErasedScorer
   readonly direction: D
   readonly bounds: readonly [number, number]
+  readonly configurationKeys?: readonly string[] | undefined
   readonly canonicalize?: ((configuration: Config) => Config) | undefined
 }
 
-function configurationRecord(configuration: object): {
-  readonly record: Readonly<Record<string, unknown>>
+function configurationRecord<D extends Direction>(
+  configuration: object,
+  direction: D,
+  configurationKeys: readonly string[],
+): {
+  readonly record: Readonly<Record<string, unknown>> & ScorerOptions
   readonly missing: MissingPolicy
 } {
-  const record: Record<string, unknown> = {}
+  const record: Record<string, unknown> & ScorerOptions = {}
   let missing: MissingPolicy = 'compatible'
   for (const key of Object.keys(configuration)) {
     const value = Reflect.get(configuration, key)
     if (key === 'missing') {
+      if (direction !== 'similarity') {
+        throw new TypeError("unknown metric configuration key 'missing'")
+      }
       if (value === 'compatible') missing = 'compatible'
       else if (value === 'throw') missing = 'throw'
       else throw new TypeError("missing must be 'compatible' or 'throw'")
-    } else record[key] = value
+    } else {
+      if (!configurationKeys.includes(key)) {
+        throw new TypeError(`unknown metric configuration key '${key}'`)
+      }
+      record[key] = value
+    }
   }
   return { record, missing }
 }
@@ -46,16 +60,9 @@ function configurationRecord(configuration: object): {
 export function builtInMetric<D extends Direction, Config extends object>(
   options: BuiltInMetricOptions<D, Config>,
 ): Metric<D, Config> {
-  // `builtInMetric` is the package-owned registration boundary: every caller
-  // supplies an implementation whose first two parameters are Sequences. Bind
-  // that fact once so the cheapest public Metric path remains a normal direct
-  // call; `Reflect.apply` measured 5-7% slower over short-string comparisons.
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- registration proves this private callable shape once
-  const implementation = options.implementation as unknown as (
-    a: Sequence,
-    b: Sequence,
-    options?: Readonly<Record<string, unknown>>,
-  ) => number
+  // Keep this as a normal direct call: `Reflect.apply` measured 5-7% slower
+  // over short-string comparisons.
+  const implementation = options.implementation
   const direct = (a: MaybeSequence, b: MaybeSequence): number => {
     if (a == null || b == null) {
       if (options.direction === 'similarity') return 0
@@ -69,10 +76,13 @@ export function builtInMetric<D extends Direction, Config extends object>(
     return implementation(a, b)
   }
   const compile = (given: Config | undefined): MetricCompilation<D> => {
-    const empty: Record<string, never> = {}
-    const canonical =
-      given === undefined ? empty : (options.canonicalize?.(given) ?? given)
-    const { record: initial, missing } = configurationRecord(canonical)
+    const canonical: object =
+      given === undefined ? {} : (options.canonicalize?.(given) ?? given)
+    const { record: initial, missing } = configurationRecord(
+      canonical,
+      options.direction,
+      options.configurationKeys ?? [],
+    )
     const canonicalizer = configurationCanonicalizerOf(options.implementation)
     const record = canonicalizer === null ? initial : canonicalizer(initial)
     const configured = Object.keys(record).length !== 0

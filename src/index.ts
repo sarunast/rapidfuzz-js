@@ -22,7 +22,7 @@ export type {
   SearchOptions,
 } from './search/index.js'
 export type {
-  BatchOptions as MatrixOptions,
+  BatchOptions,
   ScoreArray,
   ScoreArrayKind,
   ScoreArrayOf,

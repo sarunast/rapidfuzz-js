@@ -22,11 +22,10 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * `normDistance` and `indelDist` are here rather than anywhere shared because
  * `tokenSetRatioConverted` is their only caller.
  */
-import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
+import { asSequence, convPair, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
 import {
   type CharSet,
-  convertProcessedPair,
   partialAlignmentConverted,
   partialRatioConverted,
 } from './partialWindow.js'
@@ -69,7 +68,7 @@ export function tokenSetRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
 
   return tokenSetRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -229,7 +228,7 @@ export function tokenRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
 
   return tokenRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -242,7 +241,7 @@ export function partialTokenSortRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
 
   // Refused before either input is sorted, for the same reason as
   // `tokenSortRatio_impl`. `partialRatioConverted` would answer 0 anyway, but
@@ -265,7 +264,7 @@ export function partialTokenSetRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
 
   return partialTokenSetRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -305,7 +304,7 @@ export function partialTokenRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
 
   return partialTokenRatioConverted(a, b, options.scoreCutoff ?? 0)
 }

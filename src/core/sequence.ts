@@ -29,7 +29,8 @@ export function validatePair(
 
 export function snapshotSequence(value: Sequence): Sequence {
   if (typeof value === 'string') return value
-  const owned = new Array<unknown>(value.length)
-  for (let i = 0; i < value.length; i++) owned[i] = value[i]
+  const length = value.length
+  const owned = new Array<unknown>(length)
+  for (let i = 0; i < length; i++) owned[i] = value[i]
   return owned
 }

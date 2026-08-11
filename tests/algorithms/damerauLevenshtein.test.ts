@@ -31,7 +31,7 @@ describe('distance', () => {
   }
 })
 
-it('is case insensitive with the default processor', () => {
+it('compares normalized text case-insensitively', () => {
   expect(
     DamerauLevenshtein.distance(
       defaultProcess('new york mets'),

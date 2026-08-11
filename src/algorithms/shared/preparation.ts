@@ -11,11 +11,8 @@ import { alignRepresentation, scorerSequence } from './sequence.js'
 export const PREPARE_CHOICE: unique symbol = Symbol('rapidfuzz.prepareChoice')
 export const PREPARE_SCORER: unique symbol = Symbol('rapidfuzz.prepareScorer')
 
-const PREPARED_SEQUENCE = Symbol('rapidfuzz.preparedSequence')
-
-interface PreparedSequence {
-  readonly [PREPARED_SEQUENCE]: true
-  readonly value: ArrayLike<unknown>
+class PreparedSequence {
+  constructor(readonly value: ArrayLike<unknown>) {}
 }
 
 export type ChoicePreparer = (choice: Sequence) => unknown
@@ -41,17 +38,16 @@ export function withChoicePreparer(
   return Object.assign(prepare, { [PREPARE_CHOICE]: choicePreparer })
 }
 
-export function prepareScorerChoice(choice: Sequence): unknown {
-  const prepared: PreparedSequence = {
-    [PREPARED_SEQUENCE]: true,
-    value: scorerSequence(choice),
-  }
-  return prepared
+export function prepareScorerChoice(choice: Sequence): PreparedSequence {
+  return new PreparedSequence(scorerSequence(choice))
 }
 
 export function preparedScorerSequence(value: unknown): ArrayLike<unknown> {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- private preparation protocol owns this value
-  return (value as PreparedSequence).value
+  if (!(value instanceof PreparedSequence)) {
+    throw new TypeError('invalid prepared sequence')
+  }
+
+  return value.value
 }
 
 export function prepareMetric(

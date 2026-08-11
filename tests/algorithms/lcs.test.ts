@@ -21,7 +21,7 @@ it('does not invert the normalized results against a single empty string', () =>
   expect(LCSseq.similarity('', '')).toBe(1)
 })
 
-it('is case insensitive with the default processor', () => {
+it('compares normalized text case-insensitively', () => {
   expect(
     LCSseq.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)

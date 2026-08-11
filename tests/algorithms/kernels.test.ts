@@ -1616,43 +1616,6 @@ describe('the partial-ratio scan orders agree on the score', () => {
   })
 })
 
-// `levenshteinEditops` takes a hint, and upstream spends it on finding the
-// distance first so the alignment can run inside a narrower band. That is a
-// second, independent route to the same alignment, so it is exactly the kind of
-// shortcut that can disagree with the one it replaces.
-describe('an editops hint cannot change the alignment', () => {
-  it('agrees with the unhinted alignment whatever the hint', () => {
-    fc.assert(
-      fc.property(
-        fc.stringMatching(/^[abcd]{0,120}$/),
-        fc.stringMatching(/^[abcd]{0,120}$/),
-        (a, b) => {
-          const expected = editopTuples(levenshteinEditops(a, b))
-
-          for (const scoreHint of [0, 1, 5, 31, 32, 64, 200, 100_000]) {
-            expect(editopTuples(levenshteinEditops(a, b, { scoreHint }))).toEqual(
-              expected,
-            )
-          }
-        },
-      ),
-      { numRuns: 250 },
-    )
-  })
-
-  // The hint only pays off when it promises to more than halve the second pass,
-  // so a hint at or above half the longest input has to leave the band alone
-  // rather than narrow it to something the alignment cannot fit in.
-  it('is exact when the hint is far below the real distance', () => {
-    const a = 'abcd'.repeat(40)
-    const b = 'dcba'.repeat(40)
-
-    expect(editopTuples(levenshteinEditops(a, b, { scoreHint: 0 }))).toEqual(
-      editopTuples(levenshteinEditops(a, b)),
-    )
-  })
-})
-
 // The OSA kernels are exported one width at a time, and each states its own
 // bounds. Reached directly because the dispatcher above them picks by width and
 // so never asks a kernel a question outside the one it serves.

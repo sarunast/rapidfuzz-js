@@ -26,7 +26,7 @@ it('applies normalized similarity thresholds to direct scoring', () => {
   expect(Indel.similarity('abcd', 'abce', { threshold: 0.8 })).toBeUndefined()
 })
 
-it('is case insensitive with the default processor', () => {
+it('compares normalized text case-insensitively', () => {
   expect(
     Indel.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)

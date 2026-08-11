@@ -63,7 +63,9 @@ export function createMatcher<T, D extends Direction>(
   items: Items<T>,
   options: MatcherOptions<T, D>,
 ): Matcher<T, unknown, D> {
-  const compilation = scorerCompilation(options.scorer)
+  const scorer = options.scorer
+  const normalize = options.normalize
+  const compilation = scorerCompilation(scorer)
   const stableOptions: MatcherOptions<T, Direction> = {
     scorer: options.scorer,
     ...(options.getText === undefined ? {} : { getText: options.getText }),
@@ -87,7 +89,7 @@ export function createMatcher<T, D extends Direction>(
     call?: BestOptions,
   ): Match<T, unknown> | undefined => {
     const threshold = optionalThreshold(call?.threshold)
-    const normalized = normalizeQuery(query, options.normalize)
+    const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
       const missingScore = compilation.score(query, '', threshold)
       return missingBest(stored, missingScore, threshold)
@@ -118,7 +120,7 @@ export function createMatcher<T, D extends Direction>(
     const limit = resultLimit(call?.limit)
     if (limit === 0) return []
     const threshold = optionalThreshold(call?.threshold)
-    const normalized = normalizeQuery(query, options.normalize)
+    const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
       const missingScore = compilation.score(query, '', threshold)
       return missingTop(stored, missingScore, threshold, limit)
@@ -133,13 +135,18 @@ export function createMatcher<T, D extends Direction>(
       ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
       : threshold
     const score = compilation.prepareQuery(normalized)
+    const optimal = compilation.trusted
+      ? compilation.direction === 'similarity'
+        ? compilation.bounds[1]
+        : compilation.bounds[0]
+      : null
     return compilation.direction === 'similarity'
-      ? topSimilarity(stored, score, activeThreshold, limit)
-      : topDistance(stored, score, activeThreshold, limit)
+      ? topSimilarity(stored, score, activeThreshold, limit, optimal)
+      : topDistance(stored, score, activeThreshold, limit, optimal)
   }
   return Object.freeze({
     size: stored.length,
-    scorer: options.scorer,
+    scorer,
     best,
     search,
   })

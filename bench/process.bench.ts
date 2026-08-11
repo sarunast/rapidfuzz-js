@@ -12,6 +12,7 @@ import {
   createScorer,
   normalizeText,
   scoreMatrix,
+  scorePairs,
   search,
 } from '../src/index.js'
 import { sentences, words } from './_corpus.js'
@@ -19,6 +20,7 @@ import { measure } from './_harness.js'
 
 const choices = words(2_000, 12)
 const query = 'abcdefghijkl'
+const pairQueries = choices.map(() => query)
 const titles = sentences(2_000, 5)
 const titleQueries = sentences(30, 5, 0x1122_3344)
 const titleQuery = 'alpha bravo charlie delta echo'
@@ -40,6 +42,9 @@ describe('direct Metric and Scorer calls', () => {
   })
   measure('2000 pairs, fuzzy scorer', () => {
     for (const choice of choices) fuzzy.score(query, choice)
+  })
+  measure('2000 pairs, fuzzy scorer threshold 80', () => {
+    for (const choice of choices) fuzzy.score(query, choice, { threshold: 80 })
   })
   measure('2000 pairs, normalized metric', () => {
     for (const choice of choices) levenshteinSimilarity(query, choice)
@@ -68,6 +73,9 @@ describe('bestMatch, one query', () => {
 })
 
 describe('search, one query', () => {
+  measure('2000 choices, fuzzy limit 1', () => {
+    search(query, choices, { scorer: fuzzy, limit: 1 })
+  })
   measure('2000 choices, fuzzy limit 5', () => {
     search(query, choices, { scorer: fuzzy, limit: 5 })
   })
@@ -92,14 +100,37 @@ describe('createMatcher construction', () => {
 })
 
 describe('repeated Matcher queries', () => {
-  measure('30 x 2000, fuzzy best', () => {
+  measure('30 x 2000, fuzzy bestMatch one-shot', () => {
+    for (const value of titleQueries) bestMatch(value, choices, { scorer: fuzzy })
+  })
+  measure('30 x 2000, fuzzy Matcher best', () => {
     for (const value of titleQueries) fuzzyMatcher.best(value)
   })
-  measure('30 x 2000, normalized best', () => {
+  measure('30 x 2000, normalized Matcher best', () => {
     for (const value of titleQueries) normalizedMatcher.best(value)
   })
-  measure('30 x 2000, token sort search', () => {
+  measure('30 x 2000, token sort search one-shot', () => {
+    for (const value of titleQueries) {
+      search(value, titles, { scorer: tokenSort, normalize: normalizeText, limit: 5 })
+    }
+  })
+  measure('30 x 2000, token sort Matcher search', () => {
     for (const value of titleQueries) titleMatcher.search(value, { limit: 5 })
+  })
+  measure('30 x 2000, fuzzy Matcher search limit 1', () => {
+    for (const value of titleQueries) fuzzyMatcher.search(value, { limit: 1 })
+  })
+})
+
+describe('scorePairs with explicit Scorer', () => {
+  measure('2000 pairs, fuzzy', () => {
+    scorePairs(pairQueries, choices, { scorer: fuzzy })
+  })
+  measure('2000 pairs, normalized', () => {
+    scorePairs(pairQueries, choices, { scorer: normalized })
+  })
+  measure('2000 pairs, fuzzy + normalize', () => {
+    scorePairs(pairQueries, choices, { scorer: fuzzy, normalize: normalizeText })
   })
 })
 

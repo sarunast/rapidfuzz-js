@@ -83,7 +83,7 @@ it('does not regress on the cached mbleven implementation', () => {
   expect(Levenshtein.distance('0', '101', { threshold: 3 })).toBe(2)
 })
 
-it('is case insensitive with the default processor', () => {
+it('compares normalized text case-insensitively', () => {
   expect(
     Levenshtein.distance(
       defaultProcess('new york mets'),

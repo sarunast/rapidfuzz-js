@@ -21,6 +21,10 @@ describe('batch scoring', () => {
     expect([...scorePairs(['a', 'b'], ['a', 'c'], { scorer: normalized })]).toEqual([
       1, 0,
     ])
+    const sharedPairs = ['a', 'b']
+    expect([...scorePairs(sharedPairs, sharedPairs, { scorer: normalized })]).toEqual([
+      1, 1,
+    ])
     expect(() => scorePairs(['a'], ['a', 'b'], { scorer: normalized })).toThrow(
       RangeError,
     )
@@ -105,6 +109,12 @@ describe('batch scoring', () => {
     expect(rawScore).toHaveBeenCalledTimes(2)
     expect(prepareChoice).not.toHaveBeenCalled()
     expect(prepareQuery).not.toHaveBeenCalled()
+
+    normalizations = 0
+    expect([
+      ...scorePairs(['A', 'B'], ['a', 'c'], { scorer, normalize, into: 'u8' }),
+    ]).toEqual([1, 0])
+    expect(normalizations).toBe(4)
 
     normalizations = 0
     const shared = ['A', 'B']

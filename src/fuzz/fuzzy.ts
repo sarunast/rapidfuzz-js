@@ -23,11 +23,7 @@ import {
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
 import type { Metric } from '../core/metric.js'
-import {
-  applyProcessor,
-  partialRatioConverted,
-  ratioConverted,
-} from './internal/partialWindow.js'
+import { partialRatioConverted, ratioConverted } from './internal/partialWindow.js'
 import { prepareFuzz } from './internal/prepared.js'
 import {
   containsWhitespace,
@@ -51,8 +47,8 @@ export function wRatio_impl(
 
   const UNBASE_SCALE = 0.95
 
-  const p1 = applyProcessor(asSequence(s1), options.processor)
-  const p2 = applyProcessor(asSequence(s2), options.processor)
+  const p1 = asSequence(s1)
+  const p2 = asSequence(s2)
 
   // FuzzyWuzzy returns 0 here; kept for compatibility. See RapidFuzz issue 110.
   if (p1.length === 0 || p2.length === 0) return 0

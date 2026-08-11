@@ -129,7 +129,21 @@ export function createScorer<D extends Direction>(
       'custom metrics require direction, bounds, and symmetric configuration',
     )
   }
+  validateCustomConfigurationKeys(configuration)
   validateBounds(configuration.bounds)
+  const missing = configuration.missing ?? 'compatible'
+  if (missing !== 'compatible' && missing !== 'throw') {
+    throw new TypeError("missing must be 'compatible' or 'throw'")
+  }
+  if (
+    configuration.direction === 'similarity' &&
+    missing === 'compatible' &&
+    (configuration.bounds[0] > 0 || configuration.bounds[1] < 0)
+  ) {
+    throw new RangeError(
+      "custom similarity bounds must include 0 unless missing is 'throw'",
+    )
+  }
   const bounds: readonly [number, number] = Object.freeze([
     configuration.bounds[0],
     configuration.bounds[1],
@@ -140,9 +154,22 @@ export function createScorer<D extends Direction>(
       configuration.direction,
       bounds,
       configuration.symmetric,
-      configuration.missing ?? 'compatible',
+      missing,
     ),
   )
+}
+
+function validateCustomConfigurationKeys(configuration: object): void {
+  for (const key of Object.keys(configuration)) {
+    if (
+      key !== 'direction' &&
+      key !== 'bounds' &&
+      key !== 'symmetric' &&
+      key !== 'missing'
+    ) {
+      throw new TypeError(`unknown custom scorer configuration key '${key}'`)
+    }
+  }
 }
 
 function isCustomConfiguration<D extends Direction>(
@@ -161,6 +188,7 @@ function validateBounds(bounds: readonly [number, number]): void {
   const lower = bounds[0]
   const upper = bounds[1]
   if (
+    bounds.length !== 2 ||
     typeof lower !== 'number' ||
     typeof upper !== 'number' ||
     !Number.isFinite(lower) ||

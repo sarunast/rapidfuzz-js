@@ -1,7 +1,7 @@
 import { lcsLengthRange } from '../../lcs/internal/kernel.js'
 import {
   canonicalRawCutoff,
-  conv,
+  convPair,
   hasSurrogatePair,
   isSequence,
   normalize,
@@ -399,7 +399,7 @@ export function levenshteinDistanceImpl(
   // every caller writes, and the generic path below spends more on describing
   // it than the kernel spends scoring an eight-character pair: an options
   // object to allocate and read four properties off, a weights triple to
-  // validate, `conv`'s two-element tuple to allocate and destructure, and a
+  // validate, `convPair`'s two-element tuple to allocate and destructure, and a
   // cutoff to convert on the way in and collapse on the way out — none of which
   // this shape can affect.
   //
@@ -424,7 +424,7 @@ export function levenshteinDistanceImpl(
 
   const weights = parseWeights(options?.weights)
   const integral = integralWeights(weights)
-  const [a, b] = conv(s1, s2, options?.processor)
+  const [a, b] = convPair(s1, s2)
   const cutoff = levenshteinRawCutoff(options?.scoreCutoff, integral)
   const bound = cutoff ?? Number.MAX_SAFE_INTEGER
   const hint = options?.scoreHint ?? bound
@@ -444,7 +444,7 @@ export function levenshteinNormalizedSimilarityImpl(
 ): number {
   const weights = parseWeights(options.weights)
   const integral = integralWeights(weights)
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const max = maximum(a, b, weights)
   const cutoff =
     options.scoreCutoff == null

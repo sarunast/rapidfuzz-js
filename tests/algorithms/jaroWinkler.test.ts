@@ -73,7 +73,7 @@ it('handles the edge case lengths found by fuzzing', () => {
   ).toBeCloseTo(0.852344, 6)
 })
 
-it('is case insensitive with the default processor', () => {
+it('compares normalized text case-insensitively', () => {
   expect(
     JaroWinkler.similarity(
       defaultProcess('new york mets'),

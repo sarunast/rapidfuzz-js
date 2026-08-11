@@ -14,9 +14,9 @@ const budgets = {
   'direct-fuzz.js': 6_038,
   'direct-token-sort.js': 6_068,
   'compiled-fuzz.js': 6_629,
-  'compiled-token-sort.js': 6_621,
-  'one-shot.js': 7_337,
-  'matcher-token-sort.js': 7_913,
+  'compiled-token-sort.js': 6_847,
+  'one-shot.js': 7_506,
+  'matcher-token-sort.js': 8_193,
   'full-fuzz.js': 10_218,
   'all-subpaths.js': 25_384,
 }

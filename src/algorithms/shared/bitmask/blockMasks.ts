@@ -3,7 +3,7 @@
  *
  * The kernels in `lcs.ts`, `levenshtein.ts` and `osa.ts` allocate nothing per
  * call: they reuse the module-level buffers below, grown on demand. This is
- * safe because no kernel calls back into user code — no processor, no scorer,
+ * safe because no kernel calls back into user code — no normalizer, no scorer,
  * no iterator runs between acquiring a buffer and releasing it — so a call can
  * never observe another call's buffer. Buffers are created lazily rather than
  * at module scope, because `"sideEffects": false` promises that importing this
@@ -51,7 +51,7 @@ export const DIRECT_LOOKUP_LIMIT = 256
  * Widest the shared table grows: the whole Basic Multilingual Plane.
  *
  * Strings reach the kernels either as `charCodeAt` reads, which stop at
- * `0xffff`, or as code points converted by `conv` — and that conversion only
+ * `0xffff`, or as code points converted by `convPair` — and that conversion only
  * happens for text that has a surrogate pair, so astral code points above this
  * are the one string case that still takes the `Map`. They are rare enough to
  * be worth the four megabytes not spent covering them.

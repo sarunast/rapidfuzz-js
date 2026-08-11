@@ -43,7 +43,7 @@ const fuzz = {
 
 const SCORERS: ReadonlyArray<readonly [string, Scorer]> = Object.entries(fuzz)
 
-it('is case sensitive without a processor', () => {
+it('is case sensitive without normalization', () => {
   expect(fuzz.ratio('new york mets', 'new york mets')).toBe(100)
   expect(fuzz.ratio('new york mets', 'new YORK mets')).not.toBe(100)
 })
@@ -87,13 +87,13 @@ it('scores reordered tokens as a perfect partial token set ratio', () => {
 
 it('scores an equal WRatio as 100', () => {
   expect(
-    fuzz.wRatio('new york mets', 'new york mets', { processor: defaultProcess }),
+    fuzz.wRatio(defaultProcess('new york mets'), defaultProcess('new york mets')),
   ).toBe(100)
 })
 
-it('makes WRatio case insensitive with the default processor', () => {
+it('accepts text normalized before scoring', () => {
   expect(
-    fuzz.wRatio('new york mets', 'new YORK mets', { processor: defaultProcess }),
+    fuzz.wRatio(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(100)
 })
 
@@ -315,41 +315,8 @@ describe('simple unicode comparisons', () => {
   }
 })
 
-describe('every scorer preprocesses with the given processor', () => {
-  const processors = [
-    defaultProcess,
-    (s: string | ArrayLike<unknown>) => defaultProcess(s),
-  ]
-
-  for (const [name, scorer] of SCORERS) {
-    for (const [i, processor] of processors.entries()) {
-      it(`${name} (processor ${i})`, () => {
-        expect(scorer('new york mets', 'new YORK mets', { processor })).toBe(100)
-      })
-    }
-  }
-})
-
-it('is case sensitive without a processor or with an identity processor', () => {
+it('remains case sensitive without normalization', () => {
   expect(fuzz.ratio('new york mets', 'new YORK mets')).not.toBe(100)
-  expect(fuzz.ratio('new york mets', 'new YORK mets', { processor: (s) => s })).not.toBe(
-    100,
-  )
-})
-
-describe('a custom processor can select the field to compare', () => {
-  const s1 = ['chicago cubs vs new york mets', 'CitiField', '2011-05-11', '8pm']
-  const s2 = ['chicago cubs vs new york mets', 'CitiFields', '2012-05-11', '9pm']
-  const s3 = ['different string', 'CitiFields', '2012-05-11', '9pm']
-  const first = (event: string | ArrayLike<unknown>): string =>
-    String(Array.from(event)[0])
-
-  for (const [name, scorer] of SCORERS) {
-    it(name, () => {
-      expect(scorer(s1, s2, { processor: first })).toBe(100)
-      expect(scorer(s2, s3, { processor: first })).not.toBe(100)
-    })
-  }
 })
 
 describe('score_cutoff just below the score still returns it (issue 206)', () => {
@@ -370,38 +337,4 @@ it('finds the optimal partial alignment on a long repetitive input (issue 257)',
 
   expect(fuzz.partialRatio(s1, s2)).toBeCloseTo(98.46153846153847, 6)
   expect(fuzz.partialRatio(s2, s1)).toBeCloseTo(98.46153846153847, 6)
-})
-
-// Not ported — upstream raises `TypeError` (or `KeyError`, for a dict) on every
-// one of these returns, but its tests do not cover the case, and here the same
-// return produced a *perfect score*. `convSequence` reads a `length` off
-// whatever it is handed, and `new Array(undefined)` is `[undefined]`, so
-// `'abc'` and `'zzzz'` both became one-element sequences of `undefined` and
-// scored 100 — for `wRatio` and every token scorer. The distance
-// module's equivalent lives in `algorithms/contracts.test.ts`.
-describe('a fuzz processor has to return a sequence', () => {
-  // Set rather than written as a literal because these are returns TypeScript
-  // already refuses and a JavaScript caller does not.
-  const returning = (value: unknown): FuzzOptions => {
-    const options: FuzzOptions = {}
-    Reflect.set(options, 'processor', () => value)
-    return options
-  }
-
-  for (const value of [123, null, undefined, true, Symbol('s'), { a: 1 }]) {
-    it(`rejects ${String(value)}`, () => {
-      for (const [, scorer] of SCORERS) {
-        expect(() => scorer('abc', 'zzzz', returning(value))).toThrow(TypeError)
-      }
-    })
-  }
-
-  it('still takes every sequence form a fuzz scorer accepts', () => {
-    for (const [, scorer] of SCORERS) {
-      expect(scorer('abc', 'abc', { processor: (s) => s })).toBe(100)
-      expect(scorer('abc', 'zzz', returning('abc'))).toBe(100)
-      expect(scorer('abc', 'zzz', returning([97, 98, 99]))).toBe(100)
-      expect(scorer('abc', 'zzz', returning(Uint8Array.of(97, 98, 99)))).toBe(100)
-    }
-  })
 })

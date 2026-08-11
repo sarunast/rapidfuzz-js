@@ -49,7 +49,7 @@ it('rejects impossible lengths before direct and prepared kernels', () => {
   expect(OSA.similarity('a', 'abcdef', { threshold: 0.8 })).toBeUndefined()
 })
 
-it('is case insensitive with the default processor', () => {
+it('compares normalized text case-insensitively', () => {
   expect(
     OSA.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)

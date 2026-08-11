@@ -11,7 +11,7 @@ import {
 import {
   alignRepresentation,
   canonicalRawCutoff,
-  conv,
+  convPair,
   distCutoff,
   normalize,
   normSimCutoff,
@@ -19,7 +19,6 @@ import {
   type Sequence,
   DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  type EditopsOptions,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
@@ -83,7 +82,7 @@ function lcsSeqDistance_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
   const cutoff = canonicalRawCutoff(options.scoreCutoff)
   return distCutoff(max - boundedLength(a, b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
@@ -99,7 +98,7 @@ function lcsSeqNormalizedSimilarity_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
   const cutoff =
     options.scoreCutoff == null
@@ -118,12 +117,8 @@ function lcsSeqNormalizedSimilarity_impl(
  * the ones upstream produces — several alignments can be optimal and this picks
  * the same one.
  */
-export function lcsSeqEditops(
-  s1: Sequence,
-  s2: Sequence,
-  options: EditopsOptions = {},
-): Editops {
-  const [full1, full2] = conv(s1, s2, options.processor)
+export function lcsSeqEditops(s1: Sequence, s2: Sequence): Editops {
+  const [full1, full2] = convPair(s1, s2)
   const { prefixLen, suffixLen } = commonAffix(full1, full2)
 
   // The trimmed middle is addressed through `prefixLen` rather than copied out
@@ -183,12 +178,8 @@ export function lcsSeqEditops(
 }
 
 /** {@link lcsSeqEditops} expressed as blocks. */
-export function lcsSeqOpcodes(
-  s1: Sequence,
-  s2: Sequence,
-  options: EditopsOptions = {},
-): Opcodes {
-  return lcsSeqEditops(s1, s2, options).toOpcodes()
+export function lcsSeqOpcodes(s1: Sequence, s2: Sequence): Opcodes {
+  return lcsSeqEditops(s1, s2).toOpcodes()
 }
 
 type PreparedLcsKind = 'distance' | 'normalizedSimilarity'

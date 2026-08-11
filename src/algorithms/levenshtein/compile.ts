@@ -19,6 +19,7 @@ export const distance: Metric<'distance', LevenshteinDistanceConfiguration> =
     implementation: levenshteinDistance,
     direction: 'distance',
     bounds: [0, Number.POSITIVE_INFINITY],
+    configurationKeys: ['weights'],
   })
 
 export const similarity: Metric<'similarity', LevenshteinSimilarityConfiguration> =
@@ -26,4 +27,5 @@ export const similarity: Metric<'similarity', LevenshteinSimilarityConfiguration
     implementation: levenshteinNormalizedSimilarity,
     direction: 'similarity',
     bounds: [0, 1],
+    configurationKeys: ['weights'],
   })

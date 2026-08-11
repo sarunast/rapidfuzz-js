@@ -19,7 +19,7 @@ import {
   normalizeText,
   search,
 } from '../../src/index.js'
-import type { Match } from '../../src/index.js'
+import type { Match, Sequence } from '../../src/index.js'
 
 describe('one-shot search and Matcher', () => {
   const scorer = createScorer(fuzz.similarity)
@@ -33,6 +33,21 @@ describe('one-shot search and Matcher', () => {
     expect(matcher.size).toBe(2)
     expect(matcher.best(['a', 'b', 'c'])).toEqual({ item, key: 0, score: 100 })
     expect(matcher.search(['a', 'x', 'c'], { limit: null })[0]?.key).toBe(2)
+  })
+
+  test('snapshots an array-like length exactly once after validation', () => {
+    let lengthReads = 0
+    const text = {
+      0: 'a',
+      1: 'b',
+      get length() {
+        lengthReads++
+        return 2
+      },
+    }
+    const matcher = createMatcher([text], { scorer })
+    expect(matcher.best(['a', 'b'])?.score).toBe(100)
+    expect(lengthReads).toBe(2)
   })
 
   test('maps and objects preserve keys while skipped values leave gaps', () => {
@@ -89,6 +104,28 @@ describe('one-shot search and Matcher', () => {
     ])
     expect(search('none', items, { scorer, threshold: 100, limit: null })).toEqual([])
     expect(search('none', items, { scorer, threshold: 101, limit: null })).toEqual([])
+  })
+
+  test('Matcher snapshots construction options before repeated queries', () => {
+    const items = [{ primary: 'Alpha', alternate: 'Wrong' }]
+    const options: {
+      scorer: typeof scorer
+      getText: (item: (typeof items)[number]) => Sequence
+      normalize: (value: Sequence) => Sequence
+      missingItems: 'skip' | 'throw'
+    } = {
+      scorer,
+      getText: (item) => item.primary,
+      normalize: (value) => String(value).toLowerCase(),
+      missingItems: 'skip',
+    }
+    const matcher = createMatcher(items, options)
+
+    options.getText = (item) => item.alternate
+    options.normalize = (value) => String(value).toUpperCase()
+    options.missingItems = 'throw'
+
+    expect(matcher.best('ALPHA')).toEqual({ item: items[0], key: 0, score: 100 })
   })
 
   test('distance scorers use best-first ordering and maximum thresholds', () => {

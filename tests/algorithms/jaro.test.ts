@@ -62,7 +62,7 @@ it('reads thresholds on its natural normalized scale', () => {
   expect(Jaro.similarity('abcd', 'abce', { threshold: 0.9 })).toBeUndefined()
 })
 
-it('is case insensitive with the default processor', () => {
+it('compares normalized text case-insensitively', () => {
   expect(
     Jaro.similarity(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBeCloseTo(1, 6)

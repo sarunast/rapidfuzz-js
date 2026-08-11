@@ -1,7 +1,7 @@
 import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
-  conv,
+  convPair,
   normSimCutoff,
   type ScorerOptions,
   type Sequence,
@@ -500,7 +500,7 @@ function jaroSimilarity_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   return normSimCutoff(
     jaroSimilarity_(a, b, options.scoreCutoff ?? 0),
     options.scoreCutoff,

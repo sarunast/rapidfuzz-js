@@ -50,30 +50,30 @@ describe('specialized search drivers', () => {
   })
 
   it('ranks stable top results in both directions', () => {
-    expect(topSimilarity(items, numeric, null, null).map((entry) => entry.key)).toEqual([
-      1, 2, 0, 3, 4,
-    ])
-    expect(topSimilarity(items, numeric, 3, 1)).toEqual([
+    expect(
+      topSimilarity(items, numeric, null, null, null).map((entry) => entry.key),
+    ).toEqual([1, 2, 0, 3, 4])
+    expect(topSimilarity(items, numeric, 3, 1, null)).toEqual([
       { item: 'second', key: 1, score: 5 },
     ])
-    expect(topDistance(items, numeric, null, null).map((entry) => entry.key)).toEqual([
-      3, 4, 0, 1, 2,
-    ])
-    expect(topDistance(items, numeric, 2, 1)).toEqual([
+    expect(
+      topDistance(items, numeric, null, null, null).map((entry) => entry.key),
+    ).toEqual([3, 4, 0, 1, 2])
+    expect(topDistance(items, numeric, 2, 1, null)).toEqual([
       { item: 'last', key: 3, score: 1 },
     ])
-    expect(topSimilarity(items, numeric, 9, 1)).toEqual([])
-    expect(topDistance(items, numeric, 0, 1)).toEqual([])
-    expect(topSimilarity(items, numeric, 3, null).map((entry) => entry.key)).toEqual([
-      1, 2,
-    ])
-    expect(topDistance(items, numeric, 2, null).map((entry) => entry.key)).toEqual([
+    expect(topSimilarity(items, numeric, 9, 1, null)).toEqual([])
+    expect(topDistance(items, numeric, 0, 1, null)).toEqual([])
+    expect(
+      topSimilarity(items, numeric, 3, null, null).map((entry) => entry.key),
+    ).toEqual([1, 2])
+    expect(topDistance(items, numeric, 2, null, null).map((entry) => entry.key)).toEqual([
       3, 4, 0,
     ])
-    expect(topSimilarity(items, numeric, null, 0)).toEqual([])
-    expect(topDistance(items, numeric, null, 0)).toEqual([])
-    expect(topSimilarity(items, numeric, 9, 2)).toEqual([])
-    expect(topDistance(items, numeric, 0, 2)).toEqual([])
+    expect(topSimilarity(items, numeric, null, 0, null)).toEqual([])
+    expect(topDistance(items, numeric, null, 0, null)).toEqual([])
+    expect(topSimilarity(items, numeric, 9, 2, null)).toEqual([])
+    expect(topDistance(items, numeric, 0, 2, null)).toEqual([])
   })
 
   it('keeps a bounded heap and tightens the active scorer cutoff', () => {
@@ -82,9 +82,9 @@ describe('specialized search drivers', () => {
       similarityCutoffs.push(cutoff)
       return numeric(value)
     }
-    expect(topSimilarity(items, similarity, null, 2).map((entry) => entry.key)).toEqual([
-      1, 2,
-    ])
+    expect(
+      topSimilarity(items, similarity, null, 2, null).map((entry) => entry.key),
+    ).toEqual([1, 2])
     expect(similarityCutoffs).toEqual([null, null, 2, 5, 5])
 
     const distanceCutoffs: Array<number | null> = []
@@ -92,9 +92,64 @@ describe('specialized search drivers', () => {
       distanceCutoffs.push(cutoff)
       return numeric(value)
     }
-    expect(topDistance(items, distance, null, 2).map((entry) => entry.key)).toEqual([
-      3, 4,
-    ])
+    expect(topDistance(items, distance, null, 2, null).map((entry) => entry.key)).toEqual(
+      [3, 4],
+    )
     expect(distanceCutoffs).toEqual([null, null, 5, 5, 2])
+  })
+
+  it('stops once every retained finite result is optimal', () => {
+    const perfectSimilarities = [
+      { item: 'first', key: 0, prepared: 5 },
+      { item: 'second', key: 1, prepared: 5 },
+      { item: 'unread', key: 2, prepared: 4 },
+    ]
+    let similarityCalls = 0
+    const similarity = (value: unknown): number => {
+      similarityCalls++
+      return numeric(value)
+    }
+    expect(topSimilarity(perfectSimilarities, similarity, null, 2, 5)).toHaveLength(2)
+    expect(similarityCalls).toBe(2)
+
+    const perfectDistances = [
+      { item: 'first', key: 0, prepared: 0 },
+      { item: 'second', key: 1, prepared: 0 },
+      { item: 'unread', key: 2, prepared: 1 },
+    ]
+    let distanceCalls = 0
+    const distance = (value: unknown): number => {
+      distanceCalls++
+      return numeric(value)
+    }
+    expect(topDistance(perfectDistances, distance, null, 2, 0)).toHaveLength(2)
+    expect(distanceCalls).toBe(2)
+
+    expect(
+      topSimilarity(
+        [
+          { item: 'low', key: 0, prepared: 4 },
+          { item: 'high', key: 1, prepared: 5 },
+          { item: 'replacement', key: 2, prepared: 5 },
+        ],
+        numeric,
+        null,
+        2,
+        5,
+      ),
+    ).toHaveLength(2)
+    expect(
+      topDistance(
+        [
+          { item: 'high', key: 0, prepared: 1 },
+          { item: 'low', key: 1, prepared: 0 },
+          { item: 'replacement', key: 2, prepared: 0 },
+        ],
+        numeric,
+        null,
+        2,
+        0,
+      ),
+    ).toHaveLength(2)
   })
 })

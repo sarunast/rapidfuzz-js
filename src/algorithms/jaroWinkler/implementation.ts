@@ -3,7 +3,7 @@ import { commonPrefix } from '../shared/affix.js'
 import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
-  conv,
+  convPair,
   normSimCutoff,
   type ScorerOptions,
   type Sequence,
@@ -96,7 +96,7 @@ function jaroWinklerSimilarity_impl(
   s2: Sequence,
   options: JaroWinklerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   return normSimCutoff(
     directSimilarity(a, b, options.prefixWeight ?? 0.1, options.scoreCutoff ?? 0),
     options.scoreCutoff,

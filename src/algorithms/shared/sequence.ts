@@ -1,5 +1,4 @@
 import type { Sequence } from '../../core/types.js'
-import type { Processor } from './types.js'
 
 function toCodePoints(value: string): Uint32Array {
   const length = value.length
@@ -57,7 +56,7 @@ export function isSequence(value: unknown): value is Sequence {
   return typeof length === 'number' && Number.isSafeInteger(length) && length >= 0
 }
 
-function convPair(
+export function convPair(
   left: Sequence,
   right: Sequence,
 ): [ArrayLike<unknown>, ArrayLike<unknown>] {
@@ -91,18 +90,4 @@ export function asSequence(value: unknown): Sequence {
   if (!isSequence(value))
     throw new TypeError('expected a string or an array-like sequence')
   return value
-}
-
-export function conv(
-  left: Sequence,
-  right: Sequence,
-  processor?: Processor,
-): [ArrayLike<unknown>, ArrayLike<unknown>] {
-  if (processor == null) return convPair(left, right)
-  const processedLeft = processor(left)
-  const processedRight = processor(right)
-  if (!isSequence(processedLeft) || !isSequence(processedRight)) {
-    throw new TypeError('processor must return a string or an array-like sequence')
-  }
-  return convPair(processedLeft, processedRight)
 }

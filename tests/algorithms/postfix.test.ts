@@ -19,7 +19,7 @@ it('applies native distance thresholds', () => {
   expect(Postfix.distance('abcd', 'eebcd', { threshold: 0 })).toBeUndefined()
 })
 
-it('is case insensitive with the default processor', () => {
+it('compares normalized text case-insensitively', () => {
   expect(
     Postfix.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)

@@ -1,7 +1,7 @@
 import {
   alignRepresentation,
   canonicalRawCutoff,
-  conv,
+  convPair,
   distCutoff,
   normalize,
   normSimCutoff,
@@ -341,7 +341,7 @@ function damerauLevenshteinDistance_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const cutoff = canonicalRawCutoff(options.scoreCutoff)
   return distCutoff(distance_(a, b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
 }
@@ -357,7 +357,7 @@ function damerauLevenshteinNormalizedSimilarity_impl(
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = conv(s1, s2, options.processor)
+  const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
   const cutoff =
     options.scoreCutoff == null

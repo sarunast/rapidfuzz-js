@@ -12,4 +12,5 @@ export const similarity: Metric<'similarity', JaroWinklerConfiguration> =
     implementation: jaroWinklerSimilarity,
     direction: 'similarity',
     bounds: [0, 1],
+    configurationKeys: ['prefixWeight'],
   })

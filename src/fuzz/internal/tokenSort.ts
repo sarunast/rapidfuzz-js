@@ -1,11 +1,7 @@
 import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
-import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
+import { asSequence, convPair, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
-import {
-  convertProcessedPair,
-  indelNormSimHeld,
-  ratioConverted,
-} from './partialWindow.js'
+import { indelNormSimHeld, ratioConverted } from './partialWindow.js'
 import { sortedOf, tokenViewOf, type PreparedTokenChoice } from './tokens.js'
 
 /**
@@ -61,10 +57,9 @@ export function tokenSortRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
 
   // Through the core rather than straight to `ratioConverted`, so an impossible
-  // cutoff is refused before either input is sorted. The processor has already
-  // run, so nothing observable is skipped by answering early.
+  // cutoff is refused before either input is sorted.
   return tokenSortRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
