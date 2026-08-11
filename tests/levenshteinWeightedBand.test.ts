@@ -15,7 +15,7 @@ import { expect, test } from 'vitest'
 import {
   levenshteinDistance,
   levenshteinSimilarity,
-} from '../src/distance/levenshtein.js'
+} from '../src/algorithms/levenshtein/implementation.js'
 
 /** The whole matrix, no band and no common-affix trimming. */
 function reference(

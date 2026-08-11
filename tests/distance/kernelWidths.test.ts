@@ -15,18 +15,25 @@
 // different family of kernels.
 import { describe, expect, it } from 'vitest'
 
-import { prepareScorerOf, type PrepareScorer, type Sequence } from '../../src/_common.js'
-import { damerauLevenshteinDistance } from '../../src/distance/damerauLevenshtein.js'
-import { indelDistance } from '../../src/distance/indel.js'
-import { jaroSimilarity } from '../../src/distance/jaro.js'
-import { jaroWinklerSimilarity } from '../../src/distance/jaroWinkler.js'
-import { lcsSeqDistance, lcsSeqSimilarity } from '../../src/distance/lcsSeq.js'
+import { damerauLevenshteinDistance } from '../../src/algorithms/damerauLevenshtein/implementation.js'
+import { indelDistance } from '../../src/algorithms/indel/implementation.js'
+import { jaroSimilarity } from '../../src/algorithms/jaro/implementation.js'
+import { jaroWinklerSimilarity } from '../../src/algorithms/jaroWinkler/implementation.js'
+import {
+  lcsSeqDistance,
+  lcsSeqSimilarity,
+} from '../../src/algorithms/lcs/implementation.js'
 import {
   levenshteinDistance,
   levenshteinEditops,
-} from '../../src/distance/levenshtein.js'
-import { osaDistance } from '../../src/distance/osa.js'
-import { partialRatio, ratio } from '../../src/_fuzz/legacy.js'
+} from '../../src/algorithms/levenshtein/implementation.js'
+import { osaDistance } from '../../src/algorithms/osa/implementation.js'
+import {
+  prepareScorerOf,
+  type PrepareScorer,
+  type Sequence,
+} from '../../src/algorithms/shared/scorerSupport.js'
+import { partialRatio, ratio } from '../../src/fuzz/internal/scorers.js'
 
 /** Textbook Levenshtein, O(n*m). */
 function levenshteinReference(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {

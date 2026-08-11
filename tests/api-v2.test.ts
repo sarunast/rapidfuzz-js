@@ -1,4 +1,17 @@
 import { describe, expect, test } from 'vitest'
+
+import * as damerau from '../src/algorithms/damerauLevenshtein/index.js'
+import * as hamming from '../src/algorithms/hamming/index.js'
+import * as indel from '../src/algorithms/indel/index.js'
+import * as jaro from '../src/algorithms/jaro/index.js'
+import * as jaroWinkler from '../src/algorithms/jaroWinkler/index.js'
+import * as lcs from '../src/algorithms/lcs/index.js'
+import * as levenshtein from '../src/algorithms/levenshtein/index.js'
+import * as osa from '../src/algorithms/osa/index.js'
+import * as postfix from '../src/algorithms/postfix/index.js'
+import * as prefix from '../src/algorithms/prefix/index.js'
+import { withPublicScoreObserver } from '../src/core/scorer.js'
+import * as fuzz from '../src/fuzz/index.js'
 import {
   bestMatch,
   createMatcher,
@@ -10,18 +23,6 @@ import {
   scorePairs,
   search,
 } from '../src/index.js'
-import * as fuzz from '../src/fuzz.js'
-import * as levenshtein from '../src/levenshtein.js'
-import * as indel from '../src/indel.js'
-import * as lcs from '../src/lcs.js'
-import * as osa from '../src/osa.js'
-import * as damerau from '../src/damerau-levenshtein.js'
-import * as hamming from '../src/hamming.js'
-import * as jaro from '../src/jaro.js'
-import * as jaroWinkler from '../src/jaro-winkler.js'
-import * as prefix from '../src/prefix.js'
-import * as postfix from '../src/postfix.js'
-import { withPublicScoreObserver } from '../src/scorer.js'
 
 describe('0.6 metrics and scorers', () => {
   test('algorithm families keep their natural scales', () => {
@@ -108,6 +109,14 @@ describe('0.6 metrics and scorers', () => {
       symmetric: true,
     })
     expect(() => invalid.score('a', 'b', { threshold: 9 })).toThrow(RangeError)
+
+    calls = 0
+    expect(
+      bestMatch('a', ['a', 'b'], {
+        scorer: custom,
+      }),
+    ).toEqual({ item: 'a', key: 0, score: 5 })
+    expect(calls).toBe(2)
   })
 
   test('scoreIfMatch and isMatch use scorer thresholds', () => {
@@ -154,8 +163,22 @@ describe('0.6 search and matrices', () => {
     expect(bestMatch('alp', items, { scorer, normalize: normalizeText })).toEqual(
       matcher.best('alp'),
     )
-    expect(search('alp', items, { scorer, normalize: normalizeText, limit: null })).toEqual(
-      matcher.search('alp', { limit: null }),
+    expect(
+      search('alp', items, { scorer, normalize: normalizeText, limit: null }),
+    ).toEqual(matcher.search('alp', { limit: null }))
+  })
+
+  test('distance scorers use best-first ordering and maximum thresholds', () => {
+    const distance = createScorer(levenshtein.distance)
+    const items = ['sitting', 'kitten', 'kitchen']
+    const matcher = createMatcher(items, { scorer: distance })
+    expect(matcher.best('kitten')).toEqual({ item: 'kitten', key: 1, score: 0 })
+    expect(matcher.search('kitten', { threshold: 2, limit: null })).toEqual([
+      { item: 'kitten', key: 1, score: 0 },
+      { item: 'kitchen', key: 2, score: 2 },
+    ])
+    expect(bestMatch('kitten', items, { scorer: distance })).toEqual(
+      matcher.best('kitten'),
     )
   })
 
@@ -172,24 +195,45 @@ describe('0.6 search and matrices', () => {
 
   test('matrix operations consume Scorer objects', () => {
     const normalized = createScorer(levenshtein.similarity)
-    expect(scoreMatrix(['a', 'b'], ['a', 'c'], { scorer: normalized }).toArray()).toEqual([
-      [1, 0],
-      [0, 0],
-    ])
+    expect(scoreMatrix(['a', 'b'], ['a', 'c'], { scorer: normalized }).toArray()).toEqual(
+      [
+        [1, 0],
+        [0, 0],
+      ],
+    )
     expect([...scorePairs(['a', 'b'], ['a', 'c'], { scorer: normalized })]).toEqual([
       1, 0,
     ])
+    expect(() => scorePairs(['a'], ['a', 'b'], { scorer: normalized })).toThrow(
+      RangeError,
+    )
+    const bytes = scoreMatrix(['a', 'b'], ['a', 'c'], {
+      scorer: normalized,
+      into: 'u8',
+    })
+    expect(bytes.data).toBeInstanceOf(Uint8Array)
+    expect(bytes.at(0, 0)).toBe(1)
+    expect(bytes.toArray()).toEqual([
+      [1, 0],
+      [0, 0],
+    ])
+    expect([...bytes].every((row) => row.buffer === bytes.data.buffer)).toBe(true)
+    expect(() => bytes.at(-1, 0)).toThrow(RangeError)
   })
 
   test('collection policies and call limits are validated', () => {
     expect(() => createMatcher([null], { scorer, missingItems: 'throw' })).toThrow(
       TypeError,
     )
-    expect(() =>
-      createMatcher(['a'], { scorer, normalize: () => null }),
-    ).toThrow(TypeError)
+    expect(() => createMatcher(['a'], { scorer, normalize: () => null })).toThrow(
+      TypeError,
+    )
     const matcher = createMatcher(['a'], { scorer })
     expect(() => matcher.search('a', { limit: -1 })).toThrow(RangeError)
+    expect(() => matcher.search('a', { limit: 0.5 })).toThrow(RangeError)
     expect(() => matcher.best('a', { threshold: Infinity })).toThrow(RangeError)
+    expect(() => Reflect.apply(createMatcher, undefined, ['a', { scorer }])).toThrow(
+      TypeError,
+    )
   })
 })

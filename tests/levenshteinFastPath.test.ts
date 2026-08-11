@@ -10,7 +10,7 @@
 import fc from 'fast-check'
 import { expect, test } from 'vitest'
 
-import { levenshteinDistance } from '../src/distance/levenshtein.js'
+import { levenshteinDistance } from '../src/algorithms/levenshtein/implementation.js'
 
 const same = (a: string, b: string): void => {
   expect(levenshteinDistance(a, b)).toBe(levenshteinDistance(a, b, {}))

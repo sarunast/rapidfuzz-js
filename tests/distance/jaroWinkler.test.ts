@@ -1,11 +1,12 @@
 // Ported from RapidFuzz tests/distance/test_JaroWinkler.py
 import { expect, it } from 'vitest'
 
-import { prepareScorerOf } from '../../src/_common.js'
-import { configure } from '../../src/configure.js'
-import { jaroWinklerSimilarity } from '../../src/distance/jaroWinkler.js'
-import { defaultProcess } from '../../src/utils.js'
-import { matrixScores } from '../matrix.js'
+import { jaroWinklerSimilarity } from '../../src/algorithms/jaroWinkler/implementation.js'
+import { similarity as jaroWinklerMetric } from '../../src/algorithms/jaroWinkler/index.js'
+import { prepareScorerOf } from '../../src/algorithms/shared/scorerSupport.js'
+import { scoreMatrix } from '../../src/batch/index.js'
+import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
+import { createScorer } from '../../src/core/scorer.js'
 import { JaroWinkler } from './scorers.js'
 
 it('handles sequences of numbers', () => {
@@ -122,9 +123,8 @@ it('handles a prefix bonus that covers the whole score', () => {
   const options = { prefixWeight: 0.25, scoreCutoff: 0.9 }
   expect(jaroWinklerSimilarity('abcdx', 'abcdy', options)).toBeCloseTo(1, 12)
   expect(
-    matrixScores(['abcdx'], ['abcdy'], {
-      scorer: configure(jaroWinklerSimilarity, { prefixWeight: 0.25 }),
-      scoreCutoff: 0.9,
-    })[0][0],
+    scoreMatrix(['abcdx'], ['abcdy'], {
+      scorer: createScorer(jaroWinklerMetric, { prefixWeight: 0.25 }),
+    }).at(0, 0),
   ).toBeCloseTo(1, 12)
 })

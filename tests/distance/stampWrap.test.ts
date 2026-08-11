@@ -14,16 +14,16 @@
 // effect checked.
 import { describe, expect, it } from 'vitest'
 
-import { resetPartialRatioScratch } from '../../src/_fuzz/basic.js'
-import { resetBitVectorScratch } from '../../src/distance/_bitVector/shared.js'
 import {
   damerauLevenshteinDistance,
   resetDamerauScratch,
-} from '../../src/distance/damerauLevenshtein.js'
-import { indelDistance } from '../../src/distance/indel.js'
-import { lcsSeqSimilarity } from '../../src/distance/lcsSeq.js'
-import { levenshteinDistance } from '../../src/distance/levenshtein.js'
-import { partialRatio, partialRatioAlignment } from '../../src/_fuzz/legacy.js'
+} from '../../src/algorithms/damerauLevenshtein/implementation.js'
+import { indelDistance } from '../../src/algorithms/indel/implementation.js'
+import { lcsSeqSimilarity } from '../../src/algorithms/lcs/implementation.js'
+import { levenshteinDistance } from '../../src/algorithms/levenshtein/implementation.js'
+import { resetBitVectorScratch } from '../../src/algorithms/shared/bitmask/shared.js'
+import { resetPartialRatioScratch } from '../../src/fuzz/internal/basic.js'
+import { partialRatio, partialRatioAlignment } from '../../src/fuzz/internal/scorers.js'
 
 /** One before the counter's ceiling, so the next build but one wraps it. */
 const NEAR_LIMIT = 0x7fff_fffd

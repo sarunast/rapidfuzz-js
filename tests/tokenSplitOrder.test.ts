@@ -13,7 +13,12 @@
 // those scorers happen to use today.
 import { describe, expect, it } from 'vitest'
 
-import { convSequence } from '../src/_common.js'
+import { convSequence } from '../src/algorithms/shared/scorerSupport.js'
+import {
+  tokenRatio,
+  tokenSetRatio,
+  tokenSortRatio,
+} from '../src/fuzz/internal/scorers.js'
 import {
   difference,
   intersects,
@@ -22,8 +27,7 @@ import {
   tokenViewOf,
   uniqueOf,
   type UniqueTokenSet,
-} from '../src/_fuzz/tokens.js'
-import { tokenRatio, tokenSetRatio, tokenSortRatio } from '../src/_fuzz/legacy.js'
+} from '../src/fuzz/internal/tokens.js'
 
 /** Everything observable about a token set, in an order-free form. */
 function snapshot(set: UniqueTokenSet): { size: number; tokens: string[] } {

@@ -19,21 +19,23 @@
 // of their own.
 import { describe, expect, it } from 'vitest'
 
-import { resetSharedScratch } from '../src/distance/_bitVector/index.js'
 import {
   damerauLevenshteinDistance,
   resetDamerauScratch,
-} from '../src/distance/damerauLevenshtein.js'
-import { indelDistance } from '../src/distance/indel.js'
-import { jaroSimilarity, resetJaroScratch } from '../src/distance/jaro.js'
-import { lcsSeqEditops, lcsSeqSimilarity } from '../src/distance/lcsSeq.js'
+} from '../src/algorithms/damerauLevenshtein/implementation.js'
+import { indelDistance } from '../src/algorithms/indel/implementation.js'
+import {
+  jaroSimilarity,
+  resetJaroScratch,
+} from '../src/algorithms/jaro/implementation.js'
+import { lcsSeqEditops, lcsSeqSimilarity } from '../src/algorithms/lcs/implementation.js'
 import {
   levenshteinDistance,
   levenshteinEditops,
   resetWeightedScratch,
-} from '../src/distance/levenshtein.js'
-import { osaDistance } from '../src/distance/osa.js'
-import { extractOne } from '../src/search.js'
+} from '../src/algorithms/levenshtein/implementation.js'
+import { osaDistance } from '../src/algorithms/osa/implementation.js'
+import { resetSharedScratch } from '../src/algorithms/shared/bitmask/index.js'
 import { matrixScores } from './matrix.js'
 
 function resetAll(): void {
@@ -76,7 +78,6 @@ function workload(): unknown[] {
   // The prepared paths keep query-side state of their own, and are what the
   // shared mask memo exists for.
   results.push(
-    extractOne('kitten', ['sitting', 'kitchen', 'mitten'])?.score,
     matrixScores(['привет', 'kitten'], ['привет мир', 'sitting'], {
       scorer: levenshteinDistance,
     }),

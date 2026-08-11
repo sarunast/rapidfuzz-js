@@ -1,7 +1,7 @@
 // Ported from RapidFuzz tests/test_utils.py
 import { expect, it } from 'vitest'
 
-import { defaultProcess } from '../src/utils.js'
+import { normalizeText as defaultProcess } from '../src/core/normalize.js'
 
 it('preprocesses mixed unicode strings', () => {
   const mixed: ReadonlyArray<readonly [string, string]> = [
@@ -23,5 +23,5 @@ it('preprocesses mixed unicode strings', () => {
 })
 
 it('rejects non-string input', () => {
-  expect(() => defaultProcess(['a', 'b'])).toThrow('defaultProcess expects a string')
+  expect(() => defaultProcess(['a', 'b'])).toThrow('normalizeText expects a string')
 })

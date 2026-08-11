@@ -1,16 +1,19 @@
 import { describe } from 'vitest'
 
-import { damerauLevenshteinDistance } from '../src/distance/damerauLevenshtein.js'
-import { indelDistance, indelNormalizedSimilarity } from '../src/distance/indel.js'
-import { jaroSimilarity } from '../src/distance/jaro.js'
-import { lcsSeqEditops, lcsSeqSimilarity } from '../src/distance/lcsSeq.js'
+import { damerauLevenshteinDistance } from '../src/algorithms/damerauLevenshtein/implementation.js'
+import {
+  indelDistance,
+  indelNormalizedSimilarity,
+} from '../src/algorithms/indel/implementation.js'
+import { jaroSimilarity } from '../src/algorithms/jaro/implementation.js'
+import { lcsSeqEditops, lcsSeqSimilarity } from '../src/algorithms/lcs/implementation.js'
 import {
   levenshteinDistance,
   levenshteinEditops,
   levenshteinNormalizedSimilarity,
   levenshteinSimilarity,
-} from '../src/distance/levenshtein.js'
-import { osaDistance } from '../src/distance/osa.js'
+} from '../src/algorithms/levenshtein/implementation.js'
+import { osaDistance } from '../src/algorithms/osa/implementation.js'
 import {
   editedPairs,
   LATIN1,

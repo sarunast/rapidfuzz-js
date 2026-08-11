@@ -1,8 +1,8 @@
 // Ported from RapidFuzz tests/distance/test_LCSseq.py
 import { expect, it } from 'vitest'
 
-import { lcsSeqEditops, lcsSeqOpcodes } from '../../src/distance/lcsSeq.js'
-import { defaultProcess } from '../../src/utils.js'
+import { lcsSeqEditops, lcsSeqOpcodes } from '../../src/algorithms/lcs/implementation.js'
+import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { editopTuples, opcodeTuples } from '../common.js'
 import { LCSseq } from './scorers.js'
 

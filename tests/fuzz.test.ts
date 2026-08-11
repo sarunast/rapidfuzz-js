@@ -1,13 +1,13 @@
 // Ported from RapidFuzz tests/test_fuzz.py
 import { describe, expect, it } from 'vitest'
 
+import { normalizeText as defaultProcess } from '../src/core/normalize.js'
 import {
   partialRatio,
   partialRatioAlignment,
   partialTokenRatio,
   partialTokenSetRatio,
   partialTokenSortRatio,
-  qRatio,
   ratio,
   tokenRatio,
   tokenSetRatio,
@@ -15,8 +15,7 @@ import {
   wRatio,
   type FuzzInput,
   type FuzzOptions,
-} from '../src/_fuzz/legacy.js'
-import { defaultProcess } from '../src/utils.js'
+} from '../src/fuzz/internal/scorers.js'
 import { callUntyped } from './common.js'
 
 /**
@@ -44,7 +43,6 @@ const fuzz = {
   partialTokenSetRatio: symmetric(partialTokenSetRatio),
   partialTokenRatio: symmetric(partialTokenRatio),
   wRatio: symmetric(wRatio),
-  qRatio: symmetric(qRatio),
 }
 
 const SCORERS: ReadonlyArray<readonly [string, Scorer]> = Object.entries(fuzz)
@@ -89,22 +87,6 @@ it('scores reordered tokens as a perfect partial token set ratio', () => {
       'atlanta braves vs new york mets',
     ),
   ).toBe(100)
-})
-
-it('scores an equal QRatio as 100', () => {
-  expect(
-    fuzz.qRatio('new york mets', 'new york mets', { processor: defaultProcess }),
-  ).toBe(100)
-})
-
-it('makes QRatio case insensitive with the default processor', () => {
-  expect(
-    fuzz.qRatio('new york mets', 'new YORK mets', { processor: defaultProcess }),
-  ).toBe(100)
-})
-
-it('scores an unequal QRatio below 100', () => {
-  expect(fuzz.qRatio('new york mets', 'the wonderful new york mets')).not.toBe(100)
 })
 
 it('scores an equal WRatio as 100', () => {
@@ -256,7 +238,6 @@ it('treats two empty strings as a perfect match or as no match, per scorer', () 
 
   // no match
   expect(fuzz.wRatio('', '')).toBe(0)
-  expect(fuzz.qRatio('', '')).toBe(0)
   expect(fuzz.tokenSetRatio('', '')).toBe(0)
   expect(fuzz.partialTokenSetRatio('', '')).toBe(0)
 
@@ -400,7 +381,7 @@ it('finds the optimal partial alignment on a long repetitive input (issue 257)',
 // return produced a *perfect score*. `convSequence` reads a `length` off
 // whatever it is handed, and `new Array(undefined)` is `[undefined]`, so
 // `'abc'` and `'zzzz'` both became one-element sequences of `undefined` and
-// scored 100 — for `wRatio`, `qRatio` and every token scorer. The distance
+// scored 100 — for `wRatio` and every token scorer. The distance
 // module's equivalent lives in `distance/distance.test.ts`.
 describe('a fuzz processor has to return a sequence', () => {
   // Set rather than written as a literal because these are returns TypeScript

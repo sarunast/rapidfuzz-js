@@ -39,10 +39,10 @@
 
 import { bench } from 'vitest'
 
-import { resetSharedScratch } from '../src/distance/_bitVector/index.js'
-import { resetDamerauScratch } from '../src/distance/damerauLevenshtein.js'
-import { resetJaroScratch } from '../src/distance/jaro.js'
-import { resetWeightedScratch } from '../src/distance/levenshtein.js'
+import { resetDamerauScratch } from '../src/algorithms/damerauLevenshtein/implementation.js'
+import { resetJaroScratch } from '../src/algorithms/jaro/implementation.js'
+import { resetWeightedScratch } from '../src/algorithms/levenshtein/implementation.js'
+import { resetSharedScratch } from '../src/algorithms/shared/bitmask/index.js'
 
 /**
  * The subset of tinybench's options a case may override.

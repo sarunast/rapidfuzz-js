@@ -3,12 +3,11 @@ import { describe } from 'vitest'
 import {
   partialRatio,
   partialTokenSetRatio,
-  qRatio,
   ratio,
   tokenSetRatio,
   tokenSortRatio,
   wRatio,
-} from '../src/_fuzz/legacy.js'
+} from '../src/fuzz/internal/scorers.js'
 import { pairs, sentences, similarPairs } from './_corpus.js'
 import { measure } from './_harness.js'
 
@@ -135,12 +134,6 @@ describe('wRatio', () => {
   })
   measure('sentences', () => {
     for (const [a, b] of sentencePairs) wRatio(a, b)
-  })
-})
-
-describe('qRatio', () => {
-  measure('sentences', () => {
-    for (const [a, b] of sentencePairs) qRatio(a, b)
   })
 })
 

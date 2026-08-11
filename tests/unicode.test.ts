@@ -3,22 +3,25 @@
 //
 // Python iterates `str` by code point, JavaScript by UTF-16 code unit:
 // `len("😀") == 1` but `"😀".length === 2`. Every scorer here goes through
-// `toCodePoints` in `src/_common.ts` so element counts match Python's. Without
+// the shared sequence conversion so element counts match Python's. Without
 // it, astral characters would count double and silently change every score.
 //
 // The expected values below were produced by upstream's pure-Python backend
 // (`rapidfuzz.distance.Levenshtein_py` etc.), not by this implementation.
 import { describe, expect, it } from 'vitest'
 
-import { indelDistance } from '../src/distance/indel.js'
-import { levenshteinDistance, levenshteinEditops } from '../src/distance/levenshtein.js'
+import { indelDistance } from '../src/algorithms/indel/implementation.js'
+import {
+  levenshteinDistance,
+  levenshteinEditops,
+} from '../src/algorithms/levenshtein/implementation.js'
 import {
   prefixDistance,
   prefixNormalizedSimilarity,
   prefixSimilarity,
-} from '../src/distance/prefix.js'
-import { ratio } from '../src/_fuzz/legacy.js'
-import { defaultProcess } from '../src/utils.js'
+} from '../src/algorithms/prefix/implementation.js'
+import { normalizeText as defaultProcess } from '../src/core/normalize.js'
+import { ratio } from '../src/fuzz/internal/scorers.js'
 import { editopTuples, maxLen } from './common.js'
 
 interface UnicodeCase {
@@ -178,7 +181,7 @@ describe('applying an edit script to astral text', () => {
   })
 })
 
-it('treats emoji as non-word characters in defaultProcess', () => {
+it('treats emoji as non-word characters in normalizeText', () => {
   expect(defaultProcess('Hello \u{1F600} World! \u{1F44D}\u{1F3FD}')).toBe(
     'hello   world',
   )

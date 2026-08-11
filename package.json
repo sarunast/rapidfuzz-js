@@ -41,48 +41,48 @@
       "import": "./dist/index.js"
     },
     "./fuzz": {
-      "types": "./dist/fuzz.d.ts",
-      "import": "./dist/fuzz.js"
+      "types": "./dist/fuzz/index.d.ts",
+      "import": "./dist/fuzz/index.js"
     },
     "./levenshtein": {
-      "types": "./dist/levenshtein.d.ts",
-      "import": "./dist/levenshtein.js"
+      "types": "./dist/algorithms/levenshtein/index.d.ts",
+      "import": "./dist/algorithms/levenshtein/index.js"
     },
     "./indel": {
-      "types": "./dist/indel.d.ts",
-      "import": "./dist/indel.js"
+      "types": "./dist/algorithms/indel/index.d.ts",
+      "import": "./dist/algorithms/indel/index.js"
     },
     "./lcs": {
-      "types": "./dist/lcs.d.ts",
-      "import": "./dist/lcs.js"
+      "types": "./dist/algorithms/lcs/index.d.ts",
+      "import": "./dist/algorithms/lcs/index.js"
     },
     "./osa": {
-      "types": "./dist/osa.d.ts",
-      "import": "./dist/osa.js"
+      "types": "./dist/algorithms/osa/index.d.ts",
+      "import": "./dist/algorithms/osa/index.js"
     },
     "./damerau-levenshtein": {
-      "types": "./dist/damerau-levenshtein.d.ts",
-      "import": "./dist/damerau-levenshtein.js"
+      "types": "./dist/algorithms/damerauLevenshtein/index.d.ts",
+      "import": "./dist/algorithms/damerauLevenshtein/index.js"
     },
     "./hamming": {
-      "types": "./dist/hamming.d.ts",
-      "import": "./dist/hamming.js"
+      "types": "./dist/algorithms/hamming/index.d.ts",
+      "import": "./dist/algorithms/hamming/index.js"
     },
     "./jaro": {
-      "types": "./dist/jaro.d.ts",
-      "import": "./dist/jaro.js"
+      "types": "./dist/algorithms/jaro/index.d.ts",
+      "import": "./dist/algorithms/jaro/index.js"
     },
     "./jaro-winkler": {
-      "types": "./dist/jaro-winkler.d.ts",
-      "import": "./dist/jaro-winkler.js"
+      "types": "./dist/algorithms/jaroWinkler/index.d.ts",
+      "import": "./dist/algorithms/jaroWinkler/index.js"
     },
     "./prefix": {
-      "types": "./dist/prefix.d.ts",
-      "import": "./dist/prefix.js"
+      "types": "./dist/algorithms/prefix/index.d.ts",
+      "import": "./dist/algorithms/prefix/index.js"
     },
     "./postfix": {
-      "types": "./dist/postfix.d.ts",
-      "import": "./dist/postfix.js"
+      "types": "./dist/algorithms/postfix/index.d.ts",
+      "import": "./dist/algorithms/postfix/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -103,8 +103,10 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check:exports": "node scripts/check-exports.mjs",
+    "check:bundles": "node scripts/check-bundles.mjs",
+    "check:tarball": "node scripts/check-tarball.mjs",
     "check:pkg": "publint && attw --pack . --profile esm-only",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run check:exports && npm run check:pkg",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build && npm run check:exports && npm run check:bundles && npm run check:tarball && npm run check:pkg",
     "prepublishOnly": "npm run check"
   },
   "devDependencies": {

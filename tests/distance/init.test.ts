@@ -9,13 +9,16 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  levenshteinEditops,
+  levenshteinOpcodes,
+} from '../../src/algorithms/levenshtein/implementation.js'
+import {
   Editops,
   Opcodes,
   type Editop,
   type EditopTag,
   type Opcode,
-} from '../../src/distance/editops.js'
-import { levenshteinEditops, levenshteinOpcodes } from '../../src/distance/levenshtein.js'
+} from '../../src/algorithms/shared/editops/index.js'
 import { callUntyped } from '../common.js'
 
 const EDITOP_LIST: readonly Editop[] = [

@@ -1,33 +1,30 @@
-export {
-  createScorer,
-  isMatch,
-  scoreIfMatch,
-  type CustomScorerConfiguration,
-  type Direction,
-  type MaybeSequence,
-  type Metric,
-  type Scorer,
-  type Sequence,
-  type ThresholdOptions,
-} from './scorer.js'
-export {
-  bestMatch,
-  createMatcher,
-  scoreMatrix,
-  scorePairs,
-  search,
-  type BestOptions,
-  type Items,
-  type Match,
-  type Matcher,
-  type MatcherOptions,
-  type MatrixOptions,
-  type MissingItemsPolicy,
-  type Normalizer,
-  type ScoreArray,
-  type ScoreArrayKind,
-  type ScoreArrayOf,
-  type ScoreMatrix,
-  type SearchOptions,
-} from './operations.js'
-export { normalizeText } from './utils.js'
+export { createScorer } from './core/scorer.js'
+export { isMatch, scoreIfMatch } from './core/match.js'
+export { normalizeText } from './core/normalize.js'
+export { bestMatch, createMatcher, search } from './search/index.js'
+export { scoreMatrix, scorePairs } from './batch/index.js'
+
+export type { Metric } from './core/metric.js'
+export type {
+  CustomScorerConfiguration,
+  Scorer,
+  ThresholdOptions,
+} from './core/scorer.js'
+export type { Direction, MaybeSequence, Sequence } from './core/types.js'
+export type {
+  BestOptions,
+  Items,
+  Match,
+  Matcher,
+  MatcherOptions,
+  MissingItemsPolicy,
+  Normalizer,
+  SearchOptions,
+} from './search/index.js'
+export type {
+  BatchOptions as MatrixOptions,
+  ScoreArray,
+  ScoreArrayKind,
+  ScoreArrayOf,
+  ScoreMatrix,
+} from './batch/index.js'

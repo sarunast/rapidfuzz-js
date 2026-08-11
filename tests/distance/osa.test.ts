@@ -1,8 +1,8 @@
 // Ported from RapidFuzz tests/distance/test_OSA.py
 import { expect, it } from 'vitest'
 
-import { osaDistance } from '../../src/distance/osa.js'
-import { defaultProcess } from '../../src/utils.js'
+import { osaDistance } from '../../src/algorithms/osa/implementation.js'
+import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { OSA } from './scorers.js'
 
 it('treats two empty strings as a perfect match', () => {

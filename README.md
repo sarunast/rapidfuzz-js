@@ -76,12 +76,12 @@ levenshteinSimilarity('abc', 'axc')
 
 The library never rescales between families:
 
-| Family | Scale |
-| --- | --- |
-| Fuzz similarities | `0–100` |
-| Normalized edit similarities | `0–1` |
-| Jaro and Jaro-Winkler | `0–1` |
-| Distances | Native algorithm units |
+| Family                       | Scale                  |
+| ---------------------------- | ---------------------- |
+| Fuzz similarities            | `0–100`                |
+| Normalized edit similarities | `0–1`                  |
+| Jaro and Jaro-Winkler        | `0–1`                  |
+| Distances                    | Native algorithm units |
 
 Available subpaths:
 
@@ -199,14 +199,11 @@ Numbers (including `NaN`), booleans, and objects without a valid array-like
 Custom metrics must declare enough metadata for safe ordering and validation:
 
 ```ts
-const custom = createScorer(
-  (a, b) => (a === b ? 1 : 0),
-  {
-    direction: 'similarity',
-    bounds: [0, 1],
-    symmetric: true,
-  },
-)
+const custom = createScorer((a, b) => (a === b ? 1 : 0), {
+  direction: 'similarity',
+  bounds: [0, 1],
+  symmetric: true,
+})
 ```
 
 Every custom result must be finite and inside its declared bounds. The result
@@ -216,12 +213,12 @@ is validated before thresholding, ordering, or pruning.
 
 The benchmark vocabulary maps directly to the public API:
 
-| Workload | API |
-| --- | --- |
-| One best result | `bestMatch` |
-| Top N results | `search` with `limit: N` |
-| Prepare a reusable collection | `createMatcher` construction |
-| Repeated prepared query | `matcher.best` / `matcher.search` |
+| Workload                      | API                               |
+| ----------------------------- | --------------------------------- |
+| One best result               | `bestMatch`                       |
+| Top N results                 | `search` with `limit: N`          |
+| Prepare a reusable collection | `createMatcher` construction      |
+| Repeated prepared query       | `matcher.best` / `matcher.search` |
 
 The release check runs type checking, linting, formatting, all functional
 tests, the build, export-map validation, package validation, and tarball

@@ -1,7 +1,7 @@
 // Ported from RapidFuzz tests/distance/test_Jaro.py
 import { expect, it } from 'vitest'
 
-import { defaultProcess } from '../../src/utils.js'
+import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { Jaro } from './scorers.js'
 
 it('handles sequences of numbers', () => {

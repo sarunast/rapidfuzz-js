@@ -1,7 +1,7 @@
 // Not ported from RapidFuzz — this guards an optimisation of ours, not a
 // behaviour of upstream's.
 //
-// The scorers run on bit-parallel kernels (`src/distance/_bitVector/`) rather
+// The scorers run on bit-parallel kernels (`algorithms/shared/bitmask/`) rather
 // than the dynamic programs they replaced. The DP was obviously correct; the
 // kernels are not, so they are checked against it directly here.
 //
@@ -18,15 +18,22 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
-import { prepareScorerOf } from '../../src/_common.js'
+import { damerauLevenshteinDistance } from '../../src/algorithms/damerauLevenshtein/implementation.js'
+import { jaroSimilarity } from '../../src/algorithms/jaro/implementation.js'
 import {
-  commonAffix,
-  lcsSeqMatrix,
-  levenshteinMatrix,
-  levenshteinMatrixBytes,
-  rowBitSet,
-  shiftedRowBitSet,
-} from '../../src/distance/_bitParallel.js'
+  lcsSeqEditops,
+  lcsSeqLengthRange,
+  lcsSeqSimilarity,
+} from '../../src/algorithms/lcs/implementation.js'
+import {
+  levenshteinDistance,
+  levenshteinEditops,
+  levenshteinNormalizedDistance,
+  levenshteinNormalizedSimilarity,
+  levenshteinSimilarity,
+  type LevenshteinWeights,
+} from '../../src/algorithms/levenshtein/implementation.js'
+import { osaDistance } from '../../src/algorithms/osa/implementation.js'
 import {
   lcsLength,
   lcsLengthPrepared,
@@ -41,24 +48,21 @@ import {
   osaOneWordRange,
   osaPrepared,
   preparePattern,
-} from '../../src/distance/_bitVector/index.js'
-import { damerauLevenshteinDistance } from '../../src/distance/damerauLevenshtein.js'
-import { jaroSimilarity } from '../../src/distance/jaro.js'
+} from '../../src/algorithms/shared/bitmask/index.js'
 import {
-  lcsSeqEditops,
-  lcsSeqLengthRange,
-  lcsSeqSimilarity,
-} from '../../src/distance/lcsSeq.js'
+  commonAffix,
+  lcsSeqMatrix,
+  levenshteinMatrix,
+  levenshteinMatrixBytes,
+  rowBitSet,
+  shiftedRowBitSet,
+} from '../../src/algorithms/shared/bitParallel.js'
+import { prepareScorerOf } from '../../src/algorithms/shared/scorerSupport.js'
 import {
-  levenshteinDistance,
-  levenshteinEditops,
-  levenshteinNormalizedDistance,
-  levenshteinNormalizedSimilarity,
-  levenshteinSimilarity,
-  type LevenshteinWeights,
-} from '../../src/distance/levenshtein.js'
-import { osaDistance } from '../../src/distance/osa.js'
-import { partialRatio, partialRatioAlignment, ratio } from '../../src/_fuzz/legacy.js'
+  partialRatio,
+  partialRatioAlignment,
+  ratio,
+} from '../../src/fuzz/internal/scorers.js'
 import { editopTuples } from '../common.js'
 
 /** Textbook LCS, O(n*m). Slow and obviously right. */

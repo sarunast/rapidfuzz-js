@@ -5,8 +5,8 @@ import {
   hammingDistance,
   hammingEditops,
   hammingOpcodes,
-} from '../../src/distance/hamming.js'
-import { defaultProcess } from '../../src/utils.js'
+} from '../../src/algorithms/hamming/implementation.js'
+import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { editopTuples, opcodeTuples } from '../common.js'
 import { Hamming } from './scorers.js'
 

@@ -18,15 +18,15 @@
  */
 import { expect } from 'vitest'
 
-import type { ScorerOptions, Sequence } from '../src/_common.js'
+import type { LevenshteinWeightsInput } from '../src/algorithms/levenshtein/implementation.js'
 import type {
   EditopTag,
   Editops,
   MatchingBlock,
   OpcodeTag,
   Opcodes,
-} from '../src/distance/editops.js'
-import type { LevenshteinWeightsInput } from '../src/distance/levenshtein.js'
+} from '../src/algorithms/shared/editops/index.js'
+import type { ScorerOptions, Sequence } from '../src/algorithms/shared/scorerSupport.js'
 
 /** Union of every scorer-specific option, so one harness covers all metrics. */
 export interface TestOptions extends ScorerOptions {
@@ -37,7 +37,7 @@ export interface TestOptions extends ScorerOptions {
 
 type ScorerFn = (s1: Sequence, s2: Sequence, options?: TestOptions) => number
 
-/** The four functions every scorer in `src/distance/` exposes. */
+/** The four internal functions used to verify each algorithm implementation. */
 export interface ScorerFns {
   distance: ScorerFn
   similarity: ScorerFn

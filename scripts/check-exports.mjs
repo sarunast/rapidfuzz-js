@@ -60,7 +60,20 @@ const REMOVED = [
   'normalizedSimilarity',
 ]
 
-const declared = Object.keys(pkg.exports).filter((subpath) => subpath !== './package.json')
+const REMOVED_SUBPATHS = [
+  'distance',
+  'process',
+  'utils',
+  'operations',
+  'scorer',
+  'fuzz-v2',
+  'Levenshtein',
+  'JaroWinkler',
+]
+
+const declared = Object.keys(pkg.exports).filter(
+  (subpath) => subpath !== './package.json',
+)
 const missingChecks = declared.filter((subpath) => !(subpath in EXPECTED))
 if (missingChecks.length > 0) {
   throw new Error(`missing export checks for ${missingChecks.join(', ')}`)
@@ -80,13 +93,40 @@ for (const [subpath, names] of Object.entries(EXPECTED)) {
     continue
   }
   const absent = names.filter((name) => typeof module[name] !== 'function')
+  const expected = new Set(names)
+  const unexpected = Object.keys(module).filter((name) => !expected.has(name))
   const present = REMOVED.filter((name) => module[name] !== undefined)
-  if (absent.length > 0 || present.length > 0) {
+  if (absent.length > 0 || unexpected.length > 0 || present.length > 0) {
     if (absent.length > 0) console.error(`✗ ${specifier} missing ${absent.join(', ')}`)
+    if (unexpected.length > 0) {
+      console.error(`✗ ${specifier} unexpectedly exposes ${unexpected.join(', ')}`)
+    }
     if (present.length > 0) console.error(`✗ ${specifier} exposes ${present.join(', ')}`)
     failures++
   } else {
     console.log(`✓ ${specifier} (${names.length} names)`)
+  }
+}
+
+for (const subpath of REMOVED_SUBPATHS) {
+  const specifier = `${pkg.name}/${subpath}`
+  try {
+    await import(specifier)
+    console.error(`✗ removed subpath ${specifier} still resolves`)
+    failures++
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'ERR_PACKAGE_PATH_NOT_EXPORTED'
+    ) {
+      console.log(`✓ removed subpath ${specifier} is blocked`)
+    } else {
+      console.error(
+        `✗ ${specifier} failed for the wrong reason: ${error instanceof Error ? error.message : error}`,
+      )
+      failures++
+    }
   }
 }
 

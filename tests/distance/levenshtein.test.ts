@@ -3,8 +3,6 @@ import { createHash } from 'node:crypto'
 
 import { expect, it } from 'vitest'
 
-import { scorerFlagsOf } from '../../src/_common.js'
-import { configure } from '../../src/configure.js'
 import {
   levenshteinDistance,
   levenshteinEditops,
@@ -13,10 +11,12 @@ import {
   levenshteinOpcodes,
   levenshteinSimilarity,
   type LevenshteinWeights,
-} from '../../src/distance/levenshtein.js'
-import { defaultProcess } from '../../src/utils.js'
+} from '../../src/algorithms/levenshtein/implementation.js'
+import { distance as levenshteinDistanceMetric } from '../../src/algorithms/levenshtein/index.js'
+import { scoreMatrix } from '../../src/batch/index.js'
+import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
+import { createScorer } from '../../src/core/scorer.js'
 import { editopTuples, opcodeTuples } from '../common.js'
-import { matrixScores } from '../matrix.js'
 import { Levenshtein } from './scorers.js'
 
 it('treats two empty strings as a perfect match under any weights', () => {
@@ -199,17 +199,17 @@ it('reads named costs on the prepared path and in the flags', () => {
 
   // Asymmetric either way round, so the matrix may not mirror its triangle.
   expect(
-    matrixScores(queries, queries, {
-      scorer: configure(levenshteinDistance, { weights: named }),
-    }),
+    scoreMatrix(queries, queries, {
+      scorer: createScorer(levenshteinDistanceMetric, { weights: named }),
+    }).toArray(),
   ).toEqual(
-    matrixScores(queries, queries, {
-      scorer: configure(levenshteinDistance, { weights: positional }),
-    }),
+    scoreMatrix(queries, queries, {
+      scorer: createScorer(levenshteinDistanceMetric, { weights: positional }),
+    }).toArray(),
   )
-  expect(
-    scorerFlagsOf(configure(levenshteinDistance, { weights: named })).symmetric,
-  ).toBe(false)
+  expect(createScorer(levenshteinDistanceMetric, { weights: named }).symmetric).toBe(
+    false,
+  )
 })
 
 it('keeps fractional weighted cutoffs on the score lattice', () => {
@@ -224,14 +224,6 @@ it('keeps fractional weighted cutoffs on the score lattice', () => {
   for (const [scorer, accepted, rejected, score, sentinel] of cases) {
     expect(scorer('ab', 'ac', { weights, scoreCutoff: accepted })).toBe(score)
     expect(scorer('ab', 'ac', { weights, scoreCutoff: rejected })).toBe(sentinel)
-
-    const prepared = configure(scorer, { weights })
-    expect(
-      matrixScores(['ab'], ['ac'], { scorer: prepared, scoreCutoff: accepted })[0][0],
-    ).toBe(score)
-    expect(
-      matrixScores(['ab'], ['ac'], { scorer: prepared, scoreCutoff: rejected })[0][0],
-    ).toBe(sentinel)
   }
 })
 

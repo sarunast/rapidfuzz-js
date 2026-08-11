@@ -26,7 +26,7 @@
 // of them are invisible, and one of them would end the line.
 import { describe, expect, it } from 'vitest'
 
-import { tokenSortRatio } from '../src/_fuzz/legacy.js'
+import { tokenSortRatio } from '../src/fuzz/internal/scorers.js'
 
 /** Splits iff the separator is whitespace: sorting then makes the two equal. */
 function splitsOn(cp: number): boolean {

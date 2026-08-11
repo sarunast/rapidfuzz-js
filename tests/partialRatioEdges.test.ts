@@ -16,7 +16,11 @@
 // `partialRatioScan` makes it right on purpose, and these assertions keep it so.
 import { describe, expect, it } from 'vitest'
 
-import { partialRatio, partialRatioAlignment, ratio } from '../src/_fuzz/legacy.js'
+import {
+  partialRatio,
+  partialRatioAlignment,
+  ratio,
+} from '../src/fuzz/internal/scorers.js'
 
 // The windows `partialRatioScan` is defined over: every prefix and every suffix
 // shorter than the needle, plus every full-length window between them. Sliced by

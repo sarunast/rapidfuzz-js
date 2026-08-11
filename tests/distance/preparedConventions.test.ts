@@ -14,71 +14,71 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  prepareScorerOf,
-  type MaybeSequence,
-  type PrepareScorer,
-  type Sequence,
-} from '../../src/_common.js'
-import {
   damerauLevenshteinDistance,
   damerauLevenshteinNormalizedDistance,
   damerauLevenshteinNormalizedSimilarity,
   damerauLevenshteinSimilarity,
-} from '../../src/distance/damerauLevenshtein.js'
+} from '../../src/algorithms/damerauLevenshtein/implementation.js'
 import {
   hammingDistance,
   hammingNormalizedDistance,
   hammingNormalizedSimilarity,
   hammingSimilarity,
-} from '../../src/distance/hamming.js'
+} from '../../src/algorithms/hamming/implementation.js'
 import {
   indelDistance,
   indelNormalizedDistance,
   indelNormalizedSimilarity,
   indelSimilarity,
-} from '../../src/distance/indel.js'
+} from '../../src/algorithms/indel/implementation.js'
 import {
   jaroDistance,
   jaroNormalizedDistance,
   jaroNormalizedSimilarity,
   jaroSimilarity,
-} from '../../src/distance/jaro.js'
+} from '../../src/algorithms/jaro/implementation.js'
 import {
   jaroWinklerDistance,
   jaroWinklerNormalizedDistance,
   jaroWinklerNormalizedSimilarity,
   jaroWinklerSimilarity,
-} from '../../src/distance/jaroWinkler.js'
+} from '../../src/algorithms/jaroWinkler/implementation.js'
 import {
   lcsSeqDistance,
   lcsSeqNormalizedDistance,
   lcsSeqNormalizedSimilarity,
   lcsSeqSimilarity,
-} from '../../src/distance/lcsSeq.js'
+} from '../../src/algorithms/lcs/implementation.js'
 import {
   levenshteinDistance,
   levenshteinNormalizedDistance,
   levenshteinNormalizedSimilarity,
   levenshteinSimilarity,
-} from '../../src/distance/levenshtein.js'
+} from '../../src/algorithms/levenshtein/implementation.js'
 import {
   osaDistance,
   osaNormalizedDistance,
   osaNormalizedSimilarity,
   osaSimilarity,
-} from '../../src/distance/osa.js'
+} from '../../src/algorithms/osa/implementation.js'
 import {
   postfixDistance,
   postfixNormalizedDistance,
   postfixNormalizedSimilarity,
   postfixSimilarity,
-} from '../../src/distance/postfix.js'
+} from '../../src/algorithms/postfix/implementation.js'
 import {
   prefixDistance,
   prefixNormalizedDistance,
   prefixNormalizedSimilarity,
   prefixSimilarity,
-} from '../../src/distance/prefix.js'
+} from '../../src/algorithms/prefix/implementation.js'
+import {
+  prepareScorerOf,
+  type MaybeSequence,
+  type PrepareScorer,
+  type Sequence,
+} from '../../src/algorithms/shared/scorerSupport.js'
 import { callUntyped } from '../common.js'
 
 interface Scorers {
