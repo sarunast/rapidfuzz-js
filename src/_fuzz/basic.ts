@@ -640,10 +640,22 @@ function partialRatioScan(
   // only a strictly better window replaces the one held. `partialRatio` returns
   // a score, which no order can change; `partialRatioAlignment` returns the
   // positions, and there upstream's Python order is the one to match.
+  //
+  // {@link scanInterior} stops one short of the last full-length window, at
+  // `len2 - len1 - 1`; the window at `len2 - len1` is {@link scanSuffix}'s first
+  // iteration. So the suffix scan has to come before the prefix scan for the
+  // rule above to hold at all — and for equal lengths it is the *only* place a
+  // full-length window is scored, since the interior scan has no windows to
+  // visit. Scoring it after every prefix window was scoring the strongest
+  // candidate last. Measured on 400 equal-length choices, no cutoff:
+  // **0.66-0.69x** against edit-distance-1 variants of the query, 0.86-0.90x
+  // when a third of them match exactly, and noise on unrelated words of the same
+  // length, where no window raises the cutoff enough to prune another. Flat
+  // through `extractOne`, which raises the cutoff to the running best and so has
+  // already pruned what this reorders.
   if (scoreOnly) {
-    if (scanInterior()) return res
+    if (scanInterior() || scanSuffix()) return res
     scanPrefix()
-    if (scanSuffix()) return res
   } else {
     scanPrefix()
     if (scanInterior() || scanSuffix()) return res
