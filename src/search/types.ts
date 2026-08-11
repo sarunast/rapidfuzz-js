@@ -27,9 +27,15 @@ export interface SearchOptions extends BestOptions {
   readonly limit?: number | null | undefined
 }
 
+export type SearchIterOptions = BestOptions
+
 export interface Matcher<T, K, D extends Direction = Direction> {
   readonly size: number
   readonly scorer: Scorer<D>
   best(query: MaybeSequence, options?: BestOptions): Match<T, K> | undefined
   search(query: MaybeSequence, options?: SearchOptions): readonly Match<T, K>[]
+  searchIter(
+    query: MaybeSequence,
+    options?: SearchIterOptions,
+  ): IterableIterator<Match<T, K>>
 }

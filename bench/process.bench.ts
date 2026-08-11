@@ -1,6 +1,11 @@
 import { describe } from 'vitest'
 
-import { similarity as levenshteinSimilarity } from '../src/algorithms/levenshtein/index.js'
+import {
+  distance as levenshteinDistance,
+  normalizedDistance as levenshteinNormalizedDistance,
+  normalizedSimilarity as levenshteinNormalizedSimilarity,
+  similarity as levenshteinSimilarity,
+} from '../src/algorithms/levenshtein/index.js'
 import {
   fuzzySimilarity,
   similarity as fuzzSimilarity,
@@ -14,11 +19,13 @@ import {
   scoreMatrix,
   scorePairs,
   search,
+  searchIter,
 } from '../src/index.js'
 import { sentences, words } from './_corpus.js'
 import { measure } from './_harness.js'
 
 const choices = words(2_000, 12)
+const symmetricChoices = choices.slice(0, 200)
 const query = 'abcdefghijkl'
 const pairQueries = choices.map(() => query)
 const titles = sentences(2_000, 5)
@@ -28,7 +35,13 @@ const titleQuery = 'alpha bravo charlie delta echo'
 const fuzzy = createScorer(fuzzSimilarity)
 const adaptive = createScorer(fuzzySimilarity)
 const tokenSort = createScorer(tokenSortSimilarity)
-const normalized = createScorer(levenshteinSimilarity)
+const rawDistance = createScorer(levenshteinDistance)
+const rawSimilarity = createScorer(levenshteinSimilarity)
+const normalizedDistance = createScorer(levenshteinNormalizedDistance)
+const normalized = createScorer(levenshteinNormalizedSimilarity)
+const asymmetricNormalized = createScorer(levenshteinNormalizedSimilarity, {
+  weights: { insertion: 1, deletion: 2, substitution: 1 },
+})
 const fuzzyMatcher = createMatcher(choices, { scorer: fuzzy })
 const normalizedMatcher = createMatcher(choices, { scorer: normalized })
 const titleMatcher = createMatcher(titles, {
@@ -47,10 +60,22 @@ describe('direct Metric and Scorer calls', () => {
     for (const choice of choices) fuzzy.score(query, choice, { threshold: 80 })
   })
   measure('2000 pairs, normalized metric', () => {
-    for (const choice of choices) levenshteinSimilarity(query, choice)
+    for (const choice of choices) levenshteinNormalizedSimilarity(query, choice)
   })
   measure('2000 pairs, normalized scorer', () => {
     for (const choice of choices) normalized.score(query, choice)
+  })
+  measure('2000 pairs, normalized scorer threshold 0.8', () => {
+    for (const choice of choices) normalized.score(query, choice, { threshold: 0.8 })
+  })
+  measure('2000 pairs, raw distance metric', () => {
+    for (const choice of choices) levenshteinDistance(query, choice)
+  })
+  measure('2000 pairs, raw similarity metric', () => {
+    for (const choice of choices) levenshteinSimilarity(query, choice)
+  })
+  measure('2000 pairs, normalized distance metric', () => {
+    for (const choice of choices) levenshteinNormalizedDistance(query, choice)
   })
 })
 
@@ -84,6 +109,23 @@ describe('search, one query', () => {
   })
   measure('2000 titles, token sort limit 5', () => {
     search(titleQuery, titles, { scorer: tokenSort, limit: 5 })
+  })
+  measure('2000 choices, fuzzy unlimited', () => {
+    search(query, choices, { scorer: fuzzy, limit: null })
+  })
+})
+
+describe('searchIter, one query', () => {
+  measure('2000 choices, fuzzy first 5', () => {
+    let count = 0
+    for (const _match of searchIter(query, choices, { scorer: fuzzy })) {
+      if (++count === 5) break
+    }
+  })
+  measure('2000 choices, fuzzy full', () => {
+    for (const _match of searchIter(query, choices, { scorer: fuzzy })) {
+      // Consume the iterator without retaining its results.
+    }
   })
 })
 
@@ -120,6 +162,13 @@ describe('repeated Matcher queries', () => {
   measure('30 x 2000, fuzzy Matcher search limit 1', () => {
     for (const value of titleQueries) fuzzyMatcher.search(value, { limit: 1 })
   })
+  measure('30 x 2000, fuzzy Matcher searchIter', () => {
+    for (const value of titleQueries) {
+      for (const _match of fuzzyMatcher.searchIter(value, { threshold: 50 })) {
+        // Consume source-order matches.
+      }
+    }
+  })
 })
 
 describe('scorePairs with explicit Scorer', () => {
@@ -132,6 +181,21 @@ describe('scorePairs with explicit Scorer', () => {
   measure('2000 pairs, fuzzy + normalize', () => {
     scorePairs(pairQueries, choices, { scorer: fuzzy, normalize: normalizeText })
   })
+  measure('2000 pairs, normalized threshold', () => {
+    scorePairs(pairQueries, choices, { scorer: normalized, threshold: 0.8 })
+  })
+  measure('2000 pairs, normalized multiplier', () => {
+    scorePairs(pairQueries, choices, { scorer: normalized, scoreMultiplier: 100 })
+  })
+  measure('2000 pairs, raw distance', () => {
+    scorePairs(pairQueries, choices, { scorer: rawDistance })
+  })
+  measure('2000 pairs, raw similarity', () => {
+    scorePairs(pairQueries, choices, { scorer: rawSimilarity })
+  })
+  measure('2000 pairs, normalized distance', () => {
+    scorePairs(pairQueries, choices, { scorer: normalizedDistance })
+  })
 })
 
 describe('scoreMatrix with explicit Scorer', () => {
@@ -140,5 +204,17 @@ describe('scoreMatrix with explicit Scorer', () => {
   })
   measure('30 x 2000, normalized', () => {
     scoreMatrix(titleQueries, choices, { scorer: normalized })
+  })
+  measure('30 x 2000, normalized threshold', () => {
+    scoreMatrix(titleQueries, choices, { scorer: normalized, threshold: 0.8 })
+  })
+  measure('30 x 2000, normalized multiplier', () => {
+    scoreMatrix(titleQueries, choices, { scorer: normalized, scoreMultiplier: 100 })
+  })
+  measure('200 x 200, symmetric normalized', () => {
+    scoreMatrix(symmetricChoices, symmetricChoices, { scorer: normalized })
+  })
+  measure('30 x 2000, asymmetric normalized', () => {
+    scoreMatrix(titleQueries, choices, { scorer: asymmetricNormalized })
   })
 })

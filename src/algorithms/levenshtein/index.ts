@@ -1,5 +1,7 @@
 export {
   distance,
+  normalizedDistance,
+  normalizedSimilarity,
   similarity,
   type LevenshteinDistanceConfiguration,
   type LevenshteinSimilarityConfiguration,

@@ -3,7 +3,9 @@ import type { SimilarityConfiguration } from '../../core/types.js'
 import { builtInMetric } from '../shared/metricAdapter.js'
 import {
   levenshteinDistance,
+  levenshteinNormalizedDistance,
   levenshteinNormalizedSimilarity,
+  levenshteinSimilarity,
   type LevenshteinWeightsInput,
 } from './metric.js'
 
@@ -24,8 +26,26 @@ export const distance: Metric<'distance', LevenshteinDistanceConfiguration> =
 
 export const similarity: Metric<'similarity', LevenshteinSimilarityConfiguration> =
   /* @__PURE__ */ builtInMetric({
-    implementation: levenshteinNormalizedSimilarity,
+    implementation: levenshteinSimilarity,
     direction: 'similarity',
+    bounds: [0, Number.POSITIVE_INFINITY],
+    configurationKeys: ['weights'],
+  })
+
+export const normalizedDistance: Metric<'distance', LevenshteinDistanceConfiguration> =
+  /* @__PURE__ */ builtInMetric({
+    implementation: levenshteinNormalizedDistance,
+    direction: 'distance',
     bounds: [0, 1],
     configurationKeys: ['weights'],
   })
+
+export const normalizedSimilarity: Metric<
+  'similarity',
+  LevenshteinSimilarityConfiguration
+> = /* @__PURE__ */ builtInMetric({
+  implementation: levenshteinNormalizedSimilarity,
+  direction: 'similarity',
+  bounds: [0, 1],
+  configurationKeys: ['weights'],
+})

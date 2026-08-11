@@ -1,16 +1,21 @@
 import { commonSuffix } from '../shared/affix.js'
 import {
+  asSequence,
   convPair,
   distCutoff,
   normalize,
+  normDistCutoff,
   normSimCutoff,
+  simCutoff,
+  type MaybeSequence,
+  type NormalizedScorer,
   type ScorerOptions,
-  type Sequence,
   prepareMetric,
   withPreparedFlags,
   DISTANCE_FLAGS,
+  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  type Scorer,
+  SIMILARITY_FLAGS,
 } from '../shared/scorerSupport.js'
 
 function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
@@ -28,12 +33,32 @@ function preparedPostfixDistance(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>)
  * If the distance is greater than `scoreCutoff`, `scoreCutoff + 1` is returned.
  */
 function postfixDistance_impl(
-  s1: Sequence,
-  s2: Sequence,
+  s1: MaybeSequence,
+  s2: MaybeSequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = convPair(s1, s2)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
   return distCutoff(maximum(a, b) - commonSuffix(a, b), options.scoreCutoff)
+}
+
+function postfixSimilarity_impl(
+  s1: MaybeSequence,
+  s2: MaybeSequence,
+  options: ScorerOptions = {},
+): number {
+  if (s1 == null || s2 == null) return 0
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  return simCutoff(commonSuffix(a, b), options.scoreCutoff)
+}
+
+function postfixNormalizedDistance_impl(
+  s1: MaybeSequence,
+  s2: MaybeSequence,
+  options: ScorerOptions = {},
+): number {
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const max = maximum(a, b)
+  return normDistCutoff(normalize(max - commonSuffix(a, b), max), options.scoreCutoff)
 }
 
 /**
@@ -42,22 +67,35 @@ function postfixDistance_impl(
  * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
  */
 function postfixNormalizedSimilarity_impl(
-  s1: Sequence,
-  s2: Sequence,
+  s1: MaybeSequence,
+  s2: MaybeSequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = convPair(s1, s2)
+  if (s1 == null || s2 == null) return 0
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const max = maximum(a, b)
   return normSimCutoff(1 - normalize(max - commonSuffix(a, b), max), options.scoreCutoff)
 }
 
-export const postfixDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
+export const postfixDistance: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
   postfixDistance_impl,
   DISTANCE_FLAGS,
   prepareMetric('distance', preparedPostfixDistance, maximum),
 )
-export const postfixNormalizedSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
-  postfixNormalizedSimilarity_impl,
-  NORMALIZED_SIMILARITY_FLAGS,
-  prepareMetric('normalizedSimilarity', preparedPostfixDistance, maximum),
+export const postfixSimilarity: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
+  postfixSimilarity_impl,
+  SIMILARITY_FLAGS,
+  prepareMetric('similarity', preparedPostfixDistance, maximum),
 )
+export const postfixNormalizedDistance: NormalizedScorer =
+  /* @__PURE__ */ withPreparedFlags(
+    postfixNormalizedDistance_impl,
+    NORMALIZED_DISTANCE_FLAGS,
+    prepareMetric('normalizedDistance', preparedPostfixDistance, maximum),
+  )
+export const postfixNormalizedSimilarity: NormalizedScorer =
+  /* @__PURE__ */ withPreparedFlags(
+    postfixNormalizedSimilarity_impl,
+    NORMALIZED_SIMILARITY_FLAGS,
+    prepareMetric('normalizedSimilarity', preparedPostfixDistance, maximum),
+  )

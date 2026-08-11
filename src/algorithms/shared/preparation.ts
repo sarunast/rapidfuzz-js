@@ -3,7 +3,9 @@ import {
   distanceCutoffFor,
   distCutoff,
   normalize,
+  normDistCutoff,
   normSimCutoff,
+  simCutoff,
   type PreparedMetricKind,
 } from './cutoff.js'
 import { alignRepresentation, scorerSequence } from './sequence.js'
@@ -75,9 +77,16 @@ export function prepareMetric(
         parsedOptions,
         distanceCutoffFor(kind, rawCutoff, max),
       )
-      return kind === 'distance'
-        ? distCutoff(score, rawCutoff)
-        : normSimCutoff(1 - normalize(score, max), rawCutoff)
+      switch (kind) {
+        case 'distance':
+          return distCutoff(score, rawCutoff)
+        case 'similarity':
+          return simCutoff(max - score, rawCutoff)
+        case 'normalizedDistance':
+          return normDistCutoff(normalize(score, max), rawCutoff)
+        case 'normalizedSimilarity':
+          return normSimCutoff(1 - normalize(score, max), rawCutoff)
+      }
     }
   }
   return withChoicePreparer(prepare, prepareScorerChoice)

@@ -4,6 +4,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": ["node"],
+    "resolveJsonModule": true,
     "declaration": false,
     "isolatedDeclarations": false
   },

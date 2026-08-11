@@ -1,3 +1,4 @@
+import type { PreparedKernel } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
@@ -10,7 +11,13 @@ import {
   resultLimit,
   sequenceReader,
 } from './snapshot.js'
-import type { BestOptions, Items, MatcherOptions, SearchOptions } from './types.js'
+import type {
+  BestOptions,
+  Items,
+  MatcherOptions,
+  SearchIterOptions,
+  SearchOptions,
+} from './types.js'
 
 function better(direction: Direction, score: number, current: number): boolean {
   return direction === 'similarity' ? score > current : score < current
@@ -50,6 +57,11 @@ function orderedResults<T, K>(
 function arrayItemsOf<T>(items: Items<T>): readonly T[] | null {
   return Array.isArray(items) ? items : null
 }
+
+// Streaming callers often stop after only a handful of matches. Preparing a
+// query before the first candidate made that case slower than direct pair
+// scoring; after eight retained choices the held representation amortizes.
+const STREAM_PREPARE_AFTER = 8
 
 export function bestMatch<T, D extends Direction>(
   query: MaybeSequence,
@@ -278,4 +290,106 @@ export function search<T, D extends Direction>(
     }
   }
   return orderedResults(compilation.direction, results)
+}
+
+export function searchIter<T, D extends Direction>(
+  query: MaybeSequence,
+  items: readonly T[],
+  options: MatcherOptions<T, D> & SearchIterOptions,
+): IterableIterator<Match<T, number>>
+export function searchIter<K, T, D extends Direction>(
+  query: MaybeSequence,
+  items: ReadonlyMap<K, T>,
+  options: MatcherOptions<T, D> & SearchIterOptions,
+): IterableIterator<Match<T, K>>
+export function searchIter<T, D extends Direction>(
+  query: MaybeSequence,
+  items: Iterable<T>,
+  options: MatcherOptions<T, D> & SearchIterOptions,
+): IterableIterator<Match<T, number>>
+export function searchIter<T, D extends Direction>(
+  query: MaybeSequence,
+  items: Readonly<Record<string, T>>,
+  options: MatcherOptions<T, D> & SearchIterOptions,
+): IterableIterator<Match<T, string>>
+export function searchIter<T, D extends Direction>(
+  query: MaybeSequence,
+  items: Items<T>,
+  options: MatcherOptions<T, D> & SearchIterOptions,
+): IterableIterator<Match<T, unknown>>
+export function* searchIter<T, D extends Direction>(
+  query: MaybeSequence,
+  items: Items<T>,
+  options: MatcherOptions<T, D> & SearchIterOptions,
+): IterableIterator<Match<T, unknown>> {
+  const threshold = optionalThreshold(options.threshold)
+  const compilation = scorerCompilation(options.scorer)
+  const normalized = normalizeQuery(query, options.normalize)
+  const stableOptions: MatcherOptions<T, Direction> = options
+  const arrayItems = arrayItemsOf(items)
+  const readSequence = sequenceReader(stableOptions, false)
+
+  if (normalized === null) {
+    const score = compilation.score(query, '', threshold)
+    if (!qualifies('similarity', score, threshold)) return
+    if (arrayItems !== null) {
+      for (let key = 0; key < arrayItems.length; key++) {
+        const item = arrayItems[key]
+        if (readSequence(item) !== null) yield { item, key, score }
+      }
+      return
+    }
+    for (const entry of collectionEntries(items)) {
+      if (readSequence(entry.item) !== null) {
+        yield { item: entry.item, key: entry.key, score }
+      }
+    }
+    return
+  }
+
+  if (
+    compilation.trusted &&
+    impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
+  ) {
+    return
+  }
+  const activeThreshold = compilation.trusted
+    ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
+    : threshold
+  if (arrayItems !== null) {
+    let key = 0
+    let scored = 0
+    for (; key < arrayItems.length && scored < STREAM_PREPARE_AFTER; key++) {
+      const item = arrayItems[key]
+      const sequence = readSequence(item)
+      if (sequence === null) continue
+      scored++
+      const score = compilation.rawScore(normalized, sequence, activeThreshold)
+      if (qualifies(compilation.direction, score, threshold)) {
+        yield { item, key, score }
+      }
+    }
+    if (key === arrayItems.length) return
+    const prepared = compilation.prepareQuery(normalized)
+    for (; key < arrayItems.length; key++) {
+      const item = arrayItems[key]
+      const sequence = readSequence(item)
+      if (sequence === null) continue
+      const score = prepared(compilation.prepareChoice(sequence), activeThreshold)
+      if (qualifies(compilation.direction, score, threshold)) {
+        yield { item, key, score }
+      }
+    }
+    return
+  }
+
+  const prepared: PreparedKernel = compilation.prepareQuery(normalized)
+  for (const entry of collectionEntries(items)) {
+    const sequence = readSequence(entry.item)
+    if (sequence === null) continue
+    const score = prepared(compilation.prepareChoice(sequence), activeThreshold)
+    if (qualifies(compilation.direction, score, threshold)) {
+      yield { item: entry.item, key: entry.key, score }
+    }
+  }
 }

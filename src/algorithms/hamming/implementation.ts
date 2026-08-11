@@ -5,18 +5,24 @@ import {
   type Opcodes,
 } from '../shared/editops/index.js'
 import {
+  asSequence,
   convPair,
   distanceCutoffFor,
   distCutoff,
   normalize,
+  normDistCutoff,
   normSimCutoff,
+  simCutoff,
+  type MaybeSequence,
+  type NormalizedScorer,
   type ScorerOptions,
   type Sequence,
   prepareMetric,
   withPreparedFlags,
   DISTANCE_FLAGS,
+  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  type Scorer,
+  SIMILARITY_FLAGS,
 } from '../shared/scorerSupport.js'
 
 export interface HammingEditopsOptions {
@@ -152,13 +158,40 @@ function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
  * @throws if `pad` is `false` and the inputs have different lengths.
  */
 function hammingDistance_impl(
-  s1: Sequence,
-  s2: Sequence,
+  s1: MaybeSequence,
+  s2: MaybeSequence,
   options: HammingOptions = {},
 ): number {
-  const [a, b] = convPair(s1, s2)
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const cutoff = distanceCutoffFor('distance', options.scoreCutoff, maximum(a, b))
   return distCutoff(distance_(a, b, options.pad ?? true, cutoff), options.scoreCutoff)
+}
+
+function hammingSimilarity_impl(
+  s1: MaybeSequence,
+  s2: MaybeSequence,
+  options: HammingOptions = {},
+): number {
+  if (s1 == null || s2 == null) return 0
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const max = maximum(a, b)
+  const cutoff = distanceCutoffFor('similarity', options.scoreCutoff, max)
+  return simCutoff(
+    max - distance_(a, b, options.pad ?? true, cutoff),
+    options.scoreCutoff,
+  )
+}
+
+function hammingNormalizedDistance_impl(
+  s1: MaybeSequence,
+  s2: MaybeSequence,
+  options: HammingOptions = {},
+): number {
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const max = maximum(a, b)
+  const cutoff = distanceCutoffFor('normalizedDistance', options.scoreCutoff, max)
+  const norm = normalize(distance_(a, b, options.pad ?? true, cutoff), max)
+  return normDistCutoff(norm, options.scoreCutoff)
 }
 
 /**
@@ -167,11 +200,12 @@ function hammingDistance_impl(
  * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
  */
 function hammingNormalizedSimilarity_impl(
-  s1: Sequence,
-  s2: Sequence,
+  s1: MaybeSequence,
+  s2: MaybeSequence,
   options: HammingOptions = {},
 ): number {
-  const [a, b] = convPair(s1, s2)
+  if (s1 == null || s2 == null) return 0
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const max = maximum(a, b)
   const cutoff = distanceCutoffFor('normalizedSimilarity', options.scoreCutoff, max)
   const norm = normalize(distance_(a, b, options.pad ?? true, cutoff), max)
@@ -218,12 +252,25 @@ export function hammingOpcodes(
   return hammingEditops(s1, s2, options).toOpcodes()
 }
 
-export const hammingDistance: Scorer<HammingOptions> = /* @__PURE__ */ withPreparedFlags(
-  hammingDistance_impl,
-  DISTANCE_FLAGS,
-  prepareMetric('distance', preparedHammingDistance, maximum, parsedPad),
-)
-export const hammingNormalizedSimilarity: Scorer<HammingOptions> =
+export const hammingDistance: NormalizedScorer<HammingOptions> =
+  /* @__PURE__ */ withPreparedFlags(
+    hammingDistance_impl,
+    DISTANCE_FLAGS,
+    prepareMetric('distance', preparedHammingDistance, maximum, parsedPad),
+  )
+export const hammingSimilarity: NormalizedScorer<HammingOptions> =
+  /* @__PURE__ */ withPreparedFlags(
+    hammingSimilarity_impl,
+    SIMILARITY_FLAGS,
+    prepareMetric('similarity', preparedHammingDistance, maximum, parsedPad),
+  )
+export const hammingNormalizedDistance: NormalizedScorer<HammingOptions> =
+  /* @__PURE__ */ withPreparedFlags(
+    hammingNormalizedDistance_impl,
+    NORMALIZED_DISTANCE_FLAGS,
+    prepareMetric('normalizedDistance', preparedHammingDistance, maximum, parsedPad),
+  )
+export const hammingNormalizedSimilarity: NormalizedScorer<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,

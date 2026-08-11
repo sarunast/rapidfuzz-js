@@ -1,0 +1,1438 @@
+{
+  "rapidfuzzVersion": "3.14.5",
+  "metricCases": [
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0,
+        "similarity": 0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0,
+        "similarity": 3,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 3,
+        "similarity": 4,
+        "normalizedDistance": 0.42857142857142855,
+        "normalizedSimilarity": 0.5714285714285714
+      }
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 3,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 1,
+        "similarity": 1,
+        "normalizedDistance": 0.5,
+        "normalizedSimilarity": 0.5
+      }
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 1,
+        "similarity": 2,
+        "normalizedDistance": 0.3333333333333333,
+        "normalizedSimilarity": 0.6666666666666667
+      }
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 2,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0,
+        "similarity": 0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0,
+        "similarity": 6,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 5,
+        "similarity": 8,
+        "normalizedDistance": 0.38461538461538464,
+        "normalizedSimilarity": 0.6153846153846154
+      }
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 3,
+        "similarity": 2,
+        "normalizedDistance": 0.6,
+        "normalizedSimilarity": 0.4
+      }
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 2,
+        "similarity": 2,
+        "normalizedDistance": 0.5,
+        "normalizedSimilarity": 0.5
+      }
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 2,
+        "similarity": 4,
+        "normalizedDistance": 0.3333333333333333,
+        "normalizedSimilarity": 0.6666666666666667
+      }
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 3,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0,
+        "similarity": 0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0,
+        "similarity": 3,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 3,
+        "similarity": 4,
+        "normalizedDistance": 0.42857142857142855,
+        "normalizedSimilarity": 0.5714285714285714
+      }
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 2,
+        "similarity": 1,
+        "normalizedDistance": 0.6666666666666666,
+        "normalizedSimilarity": 0.33333333333333337
+      }
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 1,
+        "similarity": 1,
+        "normalizedDistance": 0.5,
+        "normalizedSimilarity": 0.5
+      }
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 1,
+        "similarity": 2,
+        "normalizedDistance": 0.3333333333333333,
+        "normalizedSimilarity": 0.6666666666666667
+      }
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 2,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "osa",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0,
+        "similarity": 0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "osa",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0,
+        "similarity": 3,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "osa",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 3,
+        "similarity": 4,
+        "normalizedDistance": 0.42857142857142855,
+        "normalizedSimilarity": 0.5714285714285714
+      }
+    },
+    {
+      "family": "osa",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 3,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "osa",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 1,
+        "similarity": 1,
+        "normalizedDistance": 0.5,
+        "normalizedSimilarity": 0.5
+      }
+    },
+    {
+      "family": "osa",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 1,
+        "similarity": 2,
+        "normalizedDistance": 0.3333333333333333,
+        "normalizedSimilarity": 0.6666666666666667
+      }
+    },
+    {
+      "family": "osa",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 2,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "damerauLevenshtein",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0,
+        "similarity": 0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "damerauLevenshtein",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0,
+        "similarity": 3,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "damerauLevenshtein",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 3,
+        "similarity": 4,
+        "normalizedDistance": 0.42857142857142855,
+        "normalizedSimilarity": 0.5714285714285714
+      }
+    },
+    {
+      "family": "damerauLevenshtein",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 2,
+        "similarity": 1,
+        "normalizedDistance": 0.6666666666666666,
+        "normalizedSimilarity": 0.33333333333333337
+      }
+    },
+    {
+      "family": "damerauLevenshtein",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 1,
+        "similarity": 1,
+        "normalizedDistance": 0.5,
+        "normalizedSimilarity": 0.5
+      }
+    },
+    {
+      "family": "damerauLevenshtein",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 1,
+        "similarity": 2,
+        "normalizedDistance": 0.3333333333333333,
+        "normalizedSimilarity": 0.6666666666666667
+      }
+    },
+    {
+      "family": "damerauLevenshtein",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 2,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0,
+        "similarity": 0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0,
+        "similarity": 3,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 3,
+        "similarity": 4,
+        "normalizedDistance": 0.42857142857142855,
+        "normalizedSimilarity": 0.5714285714285714
+      }
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 3,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 1,
+        "similarity": 1,
+        "normalizedDistance": 0.5,
+        "normalizedSimilarity": 0.5
+      }
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 1,
+        "similarity": 2,
+        "normalizedDistance": 0.3333333333333333,
+        "normalizedSimilarity": 0.6666666666666667
+      }
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 2,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "jaro",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0.0,
+        "similarity": 1.0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "jaro",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0.0,
+        "similarity": 1.0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "jaro",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 0.25396825396825395,
+        "similarity": 0.746031746031746,
+        "normalizedDistance": 0.25396825396825395,
+        "normalizedSimilarity": 0.746031746031746
+      }
+    },
+    {
+      "family": "jaro",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 1.0,
+        "similarity": 0.0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "jaro",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 0.33333333333333337,
+        "similarity": 0.6666666666666666,
+        "normalizedDistance": 0.33333333333333337,
+        "normalizedSimilarity": 0.6666666666666666
+      }
+    },
+    {
+      "family": "jaro",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 0.22222222222222232,
+        "similarity": 0.7777777777777777,
+        "normalizedDistance": 0.22222222222222232,
+        "normalizedSimilarity": 0.7777777777777777
+      }
+    },
+    {
+      "family": "jaro",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 1.0,
+        "similarity": 0.0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "jaroWinkler",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0.0,
+        "similarity": 1.0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "jaroWinkler",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0.0,
+        "similarity": 1.0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "jaroWinkler",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 0.25396825396825395,
+        "similarity": 0.746031746031746,
+        "normalizedDistance": 0.25396825396825395,
+        "normalizedSimilarity": 0.746031746031746
+      }
+    },
+    {
+      "family": "jaroWinkler",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 1.0,
+        "similarity": 0.0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "jaroWinkler",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 0.33333333333333337,
+        "similarity": 0.6666666666666666,
+        "normalizedDistance": 0.33333333333333337,
+        "normalizedSimilarity": 0.6666666666666666
+      }
+    },
+    {
+      "family": "jaroWinkler",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 0.20000000000000007,
+        "similarity": 0.7999999999999999,
+        "normalizedDistance": 0.20000000000000007,
+        "normalizedSimilarity": 0.7999999999999999
+      }
+    },
+    {
+      "family": "jaroWinkler",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 1.0,
+        "similarity": 0.0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "prefix",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0,
+        "similarity": 0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "prefix",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0,
+        "similarity": 3,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "prefix",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 7,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "prefix",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 3,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "prefix",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 1,
+        "similarity": 1,
+        "normalizedDistance": 0.5,
+        "normalizedSimilarity": 0.5
+      }
+    },
+    {
+      "family": "prefix",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 2,
+        "similarity": 1,
+        "normalizedDistance": 0.6666666666666666,
+        "normalizedSimilarity": 0.33333333333333337
+      }
+    },
+    {
+      "family": "prefix",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 2,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "postfix",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "scores": {
+        "distance": 0,
+        "similarity": 0,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "postfix",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "scores": {
+        "distance": 0,
+        "similarity": 3,
+        "normalizedDistance": 0.0,
+        "normalizedSimilarity": 1.0
+      }
+    },
+    {
+      "family": "postfix",
+      "configuration": {},
+      "left": "kitten",
+      "right": "sitting",
+      "scores": {
+        "distance": 7,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "postfix",
+      "configuration": {},
+      "left": "CA",
+      "right": "ABC",
+      "scores": {
+        "distance": 3,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "postfix",
+      "configuration": {},
+      "left": "😀a",
+      "right": "😀b",
+      "scores": {
+        "distance": 2,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "postfix",
+      "configuration": {},
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "scores": {
+        "distance": 2,
+        "similarity": 1,
+        "normalizedDistance": 0.6666666666666666,
+        "normalizedSimilarity": 0.33333333333333337
+      }
+    },
+    {
+      "family": "postfix",
+      "configuration": {},
+      "left": "é",
+      "right": "é",
+      "scores": {
+        "distance": 2,
+        "similarity": 0,
+        "normalizedDistance": 1.0,
+        "normalizedSimilarity": 0.0
+      }
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {
+        "weights": [1, 1, 2]
+      },
+      "left": "lewenstein",
+      "right": "levenshtein",
+      "scores": {
+        "distance": 3,
+        "similarity": 18,
+        "normalizedDistance": 0.14285714285714285,
+        "normalizedSimilarity": 0.8571428571428572
+      }
+    },
+    {
+      "family": "hamming",
+      "configuration": {
+        "pad": false
+      },
+      "left": "karolin",
+      "right": "kathrin",
+      "scores": {
+        "distance": 3,
+        "similarity": 4,
+        "normalizedDistance": 0.42857142857142855,
+        "normalizedSimilarity": 0.5714285714285714
+      }
+    },
+    {
+      "family": "jaroWinkler",
+      "configuration": {
+        "prefixWeight": 0.2
+      },
+      "left": "martha",
+      "right": "marhta",
+      "scores": {
+        "distance": 0.022222222222222143,
+        "similarity": 0.9777777777777779,
+        "normalizedDistance": 0.022222222222222143,
+        "normalizedSimilarity": 0.9777777777777779
+      }
+    }
+  ],
+  "fuzzCases": [
+    {
+      "left": "",
+      "right": "",
+      "scores": {
+        "similarity": 100.0,
+        "partialSimilarity": 100.0,
+        "tokenSortSimilarity": 100.0,
+        "tokenSetSimilarity": 0.0,
+        "tokenSimilarity": 100.0,
+        "partialTokenSortSimilarity": 100.0,
+        "partialTokenSetSimilarity": 0.0,
+        "partialTokenSimilarity": 100.0,
+        "fuzzySimilarity": 0.0
+      }
+    },
+    {
+      "left": "new york mets",
+      "right": "new YORK mets",
+      "scores": {
+        "similarity": 69.23076923076923,
+        "partialSimilarity": 69.23076923076923,
+        "tokenSortSimilarity": 61.53846153846154,
+        "tokenSetSimilarity": 76.19047619047619,
+        "tokenSimilarity": 76.19047619047619,
+        "partialTokenSortSimilarity": 76.19047619047619,
+        "partialTokenSetSimilarity": 100.0,
+        "partialTokenSimilarity": 100.0,
+        "fuzzySimilarity": 72.38095238095238
+      }
+    },
+    {
+      "left": "fuzzy was a bear",
+      "right": "fuzzy fuzzy was a bear",
+      "scores": {
+        "similarity": 84.21052631578947,
+        "partialSimilarity": 100.0,
+        "tokenSortSimilarity": 84.21052631578947,
+        "tokenSetSimilarity": 100.0,
+        "tokenSimilarity": 100.0,
+        "partialTokenSortSimilarity": 89.65517241379311,
+        "partialTokenSetSimilarity": 100.0,
+        "partialTokenSimilarity": 100.0,
+        "fuzzySimilarity": 95.0
+      }
+    },
+    {
+      "left": "alpha beta",
+      "right": "beta alpha",
+      "scores": {
+        "similarity": 50.0,
+        "partialSimilarity": 66.66666666666667,
+        "tokenSortSimilarity": 100.0,
+        "tokenSetSimilarity": 100.0,
+        "tokenSimilarity": 100.0,
+        "partialTokenSortSimilarity": 100.0,
+        "partialTokenSetSimilarity": 100.0,
+        "partialTokenSimilarity": 100.0,
+        "fuzzySimilarity": 95.0
+      }
+    },
+    {
+      "left": "😀 alpha",
+      "right": "alpha 😀",
+      "scores": {
+        "similarity": 71.42857142857143,
+        "partialSimilarity": 83.33333333333334,
+        "tokenSortSimilarity": 100.0,
+        "tokenSetSimilarity": 100.0,
+        "tokenSimilarity": 100.0,
+        "partialTokenSortSimilarity": 100.0,
+        "partialTokenSetSimilarity": 100.0,
+        "partialTokenSimilarity": 100.0,
+        "fuzzySimilarity": 95.0
+      }
+    }
+  ],
+  "normalization": [
+    {
+      "input": "  New YORK Mets!!!  ",
+      "output": "new york mets"
+    },
+    {
+      "input": "Hello 😀 World! 👍🏽",
+      "output": "hello   world"
+    },
+    {
+      "input": "Straße—Zürich",
+      "output": "straße zürich"
+    },
+    {
+      "input": "Already_normalized",
+      "output": "already normalized"
+    },
+    {
+      "input": "!!!",
+      "output": ""
+    },
+    {
+      "input": "",
+      "output": ""
+    }
+  ],
+  "editopsCases": [
+    {
+      "family": "levenshtein",
+      "left": "qabxcd",
+      "right": "abycdf",
+      "editops": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 2
+        },
+        {
+          "tag": "insert",
+          "srcPos": 6,
+          "destPos": 5
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 1,
+          "destStart": 0,
+          "destEnd": 0
+        },
+        {
+          "tag": "equal",
+          "srcStart": 1,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "replace",
+          "srcStart": 3,
+          "srcEnd": 4,
+          "destStart": 2,
+          "destEnd": 3
+        },
+        {
+          "tag": "equal",
+          "srcStart": 4,
+          "srcEnd": 6,
+          "destStart": 3,
+          "destEnd": 5
+        },
+        {
+          "tag": "insert",
+          "srcStart": 6,
+          "srcEnd": 6,
+          "destStart": 5,
+          "destEnd": 6
+        }
+      ]
+    },
+    {
+      "family": "levenshtein",
+      "left": "😀ab",
+      "right": "😀ac",
+      "editops": [
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "replace",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 3
+        }
+      ]
+    },
+    {
+      "family": "indel",
+      "left": "qabxcd",
+      "right": "abycdf",
+      "editops": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 2
+        },
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "insert",
+          "srcPos": 6,
+          "destPos": 5
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 1,
+          "destStart": 0,
+          "destEnd": 0
+        },
+        {
+          "tag": "equal",
+          "srcStart": 1,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 3,
+          "srcEnd": 4,
+          "destStart": 3,
+          "destEnd": 3
+        },
+        {
+          "tag": "equal",
+          "srcStart": 4,
+          "srcEnd": 6,
+          "destStart": 3,
+          "destEnd": 5
+        },
+        {
+          "tag": "insert",
+          "srcStart": 6,
+          "srcEnd": 6,
+          "destStart": 5,
+          "destEnd": 6
+        }
+      ]
+    },
+    {
+      "family": "indel",
+      "left": "😀ab",
+      "right": "😀ac",
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 3
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "insert",
+          "srcStart": 2,
+          "srcEnd": 2,
+          "destStart": 2,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 3
+        }
+      ]
+    },
+    {
+      "family": "lcs",
+      "left": "qabxcd",
+      "right": "abycdf",
+      "editops": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 2
+        },
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "insert",
+          "srcPos": 6,
+          "destPos": 5
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 1,
+          "destStart": 0,
+          "destEnd": 0
+        },
+        {
+          "tag": "equal",
+          "srcStart": 1,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 3,
+          "srcEnd": 4,
+          "destStart": 3,
+          "destEnd": 3
+        },
+        {
+          "tag": "equal",
+          "srcStart": 4,
+          "srcEnd": 6,
+          "destStart": 3,
+          "destEnd": 5
+        },
+        {
+          "tag": "insert",
+          "srcStart": 6,
+          "srcEnd": 6,
+          "destStart": 5,
+          "destEnd": 6
+        }
+      ]
+    },
+    {
+      "family": "lcs",
+      "left": "😀ab",
+      "right": "😀ac",
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 3
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "insert",
+          "srcStart": 2,
+          "srcEnd": 2,
+          "destStart": 2,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 3
+        }
+      ]
+    },
+    {
+      "family": "hamming",
+      "left": "qabxcd",
+      "right": "abycdf",
+      "editops": [
+        {
+          "tag": "replace",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 1
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "replace",
+          "srcPos": 4,
+          "destPos": 4
+        },
+        {
+          "tag": "replace",
+          "srcPos": 5,
+          "destPos": 5
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "replace",
+          "srcStart": 0,
+          "srcEnd": 6,
+          "destStart": 0,
+          "destEnd": 6
+        }
+      ]
+    },
+    {
+      "family": "hamming",
+      "left": "😀ab",
+      "right": "😀ac",
+      "editops": [
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "replace",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 3
+        }
+      ]
+    }
+  ],
+  "search": {
+    "query": "new york mets",
+    "choices": [
+      "new york mets",
+      "new york jets",
+      "the mets from new york",
+      "atlanta braves",
+      "new york mets"
+    ],
+    "threshold": 60,
+    "iter": [
+      {
+        "item": "new york mets",
+        "score": 100.0,
+        "key": 0
+      },
+      {
+        "item": "new york jets",
+        "score": 92.3076923076923,
+        "key": 1
+      },
+      {
+        "item": "new york mets",
+        "score": 100.0,
+        "key": 4
+      }
+    ],
+    "best": {
+      "item": "new york mets",
+      "score": 100.0,
+      "key": 0
+    },
+    "top": [
+      {
+        "item": "new york mets",
+        "score": 100.0,
+        "key": 0
+      },
+      {
+        "item": "new york mets",
+        "score": 100.0,
+        "key": 4
+      },
+      {
+        "item": "new york jets",
+        "score": 92.3076923076923,
+        "key": 1
+      }
+    ]
+  },
+  "batch": {
+    "queries": ["kitten", "abc", "😀a"],
+    "choices": ["sitting", "axc", "😀b"],
+    "matrixChoices": ["sitting", "kitten", "axc", "😀b"],
+    "threshold": 0.5,
+    "scoreMultiplier": 100,
+    "pairs": [57, 67, 50],
+    "matrix": [
+      [57, 100, 0, 0],
+      [0, 0, 67, 0],
+      [0, 0, 0, 50]
+    ]
+  }
+}

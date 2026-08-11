@@ -19,6 +19,7 @@ import type {
   Items,
   Matcher,
   MatcherOptions,
+  SearchIterOptions,
   SearchOptions,
 } from './types.js'
 
@@ -74,13 +75,24 @@ export function createMatcher<T, D extends Direction>(
   }
   const stored: StoredItem<T, unknown>[] = []
   const readSequence = sequenceReader(stableOptions, true)
-  for (const entry of collectionEntries(items)) {
-    const sequence = readSequence(entry.item)
-    if (sequence !== null) {
-      stored.push({
-        ...entry,
-        prepared: compilation.prepareChoice(sequence),
-      })
+  if (Array.isArray(items)) {
+    for (let key = 0; key < items.length; key++) {
+      const item = items[key]
+      const sequence = readSequence(item)
+      if (sequence !== null) {
+        stored.push({ item, key, prepared: compilation.prepareChoice(sequence) })
+      }
+    }
+  } else {
+    for (const entry of collectionEntries(items)) {
+      const sequence = readSequence(entry.item)
+      if (sequence !== null) {
+        stored.push({
+          item: entry.item,
+          key: entry.key,
+          prepared: compilation.prepareChoice(sequence),
+        })
+      }
     }
   }
 
@@ -144,10 +156,53 @@ export function createMatcher<T, D extends Direction>(
       ? topSimilarity(stored, score, activeThreshold, limit, optimal)
       : topDistance(stored, score, activeThreshold, limit, optimal)
   }
+  const searchIter = (
+    query: MaybeSequence,
+    call?: SearchIterOptions,
+  ): IterableIterator<Match<T, unknown>> => {
+    function* iterate(): Generator<Match<T, unknown>> {
+      const threshold = optionalThreshold(call?.threshold)
+      const normalized = normalizeQuery(query, normalize)
+      if (normalized === null) {
+        const missingScore = compilation.score(query, '', threshold)
+        if (threshold !== null && missingScore < threshold) return
+        for (let index = 0; index < stored.length; index++) {
+          const entry = stored[index]
+          yield { item: entry.item, key: entry.key, score: missingScore }
+        }
+        return
+      }
+      if (
+        compilation.trusted &&
+        impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
+      ) {
+        return
+      }
+      const activeThreshold = compilation.trusted
+        ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
+        : threshold
+      const score = compilation.prepareQuery(normalized)
+      for (let index = 0; index < stored.length; index++) {
+        const entry = stored[index]
+        const value = score(entry.prepared, activeThreshold)
+        if (
+          threshold === null ||
+          (compilation.direction === 'similarity'
+            ? value >= threshold
+            : value <= threshold)
+        ) {
+          yield { item: entry.item, key: entry.key, score: value }
+        }
+      }
+    }
+
+    return iterate()
+  }
   return Object.freeze({
     size: stored.length,
     scorer,
     best,
     search,
+    searchIter,
   })
 }

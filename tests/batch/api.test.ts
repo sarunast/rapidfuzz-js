@@ -11,7 +11,7 @@ import { createScorer, scoreMatrix, scorePairs } from '../../src/index.js'
 
 describe('batch scoring', () => {
   test('matrix operations consume Scorer objects', () => {
-    const normalized = createScorer(levenshtein.similarity)
+    const normalized = createScorer(levenshtein.normalizedSimilarity)
     expect(scoreMatrix(['a', 'b'], ['a', 'c'], { scorer: normalized }).toArray()).toEqual(
       [
         [1, 0],
@@ -84,7 +84,7 @@ describe('batch scoring', () => {
     ])
     expect(calls).toBe(6)
 
-    const builtIn = createScorer(levenshtein.similarity)
+    const builtIn = createScorer(levenshtein.normalizedSimilarity)
     const compilation = scorerCompilation(builtIn)
     const prepareChoice = vi.spyOn(compilation, 'prepareChoice')
     const prepareQuery = vi.spyOn(compilation, 'prepareQuery')
@@ -94,7 +94,7 @@ describe('batch scoring', () => {
   })
 
   test('scores pairs through the raw pair kernel and normalizes each input once', () => {
-    const scorer = createScorer(levenshtein.similarity)
+    const scorer = createScorer(levenshtein.normalizedSimilarity)
     const compilation = scorerCompilation(scorer)
     const rawScore = vi.spyOn(compilation, 'rawScore')
     const prepareChoice = vi.spyOn(compilation, 'prepareChoice')
@@ -126,7 +126,7 @@ describe('batch scoring', () => {
   })
 
   test('normalizes a shared symmetric matrix only once per sequence', () => {
-    const scorer = createScorer(levenshtein.similarity)
+    const scorer = createScorer(levenshtein.normalizedSimilarity)
     const values = ['A', 'B']
     let calls = 0
     const matrix = scoreMatrix(values, values, {
@@ -144,5 +144,81 @@ describe('batch scoring', () => {
     expect(() =>
       scoreMatrix(['a'], ['a'], { scorer, normalize: () => undefined }),
     ).toThrow(TypeError)
+  })
+
+  test('applies natural-scale thresholds before explicit score multiplication', () => {
+    const scorer = createScorer(levenshtein.normalizedSimilarity)
+    expect(
+      Array.from(
+        scorePairs(['kitten', 'abc'], ['sitting', 'axc'], {
+          scorer,
+          threshold: 0.6,
+          scoreMultiplier: 100,
+          into: 'u8',
+        }),
+      ),
+    ).toEqual([0, 67])
+    expect(
+      scoreMatrix(['kitten'], ['sitting', 'kitten'], {
+        scorer,
+        threshold: 0.6,
+        scoreMultiplier: 100,
+        into: 'u8',
+      }).toArray(),
+    ).toEqual([[0, 100]])
+
+    const custom = createScorer((left, right) => (left === right ? 0.75 : 0.25), {
+      direction: 'similarity',
+      bounds: [0, 1],
+      symmetric: true,
+    })
+    expect(
+      Array.from(
+        scorePairs(['a', 'a'], ['a', 'b'], {
+          scorer: custom,
+          threshold: 0.5,
+          scoreMultiplier: -2,
+          into: 'i8',
+        }),
+      ),
+    ).toEqual([-2, 0])
+    expect(
+      scoreMatrix(['a'], ['a', 'b'], {
+        scorer: custom,
+        threshold: 0.5,
+      }).toArray(),
+    ).toEqual([[0.75, 0]])
+
+    const customDistance = createScorer((left, right) => (left === right ? 0 : 2), {
+      direction: 'distance',
+      bounds: [0, 3],
+      symmetric: true,
+    })
+    expect(
+      Array.from(
+        scorePairs(['a', 'a'], ['a', 'b'], {
+          scorer: customDistance,
+          threshold: 1,
+        }),
+      ),
+    ).toEqual([0, 3])
+    expect(
+      scoreMatrix(['a'], ['a', 'b'], {
+        scorer: customDistance,
+        threshold: 1,
+      }).toArray(),
+    ).toEqual([[0, 3]])
+
+    for (const scoreMultiplier of [Number.NaN, Infinity, -Infinity]) {
+      expect(() => scorePairs(['a'], ['a'], { scorer, scoreMultiplier })).toThrow(
+        RangeError,
+      )
+      expect(() => scoreMatrix(['a'], ['a'], { scorer, scoreMultiplier })).toThrow(
+        RangeError,
+      )
+    }
+    expect(() => scorePairs(['a'], ['a'], { scorer, threshold: Infinity })).toThrow(
+      RangeError,
+    )
   })
 })

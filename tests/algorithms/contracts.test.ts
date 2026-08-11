@@ -2,36 +2,42 @@ import { describe, expect, it } from 'vitest'
 
 import {
   distance as damerauDistance,
-  similarity as damerauSimilarity,
+  normalizedSimilarity as damerauNormalizedSimilarity,
 } from '../../src/algorithms/damerauLevenshtein/index.js'
 import {
   distance as hammingDistance,
+  normalizedSimilarity as hammingNormalizedSimilarity,
   similarity as hammingSimilarity,
 } from '../../src/algorithms/hamming/index.js'
 import {
   distance as indelDistance,
+  normalizedSimilarity as indelNormalizedSimilarity,
   similarity as indelSimilarity,
 } from '../../src/algorithms/indel/index.js'
-import { similarity as jaroSimilarity } from '../../src/algorithms/jaro/index.js'
-import { similarity as jaroWinklerSimilarity } from '../../src/algorithms/jaroWinkler/index.js'
+import { normalizedSimilarity as jaroNormalizedSimilarity } from '../../src/algorithms/jaro/index.js'
+import { normalizedSimilarity as jaroWinklerNormalizedSimilarity } from '../../src/algorithms/jaroWinkler/index.js'
 import {
   distance as lcsDistance,
+  normalizedSimilarity as lcsNormalizedSimilarity,
   similarity as lcsSimilarity,
 } from '../../src/algorithms/lcs/index.js'
 import {
   distance as levenshteinDistance,
+  normalizedSimilarity as levenshteinNormalizedSimilarity,
   similarity as levenshteinSimilarity,
 } from '../../src/algorithms/levenshtein/index.js'
 import {
   distance as osaDistance,
-  similarity as osaSimilarity,
+  normalizedSimilarity as osaNormalizedSimilarity,
 } from '../../src/algorithms/osa/index.js'
 import {
   distance as postfixDistance,
+  normalizedSimilarity as postfixNormalizedSimilarity,
   similarity as postfixSimilarity,
 } from '../../src/algorithms/postfix/index.js'
 import {
   distance as prefixDistance,
+  normalizedSimilarity as prefixNormalizedSimilarity,
   similarity as prefixSimilarity,
 } from '../../src/algorithms/prefix/index.js'
 import { createScorer } from '../../src/core/scorer.js'
@@ -41,17 +47,17 @@ import { callUntyped } from '../support/common.js'
 type SimilarityMetric = (a: MaybeSequence, b: MaybeSequence) => number
 type DistanceMetric = (a: MaybeSequence, b: MaybeSequence) => number
 
-const SIMILARITIES: ReadonlyArray<readonly [string, SimilarityMetric]> = [
-  ['Damerau-Levenshtein', damerauSimilarity],
-  ['Hamming', hammingSimilarity],
-  ['Indel', indelSimilarity],
-  ['Jaro', jaroSimilarity],
-  ['Jaro-Winkler', jaroWinklerSimilarity],
-  ['LCS', lcsSimilarity],
-  ['Levenshtein', levenshteinSimilarity],
-  ['OSA', osaSimilarity],
-  ['Postfix', postfixSimilarity],
-  ['Prefix', prefixSimilarity],
+const NORMALIZED_SIMILARITIES: ReadonlyArray<readonly [string, SimilarityMetric]> = [
+  ['Damerau-Levenshtein', damerauNormalizedSimilarity],
+  ['Hamming', hammingNormalizedSimilarity],
+  ['Indel', indelNormalizedSimilarity],
+  ['Jaro', jaroNormalizedSimilarity],
+  ['Jaro-Winkler', jaroWinklerNormalizedSimilarity],
+  ['LCS', lcsNormalizedSimilarity],
+  ['Levenshtein', levenshteinNormalizedSimilarity],
+  ['OSA', osaNormalizedSimilarity],
+  ['Postfix', postfixNormalizedSimilarity],
+  ['Prefix', prefixNormalizedSimilarity],
 ]
 
 const DISTANCES: ReadonlyArray<readonly [string, DistanceMetric]> = [
@@ -67,7 +73,7 @@ const DISTANCES: ReadonlyArray<readonly [string, DistanceMetric]> = [
 
 describe('canonical algorithm scales', () => {
   it('keeps normalized similarities in zero to one', () => {
-    for (const [name, similarity] of SIMILARITIES) {
+    for (const [name, similarity] of NORMALIZED_SIMILARITIES) {
       expect(similarity('', ''), `${name}: empty identity`).toBe(1)
       const score = similarity('South Korea', 'North Korea')
       expect(score, name).toBeGreaterThanOrEqual(0)
@@ -87,20 +93,25 @@ describe('canonical algorithm scales', () => {
     expect(postfixDistance('abcd', 'eebcd')).toBe(2)
   })
 
-  it('uses normalized similarity rather than maximum-minus-distance', () => {
-    expect(levenshteinSimilarity('abc', 'axc')).toBeCloseTo(2 / 3, 12)
-    expect(lcsSimilarity('abc', 'axc')).toBeCloseTo(2 / 3, 12)
-    expect(indelSimilarity('abc', 'axc')).toBeCloseTo(2 / 3, 12)
-    expect(prefixSimilarity('abcd', 'abxy')).toBe(0.5)
-    expect(postfixSimilarity('xycd', 'abcd')).toBe(0.5)
+  it('keeps raw and normalized similarity distinct', () => {
+    expect(levenshteinSimilarity('abc', 'axc')).toBe(2)
+    expect(lcsSimilarity('abc', 'axc')).toBe(2)
+    expect(indelSimilarity('abc', 'axc')).toBe(4)
+    expect(prefixSimilarity('abcd', 'abxy')).toBe(2)
+    expect(postfixSimilarity('xycd', 'abcd')).toBe(2)
+    expect(levenshteinNormalizedSimilarity('abc', 'axc')).toBeCloseTo(2 / 3, 12)
   })
 })
 
 describe('canonical sequence handling', () => {
   it('treats compatible missing similarities as zero', () => {
-    for (const [name, similarity] of SIMILARITIES) {
+    for (const [name, similarity] of NORMALIZED_SIMILARITIES) {
       expect(similarity(null, 'test'), name).toBe(0)
       expect(similarity('test', undefined), name).toBe(0)
+    }
+    for (const similarity of [hammingSimilarity, prefixSimilarity, postfixSimilarity]) {
+      expect(similarity(null, 'test')).toBe(0)
+      expect(similarity('test', undefined)).toBe(0)
     }
   })
 
@@ -115,7 +126,7 @@ describe('canonical sequence handling', () => {
     const text = 'the wonderful new york mets'
     const characters = Array.from(text)
     const bytes = new TextEncoder().encode(text)
-    for (const [name, similarity] of SIMILARITIES) {
+    for (const [name, similarity] of NORMALIZED_SIMILARITIES) {
       expect(similarity(characters, characters), `${name}: arrays`).toBe(1)
       expect(similarity(text, characters), `${name}: mixed`).toBe(1)
       expect(similarity(bytes, bytes), `${name}: typed arrays`).toBe(1)
@@ -137,14 +148,14 @@ describe('canonical scorer thresholds', () => {
   })
 
   it('uses normalized similarity thresholds', () => {
-    const scorer = createScorer(levenshteinSimilarity)
+    const scorer = createScorer(levenshteinNormalizedSimilarity)
     const exact = scorer.score('abc', 'axc')
     expect(scorer.score('abc', 'axc', { threshold: 2 / 3 })).toBe(exact)
     expect(scorer.score('abc', 'axc', { threshold: 0.7 })).toBeUndefined()
   })
 
   it('validates thresholds once at the scorer boundary', () => {
-    const scorer = createScorer(jaroSimilarity)
+    const scorer = createScorer(jaroNormalizedSimilarity)
     for (const threshold of [Number.NaN, Infinity, -Infinity]) {
       expect(() => scorer.score('abc', 'abd', { threshold })).toThrow(RangeError)
     }

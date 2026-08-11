@@ -22,6 +22,9 @@ import {
 
 interface BuiltInMetricOptions<D extends Direction, Config extends object> {
   readonly implementation: PreparedErasedScorer
+  readonly directImplementation?:
+    | ((a: MaybeSequence, b: MaybeSequence) => number)
+    | undefined
   readonly direction: D
   readonly bounds: readonly [number, number]
   readonly configurationKeys?: readonly string[] | undefined
@@ -63,18 +66,20 @@ export function builtInMetric<D extends Direction, Config extends object>(
   // Keep this as a normal direct call: `Reflect.apply` measured 5-7% slower
   // over short-string comparisons.
   const implementation = options.implementation
-  const direct = (a: MaybeSequence, b: MaybeSequence): number => {
-    if (a == null || b == null) {
-      if (options.direction === 'similarity') return 0
-      throw new TypeError('missing sequences are not supported by this scorer')
-    }
-    // Keep the direct Metric path allocation-free. `validatePair` returns a
-    // tuple for generic callers; constructing that tuple for every short-string
-    // comparison was more expensive than the validation itself.
-    if (typeof a !== 'string') validateSequence(a)
-    if (typeof b !== 'string') validateSequence(b)
-    return implementation(a, b)
-  }
+  const direct =
+    options.directImplementation ??
+    ((a: MaybeSequence, b: MaybeSequence): number => {
+      if (a == null || b == null) {
+        if (options.direction === 'similarity') return 0
+        throw new TypeError('missing sequences are not supported by this scorer')
+      }
+      // Keep the direct Metric path allocation-free. `validatePair` returns a
+      // tuple for generic callers; constructing that tuple for every short-string
+      // comparison was more expensive than the validation itself.
+      if (typeof a !== 'string') validateSequence(a)
+      if (typeof b !== 'string') validateSequence(b)
+      return implementation(a, b)
+    })
   const compile = (given: Config | undefined): MetricCompilation<D> => {
     const canonical: object =
       given === undefined ? {} : (options.canonicalize?.(given) ?? given)

@@ -8,7 +8,8 @@ export function bestSimilarity<T, K>(
 ): DriverMatch<T, K> | undefined {
   let found: DriverMatch<T, K> | undefined
   let cutoff = threshold
-  for (const entry of items) {
+  for (let index = 0; index < items.length; index++) {
+    const entry = items[index]
     const value = score(entry.prepared, cutoff)
     if (threshold !== null && value < threshold) continue
     if (found === undefined || value > found.score) {

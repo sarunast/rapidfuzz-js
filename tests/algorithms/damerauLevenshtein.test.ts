@@ -54,8 +54,8 @@ it('rejects a generic sequence after the full bounded matrix', () => {
 })
 
 it('applies normalized similarity thresholds to direct scoring', () => {
-  expect(DamerauLevenshtein.similarity('abcd', 'abce')).toBe(0.75)
+  expect(DamerauLevenshtein.normalizedSimilarity('abcd', 'abce')).toBe(0.75)
   expect(
-    DamerauLevenshtein.similarity('abcd', 'abce', { threshold: 0.8 }),
+    DamerauLevenshtein.normalizedSimilarity('abcd', 'abce', { threshold: 0.8 }),
   ).toBeUndefined()
 })

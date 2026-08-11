@@ -5,7 +5,9 @@ import {
   hasSurrogatePair,
   isSequence,
   normalize,
+  normDistCutoff,
   normSimCutoff,
+  simCutoff,
   type Sequence,
 } from '../../shared/scorerSupport.js'
 import type {
@@ -430,6 +432,46 @@ export function levenshteinDistanceImpl(
   const hint = options?.scoreHint ?? bound
   const distance = distance_(a, b, weights, bound, hint)
   return cutoff === null || distance <= cutoff ? distance : cutoff + 1
+}
+
+/** Maximum possible weighted distance minus the actual distance. */
+export function levenshteinSimilarityImpl(
+  s1: Sequence,
+  s2: Sequence,
+  options: LevenshteinOptions = {},
+): number {
+  const weights = parseWeights(options.weights)
+  const integral = integralWeights(weights)
+  const [a, b] = convPair(s1, s2)
+  const max = maximum(a, b, weights)
+  const cutoff = levenshteinRawCutoff(options.scoreCutoff, integral)
+  const bound =
+    cutoff === null ? Number.MAX_SAFE_INTEGER : rawBound(max - cutoff, integral)
+  const hint =
+    options.scoreHint == null ? bound : rawBound(max - options.scoreHint, integral)
+  return simCutoff(max - distance_(a, b, weights, bound, hint), cutoff)
+}
+
+/** Weighted Levenshtein distance normalised into `[0, 1]`. */
+export function levenshteinNormalizedDistanceImpl(
+  s1: Sequence,
+  s2: Sequence,
+  options: LevenshteinOptions = {},
+): number {
+  const weights = parseWeights(options.weights)
+  const integral = integralWeights(weights)
+  const [a, b] = convPair(s1, s2)
+  const max = maximum(a, b, weights)
+  const cutoff =
+    options.scoreCutoff == null
+      ? Number.MAX_SAFE_INTEGER
+      : rawBound(options.scoreCutoff * max, integral)
+  const hint =
+    options.scoreHint == null ? cutoff : rawBound(options.scoreHint * max, integral)
+  return normDistCutoff(
+    normalize(distance_(a, b, weights, cutoff, hint), max),
+    options.scoreCutoff,
+  )
 }
 
 /**

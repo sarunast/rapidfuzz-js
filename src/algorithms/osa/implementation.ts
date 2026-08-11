@@ -7,11 +7,15 @@ import {
   distanceCutoffFor,
   distCutoff,
   normalize,
+  normDistCutoff,
   normSimCutoff,
+  simCutoff,
   type ScorerOptions,
   type Sequence,
   DISTANCE_FLAGS,
+  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
+  SIMILARITY_FLAGS,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
@@ -102,6 +106,28 @@ function osaDistance_impl(
   return distCutoff(distance_(a, b, cutoff), options.scoreCutoff)
 }
 
+function osaSimilarity_impl(
+  s1: Sequence,
+  s2: Sequence,
+  options: ScorerOptions = {},
+): number {
+  const [a, b] = convPair(s1, s2)
+  const max = maximum(a, b)
+  const cutoff = distanceCutoffFor('similarity', options.scoreCutoff, max)
+  return simCutoff(max - distance_(a, b, cutoff), options.scoreCutoff)
+}
+
+function osaNormalizedDistance_impl(
+  s1: Sequence,
+  s2: Sequence,
+  options: ScorerOptions = {},
+): number {
+  const [a, b] = convPair(s1, s2)
+  const max = maximum(a, b)
+  const cutoff = distanceCutoffFor('normalizedDistance', options.scoreCutoff, max)
+  return normDistCutoff(normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
+}
+
 /**
  * OSA similarity normalised into `[0, 1]`, where `1` means identical.
  *
@@ -118,7 +144,11 @@ function osaNormalizedSimilarity_impl(
   return normSimCutoff(1 - normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
 }
 
-type PreparedOsaKind = 'distance' | 'normalizedSimilarity'
+type PreparedOsaKind =
+  | 'distance'
+  | 'similarity'
+  | 'normalizedDistance'
+  | 'normalizedSimilarity'
 
 function prepareOsa(kind: PreparedOsaKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
@@ -150,6 +180,10 @@ function prepareOsa(kind: PreparedOsaKind): PreparedScorerFactory {
       switch (kind) {
         case 'distance':
           return distCutoff(distance, rawCutoff)
+        case 'similarity':
+          return simCutoff(max - distance, rawCutoff)
+        case 'normalizedDistance':
+          return normDistCutoff(normalize(distance, max), rawCutoff)
         case 'normalizedSimilarity':
           return normSimCutoff(1 - normalize(distance, max), rawCutoff)
       }
@@ -163,6 +197,16 @@ export const osaDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
   osaDistance_impl,
   DISTANCE_FLAGS,
   prepareOsa('distance'),
+)
+export const osaSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
+  osaSimilarity_impl,
+  SIMILARITY_FLAGS,
+  prepareOsa('similarity'),
+)
+export const osaNormalizedDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
+  osaNormalizedDistance_impl,
+  NORMALIZED_DISTANCE_FLAGS,
+  prepareOsa('normalizedDistance'),
 )
 export const osaNormalizedSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
   osaNormalizedSimilarity_impl,

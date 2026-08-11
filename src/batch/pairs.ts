@@ -1,6 +1,8 @@
 import { scorerCompilation } from '../core/scorer.js'
 import { validateSequence } from '../core/sequence.js'
+import { qualifies } from '../core/threshold.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
+import { resolveBatchOptions } from './options.js'
 import {
   allocateScores,
   roundHalfAwayFromZero,
@@ -44,13 +46,28 @@ export function scorePairs<D extends Direction>(
   const scores = allocateScores(kind, queries.length, 'scorePairs')
   const integral = kind !== 'f64' && kind !== 'f32'
   const compilation = scorerCompilation(options.scorer)
+  const { threshold, multiplier } = resolveBatchOptions(
+    options.threshold,
+    options.scoreMultiplier,
+  )
+  const store = (score: number): number => {
+    const thresholded =
+      compilation.trusted ||
+      threshold === null ||
+      qualifies(compilation.direction, score, threshold)
+        ? score
+        : compilation.direction === 'similarity'
+          ? compilation.bounds[0]
+          : compilation.bounds[1]
+    const scaled = thresholded * multiplier
+    return integral ? roundHalfAwayFromZero(scaled) : scaled
+  }
   const sameInput = Object.is(queries, choices)
   if (options.normalize === undefined) {
     for (let i = 0; i < queries.length; i++) {
       const query = validateSequence(queries[i])
       const choice = sameInput ? query : validateSequence(choices[i])
-      const score = compilation.rawScore(query, choice, null)
-      scores[i] = integral ? roundHalfAwayFromZero(score) : score
+      scores[i] = store(compilation.rawScore(query, choice, threshold))
     }
     return scores
   }
@@ -59,8 +76,9 @@ export function scorePairs<D extends Direction>(
     ? normalizedQueries
     : normalizeInputs(choices, options.normalize)
   for (let i = 0; i < normalizedQueries.length; i++) {
-    const score = compilation.rawScore(normalizedQueries[i], normalizedChoices[i], null)
-    scores[i] = integral ? roundHalfAwayFromZero(score) : score
+    scores[i] = store(
+      compilation.rawScore(normalizedQueries[i], normalizedChoices[i], threshold),
+    )
   }
   return scores
 }

@@ -1,6 +1,8 @@
 import {
   DISTANCE_FLAGS,
+  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
+  SIMILARITY_FLAGS,
   withPreparedFlags,
   type ConfigurationCanonicalizer,
   type ConfigurationFlagsResolver,
@@ -10,7 +12,9 @@ import {
 import {
   levenshteinCosts,
   levenshteinDistanceImpl,
+  levenshteinNormalizedDistanceImpl,
   levenshteinNormalizedSimilarityImpl,
+  levenshteinSimilarityImpl,
 } from './internal/engine.js'
 import { prepareLevenshtein } from './prepare.js'
 import type { LevenshteinOptions } from './types.js'
@@ -69,6 +73,29 @@ export const levenshteinDistance: Scorer<LevenshteinOptions> =
     {
       configurationFlags:
         /* @__PURE__ */ levenshteinConfigurationFlagsResolver(DISTANCE_FLAGS),
+      configurationCanonicalizer: levenshteinConfigurationCanonicalizer,
+    },
+  )
+export const levenshteinSimilarity: Scorer<LevenshteinOptions> =
+  /* @__PURE__ */ withPreparedFlags(
+    levenshteinSimilarityImpl,
+    SIMILARITY_FLAGS,
+    prepareLevenshtein('similarity'),
+    {
+      configurationFlags:
+        /* @__PURE__ */ levenshteinConfigurationFlagsResolver(SIMILARITY_FLAGS),
+      configurationCanonicalizer: levenshteinConfigurationCanonicalizer,
+    },
+  )
+export const levenshteinNormalizedDistance: Scorer<LevenshteinOptions> =
+  /* @__PURE__ */ withPreparedFlags(
+    levenshteinNormalizedDistanceImpl,
+    NORMALIZED_DISTANCE_FLAGS,
+    prepareLevenshtein('normalizedDistance'),
+    {
+      configurationFlags: /* @__PURE__ */ levenshteinConfigurationFlagsResolver(
+        NORMALIZED_DISTANCE_FLAGS,
+      ),
       configurationCanonicalizer: levenshteinConfigurationCanonicalizer,
     },
   )

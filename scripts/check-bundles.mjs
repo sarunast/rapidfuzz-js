@@ -11,14 +11,21 @@ const output = mkdtempSync(join(tmpdir(), 'rapidfuzz-bundles-'))
 
 /** Accepted deterministic gzip sizes plus 2% headroom. */
 const budgets = {
-  'direct-fuzz.js': 6_038,
-  'direct-token-sort.js': 6_068,
-  'compiled-fuzz.js': 6_629,
+  'direct-fuzz.js': 5_987,
+  'direct-token-sort.js': 6_097,
+  'compiled-fuzz.js': 6_747,
   'compiled-token-sort.js': 6_847,
+  'direct-normalized-edit.js': 9_880,
+  'compiled-normalized-edit.js': 10_613,
+  'direct-raw-distance.js': 9_892,
+  'compiled-raw-distance.js': 10_624,
   'one-shot.js': 7_506,
-  'matcher-token-sort.js': 8_193,
-  'full-fuzz.js': 10_218,
-  'all-subpaths.js': 25_384,
+  'one-shot-iter.js': 7_433,
+  'matcher-token-sort.js': 8_347,
+  'score-matrix.js': 11_465,
+  'score-pairs.js': 11_283,
+  'full-fuzz.js': 10_138,
+  'all-subpaths.js': 26_371,
 }
 
 try {

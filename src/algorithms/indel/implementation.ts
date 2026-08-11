@@ -14,11 +14,15 @@ import {
   convPair,
   distCutoff,
   normalize,
+  normDistCutoff,
   normSimCutoff,
+  simCutoff,
   type ScorerOptions,
   type Sequence,
   DISTANCE_FLAGS,
+  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
+  SIMILARITY_FLAGS,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
@@ -108,6 +112,30 @@ function indelDistance_impl(
   return distCutoff(distance_(a, b, cutoff ?? UNBOUNDED_MISSES), cutoff)
 }
 
+function indelSimilarity_impl(
+  s1: Sequence,
+  s2: Sequence,
+  options: ScorerOptions = {},
+): number {
+  const [a, b] = convPair(s1, s2)
+  const max = maximum(a, b)
+  const cutoff = canonicalRawCutoff(options.scoreCutoff)
+  const misses = cutoff == null ? UNBOUNDED_MISSES : max - cutoff
+  return simCutoff(max - distance_(a, b, misses), cutoff)
+}
+
+function indelNormalizedDistance_impl(
+  s1: Sequence,
+  s2: Sequence,
+  options: ScorerOptions = {},
+): number {
+  const [a, b] = convPair(s1, s2)
+  const max = maximum(a, b)
+  const cutoff =
+    options.scoreCutoff == null ? UNBOUNDED_MISSES : options.scoreCutoff * max
+  return normDistCutoff(normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
+}
+
 /**
  * Indel similarity normalised into `[0, 1]`, where `1` means identical.
  * Two empty inputs are defined as identical.
@@ -140,7 +168,11 @@ export function indelOpcodes(s1: Sequence, s2: Sequence): Opcodes {
   return lcsSeqEditops(s1, s2).toOpcodes()
 }
 
-type PreparedIndelKind = 'distance' | 'normalizedSimilarity'
+type PreparedIndelKind =
+  | 'distance'
+  | 'similarity'
+  | 'normalizedDistance'
+  | 'normalizedSimilarity'
 
 function prepareIndel(kind: PreparedIndelKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
@@ -165,6 +197,15 @@ function prepareIndel(kind: PreparedIndelKind): PreparedScorerFactory {
           const cutoff = canonicalRawCutoff(rawCutoff)
           return distCutoff(preparedDistance(b, cutoff ?? UNBOUNDED_MISSES), cutoff)
         }
+        case 'similarity': {
+          const cutoff = canonicalRawCutoff(rawCutoff)
+          const misses = cutoff === null ? UNBOUNDED_MISSES : max - cutoff
+          return simCutoff(max - preparedDistance(b, misses), cutoff)
+        }
+        case 'normalizedDistance': {
+          const cutoff = rawCutoff === null ? UNBOUNDED_MISSES : rawCutoff * max
+          return normDistCutoff(normalize(preparedDistance(b, cutoff), max), rawCutoff)
+        }
         case 'normalizedSimilarity': {
           const cutoff = rawCutoff === null ? UNBOUNDED_MISSES : (1 - rawCutoff) * max
           return normSimCutoff(1 - normalize(preparedDistance(b, cutoff), max), rawCutoff)
@@ -180,6 +221,16 @@ export const indelDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
   indelDistance_impl,
   DISTANCE_FLAGS,
   prepareIndel('distance'),
+)
+export const indelSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
+  indelSimilarity_impl,
+  SIMILARITY_FLAGS,
+  prepareIndel('similarity'),
+)
+export const indelNormalizedDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
+  indelNormalizedDistance_impl,
+  NORMALIZED_DISTANCE_FLAGS,
+  prepareIndel('normalizedDistance'),
 )
 export const indelNormalizedSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
   indelNormalizedSimilarity_impl,

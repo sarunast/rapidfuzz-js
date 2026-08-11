@@ -13,6 +13,8 @@ Practical consequences:
 - **The Python implementation is the algorithm spec.** When numeric behaviour is
   unclear, read the reference `src/rapidfuzz/**/*_py.py`. Preserve its edge cases
   and adaptive fuzzy weighting while expressing them through this package's API.
+- `normalizeText` follows the installed RapidFuzz `utils.default_process`
+  behavior, including treating underscore as non-alphanumeric.
 - **Tests are ported from RapidFuzz's own suite**, under `tests/`, with a header
   comment naming the source file. Port the assertions faithfully, including the
   regression tests named after upstream issue numbers — those numbers are the
@@ -20,8 +22,9 @@ Practical consequences:
   can express.
 - **Naming is camelCase**, but public names describe this API: `similarity`,
   `partialSimilarity`, `fuzzySimilarity`, `createScorer`, and `createMatcher`.
-  Do not restore removed RapidFuzz aliases such as `WRatio`, `QRatio`, or
-  `extractOne`.
+  Preserve mathematical and functional RapidFuzz capability
+  while replacing Python-specific mechanics. Do not restore legacy spellings
+  such as `WRatio`, `QRatio`, or `extractOne`.
 - **Correctness before speed.** Where upstream uses a bit-parallel or SIMD
   implementation, a straightforward DP that produces identical results is
   acceptable; optimise later, behind the ported tests.
@@ -128,10 +131,10 @@ scoring, threshold helpers, and text normalization. Algorithms are imported
 from canonical subpaths such as `rapidfuzz-js/levenshtein` and
 `rapidfuzz-js/fuzz`; never re-export them from the root.
 
-Preserve each algorithm's natural scale. Fuzz similarities return `0..100`,
-normalized algorithm similarities and Jaro-family similarities return `0..1`,
-and distances remain in native edit/count units. Generic infrastructure must
-not rescale between families.
+Preserve each algorithm operation's RapidFuzz scale. Fuzz similarities return
+`0..100`; raw edit/count distances and similarities use native units;
+normalized distances and similarities return `0..1`; Jaro-family measures are
+naturally `0..1`. Generic infrastructure must not rescale between families.
 
 Source ownership follows dependency direction:
 

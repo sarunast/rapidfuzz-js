@@ -22,8 +22,8 @@ it('applies native distance thresholds (issue 196)', () => {
 })
 
 it('applies normalized similarity thresholds to direct scoring', () => {
-  expect(Indel.similarity('abcd', 'abce')).toBe(0.75)
-  expect(Indel.similarity('abcd', 'abce', { threshold: 0.8 })).toBeUndefined()
+  expect(Indel.normalizedSimilarity('abcd', 'abce')).toBe(0.75)
+  expect(Indel.normalizedSimilarity('abcd', 'abce', { threshold: 0.8 })).toBeUndefined()
 })
 
 it('compares normalized text case-insensitively', () => {

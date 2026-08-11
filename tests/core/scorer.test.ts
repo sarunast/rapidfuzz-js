@@ -30,14 +30,14 @@ describe('Metric and Scorer contracts', () => {
   test('algorithm families keep their natural scales', () => {
     expect(fuzz.similarity('abc', 'axc')).toBeCloseTo(200 / 3)
     for (const metric of [
-      levenshtein.similarity,
-      indel.similarity,
-      lcs.similarity,
-      osa.similarity,
-      damerau.similarity,
-      hamming.similarity,
-      prefix.similarity,
-      postfix.similarity,
+      levenshtein.normalizedSimilarity,
+      indel.normalizedSimilarity,
+      lcs.normalizedSimilarity,
+      osa.normalizedSimilarity,
+      damerau.normalizedSimilarity,
+      hamming.normalizedSimilarity,
+      prefix.normalizedSimilarity,
+      postfix.normalizedSimilarity,
       jaro.similarity,
       jaroWinkler.similarity,
     ]) {
@@ -51,6 +51,8 @@ describe('Metric and Scorer contracts', () => {
     expect(osa.distance('ab', 'ba')).toBe(1)
     expect(damerau.distance('ab', 'ba')).toBe(1)
     expect(hamming.distance('abc', 'axc')).toBe(1)
+    expect(levenshtein.similarity('abc', 'axc')).toBe(2)
+    expect(indel.similarity('abc', 'axc')).toBe(4)
     for (const metric of [
       fuzz.partialSimilarity,
       fuzz.tokenSortSimilarity,
@@ -68,7 +70,7 @@ describe('Metric and Scorer contracts', () => {
 
   test('scorer metadata, configuration, freezing, and thresholds are scale aware', () => {
     const fuzzy = createScorer(fuzz.fuzzySimilarity)
-    const normalized = createScorer(levenshtein.similarity, {
+    const normalized = createScorer(levenshtein.normalizedSimilarity, {
       weights: { insertion: 1, deletion: 2, substitution: 1 },
     })
     const distance = createScorer(levenshtein.distance, {
@@ -110,8 +112,10 @@ describe('Metric and Scorer contracts', () => {
   })
 
   test('missing and invalid inputs follow the scorer direction', () => {
-    const compatible = createScorer(levenshtein.similarity)
-    const throwing = createScorer(levenshtein.similarity, { missing: 'throw' })
+    const compatible = createScorer(levenshtein.normalizedSimilarity)
+    const throwing = createScorer(levenshtein.normalizedSimilarity, {
+      missing: 'throw',
+    })
     const distance = createScorer(levenshtein.distance)
     expect(compatible.score(null, 'abc')).toBe(0)
     expect(compatible.score(undefined, 'abc')).toBe(0)
@@ -126,7 +130,7 @@ describe('Metric and Scorer contracts', () => {
       TypeError,
     )
     expect(compatible.score('', '')).toBe(1)
-    expect(levenshtein.similarity(null, 'abc')).toBe(0)
+    expect(levenshtein.normalizedSimilarity(null, 'abc')).toBe(0)
   })
 
   test('custom results are always validated and custom bounds never prune execution', () => {
@@ -296,7 +300,7 @@ describe('Metric and Scorer contracts', () => {
   })
 
   test('scoreIfMatch and isMatch use scorer thresholds', () => {
-    const scorer = createScorer(levenshtein.similarity)
+    const scorer = createScorer(levenshtein.normalizedSimilarity)
     expect(scoreIfMatch(scorer, 'abc', 'axc', { threshold: 0.6 })).toBeCloseTo(2 / 3)
     expect(scoreIfMatch(scorer, 'abc', 'axc', { threshold: 0.8 })).toBeUndefined()
     expect(isMatch(scorer, 'abc', 'axc', { threshold: 0.6 })).toBe(true)

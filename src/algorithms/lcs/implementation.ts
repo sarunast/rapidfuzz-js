@@ -14,11 +14,15 @@ import {
   convPair,
   distCutoff,
   normalize,
+  normDistCutoff,
   normSimCutoff,
+  simCutoff,
   type ScorerOptions,
   type Sequence,
   DISTANCE_FLAGS,
+  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
+  SIMILARITY_FLAGS,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
@@ -86,6 +90,34 @@ function lcsSeqDistance_impl(
   const max = maximum(a, b)
   const cutoff = canonicalRawCutoff(options.scoreCutoff)
   return distCutoff(max - boundedLength(a, b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
+}
+
+/** Length of the longest common subsequence of `s1` and `s2`. */
+function lcsSeqSimilarity_impl(
+  s1: Sequence,
+  s2: Sequence,
+  options: ScorerOptions = {},
+): number {
+  const [a, b] = convPair(s1, s2)
+  const cutoff = canonicalRawCutoff(options.scoreCutoff)
+  const misses = cutoff === null ? Number.MAX_SAFE_INTEGER : maximum(a, b) - cutoff
+  return simCutoff(boundedLength(a, b, misses), cutoff)
+}
+
+/** LCS distance normalised into `[0, 1]`, where `0` means identical. */
+function lcsSeqNormalizedDistance_impl(
+  s1: Sequence,
+  s2: Sequence,
+  options: ScorerOptions = {},
+): number {
+  const [a, b] = convPair(s1, s2)
+  const max = maximum(a, b)
+  const cutoff =
+    options.scoreCutoff == null ? Number.MAX_SAFE_INTEGER : options.scoreCutoff * max
+  return normDistCutoff(
+    normalize(max - boundedLength(a, b, cutoff), max),
+    options.scoreCutoff,
+  )
 }
 
 /**
@@ -182,7 +214,11 @@ export function lcsSeqOpcodes(s1: Sequence, s2: Sequence): Opcodes {
   return lcsSeqEditops(s1, s2).toOpcodes()
 }
 
-type PreparedLcsKind = 'distance' | 'normalizedSimilarity'
+type PreparedLcsKind =
+  | 'distance'
+  | 'similarity'
+  | 'normalizedDistance'
+  | 'normalizedSimilarity'
 
 function prepareLcs(kind: PreparedLcsKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
@@ -214,6 +250,15 @@ function prepareLcs(kind: PreparedLcsKind): PreparedScorerFactory {
           const cutoff = canonicalRawCutoff(rawCutoff)
           return distCutoff(max - length(b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
         }
+        case 'similarity': {
+          const cutoff = canonicalRawCutoff(rawCutoff)
+          const misses = cutoff === null ? Number.MAX_SAFE_INTEGER : max - cutoff
+          return simCutoff(length(b, misses), cutoff)
+        }
+        case 'normalizedDistance': {
+          const cutoff = rawCutoff === null ? Number.MAX_SAFE_INTEGER : rawCutoff * max
+          return normDistCutoff(normalize(max - length(b, cutoff), max), rawCutoff)
+        }
         case 'normalizedSimilarity': {
           const cutoff =
             rawCutoff === null ? Number.MAX_SAFE_INTEGER : (1 - rawCutoff) * max
@@ -230,6 +275,16 @@ export const lcsSeqDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
   lcsSeqDistance_impl,
   DISTANCE_FLAGS,
   prepareLcs('distance'),
+)
+export const lcsSeqSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
+  lcsSeqSimilarity_impl,
+  SIMILARITY_FLAGS,
+  prepareLcs('similarity'),
+)
+export const lcsSeqNormalizedDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
+  lcsSeqNormalizedDistance_impl,
+  NORMALIZED_DISTANCE_FLAGS,
+  prepareLcs('normalizedDistance'),
 )
 export const lcsSeqNormalizedSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
   lcsSeqNormalizedSimilarity_impl,

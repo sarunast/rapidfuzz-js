@@ -18,6 +18,7 @@ import {
   createScorer,
   normalizeText,
   search,
+  searchIter,
 } from '../../src/index.js'
 import type { Match, Sequence } from '../../src/index.js'
 
@@ -70,10 +71,12 @@ describe('one-shot search and Matcher', () => {
     const mapBest = bestMatch('a', new Map([[Symbol.for('a'), 'a']]), { scorer })
     const objectResults = search('a', { first: 'a' }, { scorer })
     const iterableResults = search('a', new Set(['a']), { scorer })
+    const mapStream = searchIter('a', new Map([[Symbol.for('a'), 'a']]), { scorer })
     expectTypeOf(arrayBest?.key).toEqualTypeOf<number | undefined>()
     expectTypeOf(mapBest?.key).toEqualTypeOf<symbol | undefined>()
     expectTypeOf(objectResults).toEqualTypeOf<readonly Match<string, string>[]>()
     expectTypeOf(iterableResults).toEqualTypeOf<readonly Match<string, number>[]>()
+    expectTypeOf(mapStream).toEqualTypeOf<IterableIterator<Match<string, symbol>>>()
 
     expectTypeOf(createMatcher(['a'], { scorer }).best('a')).toEqualTypeOf<
       Match<string, number> | undefined
@@ -104,6 +107,149 @@ describe('one-shot search and Matcher', () => {
     ])
     expect(search('none', items, { scorer, threshold: 100, limit: null })).toEqual([])
     expect(search('none', items, { scorer, threshold: 101, limit: null })).toEqual([])
+  })
+
+  test('searchIter is lazy, source ordered, and stops reading with its caller', () => {
+    let reads = 0
+    function* choices(): Generator<string> {
+      reads++
+      yield 'alpha'
+      reads++
+      yield 'alpine'
+      reads++
+      yield 'beta'
+    }
+    const iterator = searchIter('alpha', choices(), { scorer, threshold: 40 })
+    expect(reads).toBe(0)
+    expect(iterator.next()).toEqual({
+      done: false,
+      value: { item: 'alpha', key: 0, score: 100 },
+    })
+    expect(reads).toBe(1)
+    if (iterator.return === undefined) throw new TypeError('iterator is not closable')
+    iterator.return()
+    expect(reads).toBe(1)
+
+    expect(
+      Array.from(searchIter('alpha', ['alpine', 'alpha', 'beta'], { scorer })),
+    ).toEqual([
+      { item: 'alpine', key: 0, score: 54.54545454545454 },
+      { item: 'alpha', key: 1, score: 100 },
+      { item: 'beta', key: 2, score: 22.22222222222222 },
+    ])
+
+    const longChoices: Array<string | null> = [
+      'alpha',
+      'alpha',
+      'alpha',
+      'alpha',
+      'alpha',
+      'alpha',
+      'alpha',
+      'alpha',
+      null,
+      'beta',
+      'alpha',
+    ]
+    expect(
+      Array.from(searchIter('alpha', longChoices, { scorer, threshold: 50 })).map(
+        (match) => match.key,
+      ),
+    ).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 10])
+  })
+
+  test('searchIter applies missing, distance, keyed, and impossible thresholds', () => {
+    expect(Array.from(searchIter(null, [null, 'alpha'], { scorer }))).toEqual([
+      { item: 'alpha', key: 1, score: 0 },
+    ])
+    expect(
+      Array.from(
+        searchIter(
+          null,
+          new Map<string, string | null>([
+            ['missing', null],
+            ['alpha', 'alpha'],
+          ]),
+          {
+            scorer,
+          },
+        ),
+      ),
+    ).toEqual([{ item: 'alpha', key: 'alpha', score: 0 }])
+    expect(Array.from(searchIter(null, ['alpha'], { scorer, threshold: 1 }))).toEqual([])
+    expect(
+      Array.from(searchIter('alpha', ['alpha'], { scorer, threshold: 101 })),
+    ).toEqual([])
+    expect(Array.from(searchIter('alpha', [null, 'alpha'], { scorer }))).toEqual([
+      { item: 'alpha', key: 1, score: 100 },
+    ])
+    expect(
+      Array.from(
+        searchIter(
+          'alpha',
+          new Map<string, string | null>([
+            ['missing', null],
+            ['poor', 'beta'],
+            ['exact', 'alpha'],
+          ]),
+          { scorer, threshold: 50 },
+        ),
+      ),
+    ).toEqual([{ item: 'alpha', key: 'exact', score: 100 }])
+
+    const distance = createScorer(levenshtein.distance)
+    expect(
+      Array.from(
+        searchIter('kitten', ['sitting', 'kitten', 'kitchen'], {
+          scorer: distance,
+          threshold: 2,
+        }),
+      ),
+    ).toEqual([
+      { item: 'kitten', key: 1, score: 0 },
+      { item: 'kitchen', key: 2, score: 2 },
+    ])
+    expect(() => searchIter(null, [], { scorer: distance }).next()).toThrow(TypeError)
+    expect(() => searchIter('a', ['a'], { scorer, threshold: Infinity }).next()).toThrow(
+      RangeError,
+    )
+  })
+
+  test('Matcher searchIter reuses stored choices without public scoring', () => {
+    let accesses = 0
+    const observed = withPublicScoreObserver(scorer, () => {
+      accesses++
+    })
+    const matcher = createMatcher(['alpine', 'alpha', 'beta'], { scorer: observed })
+    expect(Array.from(matcher.searchIter('alpha', { threshold: 50 }))).toEqual([
+      { item: 'alpine', key: 0, score: 54.54545454545454 },
+      { item: 'alpha', key: 1, score: 100 },
+    ])
+    expect(Array.from(matcher.searchIter(null))).toHaveLength(3)
+    expect(Array.from(matcher.searchIter(null, { threshold: 1 }))).toEqual([])
+    expect(Array.from(matcher.searchIter('alpha', { threshold: 101 }))).toEqual([])
+    const distance = createMatcher(['sitting', 'kitten'], {
+      scorer: createScorer(levenshtein.distance),
+    })
+    expect(Array.from(distance.searchIter('kitten', { threshold: 1 }))).toEqual([
+      { item: 'kitten', key: 1, score: 0 },
+    ])
+    const custom = createScorer((left, right) => (left === right ? 1 : 0), {
+      direction: 'similarity',
+      bounds: [0, 1],
+      symmetric: true,
+    })
+    expect(
+      Array.from(createMatcher(['a', 'b'], { scorer: custom }).searchIter('a')),
+    ).toEqual([
+      { item: 'a', key: 0, score: 1 },
+      { item: 'b', key: 1, score: 0 },
+    ])
+    expect(Array.from(searchIter('a', ['a', 'b'], { scorer: custom }))).toEqual([
+      { item: 'a', key: 0, score: 1 },
+      { item: 'b', key: 1, score: 0 },
+    ])
+    expect(accesses).toBe(0)
   })
 
   test('Matcher snapshots construction options before repeated queries', () => {

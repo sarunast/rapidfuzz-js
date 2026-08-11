@@ -6,4 +6,6 @@ export interface BatchOptions<D extends Direction, K extends ScoreArrayKind = 'f
   readonly scorer: Scorer<D>
   readonly into?: K | undefined
   readonly normalize?: Normalizer | undefined
+  readonly threshold?: number | undefined
+  readonly scoreMultiplier?: number | undefined
 }

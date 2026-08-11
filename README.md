@@ -50,8 +50,9 @@ matcher.best('mechanical keybord', { threshold: 70 })
 // { item: products[0], key: 0, score: ... }
 ```
 
-Use `bestMatch` or `search` for one query. Build a `Matcher` when the same
-collection will receive many queries.
+Use `bestMatch` or `search` for one ranked query, `searchIter` for lazy
+source-order results, and a `Matcher` when the same collection will receive
+many queries.
 
 ## Metrics and score scales
 
@@ -61,6 +62,7 @@ Metrics are directly callable:
 import { similarity as fuzzySimilarity } from 'rapidfuzz-js/fuzz'
 import {
   distance as levenshteinDistance,
+  normalizedSimilarity as levenshteinNormalizedSimilarity,
   similarity as levenshteinSimilarity,
 } from 'rapidfuzz-js/levenshtein'
 
@@ -71,17 +73,20 @@ levenshteinDistance('lewenstein', 'levenshtein')
 // 2 (native edit count)
 
 levenshteinSimilarity('abc', 'axc')
-// 0.6666666666666667 (normalized 0–1)
+// 2 (raw maximum-minus-distance similarity)
+
+levenshteinNormalizedSimilarity('abc', 'axc')
+// 0.6666666666666667
 ```
 
 The library never rescales between families:
 
-| Family                       | Scale                  |
-| ---------------------------- | ---------------------- |
-| Fuzz similarities            | `0–100`                |
-| Normalized edit similarities | `0–1`                  |
-| Jaro and Jaro-Winkler        | `0–1`                  |
-| Distances                    | Native algorithm units |
+| Operation                              | Scale                  |
+| -------------------------------------- | ---------------------- |
+| Fuzz similarities                      | `0–100`                |
+| Raw edit/count distance and similarity | Native algorithm units |
+| Normalized distance and similarity     | `0–1`                  |
+| Jaro and Jaro-Winkler measures         | `0–1`                  |
 
 Available subpaths:
 
@@ -99,7 +104,9 @@ rapidfuzz-js/prefix
 rapidfuzz-js/postfix
 ```
 
-Levenshtein, Indel, LCS, and Hamming also export `editops` and `opcodes`.
+Every algorithm subpath exposes `distance`, `similarity`,
+`normalizedDistance`, and `normalizedSimilarity`. Levenshtein, Indel, LCS,
+and Hamming also export `editops` and `opcodes`.
 
 ## Scorer objects
 
@@ -132,7 +139,7 @@ threshold uses the scorer's own scale and must be finite.
 One-shot search streams its input and does not retain the collection:
 
 ```ts
-import { bestMatch, createScorer, search } from 'rapidfuzz-js'
+import { bestMatch, createScorer, search, searchIter } from 'rapidfuzz-js'
 import { fuzzySimilarity } from 'rapidfuzz-js/fuzz'
 
 const scorer = createScorer(fuzzySimilarity)
@@ -140,6 +147,13 @@ const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 bestMatch('new york jet', teams, { scorer })
 search('new york', teams, { scorer, threshold: 60, limit: 2 })
+
+for (const match of searchIter('new york', teams, {
+  scorer,
+  threshold: 60,
+})) {
+  // qualifying matches arrive lazily in source order
+}
 ```
 
 A Matcher snapshots searchable sequences and prepares them once:
@@ -152,6 +166,7 @@ const matcher = createMatcher(teams, { scorer })
 matcher.size // 3
 matcher.best('new york jet')
 matcher.search('new york', { limit: null }) // every result, best first
+matcher.searchIter('new york', { threshold: 60 }) // lazy, source order
 ```
 
 Arrays and iterables use source positions as keys. Maps retain map keys. Plain
@@ -178,7 +193,42 @@ scorePairs(['cat', 'dog'], ['cats', 'dogs'], { scorer })
 ```
 
 Set `into` to `f64`, `f32`, `i32`, `i16`, `i8`, `u32`, `u16`, `u8`, or `u8c`
-to select the typed-array storage.
+to select the typed-array storage. Batch `threshold` uses the scorer's natural
+unscaled domain; `scoreMultiplier` is applied afterward:
+
+```ts
+import { normalizedSimilarity } from 'rapidfuzz-js/levenshtein'
+
+const normalized = createScorer(normalizedSimilarity)
+scoreMatrix(['cat'], ['cats'], {
+  scorer: normalized,
+  threshold: 0.5,
+  scoreMultiplier: 100,
+  into: 'u8',
+})
+```
+
+## RapidFuzz capability mapping
+
+The API preserves RapidFuzz's mathematical operations while using
+JavaScript-native orchestration:
+
+| RapidFuzz                    | rapidfuzz-js                          |
+| ---------------------------- | ------------------------------------- |
+| `process.extractOne`         | `bestMatch`                           |
+| `process.extract`            | `search`                              |
+| `process.extract_iter`       | `searchIter`                          |
+| `process.cdist` / `cpdist`   | `scoreMatrix` / `scorePairs`          |
+| `score_cutoff`               | `threshold`                           |
+| `score_multiplier`           | `scoreMultiplier`                     |
+| `scorer_kwargs`              | `createScorer(metric, configuration)` |
+| repeated prepared extraction | `createMatcher`                       |
+
+Public `processor`, `scoreHint`, worker, and prepared-handle APIs are omitted.
+Normalization belongs at search/batch boundaries, and preparation belongs to a
+Matcher. QRatio is intentionally omitted because it only changes ratio's
+empty-input compatibility result; WRatio remains available as
+`fuzzySimilarity`.
 
 ## Missing and invalid values
 
@@ -213,12 +263,13 @@ is validated before thresholding, ordering, or pruning.
 
 The benchmark vocabulary maps directly to the public API:
 
-| Workload                      | API                               |
-| ----------------------------- | --------------------------------- |
-| One best result               | `bestMatch`                       |
-| Top N results                 | `search` with `limit: N`          |
-| Prepare a reusable collection | `createMatcher` construction      |
-| Repeated prepared query       | `matcher.best` / `matcher.search` |
+| Workload                      | API                              |
+| ----------------------------- | -------------------------------- |
+| One best result               | `bestMatch`                      |
+| Top N results                 | `search` with `limit: N`         |
+| Lazy qualifying results       | `searchIter`                     |
+| Prepare a reusable collection | `createMatcher` construction     |
+| Repeated prepared query       | `matcher.best/search/searchIter` |
 
 The release check runs type checking, linting, formatting, all functional
 tests, the build, export-map validation, package validation, and tarball

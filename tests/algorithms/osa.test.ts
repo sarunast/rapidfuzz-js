@@ -46,7 +46,7 @@ it('handles unicode', () => {
 
 it('rejects impossible lengths before direct and prepared kernels', () => {
   expect(OSA.distance('a', 'abcdef', { threshold: 2 })).toBeUndefined()
-  expect(OSA.similarity('a', 'abcdef', { threshold: 0.8 })).toBeUndefined()
+  expect(OSA.normalizedSimilarity('a', 'abcdef', { threshold: 0.8 })).toBeUndefined()
 })
 
 it('compares normalized text case-insensitively', () => {

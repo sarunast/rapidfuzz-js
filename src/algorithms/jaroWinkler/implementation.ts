@@ -3,10 +3,14 @@ import { commonPrefix } from '../shared/affix.js'
 import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
+  asSequence,
   convPair,
+  normDistCutoff,
   normSimCutoff,
+  type MaybeSequence,
+  type NormalizedScorer,
   type ScorerOptions,
-  type Sequence,
+  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   withChoicePreparer,
   prepareScorerChoice,
@@ -15,7 +19,6 @@ import {
   type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
-  type Scorer,
 } from '../shared/scorerSupport.js'
 
 export interface JaroWinklerOptions extends ScorerOptions {
@@ -92,18 +95,41 @@ function directSimilarity(
  * @throws if `prefixWeight` is outside `[0, 1]`.
  */
 function jaroWinklerSimilarity_impl(
-  s1: Sequence,
-  s2: Sequence,
+  s1: MaybeSequence,
+  s2: MaybeSequence,
   options: JaroWinklerOptions = {},
 ): number {
-  const [a, b] = convPair(s1, s2)
+  if (s1 == null || s2 == null) return 0
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
   return normSimCutoff(
     directSimilarity(a, b, options.prefixWeight ?? 0.1, options.scoreCutoff ?? 0),
     options.scoreCutoff,
   )
 }
 
-function prepareJaroWinkler(): PreparedScorerFactory {
+/** Jaro-Winkler distance in `[0, 1]`, i.e. `1 - similarity`. */
+function jaroWinklerDistance_impl(
+  s1: MaybeSequence,
+  s2: MaybeSequence,
+  options: JaroWinklerOptions = {},
+): number {
+  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const cutoff = options.scoreCutoff
+  return normDistCutoff(
+    1 -
+      directSimilarity(
+        a,
+        b,
+        options.prefixWeight ?? 0.1,
+        cutoff == null ? 0 : 1 - cutoff,
+      ),
+    cutoff,
+  )
+}
+
+type PreparedJaroWinklerKind = 'distance' | 'similarity'
+
+function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query, kwargs) => {
     const rawPrefixWeight = Reflect.get(kwargs, 'prefixWeight')
     const prefixWeight = rawPrefixWeight == null ? 0.1 : rawPrefixWeight
@@ -120,23 +146,33 @@ function prepareJaroWinkler(): PreparedScorerFactory {
       // The common-prefix bonus and Jaro's transposition pass both compare the
       // two sequences elementwise, so they have to agree on how a character is
       // spelled.
+      const similarityCutoff =
+        kind === 'distance' ? (rawCutoff === null ? 0 : 1 - rawCutoff) : (rawCutoff ?? 0)
       const similarity = similarity_(
         alignRepresentation(a, b),
         alignRepresentation(b, a),
         prefixWeight,
-        rawCutoff ?? 0,
+        similarityCutoff,
         pattern,
       )
-      return normSimCutoff(similarity, rawCutoff)
+      return kind === 'distance'
+        ? normDistCutoff(1 - similarity, rawCutoff)
+        : normSimCutoff(similarity, rawCutoff)
     }
     return score
   }
   return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
-export const jaroWinklerSimilarity: Scorer<JaroWinklerOptions> =
+export const jaroWinklerSimilarity: NormalizedScorer<JaroWinklerOptions> =
   /* @__PURE__ */ withPreparedFlags(
     jaroWinklerSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,
-    prepareJaroWinkler(),
+    prepareJaroWinkler('similarity'),
+  )
+export const jaroWinklerDistance: NormalizedScorer<JaroWinklerOptions> =
+  /* @__PURE__ */ withPreparedFlags(
+    jaroWinklerDistance_impl,
+    NORMALIZED_DISTANCE_FLAGS,
+    prepareJaroWinkler('distance'),
   )

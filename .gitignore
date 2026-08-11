@@ -8,3 +8,4 @@ coverage/
 *.log
 test-report.junit.xml
 plan.md
+.pnpm-store/

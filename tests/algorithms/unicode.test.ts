@@ -188,6 +188,6 @@ describe('canonical prefix metrics count code points', () => {
   it('scores astral characters as one element', () => {
     expect(prefixSimilarity('\u{1F600}', '\u{1F600}')).toBe(1)
     expect(prefixDistance('\u{1F600}a', '\u{1F600}b')).toBe(1)
-    expect(prefixSimilarity('\u{1F600}a', '\u{1F600}b')).toBe(0.5)
+    expect(prefixSimilarity('\u{1F600}a', '\u{1F600}b')).toBe(1)
   })
 })

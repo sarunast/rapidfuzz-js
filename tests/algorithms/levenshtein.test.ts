@@ -12,6 +12,10 @@ import {
   similarity as levenshteinSimilarityMetric,
   type LevenshteinWeights,
 } from '../../src/algorithms/levenshtein/index.js'
+import {
+  levenshteinNormalizedDistanceImpl,
+  levenshteinSimilarityImpl,
+} from '../../src/algorithms/levenshtein/internal/engine.js'
 import { scoreMatrix } from '../../src/batch/index.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { createScorer } from '../../src/core/scorer.js'
@@ -29,6 +33,18 @@ it('treats two empty strings as a perfect match under any weights', () => {
 it('does not overflow on a huge threshold', () => {
   expect(Levenshtein.distance('', '')).toBe(0)
   expect(Levenshtein.distance('', '', { threshold: 2 ** 63 })).toBe(0)
+})
+
+it('keeps score hints internal without changing restored metric results', () => {
+  expect(levenshteinSimilarityImpl('abc', 'axc', { scoreCutoff: 1, scoreHint: 2 })).toBe(
+    2,
+  )
+  expect(
+    levenshteinNormalizedDistanceImpl('abc', 'axc', {
+      scoreCutoff: 1,
+      scoreHint: 0.5,
+    }),
+  ).toBeCloseTo(1 / 3)
 })
 
 it('interprets strings and sequences the same way', () => {

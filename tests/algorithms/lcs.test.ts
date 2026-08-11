@@ -14,11 +14,11 @@ it('handles the basic cases', () => {
 
 it('does not invert the normalized results against a single empty string', () => {
   expect(LCSseq.distance('abc', '')).toBe(3)
-  expect(1 - (LCSseq.similarity('abc', '') ?? 0)).toBe(1)
-  expect(LCSseq.similarity('abc', '')).toBe(0)
+  expect(1 - (LCSseq.normalizedSimilarity('abc', '') ?? 0)).toBe(1)
+  expect(LCSseq.normalizedSimilarity('abc', '')).toBe(0)
 
-  expect(1 - (LCSseq.similarity('', '') ?? 0)).toBe(0)
-  expect(LCSseq.similarity('', '')).toBe(1)
+  expect(1 - (LCSseq.normalizedSimilarity('', '') ?? 0)).toBe(0)
+  expect(LCSseq.normalizedSimilarity('', '')).toBe(1)
 })
 
 it('compares normalized text case-insensitively', () => {

@@ -58,6 +58,18 @@ export const DISTANCE_FLAGS: ScorerFlags = {
   symmetric: true,
 }
 
+export const SIMILARITY_FLAGS: ScorerFlags = {
+  optimalScore: Number.POSITIVE_INFINITY,
+  worstScore: 0,
+  symmetric: true,
+}
+
+export const NORMALIZED_DISTANCE_FLAGS: ScorerFlags = {
+  optimalScore: 0,
+  worstScore: 1,
+  symmetric: true,
+}
+
 export const NORMALIZED_SIMILARITY_FLAGS: ScorerFlags = {
   optimalScore: 1,
   worstScore: 0,

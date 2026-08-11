@@ -31,7 +31,8 @@ export function topSimilarity<T, K>(
     const heap: ScoredEntry<T, K>[] = []
     let cutoff = threshold
     let order = 0
-    for (const entry of items) {
+    for (let index = 0; index < items.length; index++) {
+      const entry = items[index]
       const value = score(entry.prepared, cutoff)
       if (threshold !== null && value < threshold) {
         order++
@@ -57,7 +58,8 @@ export function topSimilarity<T, K>(
 
   const results: ScoredEntry<T, K>[] = []
   let order = 0
-  for (const entry of items) {
+  for (let index = 0; index < items.length; index++) {
+    const entry = items[index]
     const value = score(entry.prepared, threshold)
     if (threshold === null || value >= threshold) {
       results.push({ item: entry.item, key: entry.key, score: value, order })

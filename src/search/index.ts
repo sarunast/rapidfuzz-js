@@ -1,5 +1,5 @@
 export { createMatcher } from './matcher.js'
-export { bestMatch, search } from './oneShot.js'
+export { bestMatch, search, searchIter } from './oneShot.js'
 export type { Match } from './results.js'
 export type {
   BestOptions,
@@ -9,4 +9,5 @@ export type {
   MissingItemsPolicy,
   Normalizer,
   SearchOptions,
+  SearchIterOptions,
 } from './types.js'

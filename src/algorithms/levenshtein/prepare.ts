@@ -3,7 +3,9 @@ import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
   normalize,
+  normDistCutoff,
   normSimCutoff,
+  simCutoff,
   prepareScorerChoice,
   preparedScorerSequence,
   withChoicePreparer,
@@ -30,7 +32,11 @@ import { levenshteinPrepared, levenshteinSmallBand } from './internal/uniform.js
  */
 const MAX_BAND_BUDGET = 15
 
-type PreparedLevenshteinKind = 'distance' | 'normalizedSimilarity'
+type PreparedLevenshteinKind =
+  | 'distance'
+  | 'similarity'
+  | 'normalizedDistance'
+  | 'normalizedSimilarity'
 
 /**
  * Whether the held-pattern kernel beats rebuilding the query's masks per choice.
@@ -192,6 +198,19 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparedScore
           const bound = cutoff ?? Number.MAX_SAFE_INTEGER
           const distance = preparedDistance(b, bound)
           return cutoff === null || distance <= cutoff ? distance : cutoff + 1
+        }
+        case 'similarity': {
+          const cutoff = levenshteinRawCutoff(rawCutoff, integral)
+          const bound =
+            cutoff === null ? Number.MAX_SAFE_INTEGER : rawBound(max - cutoff, integral)
+          return simCutoff(max - preparedDistance(b, bound), cutoff)
+        }
+        case 'normalizedDistance': {
+          const cutoff =
+            rawCutoff === null
+              ? Number.MAX_SAFE_INTEGER
+              : rawBound(rawCutoff * max, integral)
+          return normDistCutoff(normalize(preparedDistance(b, cutoff), max), rawCutoff)
         }
         case 'normalizedSimilarity': {
           const cutoff =
