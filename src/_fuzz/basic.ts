@@ -198,15 +198,38 @@ export function ratio_impl(
  * a string-backed needle reaches.
  */
 export interface CharSet {
-  /** Elements below 256, by code unit for a string needle or by value for a number. */
+  /**
+   * Elements the table addresses directly, by code unit for a string needle or
+   * by value for a number.
+   *
+   * 256 entries, except for a string needle that leaves Latin-1 without leaving
+   * the low BMP — see {@link HIGH_TABLE_LIMIT}. Read its `length` rather than
+   * assuming either size.
+   */
   readonly direct: Uint8Array
   /**
-   * Everything {@link direct} cannot address: code units at or above 256 for a
-   * string needle, element values otherwise. Null when the needle has none,
-   * which is every pure Latin-1 input.
+   * Everything {@link direct} cannot address. Null when the needle has none,
+   * which is every pure Latin-1 input and every needle whose table was widened
+   * to cover its script.
    */
   readonly wide: ReadonlySet<unknown> | null
 }
+
+/**
+ * Highest code unit a string needle's direct table will stretch to cover.
+ *
+ * Every non-ideographic script sits in one contiguous block of the low BMP:
+ * Cyrillic ends at U+04FF, Greek at U+03FF, Hebrew at U+05F4, and a needle
+ * written in any of them is answered by a table of a couple of kilobytes
+ * however long it is. The ideographs start at U+4E00 and would want eighty, so
+ * they keep the `Set` — and keep it *inline* at the probe, which is why the
+ * table's size is what varies here rather than a second table being added
+ * beside it. A widened table costs one comparison against a local instead of
+ * against the constant 256; a second table cost a null test on every probe and
+ * two more fields on every {@link CharSet}, which measured 1.02-1.03x on the
+ * ASCII and Latin-1 needles that can never use one.
+ */
+const HIGH_TABLE_LIMIT = 2048
 
 /**
  * Build the pruning set for `s`.
@@ -233,12 +256,34 @@ export function charSetOf(s: ArrayLike<unknown>): CharSet {
   // below U+0100 is rarer than the null test to defer it would cost.
   if (typeof s === 'string') {
     const direct = new Uint8Array(256)
+    // A `Set<number>` of its own rather than the one below, so that widening the
+    // table can read it back without asking what it holds. A string needle's
+    // high elements are code units and nothing else.
+    let codes: Set<number> | null = null
+    // Tracked as the loop runs rather than derived afterwards, so a needle with
+    // no high code unit — the common one — never makes a second pass to be told
+    // so.
+    let highest = -1
     for (let i = 0; i < s.length; i++) {
       const code = s.charCodeAt(i)
       if (code < 256) direct[code] = 1
-      else (wide ??= new Set<unknown>()).add(code)
+      else {
+        ;(codes ??= new Set<number>()).add(code)
+        if (code > highest) highest = code
+      }
     }
-    return { direct, wide }
+
+    if (codes === null || highest >= HIGH_TABLE_LIMIT) return { direct, wide: codes }
+
+    // Cold, and once per needle rather than once per probe: widen the table to
+    // reach the script the needle is written in, and the `Set` has no reader
+    // left. From zero rather than from the lowest code unit seen, because an
+    // offset is a second field to carry and a subtraction on every probe, where
+    // the run of zeroes below the block is at most two kilobytes once.
+    const wideDirect = new Uint8Array(highest + 1)
+    wideDirect.set(direct)
+    for (const code of codes) wideDirect[code] = 1
+    return { direct: wideDirect, wide: null }
   }
 
   // A sequence of objects fills no table at all, and allocating one anyway was
@@ -456,6 +501,9 @@ function partialRatioScan(
 
   const charSet = preparedCharSet ?? charSetOf(s1)
   const direct = charSet.direct
+  // Read once: a string needle's table is 256 entries or as wide as its script
+  // needs, and the probe below has to compare against whichever it got.
+  const narrow = direct.length
   const wide = charSet.wide
 
   // The needle and the text always share a representation — `conv` returns a
@@ -487,7 +535,7 @@ function partialRatioScan(
     }
 
     const code = text.charCodeAt(index)
-    return code < 256 ? direct[code] !== 0 : wide !== null && wide.has(code)
+    return code < narrow ? direct[code] !== 0 : wide !== null && wide.has(code)
   }
 
   const res = {
