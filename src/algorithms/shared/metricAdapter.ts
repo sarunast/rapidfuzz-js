@@ -94,14 +94,20 @@ export function builtInMetric<D extends Direction, Config extends object>(
     const flags = configurationFlagsOf(options.implementation)
     const symmetric = flags?.(record).symmetric ?? true
     const prepare = options.implementation[PREPARE_SCORER]
+    // Batch and driver loops call rawScore thousands of times with one fixed
+    // threshold; a one-entry cache keeps the cutoff-bearing options from being
+    // rebuilt per pair. The threshold changes between loops, not inside them.
+    let cutoffOptions: (Readonly<Record<string, unknown>> & ScorerOptions) | null = null
+    let cutoffThreshold = 0
     const rawScore = (a: Sequence, b: Sequence, threshold: number | null): number => {
-      const callOptions =
-        threshold === null
-          ? configured
-            ? record
-            : undefined
-          : { ...record, scoreCutoff: threshold }
-      return implementation(a, b, callOptions)
+      if (threshold === null) {
+        return implementation(a, b, configured ? record : undefined)
+      }
+      if (cutoffOptions === null || cutoffThreshold !== threshold) {
+        cutoffOptions = { ...record, scoreCutoff: threshold }
+        cutoffThreshold = threshold
+      }
+      return implementation(a, b, cutoffOptions)
     }
     const score = (
       a: MaybeSequence,
