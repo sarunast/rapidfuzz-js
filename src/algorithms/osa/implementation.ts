@@ -1,10 +1,5 @@
-import {
-  osaOneWordRange,
-  osaOneWordPrepared,
-  osaPrepared,
-  preparePattern,
-  WORD_LIMIT,
-} from '../shared/bitmask/index.js'
+import { WORD_LIMIT } from '../shared/bitmask/blockMasks.js'
+import { preparePattern } from '../shared/bitmask/pattern.js'
 import { commonAffix } from '../shared/bitParallel.js'
 import {
   alignRepresentation,
@@ -30,11 +25,13 @@ import {
   preparedScorerSequence,
   scorerSequence,
   type PrepareScorer,
+  type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
   type NormalizedScorer,
   type Scorer,
 } from '../shared/scorerSupport.js'
+import { osaOneWordRange, osaOneWordPrepared, osaPrepared } from './internal/kernel.js'
 
 /**
  * Optimal String Alignment distance — Levenshtein plus transposition of two
@@ -173,7 +170,7 @@ type PreparedOsaKind =
   | 'normalizedDistance'
   | 'normalizedSimilarity'
 
-function prepareOsa(kind: PreparedOsaKind): PrepareScorer {
+function prepareOsa(kind: PreparedOsaKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
     if (a === null) throw new TypeError('expected a sequence')

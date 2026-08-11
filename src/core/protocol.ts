@@ -1,21 +1,29 @@
 import type { Direction, MaybeSequence, Sequence } from './types.js'
 
-export const METRIC_CONFIGURATION: unique symbol = Symbol(
-  'rapidfuzz.metric.configuration',
-)
 export const COMPILE: unique symbol = Symbol('rapidfuzz.metric.compile')
 
 export interface PreparedKernel {
   (choice: unknown, threshold: number | null): number
 }
 
-export interface MetricCompilation<D extends Direction> {
+interface Compilation<D extends Direction> {
   readonly direction: D
   readonly bounds: readonly [number, number]
   readonly symmetric: boolean
-  readonly trusted: boolean
-  readonly validate: (a: MaybeSequence, b: MaybeSequence) => void
   readonly score: (a: MaybeSequence, b: MaybeSequence, threshold: number | null) => number
   readonly prepareQuery: (query: Sequence) => PreparedKernel
   readonly prepareChoice: (choice: Sequence) => unknown
 }
+
+export interface TrustedMetricCompilation<D extends Direction> extends Compilation<D> {
+  readonly trusted: true
+  readonly validate: (a: MaybeSequence, b: MaybeSequence) => void
+}
+
+export interface CustomMetricCompilation<D extends Direction> extends Compilation<D> {
+  readonly trusted: false
+}
+
+export type MetricCompilation<D extends Direction> =
+  | TrustedMetricCompilation<D>
+  | CustomMetricCompilation<D>

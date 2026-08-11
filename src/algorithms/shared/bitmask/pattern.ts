@@ -49,10 +49,12 @@
  * masks start" below for why each kernel carries its own copy of the body.
  */
 
-// Declared here rather than imported from `shared.ts`. These are read once per
+import { isDirectSymbol, isHighSymbol } from './lookup.js'
+
+// Declared here rather than imported from `blockMasks.ts`. These are read once per
 // element of the pattern, and a cross-module binding does not fold the way a
 // module-local `const` does — measured at +3% on Latin-1 and +15% on Cyrillic
-// for a loop of this shape. `_bitVector/shared.ts` is the canonical home and
+// for a loop of this shape. `blockMasks.ts` is the canonical home and
 // documents the invariant these have to keep; the values must agree with it.
 const WORD_SHIFT = 5
 const WORD_MASK = 31
@@ -116,23 +118,6 @@ export interface PatternMask {
   readonly highStart: number
   /** Absolute index into {@link masks} for an element neither region holds. */
   readonly wideOffsets: ReadonlyMap<unknown, number>
-}
-
-/** Whether `symbol` indexes the Latin-1 region directly. */
-function isDirectSymbol(symbol: unknown): boolean {
-  return (
-    typeof symbol === 'number' &&
-    symbol >= 0 &&
-    symbol < DIRECT_LOOKUP_LIMIT &&
-    (symbol | 0) === symbol
-  )
-}
-
-/** Whether `symbol` is an integer the window could cover. */
-function isHighSymbol(symbol: unknown): symbol is number {
-  return (
-    typeof symbol === 'number' && symbol >= DIRECT_LOOKUP_LIMIT && (symbol | 0) === symbol
-  )
 }
 
 /**
@@ -244,7 +229,7 @@ export function preparePattern(
   for (let i = 0; i < length; i++) {
     const index = start + i * step
     const symbol = stringPattern ? pattern.charCodeAt(index) : pattern[index]
-    if (isDirectSymbol(symbol) && typeof symbol === 'number') {
+    if (isDirectSymbol(symbol)) {
       masks[symbol * words + (i >>> WORD_SHIFT)] |= 1 << (i & WORD_MASK)
       continue
     }

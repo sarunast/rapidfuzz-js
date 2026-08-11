@@ -33,7 +33,23 @@ export function bestMatch<T, D extends Direction>(
   const threshold = optionalThreshold(options.threshold)
   const compilation = scorerCompilation(options.scorer)
   const normalized = normalizeQuery(query, options.normalize)
-  const prepared = normalized === null ? null : compilation.prepareQuery(normalized)
+  if (normalized === null) {
+    const score = compilation.score(query, '', threshold)
+    const stableOptions: MatcherOptions<T, Direction> = options
+    let found: Match<T, unknown> | undefined
+    for (const entry of collectionEntries(items)) {
+      const sequence = searchableSequence(entry.item, stableOptions, false)
+      if (
+        sequence !== null &&
+        found === undefined &&
+        qualifies('similarity', score, threshold)
+      ) {
+        found = { item: entry.item, key: entry.key, score }
+      }
+    }
+    return found
+  }
+  const prepared = compilation.prepareQuery(normalized)
   const optimal = compilation.trusted
     ? compilation.direction === 'similarity'
       ? compilation.bounds[1]
@@ -45,10 +61,7 @@ export function bestMatch<T, D extends Direction>(
   for (const entry of collectionEntries(items)) {
     const sequence = searchableSequence(entry.item, stableOptions, false)
     if (sequence === null) continue
-    const score =
-      prepared === null
-        ? compilation.score(query, sequence, cutoff)
-        : prepared(compilation.prepareChoice(sequence), cutoff)
+    const score = prepared(compilation.prepareChoice(sequence), cutoff)
     if (!qualifies(compilation.direction, score, threshold)) continue
     if (found === undefined || better(compilation.direction, score, found.score)) {
       found = { item: entry.item, key: entry.key, score }
@@ -69,17 +82,26 @@ export function search<T, D extends Direction>(
   const threshold = optionalThreshold(options.threshold)
   const compilation = scorerCompilation(options.scorer)
   const normalized = normalizeQuery(query, options.normalize)
-  const prepared = normalized === null ? null : compilation.prepareQuery(normalized)
+  if (normalized === null) {
+    const score = compilation.score(query, '', threshold)
+    const stableOptions: MatcherOptions<T, Direction> = options
+    const results: Match<T, unknown>[] = []
+    for (const entry of collectionEntries(items)) {
+      const sequence = searchableSequence(entry.item, stableOptions, false)
+      if (sequence !== null && qualifies('similarity', score, threshold)) {
+        results.push({ item: entry.item, key: entry.key, score })
+      }
+    }
+    return limit === null ? results : results.slice(0, limit)
+  }
+  const prepared = compilation.prepareQuery(normalized)
   const stableOptions: MatcherOptions<T, Direction> = options
   const results: Array<Match<T, unknown> & { readonly order: number }> = []
   let order = 0
   for (const entry of collectionEntries(items)) {
     const sequence = searchableSequence(entry.item, stableOptions, false)
     if (sequence === null) continue
-    const score =
-      prepared === null
-        ? compilation.score(query, sequence, threshold)
-        : prepared(compilation.prepareChoice(sequence), threshold)
+    const score = prepared(compilation.prepareChoice(sequence), threshold)
     if (qualifies(compilation.direction, score, threshold)) {
       results.push({ item: entry.item, key: entry.key, score, order })
     }

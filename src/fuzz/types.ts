@@ -6,6 +6,9 @@
  * logic is what lets the scorer families below it stay unaware of each other.
  */
 import type { MaybeSequence, Processor } from '../algorithms/shared/scorerSupport.js'
+import type { SimilarityConfiguration } from '../core/types.js'
+
+export type FuzzConfiguration = SimilarityConfiguration
 
 /**
  * Options every fuzz scorer accepts.
@@ -42,9 +45,8 @@ export interface FuzzOptions {
  * Anything a fuzz scorer accepts, including the "missing value" cases.
  *
  * An alias rather than a restatement: it is the same set of inputs the
- * normalized scorers in `distance/` take, and the reason `NaN` is missing from
- * it — treated as missing at run time, kept out of the type — is written up
- * there, on {@link MaybeSequence}.
+ * normalized algorithm scorers take. Only `null` and `undefined` are missing;
+ * `NaN` is not a sequence and is rejected by the public metric boundary.
  */
 export type FuzzInput = MaybeSequence
 
@@ -65,9 +67,7 @@ export interface ScoreAlignment {
 
 /** Which scorer a prepared-query hook was built for. See `prepared.ts`. */
 export type PreparedFuzzKind =
-  | 'ratio'
   | 'partialRatio'
-  | 'tokenSortRatio'
   | 'tokenSetRatio'
   | 'tokenRatio'
   | 'partialTokenSortRatio'

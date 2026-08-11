@@ -41,8 +41,9 @@ import { bench } from 'vitest'
 
 import { resetDamerauScratch } from '../src/algorithms/damerauLevenshtein/implementation.js'
 import { resetJaroScratch } from '../src/algorithms/jaro/implementation.js'
-import { resetWeightedScratch } from '../src/algorithms/levenshtein/implementation.js'
-import { resetSharedScratch } from '../src/algorithms/shared/bitmask/index.js'
+import { resetWeightedScratch } from '../src/algorithms/levenshtein/internal/scratch.js'
+import { resetOsaScratch } from '../src/algorithms/osa/internal/kernel.js'
+import { resetBitVectorScratch } from '../src/algorithms/shared/bitmask/blockMasks.js'
 
 /**
  * The subset of tinybench's options a case may override.
@@ -72,7 +73,8 @@ function collectGarbage(): void {
 
 function beforeCase(_task: unknown, mode: 'warmup' | 'run'): void {
   if (mode === 'warmup') {
-    resetSharedScratch()
+    resetBitVectorScratch()
+    resetOsaScratch()
     resetWeightedScratch()
     resetJaroScratch()
     resetDamerauScratch()

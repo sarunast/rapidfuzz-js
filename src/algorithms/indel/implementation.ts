@@ -6,6 +6,7 @@ import {
   prepareLcsPattern,
   UNBOUNDED_MISSES,
 } from '../lcs/implementation.js'
+import { sharesAffix } from '../shared/affix.js'
 import type { Editops, Opcodes } from '../shared/editops/index.js'
 import {
   alignRepresentation,
@@ -31,8 +32,8 @@ import {
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
-  sharesAffix,
   type PrepareScorer,
+  type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
   type NormalizedScorer,
@@ -74,7 +75,7 @@ function preparedDistanceWorthwhile(
 
 function distanceFromPrepared(
   query: ArrayLike<unknown>,
-  pattern: import('../shared/bitmask/index.js').PatternMask,
+  pattern: import('../shared/bitmask/pattern.js').PatternMask,
   choice: ArrayLike<unknown>,
   scoreCutoff: number,
 ): number {
@@ -200,11 +201,11 @@ type PreparedIndelKind =
   | 'normalizedDistance'
   | 'normalizedSimilarity'
 
-function prepareIndel(kind: PreparedIndelKind): PrepareScorer {
+function prepareIndel(kind: PreparedIndelKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
     if (a === null) throw new TypeError('expected a sequence')
-    let pattern: import('../shared/bitmask/index.js').PatternMask | null = null
+    let pattern: import('../shared/bitmask/pattern.js').PatternMask | null = null
     const preparedDistance = (b: ArrayLike<unknown>, cutoff: number): number => {
       if (!preparedDistanceWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
         // The unprepared kernel trims a common affix, which compares the two

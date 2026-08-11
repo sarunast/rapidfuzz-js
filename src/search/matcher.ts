@@ -21,57 +21,25 @@ import type {
   SearchOptions,
 } from './types.js'
 
-function missingBest<T, K, D extends Direction>(
-  query: MaybeSequence,
+function missingBest<T, K>(
   items: readonly StoredItem<T, K>[],
-  options: MatcherOptions<T, D>,
+  score: number,
   threshold: number | null,
 ): Match<T, K> | undefined {
-  const compilation = scorerCompilation(options.scorer)
-  let found: Match<T, K> | undefined
-  for (const entry of items) {
-    const score = compilation.score(query, entry.sequence, threshold)
-    const qualifies =
-      threshold === null ||
-      (compilation.direction === 'similarity' ? score >= threshold : score <= threshold)
-    if (!qualifies) continue
-    if (
-      found === undefined ||
-      (compilation.direction === 'similarity' ? score > found.score : score < found.score)
-    ) {
-      found = { item: entry.item, key: entry.key, score }
-    }
-  }
-  return found
+  if (threshold !== null && score < threshold) return undefined
+  const first = items[0]
+  return first === undefined ? undefined : { item: first.item, key: first.key, score }
 }
 
-function missingTop<T, K, D extends Direction>(
-  query: MaybeSequence,
+function missingTop<T, K>(
   items: readonly StoredItem<T, K>[],
-  options: MatcherOptions<T, D>,
+  score: number,
   threshold: number | null,
   limit: number | null,
 ): readonly Match<T, K>[] {
-  const compilation = scorerCompilation(options.scorer)
-  const results: Array<Match<T, K> & { readonly order: number }> = []
-  let order = 0
-  for (const entry of items) {
-    const score = compilation.score(query, entry.sequence, threshold)
-    if (
-      threshold === null ||
-      (compilation.direction === 'similarity' ? score >= threshold : score <= threshold)
-    ) {
-      results.push({ item: entry.item, key: entry.key, score, order })
-    }
-    order++
-  }
-  results.sort((a, b) => {
-    const byScore =
-      compilation.direction === 'similarity' ? b.score - a.score : a.score - b.score
-    return byScore || a.order - b.order
-  })
-  const selected = limit === null ? results : results.slice(0, limit)
-  return selected.map(({ item, key, score }) => ({ item, key, score }))
+  if (threshold !== null && score < threshold) return []
+  const selected = limit === null ? items : items.slice(0, limit)
+  return selected.map(({ item, key }) => ({ item, key, score }))
 }
 
 export function createMatcher<T, D extends Direction>(
@@ -119,7 +87,10 @@ export function createMatcher<T, D extends Direction>(
   ): Match<T, unknown> | undefined => {
     const threshold = optionalThreshold(call?.threshold)
     const normalized = normalizeQuery(query, options.normalize)
-    if (normalized === null) return missingBest(query, stored, options, threshold)
+    if (normalized === null) {
+      const missingScore = compilation.score(query, '', threshold)
+      return missingBest(stored, missingScore, threshold)
+    }
     const score = compilation.prepareQuery(normalized)
     const optimal = compilation.trusted
       ? compilation.direction === 'similarity'
@@ -138,7 +109,10 @@ export function createMatcher<T, D extends Direction>(
     if (limit === 0) return []
     const threshold = optionalThreshold(call?.threshold)
     const normalized = normalizeQuery(query, options.normalize)
-    if (normalized === null) return missingTop(query, stored, options, threshold, limit)
+    if (normalized === null) {
+      const missingScore = compilation.score(query, '', threshold)
+      return missingTop(stored, missingScore, threshold, limit)
+    }
     const score = compilation.prepareQuery(normalized)
     return compilation.direction === 'similarity'
       ? topSimilarity(stored, score, threshold, limit)

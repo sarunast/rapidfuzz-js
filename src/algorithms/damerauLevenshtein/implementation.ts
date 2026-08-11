@@ -15,6 +15,7 @@ import {
   preparedScorerSequence,
   scorerSequence,
   type PrepareScorer,
+  type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
   DISTANCE_FLAGS,
@@ -313,7 +314,7 @@ type PreparedDamerauKind =
   | 'normalizedDistance'
   | 'normalizedSimilarity'
 
-function prepareDamerau(kind: PreparedDamerauKind): PrepareScorer {
+function prepareDamerau(kind: PreparedDamerauKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
     if (a === null) throw new TypeError('expected a sequence')

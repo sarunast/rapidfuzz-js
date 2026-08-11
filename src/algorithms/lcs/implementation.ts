@@ -1,10 +1,6 @@
-import {
-  lcsLengthPrepared,
-  lcsLengthPreparedBounded,
-  lcsLengthRange,
-  preparePattern,
-  UNBOUNDED_MISSES,
-} from '../shared/bitmask/index.js'
+import { sharesAffix } from '../shared/affix.js'
+import { UNBOUNDED_MISSES } from '../shared/bitmask/blockMasks.js'
+import { preparePattern } from '../shared/bitmask/pattern.js'
 import { commonAffix, lcsSeqMatrix, rowBitSet } from '../shared/bitParallel.js'
 import {
   editopsFromValidated,
@@ -36,13 +32,18 @@ import {
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
-  sharesAffix,
   type PrepareScorer,
+  type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
   type NormalizedScorer,
   type Scorer,
 } from '../shared/scorerSupport.js'
+import {
+  lcsLengthPrepared,
+  lcsLengthPreparedBounded,
+  lcsLengthRange,
+} from './internal/kernel.js'
 
 export {
   lcsLengthPrepared as lcsSeqLengthPrepared,
@@ -246,11 +247,11 @@ type PreparedLcsKind =
   | 'normalizedDistance'
   | 'normalizedSimilarity'
 
-function prepareLcs(kind: PreparedLcsKind): PrepareScorer {
+function prepareLcs(kind: PreparedLcsKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
     if (a === null) throw new TypeError('expected a sequence')
-    let pattern: import('../shared/bitmask/index.js').PatternMask | null = null
+    let pattern: import('../shared/bitmask/pattern.js').PatternMask | null = null
     const length = (b: ArrayLike<unknown>, cutoff: number): number => {
       if (!preparedLengthWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
         // The unprepared kernel trims a common affix, which compares the two

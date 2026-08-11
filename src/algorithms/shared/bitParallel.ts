@@ -96,7 +96,7 @@ function symbolSpan(s1: ArrayLike<unknown>, start: number, length: number): Symb
  *
  * A pattern of at most 32 elements has at most 32 distinct ones, so the table
  * covers only `[minSymbol, maxSymbol]` — 26 entries for lowercase text —
- * instead of the whole of Latin-1 as the kernels under `_bitVector/` do. Those
+ * instead of the whole of Latin-1 as the algorithm-owned kernels do. Those
  * hold one table for the process and stamp its entries; this one is built and
  * dropped per matrix, where a kilobyte to zero costs more than the lookups it
  * would save.

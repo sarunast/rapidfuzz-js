@@ -1,35 +1,8 @@
-import type { Metric } from '../../core/metric.js'
-import type { SimilarityConfiguration } from '../../core/types.js'
-import { builtInMetric } from '../shared/metricAdapter.js'
-import {
-  levenshteinDistance,
-  levenshteinEditops,
-  levenshteinNormalizedSimilarity,
-  levenshteinOpcodes,
-  type LevenshteinWeightsInput,
-} from './implementation.js'
-
-export type { LevenshteinCosts, LevenshteinWeights } from './implementation.js'
-
-export interface LevenshteinDistanceConfiguration {
-  readonly weights?: LevenshteinWeightsInput | undefined
-}
-
-export interface LevenshteinSimilarityConfiguration
-  extends LevenshteinDistanceConfiguration, SimilarityConfiguration {}
-
-export const distance: Metric<'distance', LevenshteinDistanceConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: levenshteinDistance,
-    direction: 'distance',
-    bounds: [0, Number.POSITIVE_INFINITY],
-  })
-
-export const similarity: Metric<'similarity', LevenshteinSimilarityConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: levenshteinNormalizedSimilarity,
-    direction: 'similarity',
-    bounds: [0, 1],
-  })
-
-export { levenshteinEditops as editops, levenshteinOpcodes as opcodes }
+export {
+  distance,
+  similarity,
+  type LevenshteinDistanceConfiguration,
+  type LevenshteinSimilarityConfiguration,
+} from './compile.js'
+export { editops, opcodes } from './editops.js'
+export type { LevenshteinCosts, LevenshteinWeights } from './metric.js'

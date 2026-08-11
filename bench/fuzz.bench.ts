@@ -1,13 +1,11 @@
 import { describe } from 'vitest'
 
-import {
-  partialRatio,
-  partialTokenSetRatio,
-  ratio,
-  tokenSetRatio,
-  tokenSortRatio,
-  wRatio,
-} from '../src/fuzz/internal/scorers.js'
+import { wRatio } from '../src/fuzz/fuzzy.js'
+import { partialRatio } from '../src/fuzz/partial.js'
+import { partialTokenSetRatio } from '../src/fuzz/partialTokenSet.js'
+import { ratio } from '../src/fuzz/similarity.js'
+import { tokenSetRatio } from '../src/fuzz/tokenSet.js'
+import { tokenSortRatio } from '../src/fuzz/tokenSort.js'
 import { pairs, sentences, similarPairs } from './_corpus.js'
 import { measure } from './_harness.js'
 

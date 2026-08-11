@@ -21,8 +21,8 @@ export function isMatch<D extends Direction>(
   const compilation = scorerCompilation(scorer)
   if (
     compilation.trusted &&
-    ((compilation.direction === 'similarity' && threshold <= compilation.bounds[0]) ||
-      (compilation.direction === 'distance' && threshold >= compilation.bounds[1]))
+    compilation.direction === 'similarity' &&
+    threshold <= compilation.bounds[0]
   ) {
     compilation.validate(a, b)
     return true

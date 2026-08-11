@@ -3,7 +3,7 @@ import {
   lcsSeqLengthPreparedBounded,
   prepareLcsPattern,
 } from '../../algorithms/lcs/implementation.js'
-import type { PatternMask } from '../../algorithms/shared/bitmask/index.js'
+import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
 /**
  * The prepared-query hook every fuzz scorer shares.
  *
@@ -39,6 +39,7 @@ import {
   scorerSequence,
   type ChoicePreparer,
   type PrepareScorer,
+  type PreparedScorerFactory,
   type PreparedScore,
 } from '../../algorithms/shared/scorerSupport.js'
 import type { PreparedFuzzKind } from '../types.js'
@@ -48,13 +49,11 @@ import {
   partialAlignmentConverted,
   partialRatioConverted,
   partialRatioImpl,
-} from './basic.js'
+} from './partialWindow.js'
 import {
-  containsWhitespace,
   hasWhitespaceOf,
   preparedTokenChoice,
   sortedOf,
-  stringContainsWhitespace,
   tokenChoicePreparer,
   tokenForm,
   tokenViewOf,
@@ -64,8 +63,7 @@ import {
   partialTokenSetRatioConverted,
   tokenRatioConverted,
   tokenSetRatioConverted,
-  tokenSortRatioConverted,
-} from './tokenScorers.js'
+} from './tokenSet.js'
 
 /**
  * Ratio against immutable query-side LCS masks.
@@ -88,8 +86,6 @@ function ratioPrepared(
   scoreCutoff: number,
 ): number {
   const maximum = query.length + choice.length
-  if (maximum === 0) return scoreCutoff <= 100 ? 100 : 0
-
   const ceiling =
     (1 - (maximum - 2 * Math.min(query.length, choice.length)) / maximum) * 100
   if (ceiling < scoreCutoff) return 0
@@ -119,10 +115,8 @@ function ratioPrepared(
  */
 function tokenisesInput(kind: PreparedFuzzKind): boolean {
   switch (kind) {
-    case 'ratio':
     case 'partialRatio':
       return false
-    case 'tokenSortRatio':
     case 'partialTokenSortRatio':
     case 'tokenSetRatio':
     case 'partialTokenSetRatio':
@@ -134,7 +128,7 @@ function tokenisesInput(kind: PreparedFuzzKind): boolean {
 }
 
 /** Build the internal query-caching hook shared by all fuzz scorers. */
-export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
+export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
   const usesTokens = tokenisesInput(kind)
   // Every token scorer but one splits whatever it is handed, so converting a
   // raw candidate up front costs nothing it would not spend anyway. `wRatio` is
@@ -244,8 +238,6 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
       const cutoff = rawCutoff ?? 0
 
       switch (kind) {
-        case 'ratio':
-          return ratioPrepared(a, patternOf(), b, cutoff)
         case 'partialRatio': {
           // Unlike the mask kernels, the window scan prunes by comparing
           // elements with `===`, so a query held as a BMP string and a choice
@@ -270,15 +262,6 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
             )?.score ?? 0
           )
         }
-        case 'tokenSortRatio':
-          return tokenSortRatioConverted(
-            a,
-            b,
-            cutoff,
-            queryView,
-            choiceView,
-            sortedPatternOf(),
-          )
         case 'tokenSetRatio':
           return tokenSetRatioConverted(a, b, cutoff, queryView, choiceView)
         case 'tokenRatio':
@@ -323,6 +306,9 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
           )
         case 'wRatio': {
           if (a.length === 0 || b.length === 0 || cutoff > 100) return 0
+          if (tokenChoice === null) {
+            throw new TypeError('prepared fuzzy similarity expects a prepared choice')
+          }
           const unbaseScale = 0.95
           const lenRatio = a.length > b.length ? a.length / b.length : b.length / a.length
           let dynamicCutoff = cutoff
@@ -349,14 +335,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
             // The candidate reaches here unconverted, so its own test goes
             // through whichever spelling it arrived in — a prepared view always
             // holds code points, an unprepared candidate may still be a string.
-            if (
-              !hasWhitespaceOf(queryTokens) &&
-              !(choiceView === undefined
-                ? typeof b === 'string'
-                  ? stringContainsWhitespace(b)
-                  : containsWhitespace(b)
-                : hasWhitespaceOf(choiceView))
-            )
+            if (!hasWhitespaceOf(queryTokens) && !hasWhitespaceOf(tokenChoice))
               return result
             dynamicCutoff = Math.max(dynamicCutoff, result) / unbaseScale
             return Math.max(
@@ -370,7 +349,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
                 tokenForm(b),
                 dynamicCutoff,
                 queryView,
-                choiceView,
+                tokenChoice,
                 sortedPatternOf,
               ) * unbaseScale,
             )
@@ -405,7 +384,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
               tokenForm(b),
               dynamicCutoff,
               queryView,
-              choiceView,
+              tokenChoice,
               sortedPatternOf,
               sortedCharSetOf,
             ) *

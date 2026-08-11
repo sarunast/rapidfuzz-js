@@ -1,5 +1,5 @@
+import { commonPrefix } from '../shared/affix.js'
 import {
-  commonPrefix,
   conv,
   distCutoff,
   normalize,

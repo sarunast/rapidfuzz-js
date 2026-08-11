@@ -46,9 +46,6 @@ function customCompilation<D extends Direction>(
     bounds,
     symmetric,
     trusted: false,
-    validate: (a, b) => {
-      validatePair(a, b, direction, missing)
-    },
     score: (a, b) => score(a, b),
     prepareQuery: (query) => (choice) => score(query, validatePreparedChoice(choice)),
     prepareChoice: (choice) => choice,
@@ -117,11 +114,7 @@ export function createScorer<D extends Direction>(
   configuration?: object,
 ): Scorer<D> {
   if (isBuiltInMetric(metric)) {
-    const result: unknown = Reflect.apply(metric[COMPILE], metric, [configuration])
-    if (!isCompilation<D>(result)) {
-      throw new TypeError('built-in metric returned invalid compilation metadata')
-    }
-    return fromCompilation(result)
+    return fromCompilation(metric[COMPILE](configuration))
   }
   if (!isCustomConfiguration<D>(configuration)) {
     throw new TypeError(
@@ -141,22 +134,6 @@ export function createScorer<D extends Direction>(
       configuration.symmetric,
       configuration.missing ?? 'compatible',
     ),
-  )
-}
-
-function isCompilation<D extends Direction>(
-  value: unknown,
-): value is MetricCompilation<D> {
-  if (typeof value !== 'object' || value === null) return false
-  return (
-    (Reflect.get(value, 'direction') === 'similarity' ||
-      Reflect.get(value, 'direction') === 'distance') &&
-    Array.isArray(Reflect.get(value, 'bounds')) &&
-    typeof Reflect.get(value, 'symmetric') === 'boolean' &&
-    typeof Reflect.get(value, 'validate') === 'function' &&
-    typeof Reflect.get(value, 'score') === 'function' &&
-    typeof Reflect.get(value, 'prepareQuery') === 'function' &&
-    typeof Reflect.get(value, 'prepareChoice') === 'function'
   )
 }
 

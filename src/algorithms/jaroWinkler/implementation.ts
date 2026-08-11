@@ -1,8 +1,8 @@
 import { jaroSimilarity_, jaroSimilarityPrepared_ } from '../jaro/implementation.js'
-import { preparePattern, type PatternMask } from '../shared/bitmask/index.js'
+import { commonPrefix } from '../shared/affix.js'
+import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
-  commonPrefix,
   conv,
   normDistCutoff,
   normSimCutoff,
@@ -21,6 +21,7 @@ import {
   preparedScorerSequence,
   scorerSequence,
   type PrepareScorer,
+  type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
   type NormalizedScorer,
@@ -189,7 +190,7 @@ type PreparedJaroWinklerKind =
   | 'normalizedDistance'
   | 'normalizedSimilarity'
 
-function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PrepareScorer {
+function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query, kwargs) => {
     const rawPrefixWeight = Reflect.get(kwargs, 'prefixWeight')
     const prefixWeight = rawPrefixWeight == null ? 0.1 : rawPrefixWeight

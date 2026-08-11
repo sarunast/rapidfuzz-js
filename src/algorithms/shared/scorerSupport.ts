@@ -183,6 +183,7 @@ export interface Flagged {
 }
 
 export const PREPARE_CHOICE: unique symbol = Symbol('rapidfuzz.prepareChoice')
+export const PREPARE_SCORER: unique symbol = Symbol('rapidfuzz.prepareScorer')
 
 const PREPARED_SEQUENCE = Symbol('rapidfuzz.preparedSequence')
 
@@ -201,7 +202,7 @@ interface PreparedSequence {
 export type ChoicePreparer = (choice: unknown) => unknown
 
 export interface PreparedScore {
-  (choice: unknown, scoreCutoff: number | null, scoreHint: number | null): number
+  (choice: unknown, scoreCutoff: number | null): number
 }
 
 /**
@@ -230,6 +231,10 @@ export interface PrepareScorer {
   [PREPARE_CHOICE]?: ChoicePreparer
 }
 
+export interface PreparedScorerFactory extends PrepareScorer {
+  [PREPARE_CHOICE]: ChoicePreparer
+}
+
 /**
  * Attach a factory's choice-preparation policy, at the point the factory is
  * built. Every built-in goes through here, so the two cannot drift apart.
@@ -237,9 +242,9 @@ export interface PrepareScorer {
 export function withChoicePreparer(
   prepare: PrepareScorer,
   choicePreparer: ChoicePreparer,
-): PrepareScorer {
+): PreparedScorerFactory {
   prepare[PREPARE_CHOICE] = choicePreparer
-  return prepare
+  return Object.assign(prepare, { [PREPARE_CHOICE]: choicePreparer })
 }
 
 export type PreparedMetricKind =
@@ -302,7 +307,7 @@ export function prepareMetric(
   ) => number,
   maximum: (query: ArrayLike<unknown>, choice: ArrayLike<unknown>) => number,
   parseKwargs: (kwargs: Readonly<Record<string, unknown>>) => unknown = () => null,
-): PrepareScorer {
+): PreparedScorerFactory {
   const prepare: PrepareScorer = (query, kwargs) => {
     const preparedQuery = preparedScorerSequence(prepareScorerChoice(query))
     if (preparedQuery === null) throw new TypeError('expected a sequence')
@@ -356,14 +361,14 @@ export function prepareMetric(
  * annotating keeps the internal `*_impl` out of the declarations and satisfies
  * `isolatedDeclarations`.
  *
- * Deliberately *not* {@link Preparable}. Having a prepared-query factory is a
- * separate fact from being a scorer, and the run time already treats it as one:
- * {@link prepareScorerOf} answers `null` for a built-in registered without a
- * factory, which is exactly what {@link configure} produces from a scorer with
- * a baked-in processor. A `Scorer` that promised the factory would be a type
- * that a value this package itself hands out does not satisfy.
+ * The private preparation capability is part of every built-in scorer in 0.6.
  */
-export interface Scorer<O extends ScorerOptions = ScorerOptions> extends Flagged {
+export interface PreparedCapability {
+  readonly [PREPARE_SCORER]: PreparedScorerFactory
+}
+
+export interface Scorer<O extends ScorerOptions = ScorerOptions>
+  extends Flagged, PreparedCapability {
   (s1: Sequence, s2: Sequence, options?: O): number
 }
 
@@ -372,39 +377,27 @@ export interface Scorer<O extends ScorerOptions = ScorerOptions> extends Flagged
  * "missing" input instead of throwing, so their inputs widen to
  * {@link MaybeSequence}.
  */
-export interface NormalizedScorer<
-  O extends ScorerOptions = ScorerOptions,
-> extends Flagged {
+export interface NormalizedScorer<O extends ScorerOptions = ScorerOptions>
+  extends Flagged, PreparedCapability {
   (s1: MaybeSequence, s2: MaybeSequence, options?: O): number
 }
 
-/**
- * The prepared-query factory each built-in scorer was registered with.
- *
- * `process` could read the same function back off the `PREPARE_SCORER`
- * property, but only as an `unknown` it would then have to narrow — and no
- * runtime check can confirm a function's signature, so that narrowing would
- * assert a shape nothing had verified. Recording the factory here instead
- * keeps it typed from the point of registration, where it is known.
- */
-const preparedFactories = new WeakMap<object, PrepareScorer>()
+export function prepareScorerOf(scorer: PreparedCapability): PreparedScorerFactory {
+  return scorer[PREPARE_SCORER]
+}
+
+/** How a scorer's flags change once configuration is compiled into it. */
+const configurationFlagResolvers = new WeakMap<object, ConfigurationFlagsResolver>()
 
 /**
- * How a scorer's flags change once options are baked into it.
+ * How a scorer turns configuration into values it can safely retain.
  *
  * Recorded in a WeakMap for the same reason {@link preparedFactories} is.
  */
-const flagsFactories = new WeakMap<object, ConfiguredFlags>()
+const optionCanonicalizers = new WeakMap<object, ConfigurationCanonicalizer>()
 
 /**
- * How a scorer turns options being baked into it into values it can keep.
- *
- * Recorded in a WeakMap for the same reason {@link preparedFactories} is.
- */
-const optionCanonicalizers = new WeakMap<object, ConfigureOptions>()
-
-/**
- * Derives a scorer's flags from the options {@link configure} baked into it.
+ * Derives a scorer's flags from its compiled configuration.
  *
  * Only a scorer whose options can change its direction or its symmetry needs
  * one. Levenshtein is the case that exists: swapping the arguments swaps
@@ -413,14 +406,16 @@ const optionCanonicalizers = new WeakMap<object, ConfigureOptions>()
  * they are. Asking the scorer that owns the option is what keeps `scoreMatrix`
  * from having to know that the option is spelled `weights`.
  */
-export type ConfiguredFlags = (options: Readonly<Record<string, unknown>>) => ScorerFlags
+export type ConfigurationFlagsResolver = (
+  options: Readonly<Record<string, unknown>>,
+) => ScorerFlags
 
 /**
- * Replaces baked option values with ones the scorer can hold onto.
+ * Replaces configuration values with ones the scorer can hold onto.
  *
- * {@link configure} copies the options object, but only one level deep — a
+ * Scorer compilation copies the configuration object only one level deep, so a
  * nested value stays shared with whoever passed it in. That is a correctness
- * problem, not just an aliasing wart, because {@link ConfiguredFlags} runs
+ * problem, not just an aliasing wart, because {@link ConfigurationFlagsResolver} runs
  * *once*: bake `{ weights }`, then mutate `weights.deletion`, and the scorer
  * starts scoring asymmetrically while its recorded flags still say symmetric —
  * at which point `scoreMatrix` mirrors a triangle it never scored and reports
@@ -430,32 +425,25 @@ export type ConfiguredFlags = (options: Readonly<Record<string, unknown>>) => Sc
  * so canonicalising is asked of it rather than attempted generically. A deep
  * copy here could not tell a weights array from a processor function.
  */
-export type ConfigureOptions = (
+export type ConfigurationCanonicalizer = (
   options: Readonly<Record<string, unknown>>,
 ) => Readonly<Record<string, unknown>>
 
 /** Everything a scorer may register beyond its static flags. */
 export interface ScorerRegistration {
-  /**
-   * Query-caching factory. Absent means this scorer has no prepared path and
-   * {@link prepareScorerOf} reports `null` for it — which is the state a
-   * configured scorer with a baked-in processor needs, since the processor has
-   * to reach the scorer and the prepared path bypasses it.
-   */
-  readonly prepare?: PrepareScorer | undefined
-  /** See {@link ConfiguredFlags}. Absent means options cannot change the flags. */
-  readonly configuredFlags?: ConfiguredFlags | undefined
-  /** See {@link ConfigureOptions}. Absent means no option value needs snapshotting. */
-  readonly configureOptions?: ConfigureOptions | undefined
+  /** See {@link ConfigurationFlagsResolver}. Absent means options cannot change the flags. */
+  readonly configurationFlags?: ConfigurationFlagsResolver | undefined
+  /** See {@link ConfigurationCanonicalizer}. Absent means no option value needs snapshotting. */
+  readonly configurationCanonicalizer?: ConfigurationCanonicalizer | undefined
 }
 
 /**
  * Record a scorer this package built, with whatever metadata it has.
  *
  * Deliberately three independent facts rather than one bundle: being a built-in
- * (which lets `extract` tighten its cutoff against the running best), having a
+ * (which lets Matcher tighten its threshold against the running best), having a
  * prepared factory, and knowing how baked options change its flags. A
- * configured scorer needs the first without the second.
+ * compiled scorer needs the first without the second.
  */
 /**
  * Take a scorer's flags out of its supplier's hands.
@@ -463,7 +451,7 @@ export interface ScorerRegistration {
  * {@link ScorerFlags} is read once per scoring *run* and then trusted for every
  * pair in it, so a flag that changes underneath is not a stale display value —
  * `symmetric` turned on for an asymmetric scorer makes `scoreMatrix` mirror a
- * triangle it never scored. The same reasoning as {@link ConfigureOptions},
+ * triangle it never scored. The same reasoning as {@link ConfigurationCanonicalizer},
  * one level further out: what a scorer promises about its own output has to
  * stop being anyone else's to change once the scorer exists.
  *
@@ -477,32 +465,23 @@ function stableFlags(flags: ScorerFlags): ScorerFlags {
 
 /** Populate the registries, leaving the caller to attach the properties. */
 function recordScorer(scorer: object, registration: ScorerRegistration): void {
-  if (registration.prepare !== undefined) {
-    preparedFactories.set(scorer, registration.prepare)
+  if (registration.configurationFlags !== undefined) {
+    configurationFlagResolvers.set(scorer, registration.configurationFlags)
   }
-  if (registration.configuredFlags !== undefined) {
-    flagsFactories.set(scorer, registration.configuredFlags)
+  if (registration.configurationCanonicalizer !== undefined) {
+    optionCanonicalizers.set(scorer, registration.configurationCanonicalizer)
   }
-  if (registration.configureOptions !== undefined) {
-    optionCanonicalizers.set(scorer, registration.configureOptions)
-  }
-}
-
-/**
- * The prepared-query factory for a built-in scorer, or `null` for anything this
- * package did not build — third-party scorers take the generic call path.
- */
-export function prepareScorerOf(scorer: object): PrepareScorer | null {
-  return preparedFactories.get(scorer) ?? null
 }
 
 /** The flags-from-options resolver a scorer registered, or `null`. */
-export function configuredFlagsOf(scorer: object): ConfiguredFlags | null {
-  return flagsFactories.get(scorer) ?? null
+export function configurationFlagsOf(scorer: object): ConfigurationFlagsResolver | null {
+  return configurationFlagResolvers.get(scorer) ?? null
 }
 
 /** The option canonicaliser a scorer registered, or `null`. */
-export function configureOptionsOf(scorer: object): ConfigureOptions | null {
+export function configurationCanonicalizerOf(
+  scorer: object,
+): ConfigurationCanonicalizer | null {
   return optionCanonicalizers.get(scorer) ?? null
 }
 
@@ -552,119 +531,6 @@ export function alignRepresentation(
   other: ArrayLike<unknown>,
 ): ArrayLike<unknown> {
   return typeof s === 'string' && typeof other !== 'string' ? convSequence(s) : s
-}
-
-/**
- * Ceiling on the probe below, whatever an eighth of the inputs comes to.
- *
- * The pair the probe is most expensive for is the one it sends to the trimming
- * kernel: an affix of 480 in 512 leaves that kernel 32 elements to score, so an
- * unbounded eighth would spend more choosing than scoring. Thirty-two costs
- * half of what an eighth of that pair would and reaches the same verdict, and
- * it is still wider than the nineteen-element prefixes a near-copy list throws
- * up at every width the suite measures — which is the confusion that matters,
- * since calling those an affix would give back the whole win.
- *
- * Past this width the probe over-reports: an affix of exactly this many in a
- * pair thousands long is called worth trimming when it removes almost nothing.
- * That is the safe direction — over-reporting keeps the behaviour the length
- * gate had on its own — and it is what bounds the cost.
- *
- * Halving it again to 16 was measured and is worse: it starts calling the
- * near-copy prefixes an affix, which took the wins on those from 0.56x and
- * 0.74x back to 0.65x and 0.84x, to save 2% on the affix-heavy shape.
- */
-const AFFIX_PROBE_LIMIT = 32
-
-/**
- * Whether the pair shares an affix long enough to be worth trimming.
- *
- * This is the content half of the dispatch each metric's length gate
- * makes on lengths alone. The unprepared kernel's advantage over the held
- * pattern is entirely that it removes a common prefix and suffix first, and a
- * tight cutoff produces a narrow band and a large affix alike, so lengths
- * cannot tell an affix-free pair from an affix-heavy one — which is why
- * relaxing that gate on lengths measured 1.6x to 7.7x faster on one population
- * and 3.2x slower on the other.
- *
- * Deliberately a lower bound rather than the affix itself: it answers "is there
- * at least an eighth", not "how much", because measuring the affix itself would
- * cost the whole scan the answer is meant to avoid.
- *
- * It does not make the affix-heavy case free, and is not meant to: scanning the
- * probe and then handing the pair to a kernel with 32 elements left to score
- * measures about 4% slower than not asking. What it buys for that 4% is 1.35x
- * to 7.0x on the pairs the length gate was refusing, where the previous attempt
- * — relaxing on lengths alone — cost 3.2x on this same shape.
- *
- * An eighth rather than a constant because what matters is the affix relative
- * to the work it removes — nineteen shared elements out of 1024 is noise, and
- * the near-copy corpus is full of exactly that. It also makes the probe pay for
- * itself: it runs to completion only when the affix really is an eighth or
- * more, and trimming then removes at least an eighth of the kernel's work,
- * while an affix-free pair leaves at the first mismatch.
- *
- * Representation is a property of the pair, not of either side — a BMP string
- * held as a string and a sequence converted to code points compare `'a'`
- * against `97` and agree nowhere. A mixed pair therefore reports `true`, which
- * is the conservative answer: it leaves the length gate deciding alone, exactly
- * as it did before this probe existed.
- */
-export function sharesAffix(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
-  return hasAffix(a, b, Math.min(Math.min(a.length, b.length) >>> 3, AFFIX_PROBE_LIMIT))
-}
-
-/**
- * {@link sharesAffix} asking for a quarter rather than an eighth, and up to 64
- * elements rather than 32.
- *
- * Levenshtein's held pattern reads either representation and rebuilds nothing,
- * so the pair it is deciding for has already passed a gate that says the held
- * masks are worth it — which makes a false "yes" here cost the whole of that,
- * where for the LCS metrics it costs only what a length gate was refusing
- * anyway. An eighth is too little evidence for that: a near-copy list edited
- * one element in twenty clears an eighth of a 128-element pair, and calling
- * those an affix measured 0.74x. A quarter refuses them and keeps the 1.5x on
- * pairs that really do share their front.
- *
- * The wider ceiling follows the same asymmetry. Over-reporting is the safe
- * direction for {@link sharesAffix} and the expensive one here, so the demand
- * keeps rising with the input for twice as long before it flattens.
- */
-export function sharesWideAffix(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
-  return hasAffix(
-    a,
-    b,
-    Math.min(Math.min(a.length, b.length) >>> 2, 2 * AFFIX_PROBE_LIMIT),
-  )
-}
-
-/**
- * Whether `probe` elements match at either end. Shared by the two questions
- * above, which differ only in how many elements they ask for.
- *
- * A probe of zero reports `true` — an input too short to hold one has nothing
- * to trim, and both callers reach the same verdict from lengths alone.
- */
-function hasAffix(a: ArrayLike<unknown>, b: ArrayLike<unknown>, probe: number): boolean {
-  const lastA = a.length - 1
-  const lastB = b.length - 1
-  if (typeof a === 'string') {
-    if (typeof b !== 'string') return true
-    let i = 0
-    while (i < probe && a.charCodeAt(i) === b.charCodeAt(i)) i++
-    if (i === probe) return true
-    let j = 0
-    while (j < probe && a.charCodeAt(lastA - j) === b.charCodeAt(lastB - j)) j++
-    return j === probe
-  }
-  if (typeof b === 'string') return true
-  let i = 0
-  while (i < probe && a[i] === b[i]) i++
-  if (i === probe) return true
-  let j = 0
-  while (j < probe && a[lastA - j] === b[lastB - j]) j++
-  return j === probe
 }
 
 /** Read a process-prepared sequence after validating its opaque record. */
@@ -724,16 +590,17 @@ export const FUZZ_FLAGS: ScorerFlags = {
 export function withPreparedFlags<F extends ErasedScorer>(
   fn: F,
   flags: ScorerFlags,
-  prepare: PrepareScorer,
-  metadata: Omit<ScorerRegistration, 'prepare'> = {},
-): F & Flagged {
+  prepare: PreparedScorerFactory,
+  metadata: ScorerRegistration = {},
+): F & Flagged & PreparedErasedScorer {
   // One `Object.assign`, not one per registration step: adding properties to a
   // function object in two passes transitions its shape twice, and every scorer
   // this package ships goes through here.
   const scorer = Object.assign(fn, {
     rfScorerFlags: stableFlags(flags),
+    [PREPARE_SCORER]: prepare,
   })
-  recordScorer(scorer, { ...metadata, prepare })
+  recordScorer(scorer, metadata)
   return scorer
 }
 
@@ -748,6 +615,10 @@ export function withPreparedFlags<F extends ErasedScorer>(
  * let a plain record through.
  */
 export type ErasedScorer = (s1: never, s2: never, options?: never) => number
+
+export interface PreparedErasedScorer extends ErasedScorer {
+  readonly [PREPARE_SCORER]: PreparedScorerFactory
+}
 
 /**
  * Call a scorer whose declared input types the caller cannot see.
@@ -940,43 +811,4 @@ export function normSimCutoff(sim: number, cutoff?: number | null | undefined): 
 /** `dist / maximum`, with the degenerate "both inputs empty" case pinned to 0. */
 export function normalize(dist: number, maximum: number): number {
   return maximum === 0 ? 0 : dist / maximum
-}
-
-/**
- * Number of leading elements `s1` and `s2` have in common.
- *
- * The string branch exists because {@link scorerSequence} deliberately keeps a
- * BMP-only string as a string: indexing one yields a fresh single-character
- * string per position, so `s1[i] === s2[i]` allocates twice and then compares
- * two heap values. `charCodeAt` compares two integers instead. Both inputs
- * share a representation by the time they reach here, so the question is asked
- * once for the whole scan rather than per position.
- */
-export function commonPrefix(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
-  const limit = Math.min(s1.length, s2.length)
-  let i = 0
-
-  if (typeof s1 === 'string' && typeof s2 === 'string') {
-    while (i < limit && s1.charCodeAt(i) === s2.charCodeAt(i)) i++
-    return i
-  }
-
-  while (i < limit && s1[i] === s2[i]) i++
-  return i
-}
-
-/** Number of trailing elements `s1` and `s2` have in common. See {@link commonPrefix}. */
-export function commonSuffix(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
-  const limit = Math.min(s1.length, s2.length)
-  const end1 = s1.length - 1
-  const end2 = s2.length - 1
-  let i = 0
-
-  if (typeof s1 === 'string' && typeof s2 === 'string') {
-    while (i < limit && s1.charCodeAt(end1 - i) === s2.charCodeAt(end2 - i)) i++
-    return i
-  }
-
-  while (i < limit && s1[end1 - i] === s2[end2 - i]) i++
-  return i
 }

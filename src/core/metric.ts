@@ -1,4 +1,4 @@
-import { COMPILE, METRIC_CONFIGURATION, type MetricCompilation } from './protocol.js'
+import { COMPILE, type MetricCompilation } from './protocol.js'
 import type { Direction, MaybeSequence } from './types.js'
 
 export interface Metric<
@@ -6,10 +6,11 @@ export interface Metric<
   Config extends object = Record<never, never>,
 > {
   (a: MaybeSequence, b: MaybeSequence): number
-  readonly [METRIC_CONFIGURATION]: (configuration: Config) => Config
   readonly [COMPILE]: (configuration: Config | undefined) => MetricCompilation<D>
 }
 
-export function isBuiltInMetric(value: object): value is Metric<Direction, object> {
+export function isBuiltInMetric<D extends Direction, Config extends object>(
+  value: Metric<D, Config> | ((a: MaybeSequence, b: MaybeSequence) => number),
+): value is Metric<D, Config> {
   return COMPILE in value && typeof value[COMPILE] === 'function'
 }

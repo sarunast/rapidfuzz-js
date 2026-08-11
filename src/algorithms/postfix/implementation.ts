@@ -1,5 +1,5 @@
+import { commonSuffix } from '../shared/affix.js'
 import {
-  commonSuffix,
   conv,
   distCutoff,
   normalize,

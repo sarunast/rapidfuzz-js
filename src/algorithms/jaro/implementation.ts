@@ -1,4 +1,4 @@
-import { preparePattern, type PatternMask } from '../shared/bitmask/index.js'
+import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
   conv,
@@ -19,6 +19,7 @@ import {
   preparedScorerSequence,
   scorerSequence,
   type PrepareScorer,
+  type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
   type NormalizedScorer,
@@ -158,7 +159,6 @@ function jaroSimilarityCore(
   for (let i = skip; i < textLength; i++) {
     const low = Math.max(0, i - bound)
     const high = Math.min(patternLength - 1, i + bound)
-    if (low > high) continue
     const firstWord = low >>> 5
     const lastWord = high >>> 5
     const symbol = stringText ? text.charCodeAt(origin + i) : text[origin + i]
@@ -210,7 +210,6 @@ function jaroSimilarityCore(
     text,
     origin,
     skip,
-    patternLength,
     textLength,
     pFlag,
     tFlag,
@@ -233,12 +232,10 @@ function countTranspositionsWords(
   text: ArrayLike<unknown>,
   origin: number,
   skip: number,
-  patternLength: number,
   textLength: number,
   pFlag: Uint32Array,
   tFlag: Uint32Array,
 ): number {
-  const patternWords = (patternLength + 31) >>> 5
   const textWords = (textLength + 31) >>> 5
   const firstWord = skip >>> 5
   // Both sides start past the prefix: those positions matched each other in
@@ -251,7 +248,7 @@ function countTranspositionsWords(
   // positions costs nothing rather than a step each.
   let transpositions = 0
   let patternWord = firstWord
-  let patternBits = patternWords === 0 ? 0 : pFlag[firstWord] & leading
+  let patternBits = pFlag[firstWord] & leading
 
   if (typeof pattern === 'string' && typeof text === 'string') {
     for (let word = firstWord; word < textWords; word++) {
@@ -479,7 +476,7 @@ type PreparedJaroKind =
   | 'normalizedDistance'
   | 'normalizedSimilarity'
 
-export function prepareJaro(kind: PreparedJaroKind): PrepareScorer {
+export function prepareJaro(kind: PreparedJaroKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
     if (a === null) throw new TypeError('expected a sequence')

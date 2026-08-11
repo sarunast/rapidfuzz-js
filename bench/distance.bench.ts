@@ -7,12 +7,12 @@ import {
 } from '../src/algorithms/indel/implementation.js'
 import { jaroSimilarity } from '../src/algorithms/jaro/implementation.js'
 import { lcsSeqEditops, lcsSeqSimilarity } from '../src/algorithms/lcs/implementation.js'
+import { levenshteinEditops } from '../src/algorithms/levenshtein/editops.js'
 import {
   levenshteinDistance,
-  levenshteinEditops,
   levenshteinNormalizedSimilarity,
   levenshteinSimilarity,
-} from '../src/algorithms/levenshtein/implementation.js'
+} from '../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../src/algorithms/osa/implementation.js'
 import {
   editedPairs,

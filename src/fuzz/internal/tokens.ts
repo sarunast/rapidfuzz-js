@@ -19,7 +19,7 @@
  *
  * One piece is structural rather than stylistic: `tokenChoices` is an
  * identity-based brand registry, so it has to be a singleton, and an ESM importer
- * cannot assign an imported binding — see `_bitVector/shared.ts` for the same
+ * cannot assign an imported binding — see `blockMasks.ts` for the same
  * constraint met the other way. {@link tokenChoicePreparer} writes to it and
  * `isPreparedTokenChoice` reads it.
  *
@@ -42,6 +42,7 @@ import {
   convSequence,
   isSequence,
   type ChoicePreparer,
+  type Sequence,
 } from '../../algorithms/shared/scorerSupport.js'
 
 const SPACE = 32
@@ -666,10 +667,15 @@ const tokenChoices = new WeakSet<object>()
 export function tokenChoicePreparer(): ChoicePreparer {
   return (choice) => {
     if (!isSequence(choice)) return choice
-    const prepared: PreparedTokenChoice = { sequence: convSequence(choice) }
-    tokenChoices.add(prepared)
-    return prepared
+    return prepareTokenChoice(choice)
   }
+}
+
+/** Build a token choice after the caller has established the sequence contract. */
+export function prepareTokenChoice(choice: Sequence): PreparedTokenChoice {
+  const prepared: PreparedTokenChoice = { sequence: convSequence(choice) }
+  tokenChoices.add(prepared)
+  return prepared
 }
 
 /** Whether this module tokenised `value`, and so wrote every field on it. */
