@@ -74,6 +74,8 @@ function editedPair(random, length) {
  * @property {string[]}                           queries    needles for it
  * @property {string[]}                           matrixRows queries for a matrix
  * @property {string[]}                           matrixCols choices for it
+ * @property {string[]}                           titles     multiword search choices
+ * @property {string[]}                           titleQueries multiword needles
  */
 
 /** The lengths the distance tasks run at. */
@@ -122,5 +124,28 @@ export function buildCorpus() {
   const matrixRows = choices.slice(0, 50)
   const matrixCols = choices.slice(50, 250)
 
-  return { pairs, sentences, choices, queries, matrixRows, matrixCols }
+  const titles = []
+  for (let i = 0; i < 2000; i++) {
+    const parts = []
+    for (let w = 0; w < 5; w++) parts.push(word(random, 3 + Math.floor(random() * 6)))
+    titles.push(parts.join(' '))
+  }
+
+  const titleQueries = []
+  for (let i = 0; i < 20; i++) {
+    const parts = []
+    for (let w = 0; w < 5; w++) parts.push(word(random, 3 + Math.floor(random() * 6)))
+    titleQueries.push(parts.join(' '))
+  }
+
+  return {
+    pairs,
+    sentences,
+    choices,
+    queries,
+    matrixRows,
+    matrixCols,
+    titles,
+    titleQueries,
+  }
 }

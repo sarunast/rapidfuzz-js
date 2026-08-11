@@ -26,7 +26,18 @@ from time import perf_counter
 from typing import Callable
 
 from rapidfuzz import fuzz, process
-from rapidfuzz.distance import Levenshtein
+from rapidfuzz.distance import (
+    DamerauLevenshtein,
+    Hamming,
+    Indel,
+    Jaro,
+    JaroWinkler,
+    LCSseq,
+    Levenshtein,
+    OSA,
+    Postfix,
+    Prefix,
+)
 
 WARMUPS = 3
 PASSES = 9
@@ -81,6 +92,45 @@ def main() -> None:
         lambda: [ratio(a, b) for a, b in sentences] and None
     )
 
+    pairs_128 = corpus["pairs"]["128"]
+    fixed_query_128 = pairs_128[0][0]
+    fixed_choices_128 = [choice for _, choice in pairs_128]
+    levenshtein_distance = Levenshtein.distance
+    results["fixed-query-levenshtein-128"] = time_it(
+        lambda: [
+            levenshtein_distance(fixed_query_128, choice)
+            for choice in fixed_choices_128
+        ]
+        and None
+    )
+    pair_metrics = {
+        "indel-distance-128": Indel.distance,
+        "lcs-similarity-128": LCSseq.similarity,
+        "osa-distance-128": OSA.distance,
+        "damerau-distance-128": DamerauLevenshtein.distance,
+        "hamming-distance-128": Hamming.distance,
+        "jaro-similarity-128": Jaro.similarity,
+        "jaro-winkler-similarity-128": JaroWinkler.similarity,
+        "prefix-distance-128": Prefix.distance,
+        "postfix-distance-128": Postfix.distance,
+    }
+    for key, metric in pair_metrics.items():
+        results[key] = time_it(
+            lambda metric=metric: [metric(a, b) for a, b in pairs_128] and None
+        )
+
+    fuzz_metrics = {
+        "partial-ratio-sentences": fuzz.partial_ratio,
+        "token-sort-ratio-sentences": fuzz.token_sort_ratio,
+        "token-set-ratio-sentences": fuzz.token_set_ratio,
+        "w-ratio-sentences": fuzz.WRatio,
+        "q-ratio-sentences": fuzz.QRatio,
+    }
+    for key, scorer in fuzz_metrics.items():
+        results[key] = time_it(
+            lambda scorer=scorer: [scorer(a, b) for a, b in sentences] and None
+        )
+
     choices = corpus["choices"]
     queries = corpus["queries"]
     extract_one = process.extractOne
@@ -88,10 +138,41 @@ def main() -> None:
         lambda: [extract_one(q, choices, scorer=ratio) for q in queries] and None
     )
 
+    titles = corpus["titles"]
+    title_queries = corpus["titleQueries"]
+    token_sort_ratio = fuzz.token_sort_ratio
+    results["extract-one-token-sort"] = time_it(
+        lambda: [
+            extract_one(q, titles, scorer=token_sort_ratio) for q in title_queries
+        ]
+        and None
+    )
+
     rows = corpus["matrixRows"]
     cols = corpus["matrixCols"]
     results["score-matrix"] = time_it(
         lambda: process.cdist(rows, cols, scorer=ratio) is None
+    )
+    results["score-matrix-token-sort"] = time_it(
+        lambda: process.cdist(
+            titles[:50], titles[50:250], scorer=token_sort_ratio
+        )
+        is None
+    )
+
+    sentence_left = [left for left, _ in sentences]
+    sentence_right = [right for _, right in sentences]
+    results["score-pairs-ratio"] = time_it(
+        lambda: process.cpdist(sentence_left, sentence_right, scorer=ratio) is None
+    )
+
+    levenshtein_editops = Levenshtein.editops
+    results["levenshtein-editops-128"] = time_it(
+        lambda: [levenshtein_editops(a, b) for a, b in pairs_128] and None
+    )
+    lcs_editops = LCSseq.editops
+    results["lcs-editops-128"] = time_it(
+        lambda: [lcs_editops(a, b) for a, b in pairs_128] and None
     )
 
     json.dump(results, sys.stdout)
