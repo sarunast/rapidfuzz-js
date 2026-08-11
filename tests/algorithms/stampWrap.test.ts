@@ -19,7 +19,7 @@ import {
   resetDamerauScratch,
 } from '../../src/algorithms/damerauLevenshtein/implementation.js'
 import { indelDistance } from '../../src/algorithms/indel/implementation.js'
-import { lcsSeqSimilarity } from '../../src/algorithms/lcs/implementation.js'
+import { lcsSeqNormalizedSimilarity } from '../../src/algorithms/lcs/implementation.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { resetBitVectorScratch } from '../../src/algorithms/shared/bitmask/blockMasks.js'
 import { resetPartialRatioScratch } from '../../src/fuzz/internal/partialWindow.js'
@@ -63,7 +63,7 @@ describe('the shared mask table across its stamp wrap', () => {
 
     for (let pass = 0; pass < 4; pass++) {
       expect(indelDistance('flaw', 'lawn')).toBe(2)
-      expect(lcsSeqSimilarity('abcde', 'axcye')).toBe(3)
+      expect(lcsSeqNormalizedSimilarity('abcde', 'axcye')).toBe(3 / 5)
       expect(indelDistance('привет', 'превет')).toBe(2)
     }
 

@@ -4,8 +4,8 @@
  * Distinct from the shared table in `shared.ts` in the one way that matters:
  * this storage belongs to the pattern that built it. A later kernel call cannot
  * overwrite it, so a prepared process scorer can hold one for an entire
- * extraction or matrix row — which is what `partialRatio`, `cdist` and the
- * prepared scorers in `fuzz.ts` rely on.
+ * search or matrix row — which is what partial similarity, `scoreMatrix`, and
+ * the prepared fuzz scorers rely on.
  *
  * Nothing here reads or writes the shared scratch, so this module imports no
  * sibling.
@@ -37,7 +37,7 @@
  * allocated, which the span alone does not bound, since the same span behind a
  * 4096-element pattern is thirty times the storage it is behind a short one.
  * Together they cap a window at 64KB whatever the pattern's length, which
- * matters because `cdist` holds one prepared pattern per row.
+ * matters because `scoreMatrix` holds one prepared pattern per row.
  *
  * Addressing all three regions the same way is what makes the lookup a single
  * number. While the masks lived in two arrays it had two things to say — which
@@ -74,7 +74,7 @@ const WINDOW_SPAN_LIMIT = 2048
  * The span alone does not bound the memory — a window is `span * words` cells,
  * so the same 2048-code-point span is 32KB behind a four-word pattern and 1MB
  * behind a 4096-element one. This is the bound that actually holds: 16384 cells
- * is 64KB whatever the pattern's length, which matters because `cdist` holds
+ * is 64KB whatever the pattern's length, which matters because `scoreMatrix` holds
  * one prepared pattern per row.
  *
  * A cap rather than a measured optimum. It is set where the allocation stops

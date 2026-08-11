@@ -2,8 +2,8 @@
 import { expect, it } from 'vitest'
 
 import { jaroSimilarity } from '../../src/algorithms/jaro/implementation.js'
-import { prepareScorerOf } from '../../src/algorithms/shared/scorerSupport.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
+import { prepareScorerOf } from '../support/preparation.js'
 import { Jaro } from '../support/scorers.js'
 
 it('handles sequences of numbers', () => {
@@ -49,36 +49,22 @@ it('handles the edge case lengths found by fuzzing', () => {
   ).toBeCloseTo(0.8359375, 6)
 })
 
-it('applies score_cutoff to the exact similarity, not just the coarse bound', () => {
+it('applies thresholds to the exact similarity, not just the coarse bound', () => {
   // The transpositions in "abcd"/"dcba" place the exact similarity (0.5) below
   // the coarse upper bound (0.66).
   expect(Jaro.similarity('abcd', 'dcba')).toBeCloseTo(0.5, 6)
-  expect(Jaro.similarity('abcd', 'dcba', { scoreCutoff: 0.5 })).toBeCloseTo(0.5, 6)
-  expect(Jaro.similarity('abcd', 'dcba', { scoreCutoff: 0.6 })).toBe(0)
-  expect(Jaro.normalizedSimilarity('abcd', 'dcba', { scoreCutoff: 0.6 })).toBe(0)
+  expect(Jaro.similarity('abcd', 'dcba', { threshold: 0.5 })).toBeCloseTo(0.5, 6)
+  expect(Jaro.similarity('abcd', 'dcba', { threshold: 0.6 })).toBeUndefined()
 })
 
-// Not ported — upstream has no test for it, but its `Jaro.distance` and
-// `Jaro.similarity` take `score_cutoff` as a `double` in `[0, 1]`, exactly as
-// the `normalized_*` pair does, because Jaro has no raw score for a cutoff to
-// count elements of. The values below are rapidfuzz 3.14.5's.
-//
-// The distinction is visible in three places: a fraction is a real cutoff
-// rather than something truncated to `0`, a rejected pair reports the worst
-// score rather than `scoreCutoff + 1`, and a cutoff outside `[0, 1]` is
-// refused rather than quietly rejecting everything.
-it('reads scoreCutoff as a normalised one, distance included', () => {
+it('reads thresholds on its natural normalized scale', () => {
   expect(Jaro.similarity('abcd', 'abce')).toBeCloseTo(0.833333, 5)
-  expect(Jaro.similarity('abcd', 'abce', { scoreCutoff: 0.9 })).toBe(0)
-  expect(Jaro.distance('abcd', 'abce', { scoreCutoff: 0.1 })).toBe(1)
-  expect(Jaro.distance('abcd', 'abce', { scoreCutoff: 0.5 })).toBeCloseTo(0.166666, 5)
-  expect(() => Jaro.similarity('abcd', 'abce', { scoreCutoff: 1.5 })).toThrow(RangeError)
-  expect(() => Jaro.distance('abcd', 'abce', { scoreCutoff: -1 })).toThrow(RangeError)
+  expect(Jaro.similarity('abcd', 'abce', { threshold: 0.9 })).toBeUndefined()
 })
 
 it('is case insensitive with the default processor', () => {
   expect(
-    Jaro.similarity('new york mets', 'new YORK mets', { processor: defaultProcess }),
+    Jaro.similarity(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBeCloseTo(1, 6)
 })
 

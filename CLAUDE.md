@@ -1,26 +1,27 @@
 # Project conventions
 
-## Goal: parity with Python RapidFuzz
+## Goal: RapidFuzz algorithms behind a JavaScript-first API
 
-This project is a JavaScript/TypeScript port of
-[RapidFuzz](https://github.com/rapidfuzz/RapidFuzz) (MIT). The goal is a
-**parity library**: the same modules (`distance`, `fuzz`, `process`, `utils`),
-the same algorithms, and the same numeric results for the same inputs.
+This project is a JavaScript/TypeScript implementation of
+[RapidFuzz](https://github.com/rapidfuzz/RapidFuzz) algorithms (MIT). Algorithm
+results follow RapidFuzz, but the public API is intentionally JavaScript-first:
+`Metric -> Scorer -> Matcher`, canonical lowercase algorithm subpaths, and no
+legacy aggregate namespaces.
 
 Practical consequences:
 
-- **The Python implementation is the spec.** When behaviour is unclear, read the
-  reference `src/rapidfuzz/**/*_py.py` rather than guessing or inventing
-  something more "natural" for JS. Its edge cases (`scoreCutoff` conventions,
-  empty-input handling, `WRatio`'s 0.9/0.95 scaling) are load-bearing.
+- **The Python implementation is the algorithm spec.** When numeric behaviour is
+  unclear, read the reference `src/rapidfuzz/**/*_py.py`. Preserve its edge cases
+  and adaptive fuzzy weighting while expressing them through this package's API.
 - **Tests are ported from RapidFuzz's own suite**, under `tests/`, with a header
   comment naming the source file. Port the assertions faithfully, including the
   regression tests named after upstream issue numbers — those numbers are the
   reason the test exists. Aim for the fullest coverage of the upstream suite we
   can express.
-- **Naming is camelCase** (`indelDistance`, `scoreCutoff`) but maps 1:1 onto
-  upstream's snake_case (`indel_distance`, `score_cutoff`). Keep the mapping
-  mechanical so upstream docs stay usable.
+- **Naming is camelCase**, but public names describe this API: `similarity`,
+  `partialSimilarity`, `fuzzySimilarity`, `createScorer`, and `createMatcher`.
+  Do not restore removed RapidFuzz aliases such as `WRatio`, `QRatio`, or
+  `extractOne`.
 - **Correctness before speed.** Where upstream uses a bit-parallel or SIMD
   implementation, a straightforward DP that produces identical results is
   acceptable; optimise later, behind the ported tests.
@@ -74,7 +75,7 @@ the proof is visible — `filter((x) => x !== undefined)` narrows where
 
 Note: `noUncheckedIndexedAccess` is deliberately **off** in `tsconfig.json`.
 With it on, every read from an array or typed array widens to `T | undefined`,
-and the numeric DP loops in `src/distance/` would need a `!` or a `?? 0` on
+and the numeric DP loops in `src/algorithms/` would need a `!` or a `?? 0` on
 every single indexed read. Turning it off removes the need for the assertion
 rather than hiding it.
 
@@ -82,9 +83,7 @@ rather than hiding it.
 
 `pnpm coverage` passes `--coverage.thresholds.100` and fails below it on all
 four metrics. CI runs the same script, so a laptop and a pull request refuse
-for the same reason. The threshold lives in the script rather than in
-`vitest.config.ts` because that file is hashed into all 155 benchmark baseline
-entries — see below.
+for the same reason.
 
 The number is only meaningful because unreachable code is **deleted rather than
 excused**. `src/` carries **no `/* v8 ignore */` at all**, and that is the state
@@ -100,7 +99,8 @@ order of how often it applied:
 
 - **It is a type-checker artefact, not dead logic.** Restructure so the proof
   is visible. Sixteen `pool === null` guards became four accessors in
-  `_bitVector/shared.ts` that return the buffer instead of a nullable binding.
+  the algorithm-owned bitmask helpers that return the buffer instead of a
+  nullable binding.
   The last one to go was `identityOrder`'s: `compareElements` narrows with
   `isObjectLike` while the runtime proof is still in scope, so the callee takes
   `object` and needs no guard of its own. Narrowing at the call site is what an
@@ -121,55 +121,36 @@ These are load-bearing for bundle size — see README.md for the full rationale:
 - Export standalone named functions, never namespace objects.
 - No runtime dependencies, and no Node built-ins in `src/`.
 
-## Names that deliberately break the 1:1 mapping
+## Public API and dependency ownership
 
-The camelCase rule above holds for every scorer, and for the options they take.
-It does not hold for the handful of entry points whose Python shape did not
-survive the port. These are deliberate — do not "fix" them back:
+The root exports orchestration only: scorer creation, matching/search, batch
+scoring, threshold helpers, and text normalization. Algorithms are imported
+from canonical subpaths such as `rapidfuzz-js/levenshtein` and
+`rapidfuzz-js/fuzz`; never re-export them from the root.
 
-| Upstream           | Here                                              | Why                                                                                                                                                                                                                     |
-| ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `process` (module) | `search`                                          | `process` is a Node global, and shadowing it inside the module had already happened once.                                                                                                                               |
-| `cdist`            | `scoreMatrix`                                     | Returns a `ScoreMatrix` over a typed array, not `cdist`'s array of arrays.                                                                                                                                              |
-| `cpdist`           | `scorePairs`                                      | Returns a typed array.                                                                                                                                                                                                  |
-| `dtype`            | `into`                                            | Chooses the element type, where `dtype` only chose whether to round.                                                                                                                                                    |
-| `scorer_kwargs`    | `configure(scorer, options)`                      | A bag of arguments passed alongside a scorer cannot be type-checked against it.                                                                                                                                         |
-| —                  | `matchScore`, `isMatch`                           | No counterpart: they exist because a missed `scoreCutoff` is otherwise reported as a sentinel, and for a similarity that sentinel is `0`.                                                                               |
-| —                  | `prepareChoices`, `prepareQuery`, `prepareChoice` | No counterpart: upstream caches the query side of a scorer inside `process` and hands a caller neither half. `prepareChoices` measured 0.17-0.81x per query; the two singular handles 0.14-0.85x against a direct call. |
-| `Editops` (list)   | `Editops` (readonly result)                       | The Python original is a mutable sequence of tuples. Reproducing it meant reimplementing `list`; the operations live in `ops.operations`, and JavaScript supplies the rest.                                             |
+Preserve each algorithm's natural scale. Fuzz similarities return `0..100`,
+normalized algorithm similarities and Jaro-family similarities return `0..1`,
+and distances remain in native edit/count units. Generic infrastructure must
+not rescale between families.
 
-The last one is the largest. Upstream's `Editops`/`Opcodes` are indexable,
-sliceable with a step, `del`-able and full of tuples; here they hold readonly
-records and nothing else. `as_list()`, `at`, `slice`, `delete`, `copy` and
-per-operation iteration are gone, `as_opcodes()`/`as_matching_blocks()` are
-`toOpcodes()`/`toMatchingBlocks()`, the constructors are
-`fromOperations`/`fromOpcodes`/`fromEditops`, and `MatchingBlock` is
-`{ srcStart, destStart, length }`. What did not change: tags, positions,
-`srcLen`/`destLen`, and every conversion. When porting an upstream test that
-indexes or slices one of these, port the assertion, not the protocol —
-`tests/common.ts` has `editopTuples`/`opcodeTuples`/`blockTuples` so upstream's
-tuple tables can still be transcribed verbatim.
+Source ownership follows dependency direction:
 
-Building either collection without validating is `editopsFromValidated` /
-`opcodesFromValidated`, module-level functions in `src/distance/editops.ts`
-that are deliberately absent from both barrels — a static on an exported class
-would be public API, and these skip every check. Both barrels list their
-editops exports explicitly for that reason; do not restore the `export *`.
+- `core/` knows types, protocols, scorer construction, thresholds, and
+  normalization. It never imports algorithms.
+- Each algorithm directory owns its public metric, compilation, preparation,
+  and hot kernels. Shared algorithm code is limited to proven low-level data
+  structures under `algorithms/shared/`.
+- `fuzz/` is split by scorer family. Basic similarity must not import token or
+  adaptive-fuzzy modules.
+- `search/` and `batch/` depend only on core protocols, never on named
+  algorithms. They execute private prepared kernels rather than public
+  `Scorer.score()` calls.
+- Tests mirror these domains, with import direction and public reachability
+  guarded in `tests/architecture/`.
 
-Three types were renamed in 0.5.0, once the singular handles arrived. Two are
-public and were renamed outright, with no alias: `PreparedChoices` →
-`PreparedChoiceIndex`, `PrepareChoicesOptions` → `PrepareOptions` (now shared by
-all three `prepare*` entry points). Neither old name describes what it holds any
-more, and a type-only alias is invisible to `check-exports.mjs`, which asserts
-runtime values — so an alias would have had nothing but a test holding it. The
-third is internal: `PrepareChoice` became `ChoicePreparer`, because the old name
-was one import away from shadowing the `prepareChoice` export.
-
-Two more shape changes with no name attached: `extract*` return
-`{ choice, score, key }` rather than the positional tuple, and `NaN` is treated
-as a missing value at run time but is not in the input types. README's
-"Differences from Python RapidFuzz" is the user-facing list; keep the two in
-sync.
+Do not add compatibility aliases, aggregate namespaces, public prepared
+handles, or a horizontal `common`/`preparation` subsystem. Delete unused code;
+do not keep it for a removed API.
 
 ## Benchmarks
 

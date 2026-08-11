@@ -14,29 +14,19 @@ import {
   conv,
   distCutoff,
   normalize,
-  normDistCutoff,
   normSimCutoff,
-  simCutoff,
   type ScorerOptions,
   type Sequence,
   DISTANCE_FLAGS,
-  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  SIMILARITY_FLAGS,
-  type MaybeSequence,
-  isNone,
-  asSequence,
   type EditopsOptions,
-  isSequence,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
-  scorerSequence,
   type PrepareScorer,
   type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
-  type NormalizedScorer,
   type Scorer,
 } from '../shared/scorerSupport.js'
 import {
@@ -100,56 +90,16 @@ function lcsSeqDistance_impl(
 }
 
 /**
- * Length of the longest common subsequence of `s1` and `s2`.
+ * LCS similarity normalised into `[0, 1]`, where `1` means identical.
  *
- * If the similarity is smaller than `scoreCutoff`, `0` is returned.
+ * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
  */
-function lcsSeqSimilarity_impl(
+function lcsSeqNormalizedSimilarity_impl(
   s1: Sequence,
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
   const [a, b] = conv(s1, s2, options.processor)
-  const cutoff = canonicalRawCutoff(options.scoreCutoff)
-  const misses = cutoff == null ? Number.MAX_SAFE_INTEGER : maximum(a, b) - cutoff
-  return simCutoff(boundedLength(a, b, misses), cutoff)
-}
-
-/**
- * {@link lcsSeqDistance} normalised into `[0, 1]`.
- *
- * If the normalised distance is greater than `scoreCutoff`, `1` is returned.
- */
-function lcsSeqNormalizedDistance_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: ScorerOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 1
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  const max = maximum(a, b)
-  const cutoff =
-    options.scoreCutoff == null ? Number.MAX_SAFE_INTEGER : options.scoreCutoff * max
-  return normDistCutoff(
-    normalize(max - boundedLength(a, b, cutoff), max),
-    options.scoreCutoff,
-  )
-}
-
-/**
- * {@link lcsSeqSimilarity} normalised into `[0, 1]`, where `1` means identical.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
-function lcsSeqNormalizedSimilarity_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: ScorerOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 0
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
   const max = maximum(a, b)
   const cutoff =
     options.scoreCutoff == null
@@ -241,16 +191,11 @@ export function lcsSeqOpcodes(
   return lcsSeqEditops(s1, s2, options).toOpcodes()
 }
 
-type PreparedLcsKind =
-  | 'distance'
-  | 'similarity'
-  | 'normalizedDistance'
-  | 'normalizedSimilarity'
+type PreparedLcsKind = 'distance' | 'normalizedSimilarity'
 
 function prepareLcs(kind: PreparedLcsKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
-    if (a === null) throw new TypeError('expected a sequence')
     let pattern: import('../shared/bitmask/pattern.js').PatternMask | null = null
     const length = (b: ArrayLike<unknown>, cutoff: number): number => {
       if (!preparedLengthWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
@@ -260,38 +205,23 @@ function prepareLcs(kind: PreparedLcsKind): PreparedScorerFactory {
         return boundedLength(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)
       }
       pattern ??= preparePattern(a, 0, a.length)
-      const required = Math.max(0, Math.ceil(maximum(a, b) - cutoff))
+      // A lower integer bound is deliberately conservative. Rounding a
+      // normalized threshold back into edit units can land one ULP above an
+      // integer; rounding upward there would reject a score exactly at the
+      // caller's threshold. Being one match looser only costs pruning.
+      const required = Math.max(0, Math.floor(maximum(a, b) - cutoff))
       return required > 0
         ? lcsLengthPreparedBounded(pattern, b, 0, b.length, required)
         : lcsLengthPrepared(pattern, b, 0, b.length)
     }
 
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      if (isNone(rawChoice)) {
-        if (kind === 'normalizedDistance') return 1
-        if (kind === 'normalizedSimilarity') return 0
-      }
-      let b = preparedScorerSequence(rawChoice)
-      if (b === null) {
-        if (!isSequence(rawChoice)) {
-          throw new TypeError('expected a string or an array-like sequence')
-        }
-        b = scorerSequence(rawChoice)
-      }
+      const b = preparedScorerSequence(rawChoice)
       const max = maximum(a, b)
       switch (kind) {
         case 'distance': {
           const cutoff = canonicalRawCutoff(rawCutoff)
           return distCutoff(max - length(b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
-        }
-        case 'similarity': {
-          const cutoff = canonicalRawCutoff(rawCutoff)
-          const misses = cutoff === null ? Number.MAX_SAFE_INTEGER : max - cutoff
-          return simCutoff(length(b, misses), cutoff)
-        }
-        case 'normalizedDistance': {
-          const cutoff = rawCutoff === null ? Number.MAX_SAFE_INTEGER : rawCutoff * max
-          return normDistCutoff(normalize(max - length(b, cutoff), max), rawCutoff)
         }
         case 'normalizedSimilarity': {
           const cutoff =
@@ -305,26 +235,13 @@ function prepareLcs(kind: PreparedLcsKind): PreparedScorerFactory {
   return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
-// Scorer flags let `process` tell distances from similarities.
 export const lcsSeqDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
   lcsSeqDistance_impl,
   DISTANCE_FLAGS,
   prepareLcs('distance'),
 )
-export const lcsSeqSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
-  lcsSeqSimilarity_impl,
-  SIMILARITY_FLAGS,
-  prepareLcs('similarity'),
+export const lcsSeqNormalizedSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
+  lcsSeqNormalizedSimilarity_impl,
+  NORMALIZED_SIMILARITY_FLAGS,
+  prepareLcs('normalizedSimilarity'),
 )
-export const lcsSeqNormalizedDistance: NormalizedScorer =
-  /* @__PURE__ */ withPreparedFlags(
-    lcsSeqNormalizedDistance_impl,
-    NORMALIZED_DISTANCE_FLAGS,
-    prepareLcs('normalizedDistance'),
-  )
-export const lcsSeqNormalizedSimilarity: NormalizedScorer =
-  /* @__PURE__ */ withPreparedFlags(
-    lcsSeqNormalizedSimilarity_impl,
-    NORMALIZED_SIMILARITY_FLAGS,
-    prepareLcs('normalizedSimilarity'),
-  )

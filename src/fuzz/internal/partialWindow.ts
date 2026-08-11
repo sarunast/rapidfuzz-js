@@ -11,11 +11,11 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  *
  * ## This module must not tokenise
  *
- * `basic.ts` and `tokens.ts` are siblings, not a chain: nothing here may import
- * the token engine. `ratio` and `partialRatio` are the lower-level subsystem,
- * and keeping them usable without loading or splitting anything is what makes
- * the dependency graph readable — `tokenScorers.ts` and `composite.ts` sit above
- * both, and a cycle would show up here first.
+ * `partialWindow.ts` and `tokens.ts` are siblings, not a chain: nothing here may
+ * import the token engine. Basic and partial similarity are the lower-level
+ * subsystem, and keeping them usable without loading or splitting anything is
+ * what makes the dependency graph readable. Token families and adaptive fuzzy
+ * similarity sit above both, and a cycle would show up here first.
  *
  * The four helpers exported for those upper layers — {@link indelNormSimHeld},
  * {@link applyProcessor}, {@link convertProcessedPair} and
@@ -26,7 +26,7 @@ import {
   asSequence,
   conv,
   convSequence,
-  isNone,
+  isMissing,
   isSequence,
   type Processor,
   type Sequence,
@@ -60,7 +60,7 @@ function indelNormSimRange(
   // A common subsequence cannot be longer than the shorter input, so the indel
   // distance can never fall below the length difference — which makes this an
   // exact ceiling on the score, reachable without touching the LCS kernel.
-  // `extractOne` raises its cutoff to the running best, so once a good match is
+  // Best-match search raises its cutoff to the running best, so once a good match is
   // found this rejects every candidate too differently sized to beat it.
   //
   // The ceiling is scored through the same expression and the same comparison
@@ -174,7 +174,7 @@ export function ratio_impl(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
+  if (isMissing(s1) || isMissing(s2)) return 0
 
   const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
   return ratioConverted(a, b, options.scoreCutoff ?? 0)
@@ -741,7 +741,7 @@ function partialRatioScan(
   // **0.66-0.69x** against edit-distance-1 variants of the query, 0.86-0.90x
   // when a third of them match exactly, and noise on unrelated words of the same
   // length, where no window raises the cutoff enough to prune another. Flat
-  // through `extractOne`, which raises the cutoff to the running best and so has
+  // through best-match search, which raises the cutoff to the running best and has
   // already pruned what this reorders.
   if (scoreOnly) {
     if (scanInterior() || scanSuffix()) return res
@@ -777,7 +777,7 @@ export function partialRatioAlignment(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): ScoreAlignment | null {
-  if (isNone(s1) || isNone(s2)) return null
+  if (isMissing(s1) || isMissing(s2)) return null
 
   // `conv` rather than `convertProcessedPair`: unlike the token scorers, nothing
   // below needs code points specifically — it needs the two inputs to agree,
@@ -865,7 +865,7 @@ export function partialRatio_impl(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
+  if (isMissing(s1) || isMissing(s2)) return 0
 
   // Same work as `partialRatioAlignment`, minus its obligation to report *which*
   // alignment won — which is what lets the scan visit the windows in the order

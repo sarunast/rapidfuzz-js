@@ -12,19 +12,23 @@ it('handles the basic cases', () => {
   expect(Indel.distance('aaaa', 'bbbb')).toBe(8)
 })
 
-it('applies score_cutoff correctly (issue 196)', () => {
-  // Indel distance did not work correctly for score_cutoff=1
+it('applies native distance thresholds (issue 196)', () => {
   expect(Indel.distance('South Korea', 'North Korea')).toBe(4)
-  expect(Indel.distance('South Korea', 'North Korea', { scoreCutoff: 4 })).toBe(4)
-  expect(Indel.distance('South Korea', 'North Korea', { scoreCutoff: 3 })).toBe(4)
-  expect(Indel.distance('South Korea', 'North Korea', { scoreCutoff: 2 })).toBe(3)
-  expect(Indel.distance('South Korea', 'North Korea', { scoreCutoff: 1 })).toBe(2)
-  expect(Indel.distance('South Korea', 'North Korea', { scoreCutoff: 0 })).toBe(1)
+  expect(Indel.distance('South Korea', 'North Korea', { threshold: 4 })).toBe(4)
+  expect(Indel.distance('South Korea', 'North Korea', { threshold: 3 })).toBeUndefined()
+  expect(Indel.distance('South Korea', 'North Korea', { threshold: 2 })).toBeUndefined()
+  expect(Indel.distance('South Korea', 'North Korea', { threshold: 1 })).toBeUndefined()
+  expect(Indel.distance('South Korea', 'North Korea', { threshold: 0 })).toBeUndefined()
+})
+
+it('applies normalized similarity thresholds to direct scoring', () => {
+  expect(Indel.similarity('abcd', 'abce')).toBe(0.75)
+  expect(Indel.similarity('abcd', 'abce', { threshold: 0.8 })).toBeUndefined()
 })
 
 it('is case insensitive with the default processor', () => {
   expect(
-    Indel.distance('new york mets', 'new YORK mets', { processor: defaultProcess }),
+    Indel.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)
 })
 

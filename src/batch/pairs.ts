@@ -1,6 +1,6 @@
 import { scorerCompilation } from '../core/scorer.js'
 import { validateSequence } from '../core/sequence.js'
-import type { Direction, Sequence } from '../core/types.js'
+import type { Direction, Normalizer, Sequence } from '../core/types.js'
 import {
   allocateScores,
   roundHalfAwayFromZero,
@@ -9,6 +9,19 @@ import {
   type ScoreArrayOf,
 } from './scoreArray.js'
 import type { BatchOptions } from './types.js'
+
+function normalizeInputs(
+  values: readonly Sequence[],
+  normalize: Normalizer | undefined,
+): readonly Sequence[] {
+  return values.map((value) => {
+    const sequence = validateSequence(value)
+    if (normalize === undefined) return sequence
+    const normalized = normalize(sequence)
+    if (normalized == null) throw new TypeError('normalize returned a missing value')
+    return validateSequence(normalized)
+  })
+}
 
 export function scorePairs<D extends Direction>(
   queries: readonly Sequence[],
@@ -32,10 +45,13 @@ export function scorePairs<D extends Direction>(
   const scores = allocateScores(kind, queries.length, 'scorePairs')
   const integral = kind !== 'f64' && kind !== 'f32'
   const compilation = scorerCompilation(options.scorer)
-  for (let i = 0; i < queries.length; i++) {
-    const query = validateSequence(queries[i])
-    const choice = validateSequence(choices[i])
-    const score = compilation.prepareQuery(query)(compilation.prepareChoice(choice), null)
+  const sameInput = Object.is(queries, choices)
+  const normalizedQueries = normalizeInputs(queries, options.normalize)
+  const normalizedChoices = sameInput
+    ? normalizedQueries
+    : normalizeInputs(choices, options.normalize)
+  for (let i = 0; i < normalizedQueries.length; i++) {
+    const score = compilation.rawScore(normalizedQueries[i], normalizedChoices[i], null)
     scores[i] = integral ? roundHalfAwayFromZero(score) : score
   }
   return scores

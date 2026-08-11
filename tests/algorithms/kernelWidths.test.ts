@@ -21,19 +21,19 @@ import { jaroSimilarity } from '../../src/algorithms/jaro/implementation.js'
 import { jaroWinklerSimilarity } from '../../src/algorithms/jaroWinkler/implementation.js'
 import {
   lcsSeqDistance,
-  lcsSeqSimilarity,
+  lcsSeqNormalizedSimilarity,
 } from '../../src/algorithms/lcs/implementation.js'
 import { levenshteinEditops } from '../../src/algorithms/levenshtein/editops.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../../src/algorithms/osa/implementation.js'
 import {
-  prepareScorerOf,
   type PreparedCapability,
   type PrepareScorer,
   type Sequence,
 } from '../../src/algorithms/shared/scorerSupport.js'
 import { partialRatio } from '../../src/fuzz/partial.js'
 import { ratio } from '../../src/fuzz/similarity.js'
+import { prepareScorerOf } from '../support/preparation.js'
 
 /** Textbook Levenshtein, O(n*m). */
 function levenshteinReference(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
@@ -73,6 +73,10 @@ function lcsReference(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
   }
 
   return row[s2.length]
+}
+
+function normalizedLcs(length: number, maximum: number): number {
+  return maximum === 0 ? 1 : 1 - (maximum - length) / maximum
 }
 
 /** Textbook optimal string alignment, O(n*m). */
@@ -295,18 +299,20 @@ describe('every mask region, at every pattern width', () => {
   it('scores LCS as the dynamic program does', () => {
     for (const { what, s1, s2 } of PAIRS) {
       const expected = lcsReference(s1, s2)
-      expect(lcsSeqSimilarity(s1, s2), what).toBe(expected)
+      const normalized = normalizedLcs(expected, Math.max(s1.length, s2.length))
+      expect(lcsSeqNormalizedSimilarity(s1, s2), what).toBe(normalized)
       expect(lcsSeqDistance(s1, s2), what).toBe(Math.max(s1.length, s2.length) - expected)
       expect(indelDistance(s1, s2), what).toBe(s1.length + s2.length - 2 * expected)
     }
   })
 
   it('scores a held LCS pattern the same', () => {
-    const prepare = preparedOf(lcsSeqSimilarity)
+    const prepare = preparedOf(lcsSeqNormalizedSimilarity)
     for (const { what, s1, s2 } of PAIRS) {
       const expected = lcsReference(s1, s2)
-      expect(prepare(s1, {})(s2, null), what).toBe(expected)
-      expect(prepare(s2, {})(s1, null), what).toBe(expected)
+      const normalized = normalizedLcs(expected, Math.max(s1.length, s2.length))
+      expect(prepare(s1, {})(s2, null), what).toBe(normalized)
+      expect(prepare(s2, {})(s1, null), what).toBe(normalized)
     }
   })
 
@@ -423,11 +429,19 @@ describe('every mask region, under a cutoff', () => {
           `${what} at ${cutoff}`,
         ).toBe(indel <= cutoff ? indel : cutoff + 1)
       }
-      for (const cutoff of [0, 1, 8, lcs, lcs + 1]) {
+      const similarity = normalizedLcs(lcs, Math.max(s1.length, s2.length))
+      for (const cutoff of [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        similarity,
+        Math.min(1, similarity + 0.1),
+      ]) {
         expect(
-          lcsSeqSimilarity(s1, s2, { scoreCutoff: cutoff }),
+          lcsSeqNormalizedSimilarity(s1, s2, { scoreCutoff: cutoff }),
           `${what} at ${cutoff}`,
-        ).toBe(lcs >= cutoff ? lcs : 0)
+        ).toBe(similarity >= cutoff ? similarity : 0)
       }
     }
   })
@@ -452,7 +466,7 @@ describe('every mask region, with a held pattern under a cutoff', () => {
 
   it('scores Indel and LCS exactly inside the bound', () => {
     const prepareIndel = preparedOf(indelDistance)
-    const prepareLcs = preparedOf(lcsSeqSimilarity)
+    const prepareLcs = preparedOf(lcsSeqNormalizedSimilarity)
     for (const { what, s1, s2 } of PAIRS) {
       const lcs = lcsReference(s1, s2)
       const indel = s1.length + s2.length - 2 * lcs
@@ -464,8 +478,18 @@ describe('every mask region, with a held pattern under a cutoff', () => {
           indel <= cutoff ? indel : cutoff + 1,
         )
       }
-      for (const cutoff of [0, 1, 8, lcs, lcs + 1]) {
-        expect(scoreLcs(s2, cutoff), `${what} at ${cutoff}`).toBe(lcs >= cutoff ? lcs : 0)
+      const similarity = normalizedLcs(lcs, Math.max(s1.length, s2.length))
+      for (const cutoff of [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        similarity,
+        Math.min(1, similarity + 0.1),
+      ]) {
+        expect(scoreLcs(s2, cutoff), `${what} at ${cutoff}`).toBe(
+          similarity >= cutoff ? similarity : 0,
+        )
       }
     }
   })

@@ -1,7 +1,12 @@
 import { isBuiltInMetric, type Metric } from './metric.js'
 import { COMPILE, type MetricCompilation } from './protocol.js'
 import { validatePair, validateSequence } from './sequence.js'
-import { qualifies, validateThreshold } from './threshold.js'
+import {
+  impossibleTrustedThreshold,
+  qualifies,
+  trustedKernelThreshold,
+  validateThreshold,
+} from './threshold.js'
 import type { Direction, MaybeSequence, MissingPolicy, Sequence } from './types.js'
 
 export interface ThresholdOptions {
@@ -32,14 +37,16 @@ function customCompilation<D extends Direction>(
   symmetric: boolean,
   missing: MissingPolicy,
 ): MetricCompilation<D> {
-  const score = (a: MaybeSequence, b: MaybeSequence): number => {
-    const pair = validatePair(a, b, direction, missing)
-    if (pair === null) return 0
-    const result = metric(pair[0], pair[1])
+  const rawScore = (a: Sequence, b: Sequence): number => {
+    const result = metric(a, b)
     if (!Number.isFinite(result) || result < bounds[0] || result > bounds[1]) {
       throw new RangeError('custom metric returned a score outside its declared bounds')
     }
     return result
+  }
+  const score = (a: MaybeSequence, b: MaybeSequence): number => {
+    const pair = validatePair(a, b, direction, missing)
+    return pair === null ? 0 : rawScore(pair[0], pair[1])
   }
   return {
     direction,
@@ -47,7 +54,8 @@ function customCompilation<D extends Direction>(
     symmetric,
     trusted: false,
     score: (a, b) => score(a, b),
-    prepareQuery: (query) => (choice) => score(query, validatePreparedChoice(choice)),
+    rawScore,
+    prepareQuery: (query) => (choice) => rawScore(query, validatePreparedChoice(choice)),
     prepareChoice: (choice) => choice,
   }
 }
@@ -72,17 +80,17 @@ function createScoreMethod<D extends Direction>(
   ): number | undefined {
     if (options === undefined) return compilation.score(a, b, null)
     const threshold = validateThreshold(options.threshold)
-    const lower = compilation.bounds[0]
-    const upper = compilation.bounds[1]
     if (
       compilation.trusted &&
-      ((compilation.direction === 'similarity' && threshold > upper) ||
-        (compilation.direction === 'distance' && threshold < lower))
+      impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
     ) {
       compilation.validate(a, b)
       return undefined
     }
-    const result = compilation.score(a, b, threshold)
+    const activeThreshold = compilation.trusted
+      ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
+      : threshold
+    const result = compilation.score(a, b, activeThreshold)
     return qualifies(compilation.direction, result, threshold) ? result : undefined
   }
   return score

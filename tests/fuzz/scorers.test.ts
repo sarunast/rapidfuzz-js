@@ -293,15 +293,15 @@ describe('byte arrays are treated like strings', () => {
   }
 })
 
-describe('a missing input always scores 0', () => {
+describe('only null and undefined are compatible missing inputs', () => {
   for (const [name, scorer] of SCORERS) {
     it(name, () => {
       expect(scorer('test', null)).toBe(0)
       expect(scorer(null, 'test')).toBe(0)
       expect(scorer('test', undefined)).toBe(0)
       expect(scorer(undefined, 'test')).toBe(0)
-      expect(callUntyped(scorer, 'test', Number.NaN)).toBe(0)
-      expect(callUntyped(scorer, Number.NaN, 'test')).toBe(0)
+      expect(() => callUntyped(scorer, 'test', Number.NaN)).toThrow(TypeError)
+      expect(() => callUntyped(scorer, Number.NaN, 'test')).toThrow(TypeError)
     })
   }
 })
@@ -378,7 +378,7 @@ it('finds the optimal partial alignment on a long repetitive input (issue 257)',
 // whatever it is handed, and `new Array(undefined)` is `[undefined]`, so
 // `'abc'` and `'zzzz'` both became one-element sequences of `undefined` and
 // scored 100 — for `wRatio` and every token scorer. The distance
-// module's equivalent lives in `distance/distance.test.ts`.
+// module's equivalent lives in `algorithms/contracts.test.ts`.
 describe('a fuzz processor has to return a sequence', () => {
   // Set rather than written as a literal because these are returns TypeScript
   // already refuses and a JavaScript caller does not.

@@ -5,11 +5,8 @@ import {
 } from '../algorithms/lcs/implementation.js'
 import { builtInMetric } from '../algorithms/shared/metricAdapter.js'
 import {
-  isNone,
-  isSequence,
   prepareScorerChoice,
   preparedScorerSequence,
-  scorerSequence,
   withChoicePreparer,
   type PrepareScorer,
   type PreparedScorerFactory,
@@ -47,17 +44,9 @@ function scoreRatio(
 export function prepareSimilarity(): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const held = preparedScorerSequence(prepareScorerChoice(query))
-    if (held === null) throw new TypeError('fuzz scorers expect a sequence')
     const pattern = prepareLcsPattern(held, 0, held.length)
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      if (isNone(rawChoice)) return 0
-      let choice = preparedScorerSequence(rawChoice)
-      if (choice === null) {
-        if (!isSequence(rawChoice)) {
-          throw new TypeError('fuzz scorers expect a string or an array-like sequence')
-        }
-        choice = scorerSequence(rawChoice)
-      }
+      const choice = preparedScorerSequence(rawChoice)
       return scoreRatio(held, pattern, choice, rawCutoff ?? 0)
     }
     return score

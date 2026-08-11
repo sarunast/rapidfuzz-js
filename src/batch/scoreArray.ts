@@ -177,7 +177,7 @@ export function roundHalfAwayFromZero(value: number): number {
 /**
  * A `queries × choices` block of scores, stored row-major in one typed array.
  *
- * Replaces the `number[][]` upstream's `cdist` maps onto. Two-dimensional
+ * Storage backing `scoreMatrix`. Two-dimensional
  * indexing is the only thing a flat array does not already give a caller, so
  * that is all this adds.
  */

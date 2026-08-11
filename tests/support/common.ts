@@ -1,24 +1,9 @@
 /**
  * Port of RapidFuzz's `tests/common.py` + `tests/distance/common.py`.
  *
- * The Python original cross-checks the pure-Python scorer against the C++ one
- * and against `process.extractOne`/`extract`/`cdist`. We have a single
- * implementation and no `process` module yet, so what carries over is the part
- * that actually pins down each metric's contract:
- *
- *   - `distance == maximum - similarity`
- *   - `normalizedDistance == distance / maximum`
- *   - `normalizedSimilarity == similarity / maximum`
- *   - both are 0.0 / 1.0 respectively when `maximum` is 0
- *   - symmetric metrics give the same score with the arguments swapped
- *
- * Every assertion in the ported test files runs through here, so a metric that
- * gets one of its four entry points wrong fails even when the test only asserts
- * on `distance`.
+ * Only representation helpers shared by the canonical algorithm tests live
+ * here. Metric/scorer behavior is exercised through public subpath metrics.
  */
-import { expect } from 'vitest'
-
-import type { LevenshteinWeightsInput } from '../../src/algorithms/levenshtein/metric.js'
 import type {
   EditopTag,
   Editops,
@@ -26,33 +11,6 @@ import type {
   OpcodeTag,
   Opcodes,
 } from '../../src/algorithms/shared/editops/index.js'
-import type {
-  ScorerOptions,
-  Sequence,
-} from '../../src/algorithms/shared/scorerSupport.js'
-
-/** Union of every scorer-specific option, so one harness covers all metrics. */
-export interface TestOptions extends ScorerOptions {
-  weights?: LevenshteinWeightsInput | undefined
-  pad?: boolean | undefined
-  prefixWeight?: number | undefined
-}
-
-type ScorerFn = (s1: Sequence, s2: Sequence, options?: TestOptions) => number
-
-/** The four internal functions used to verify each algorithm implementation. */
-export interface ScorerFns {
-  distance: ScorerFn
-  similarity: ScorerFn
-  normalizedDistance: ScorerFn
-  normalizedSimilarity: ScorerFn
-}
-
-export interface ScorerFlags {
-  /** Score of a maximally dissimilar pair — the denominator for normalisation. */
-  maximum: number
-  symmetric: boolean
-}
 
 /**
  * Call something with an argument its parameter types do not admit.
@@ -72,115 +30,6 @@ export interface ScorerFlags {
  */
 export function callUntyped<R>(fn: (...args: never[]) => R, ...args: unknown[]): R {
   return Reflect.apply(fn, undefined, args)
-}
-
-/** Mirrors `pytest.approx`, which compares relatively rather than absolutely. */
-function approxEqual(a: number, b: number): boolean {
-  if (a === b) return true
-  return Math.abs(a - b) <= 1e-6 * Math.max(Math.abs(a), Math.abs(b))
-}
-
-function expectApprox(actual: number, expected: number, what: string): void {
-  expect(
-    approxEqual(actual, expected),
-    `${what}: expected ${actual} to approximately equal ${expected}`,
-  ).toBe(true)
-}
-
-export class GenericScorer {
-  readonly #fns: ScorerFns
-  readonly #getFlags: (s1: Sequence, s2: Sequence, options: TestOptions) => ScorerFlags
-
-  constructor(
-    fns: ScorerFns,
-    getFlags: (s1: Sequence, s2: Sequence, options: TestOptions) => ScorerFlags,
-  ) {
-    this.#fns = fns
-    this.#getFlags = getFlags
-  }
-
-  /** Run `fn` both ways round and assert the metric is symmetric, as declared. */
-  #call(fn: ScorerFn, s1: Sequence, s2: Sequence, options: TestOptions): number {
-    const score = fn(s1, s2, options)
-
-    if (this.#getFlags(s1, s2, options).symmetric) {
-      expectApprox(fn(s2, s1, options), score, 'symmetry')
-    }
-
-    return score
-  }
-
-  /** The invariant block from `GenericScorer._validate`. */
-  #validate(
-    s1: Sequence,
-    s2: Sequence,
-    options: TestOptions,
-  ): [number, number, number, number] {
-    const base: TestOptions = { ...options, scoreCutoff: undefined }
-    const { maximum } = this.#getFlags(s1, s2, base)
-
-    const dist = this.#call(this.#fns.distance, s1, s2, base)
-    const sim = this.#call(this.#fns.similarity, s1, s2, base)
-    const normDist = this.#call(this.#fns.normalizedDistance, s1, s2, base)
-    const normSim = this.#call(this.#fns.normalizedSimilarity, s1, s2, base)
-
-    expectApprox(dist, maximum - sim, 'distance == maximum - similarity')
-
-    if (maximum !== 0) {
-      expectApprox(normDist, dist / maximum, 'normalizedDistance == distance / maximum')
-      expectApprox(normSim, sim / maximum, 'normalizedSimilarity == similarity / maximum')
-    } else {
-      expectApprox(normDist, 0, 'normalizedDistance of two empty inputs')
-      expectApprox(normSim, 1, 'normalizedSimilarity of two empty inputs')
-    }
-
-    return [dist, sim, normDist, normSim]
-  }
-
-  distance(s1: Sequence, s2: Sequence, options: TestOptions = {}): number {
-    const [dist] = this.#validate(s1, s2, options)
-    return options.scoreCutoff == null
-      ? dist
-      : this.#call(this.#fns.distance, s1, s2, options)
-  }
-
-  similarity(s1: Sequence, s2: Sequence, options: TestOptions = {}): number {
-    const [, sim] = this.#validate(s1, s2, options)
-    return options.scoreCutoff == null
-      ? sim
-      : this.#call(this.#fns.similarity, s1, s2, options)
-  }
-
-  normalizedDistance(s1: Sequence, s2: Sequence, options: TestOptions = {}): number {
-    const [, , normDist] = this.#validate(s1, s2, options)
-    return options.scoreCutoff == null
-      ? normDist
-      : this.#call(this.#fns.normalizedDistance, s1, s2, options)
-  }
-
-  normalizedSimilarity(s1: Sequence, s2: Sequence, options: TestOptions = {}): number {
-    const [, , , normSim] = this.#validate(s1, s2, options)
-    return options.scoreCutoff == null
-      ? normSim
-      : this.#call(this.#fns.normalizedSimilarity, s1, s2, options)
-  }
-}
-
-/**
- * `max(|s1|, |s2|)` — the `maximum` used by most metrics.
- *
- * Measured the way a scorer measures, which for a string means code points:
- * `conv` expands an astral one before anything counts it, so `'\u{1F600}a'` is two
- * elements to every metric and three to JavaScript. Reading `.length` here
- * instead would not fail a comparison against a scorer — it would quietly
- * expect the wrong normalised value for any input above the BMP.
- */
-export function maxLen(s1: Sequence, s2: Sequence): number {
-  return Math.max(scorerLength(s1), scorerLength(s2))
-}
-
-function scorerLength(s: Sequence): number {
-  return typeof s === 'string' ? [...s].length : s.length
 }
 
 /**

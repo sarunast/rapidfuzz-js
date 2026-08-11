@@ -7,14 +7,11 @@ import {
   levenshteinEditops,
   levenshteinOpcodes,
 } from '../../src/algorithms/levenshtein/editops.js'
-import { distance as levenshteinDistanceMetric } from '../../src/algorithms/levenshtein/index.js'
 import {
-  levenshteinDistance,
-  levenshteinNormalizedDistance,
-  levenshteinNormalizedSimilarity,
-  levenshteinSimilarity,
+  distance as levenshteinDistanceMetric,
+  similarity as levenshteinSimilarityMetric,
   type LevenshteinWeights,
-} from '../../src/algorithms/levenshtein/metric.js'
+} from '../../src/algorithms/levenshtein/index.js'
 import { scoreMatrix } from '../../src/batch/index.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { createScorer } from '../../src/core/scorer.js'
@@ -29,9 +26,9 @@ it('treats two empty strings as a perfect match under any weights', () => {
   expect(Levenshtein.distance('', '', { weights: [3, 7, 5] })).toBe(0)
 })
 
-it('does not overflow on a huge score_cutoff', () => {
+it('does not overflow on a huge threshold', () => {
   expect(Levenshtein.distance('', '')).toBe(0)
-  expect(Levenshtein.distance('', '', { scoreCutoff: 2 ** 63 })).toBe(0)
+  expect(Levenshtein.distance('', '', { threshold: 2 ** 63 })).toBe(0)
 })
 
 it('interprets strings and sequences the same way', () => {
@@ -73,22 +70,25 @@ it('uses scaled Indel for expensive replacements and trims weighted affixes', ()
   expect(
     Levenshtein.distance(source, inserted, {
       weights: [2, 2, 5],
-      scoreCutoff: 1,
+      threshold: 1,
     }),
-  ).toBe(2)
+  ).toBeUndefined()
   expect(Levenshtein.distance(source, inserted, { weights: [3, 7, 5] })).toBe(3)
   expect(Levenshtein.distance(inserted, source, { weights: [3, 7, 5] })).toBe(7)
 })
 
 it('does not regress on the cached mbleven implementation', () => {
-  expect(Levenshtein.distance('0', '101', { scoreCutoff: 1 })).toBe(2)
-  expect(Levenshtein.distance('0', '101', { scoreCutoff: 2 })).toBe(2)
-  expect(Levenshtein.distance('0', '101', { scoreCutoff: 3 })).toBe(2)
+  expect(Levenshtein.distance('0', '101', { threshold: 1 })).toBeUndefined()
+  expect(Levenshtein.distance('0', '101', { threshold: 2 })).toBe(2)
+  expect(Levenshtein.distance('0', '101', { threshold: 3 })).toBe(2)
 })
 
 it('is case insensitive with the default processor', () => {
   expect(
-    Levenshtein.distance('new york mets', 'new YORK mets', { processor: defaultProcess }),
+    Levenshtein.distance(
+      defaultProcess('new york mets'),
+      defaultProcess('new YORK mets'),
+    ),
   ).toBe(0)
 })
 
@@ -188,8 +188,8 @@ it('accepts named costs as well as the positional tuple', () => {
     expect(Levenshtein.distance(s1, s2, { weights: named })).toBe(
       Levenshtein.distance(s1, s2, { weights: positional }),
     )
-    expect(Levenshtein.normalizedSimilarity(s1, s2, { weights: named })).toBe(
-      Levenshtein.normalizedSimilarity(s1, s2, { weights: positional }),
+    expect(Levenshtein.similarity(s1, s2, { weights: named })).toBe(
+      Levenshtein.similarity(s1, s2, { weights: positional }),
     )
   }
 })
@@ -216,17 +216,13 @@ it('reads named costs on the prepared path and in the flags', () => {
 
 it('keeps fractional weighted cutoffs on the score lattice', () => {
   const weights: LevenshteinWeights = [0.5, 0.5, 0.5]
-  const cases = [
-    [levenshteinDistance, 0.5, 0.49, 0.5, 1.49],
-    [levenshteinSimilarity, 0.5, 0.51, 0.5, 0],
-    [levenshteinNormalizedDistance, 0.5, 0.49, 0.5, 1],
-    [levenshteinNormalizedSimilarity, 0.5, 0.51, 0.5, 0],
-  ] as const
+  const distance = createScorer(levenshteinDistanceMetric, { weights })
+  const similarity = createScorer(levenshteinSimilarityMetric, { weights })
 
-  for (const [scorer, accepted, rejected, score, sentinel] of cases) {
-    expect(scorer('ab', 'ac', { weights, scoreCutoff: accepted })).toBe(score)
-    expect(scorer('ab', 'ac', { weights, scoreCutoff: rejected })).toBe(sentinel)
-  }
+  expect(distance.score('ab', 'ac', { threshold: 0.5 })).toBe(0.5)
+  expect(distance.score('ab', 'ac', { threshold: 0.49 })).toBeUndefined()
+  expect(similarity.score('ab', 'ac', { threshold: 0.5 })).toBe(0.5)
+  expect(similarity.score('ab', 'ac', { threshold: 0.51 })).toBeUndefined()
 })
 
 it('validates named costs the same way as positional ones', () => {

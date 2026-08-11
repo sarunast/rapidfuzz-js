@@ -44,8 +44,13 @@ it('handles unicode', () => {
   expect(OSA.distance(s1, s1)).toBe(0)
 })
 
+it('rejects impossible lengths before direct and prepared kernels', () => {
+  expect(OSA.distance('a', 'abcdef', { threshold: 2 })).toBeUndefined()
+  expect(OSA.similarity('a', 'abcdef', { threshold: 0.8 })).toBeUndefined()
+})
+
 it('is case insensitive with the default processor', () => {
   expect(
-    OSA.distance('new york mets', 'new YORK mets', { processor: defaultProcess }),
+    OSA.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)
 })

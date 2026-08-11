@@ -1,4 +1,5 @@
 import { scorerCompilation } from '../core/scorer.js'
+import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
 import { collectionEntries } from './collection.js'
 import { bestDistance } from './internal/bestDistance.js'
@@ -11,7 +12,7 @@ import {
   normalizeQuery,
   optionalThreshold,
   resultLimit,
-  searchableSequence,
+  sequenceReader,
 } from './snapshot.js'
 import type {
   BestOptions,
@@ -70,12 +71,12 @@ export function createMatcher<T, D extends Direction>(
     ...(options.missingItems === undefined ? {} : { missingItems: options.missingItems }),
   }
   const stored: StoredItem<T, unknown>[] = []
+  const readSequence = sequenceReader(stableOptions, true)
   for (const entry of collectionEntries(items)) {
-    const sequence = searchableSequence(entry.item, stableOptions, true)
+    const sequence = readSequence(entry.item)
     if (sequence !== null) {
       stored.push({
         ...entry,
-        sequence,
         prepared: compilation.prepareChoice(sequence),
       })
     }
@@ -91,6 +92,15 @@ export function createMatcher<T, D extends Direction>(
       const missingScore = compilation.score(query, '', threshold)
       return missingBest(stored, missingScore, threshold)
     }
+    if (
+      compilation.trusted &&
+      impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
+    ) {
+      return undefined
+    }
+    const activeThreshold = compilation.trusted
+      ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
+      : threshold
     const score = compilation.prepareQuery(normalized)
     const optimal = compilation.trusted
       ? compilation.direction === 'similarity'
@@ -98,8 +108,8 @@ export function createMatcher<T, D extends Direction>(
         : compilation.bounds[0]
       : null
     return compilation.direction === 'similarity'
-      ? bestSimilarity(stored, score, threshold, optimal)
-      : bestDistance(stored, score, threshold, optimal)
+      ? bestSimilarity(stored, score, activeThreshold, optimal)
+      : bestDistance(stored, score, activeThreshold, optimal)
   }
   const search = (
     query: MaybeSequence,
@@ -113,10 +123,19 @@ export function createMatcher<T, D extends Direction>(
       const missingScore = compilation.score(query, '', threshold)
       return missingTop(stored, missingScore, threshold, limit)
     }
+    if (
+      compilation.trusted &&
+      impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
+    ) {
+      return []
+    }
+    const activeThreshold = compilation.trusted
+      ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
+      : threshold
     const score = compilation.prepareQuery(normalized)
     return compilation.direction === 'similarity'
-      ? topSimilarity(stored, score, threshold, limit)
-      : topDistance(stored, score, threshold, limit)
+      ? topSimilarity(stored, score, activeThreshold, limit)
+      : topDistance(stored, score, activeThreshold, limit)
   }
   return Object.freeze({
     size: stored.length,

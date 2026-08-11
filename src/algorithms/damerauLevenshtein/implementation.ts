@@ -4,28 +4,18 @@ import {
   conv,
   distCutoff,
   normalize,
-  normDistCutoff,
   normSimCutoff,
-  simCutoff,
   type ScorerOptions,
   type Sequence,
-  isSequence,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
-  scorerSequence,
   type PrepareScorer,
   type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
   DISTANCE_FLAGS,
-  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  SIMILARITY_FLAGS,
-  type MaybeSequence,
-  isNone,
-  asSequence,
-  type NormalizedScorer,
   type Scorer,
 } from '../shared/scorerSupport.js'
 
@@ -308,26 +298,13 @@ function distance_(
   return result <= scoreCutoff ? result : scoreCutoff + 1
 }
 
-type PreparedDamerauKind =
-  | 'distance'
-  | 'similarity'
-  | 'normalizedDistance'
-  | 'normalizedSimilarity'
+type PreparedDamerauKind = 'distance' | 'normalizedSimilarity'
 
 function prepareDamerau(kind: PreparedDamerauKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
-    if (a === null) throw new TypeError('expected a sequence')
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      if (isNone(rawChoice)) {
-        if (kind === 'normalizedDistance') return 1
-        if (kind === 'normalizedSimilarity') return 0
-      }
       let b = preparedScorerSequence(rawChoice)
-      if (b === null) {
-        if (!isSequence(rawChoice)) throw new TypeError('expected a sequence')
-        b = scorerSequence(rawChoice)
-      }
       // The kernel trims a common affix, which compares the two sequences
       // elementwise, so they have to agree on how a character is spelled.
       const s1 = alignRepresentation(a, b)
@@ -337,15 +314,6 @@ function prepareDamerau(kind: PreparedDamerauKind): PreparedScorerFactory {
         case 'distance': {
           const cutoff = canonicalRawCutoff(rawCutoff)
           return distCutoff(distance_(s1, b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
-        }
-        case 'similarity': {
-          const cutoff = canonicalRawCutoff(rawCutoff)
-          const bound = cutoff === null ? Number.MAX_SAFE_INTEGER : max - cutoff
-          return simCutoff(max - distance_(s1, b, bound), cutoff)
-        }
-        case 'normalizedDistance': {
-          const cutoff = rawCutoff === null ? Number.MAX_SAFE_INTEGER : rawCutoff * max
-          return normDistCutoff(normalize(distance_(s1, b, cutoff), max), rawCutoff)
         }
         case 'normalizedSimilarity': {
           const cutoff =
@@ -379,55 +347,17 @@ function damerauLevenshteinDistance_impl(
 }
 
 /**
- * Damerau-Levenshtein similarity: `max(|s1|, |s2|)` minus the distance.
- *
- * If the similarity is smaller than `scoreCutoff`, `0` is returned.
- */
-function damerauLevenshteinSimilarity_impl(
-  s1: Sequence,
-  s2: Sequence,
-  options: ScorerOptions = {},
-): number {
-  const [a, b] = conv(s1, s2, options.processor)
-  const max = maximum(a, b)
-  const cutoff = canonicalRawCutoff(options.scoreCutoff)
-  const bound = cutoff == null ? Number.MAX_SAFE_INTEGER : max - cutoff
-  return simCutoff(max - distance_(a, b, bound), cutoff)
-}
-
-/**
- * {@link damerauLevenshteinDistance} normalised into `[0, 1]`.
- *
- * If the normalised distance is greater than `scoreCutoff`, `1` is returned.
- */
-function damerauLevenshteinNormalizedDistance_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: ScorerOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 1
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  const max = maximum(a, b)
-  const cutoff =
-    options.scoreCutoff == null ? Number.MAX_SAFE_INTEGER : options.scoreCutoff * max
-  return normDistCutoff(normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
-}
-
-/**
- * {@link damerauLevenshteinSimilarity} normalised into `[0, 1]`, where `1` means
+ * Damerau-Levenshtein similarity normalised into `[0, 1]`, where `1` means
  * identical.
  *
  * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
  */
 function damerauLevenshteinNormalizedSimilarity_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
+  s1: Sequence,
+  s2: Sequence,
   options: ScorerOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
+  const [a, b] = conv(s1, s2, options.processor)
   const max = maximum(a, b)
   const cutoff =
     options.scoreCutoff == null
@@ -436,24 +366,12 @@ function damerauLevenshteinNormalizedSimilarity_impl(
   return normSimCutoff(1 - normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
 }
 
-// Scorer flags let `process` tell distances from similarities.
 export const damerauLevenshteinDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
   damerauLevenshteinDistance_impl,
   DISTANCE_FLAGS,
   prepareDamerau('distance'),
 )
-export const damerauLevenshteinSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
-  damerauLevenshteinSimilarity_impl,
-  SIMILARITY_FLAGS,
-  prepareDamerau('similarity'),
-)
-export const damerauLevenshteinNormalizedDistance: NormalizedScorer =
-  /* @__PURE__ */ withPreparedFlags(
-    damerauLevenshteinNormalizedDistance_impl,
-    NORMALIZED_DISTANCE_FLAGS,
-    prepareDamerau('normalizedDistance'),
-  )
-export const damerauLevenshteinNormalizedSimilarity: NormalizedScorer =
+export const damerauLevenshteinNormalizedSimilarity: Scorer =
   /* @__PURE__ */ withPreparedFlags(
     damerauLevenshteinNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,

@@ -9,22 +9,14 @@ import {
   distanceCutoffFor,
   distCutoff,
   normalize,
-  normDistCutoff,
   normSimCutoff,
-  simCutoff,
   type ScorerOptions,
   type Sequence,
   prepareMetric,
   withPreparedFlags,
   DISTANCE_FLAGS,
-  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  SIMILARITY_FLAGS,
-  type MaybeSequence,
-  isNone,
-  asSequence,
   type EditopsOptions,
-  type NormalizedScorer,
   type Scorer,
 } from '../shared/scorerSupport.js'
 
@@ -60,7 +52,7 @@ export interface HammingOptions extends ScorerOptions {
  *
  * Hamming has no structure to exploit — every position has to be looked at —
  * so a cutoff is the only thing that can make it sublinear. Under
- * `process.extract`, where the running best tightens the bound after every
+ * best-match search, where the running best tightens the bound after every
  * candidate, most comparisons are decided within the first few positions
  * instead of after a full pass. The bail-out value is only required to exceed
  * `cutoff`; each caller maps it onto the rejection its convention reports.
@@ -171,56 +163,16 @@ function hammingDistance_impl(
 }
 
 /**
- * Hamming similarity: `max(|s1|, |s2|) - hammingDistance(s1, s2)`.
+ * Hamming similarity normalised into `[0, 1]`, where `1` means identical.
  *
- * If the similarity is smaller than `scoreCutoff`, `0` is returned.
+ * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
  */
-function hammingSimilarity_impl(
+function hammingNormalizedSimilarity_impl(
   s1: Sequence,
   s2: Sequence,
   options: HammingOptions = {},
 ): number {
   const [a, b] = conv(s1, s2, options.processor)
-  const max = maximum(a, b)
-  const cutoff = distanceCutoffFor('similarity', options.scoreCutoff, max)
-  return simCutoff(
-    max - distance_(a, b, options.pad ?? true, cutoff),
-    options.scoreCutoff,
-  )
-}
-
-/**
- * {@link hammingDistance} normalised into `[0, 1]`.
- *
- * If the normalised distance is greater than `scoreCutoff`, `1` is returned.
- */
-function hammingNormalizedDistance_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: HammingOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 1
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  const max = maximum(a, b)
-  const cutoff = distanceCutoffFor('normalizedDistance', options.scoreCutoff, max)
-  const norm = normalize(distance_(a, b, options.pad ?? true, cutoff), max)
-  return normDistCutoff(norm, options.scoreCutoff)
-}
-
-/**
- * {@link hammingSimilarity} normalised into `[0, 1]`, where `1` means identical.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
-function hammingNormalizedSimilarity_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: HammingOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 0
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
   const max = maximum(a, b)
   const cutoff = distanceCutoffFor('normalizedSimilarity', options.scoreCutoff, max)
   const norm = normalize(distance_(a, b, options.pad ?? true, cutoff), max)
@@ -267,25 +219,12 @@ export function hammingOpcodes(
   return hammingEditops(s1, s2, options).toOpcodes()
 }
 
-// Scorer flags let `process` tell distances from similarities.
 export const hammingDistance: Scorer<HammingOptions> = /* @__PURE__ */ withPreparedFlags(
   hammingDistance_impl,
   DISTANCE_FLAGS,
   prepareMetric('distance', preparedHammingDistance, maximum, parsedPad),
 )
-export const hammingSimilarity: Scorer<HammingOptions> =
-  /* @__PURE__ */ withPreparedFlags(
-    hammingSimilarity_impl,
-    SIMILARITY_FLAGS,
-    prepareMetric('similarity', preparedHammingDistance, maximum, parsedPad),
-  )
-export const hammingNormalizedDistance: NormalizedScorer<HammingOptions> =
-  /* @__PURE__ */ withPreparedFlags(
-    hammingNormalizedDistance_impl,
-    NORMALIZED_DISTANCE_FLAGS,
-    prepareMetric('normalizedDistance', preparedHammingDistance, maximum, parsedPad),
-  )
-export const hammingNormalizedSimilarity: NormalizedScorer<HammingOptions> =
+export const hammingNormalizedSimilarity: Scorer<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,

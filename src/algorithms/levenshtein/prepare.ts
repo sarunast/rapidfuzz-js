@@ -2,14 +2,10 @@ import { sharesWideAffix } from '../shared/affix.js'
 import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
-  isNone,
-  isSequence,
   normalize,
-  normDistCutoff,
   normSimCutoff,
   prepareScorerChoice,
   preparedScorerSequence,
-  scorerSequence,
   withChoicePreparer,
   type PrepareScorer,
   type PreparedScorerFactory,
@@ -34,11 +30,7 @@ import { levenshteinPrepared, levenshteinSmallBand } from './internal/uniform.js
  */
 const MAX_BAND_BUDGET = 15
 
-type PreparedLevenshteinKind =
-  | 'distance'
-  | 'similarity'
-  | 'normalizedDistance'
-  | 'normalizedSimilarity'
+type PreparedLevenshteinKind = 'distance' | 'normalizedSimilarity'
 
 /**
  * Whether the held-pattern kernel beats rebuilding the query's masks per choice.
@@ -79,7 +71,7 @@ function preparedDistanceWorthwhile(
  *
  * `extract` tightens its cutoff as the heap fills, so nearly every choice it
  * scores arrives with a budget — which is what kept it on the unprepared path
- * while `cdist` moved onto the held masks.
+ * while `scoreMatrix` moved onto the held masks.
  *
  * {@link levenshteinSmallBand} reads its masks through `shiftedPatternMatches`,
  * which windows a pattern of any width, so the whole-query masks serve it
@@ -152,7 +144,6 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparedScore
   const prepare: PrepareScorer = (query, kwargs) => {
     const weights = parseWeights(Reflect.get(kwargs, 'weights'))
     const a = preparedScorerSequence(prepareScorerChoice(query))
-    if (a === null) throw new TypeError('expected a sequence')
 
     const [insert, delete_, replace] = weights
     const uniform = insert === 1 && delete_ === 1 && replace === 1
@@ -161,7 +152,7 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparedScore
 
     const preparedDistance = (b: ArrayLike<unknown>, cutoff: number): number => {
       // A scorer with no cutoff runs with `cutoff` at `MAX_SAFE_INTEGER`, which
-      // is what `cdist` does, and this comparison keeps it from paying for the
+      // is what `scoreMatrix` does, and this comparison keeps it from paying for the
       // rest of the band test. It is also the only place the band's width bound
       // is applied, so `preparedBandWorthwhile` can take the budget as given.
       if (cutoff < MAX_BAND_BUDGET + 1 && uniform && a.length > 0 && b.length > 0) {
@@ -191,17 +182,7 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparedScore
     }
 
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      if (isNone(rawChoice)) {
-        if (kind === 'normalizedDistance') return 1
-        if (kind === 'normalizedSimilarity') return 0
-      }
-      let b = preparedScorerSequence(rawChoice)
-      if (b === null) {
-        if (!isSequence(rawChoice)) {
-          throw new TypeError('expected a string or an array-like sequence')
-        }
-        b = scorerSequence(rawChoice)
-      }
+      const b = preparedScorerSequence(rawChoice)
       // Lengths are all `maximum` reads, and aligning cannot change them, so it
       // is left to the unprepared path in `preparedDistance` that needs it.
       const max = maximum(a, b, weights)
@@ -211,20 +192,6 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparedScore
           const bound = cutoff ?? Number.MAX_SAFE_INTEGER
           const distance = preparedDistance(b, bound)
           return cutoff === null || distance <= cutoff ? distance : cutoff + 1
-        }
-        case 'similarity': {
-          const cutoff = levenshteinRawCutoff(rawCutoff, integral)
-          const bound =
-            cutoff === null ? Number.MAX_SAFE_INTEGER : rawBound(max - cutoff, integral)
-          const similarity = max - preparedDistance(b, bound)
-          return cutoff === null || similarity >= cutoff ? similarity : 0
-        }
-        case 'normalizedDistance': {
-          const cutoff =
-            rawCutoff === null
-              ? Number.MAX_SAFE_INTEGER
-              : rawBound(rawCutoff * max, integral)
-          return normDistCutoff(normalize(preparedDistance(b, cutoff), max), rawCutoff)
         }
         case 'normalizedSimilarity': {
           const cutoff =

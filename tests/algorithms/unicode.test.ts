@@ -14,13 +14,12 @@ import { indelDistance } from '../../src/algorithms/indel/implementation.js'
 import { levenshteinEditops } from '../../src/algorithms/levenshtein/editops.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import {
-  prefixDistance,
-  prefixNormalizedSimilarity,
-  prefixSimilarity,
-} from '../../src/algorithms/prefix/implementation.js'
+  distance as prefixDistance,
+  similarity as prefixSimilarity,
+} from '../../src/algorithms/prefix/index.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { ratio } from '../../src/fuzz/similarity.js'
-import { editopTuples, maxLen } from '../support/common.js'
+import { editopTuples } from '../support/common.js'
 
 interface UnicodeCase {
   readonly name: string
@@ -185,24 +184,10 @@ it('treats emoji as non-word characters in normalizeText', () => {
   )
 })
 
-// The generic suite computes every expected normalised score from `maxLen`, so
-// a `maxLen` that counted UTF-16 units would expect the wrong value for astral
-// input rather than fail against the scorer — a trap that only springs once one
-// of these inputs reaches the generic wrapper.
-describe('the suite measures length the way a scorer does', () => {
-  it('counts an astral character once', () => {
-    expect(maxLen('\u{1F600}a', '\u{1F600}b')).toBe(2)
-    expect(maxLen('\u{1F600}', '\u{1F600}')).toBe(1)
-    expect(maxLen('abc', 'ab')).toBe(3)
-    expect(maxLen([1, 2, 3], Uint8Array.of(1, 2))).toBe(3)
-  })
-
-  it('agrees with what the scorers themselves report', () => {
+describe('canonical prefix metrics count code points', () => {
+  it('scores astral characters as one element', () => {
     expect(prefixSimilarity('\u{1F600}', '\u{1F600}')).toBe(1)
     expect(prefixDistance('\u{1F600}a', '\u{1F600}b')).toBe(1)
-    expect(prefixNormalizedSimilarity('\u{1F600}a', '\u{1F600}b')).toBe(0.5)
-    expect(prefixNormalizedSimilarity('\u{1F600}a', '\u{1F600}b')).toBe(
-      prefixSimilarity('\u{1F600}a', '\u{1F600}b') / maxLen('\u{1F600}a', '\u{1F600}b'),
-    )
+    expect(prefixSimilarity('\u{1F600}a', '\u{1F600}b')).toBe(0.5)
   })
 })

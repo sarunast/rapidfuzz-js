@@ -1,7 +1,7 @@
 /**
  * The data contracts the fuzz scorers share, and nothing else.
  *
- * A dependency-free leaf: every other module under `_fuzz/` may import this one,
+ * A dependency-free leaf: every other module under `fuzz/` may import this one,
  * and this one imports only algorithm-runtime types. Keeping it free of runtime
  * logic is what lets the scorer families below it stay unaware of each other.
  */
@@ -31,9 +31,9 @@ export interface FuzzOptions {
    * bit-parallel LCS kernel, whose only budgeted lever is an early exit — and
    * an early exit sized by an *estimate* has to be redone whenever the estimate
    * was too optimistic. Wiring it into prepared `ratio` cost 1.49-1.71x the
-   * kernel iterations across an `extract` of 2000 choices, so it was dropped.
-   * `search`'s `extractOne` already tightens `scoreCutoff` to the best score it
-   * has seen, which is the same pruning exactly rather than approximately.
+   * kernel iterations across a one-shot search of 2000 choices, so it was
+   * dropped. The best-match driver already tightens its cutoff to the best score
+   * it has seen, which is the same pruning exactly rather than approximately.
    *
    * The distance scorers are the ones that honour it — `levenshtein` sizes its
    * band from the hint, where a wrong guess widens rather than restarts.

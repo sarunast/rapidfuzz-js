@@ -1,16 +1,11 @@
 import { lcsLengthRange } from '../../lcs/internal/kernel.js'
-import { UNBOUNDED_MISSES } from '../../shared/bitmask/blockMasks.js'
 import {
-  asSequence,
   canonicalRawCutoff,
   conv,
   hasSurrogatePair,
-  isNone,
   isSequence,
   normalize,
-  normDistCutoff,
   normSimCutoff,
-  type MaybeSequence,
   type Sequence,
 } from '../../shared/scorerSupport.js'
 import type {
@@ -149,15 +144,11 @@ export function distance_(
   if (insert === 0 && delete_ === 0) return 0
 
   if (insert === delete_ && insert > 0) {
-    const scaledCutoff = Number.isFinite(scoreCutoff)
-      ? Math.floor(scoreCutoff / insert)
-      : UNBOUNDED_MISSES
+    const scaledCutoff = Math.floor(scoreCutoff / insert)
 
     // Factoring equal weights exposes the much faster uniform kernel.
     if (insert === replace) {
-      const scaledHint = Number.isFinite(scoreHint)
-        ? Math.ceil(scoreHint / insert)
-        : UNBOUNDED_MISSES
+      const scaledHint = Math.ceil(scoreHint / insert)
       return levenshteinUniform(s1, s2, scaledCutoff, scaledHint) * insert
     }
 
@@ -442,11 +433,11 @@ export function levenshteinDistanceImpl(
 }
 
 /**
- * Levenshtein similarity: the maximum possible distance minus the actual one.
+ * Levenshtein similarity normalised into `[0, 1]`, where `1` means identical.
  *
- * If the similarity is smaller than `scoreCutoff`, `0` is returned.
+ * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
  */
-export function levenshteinSimilarityImpl(
+export function levenshteinNormalizedSimilarityImpl(
   s1: Sequence,
   s2: Sequence,
   options: LevenshteinOptions = {},
@@ -454,57 +445,6 @@ export function levenshteinSimilarityImpl(
   const weights = parseWeights(options.weights)
   const integral = integralWeights(weights)
   const [a, b] = conv(s1, s2, options.processor)
-  const max = maximum(a, b, weights)
-  const cutoff = levenshteinRawCutoff(options.scoreCutoff, integral)
-  const bound =
-    cutoff == null ? Number.MAX_SAFE_INTEGER : rawBound(max - cutoff, integral)
-  const hint =
-    options.scoreHint == null ? bound : rawBound(max - options.scoreHint, integral)
-  const similarity = max - distance_(a, b, weights, bound, hint)
-  return cutoff === null || similarity >= cutoff ? similarity : 0
-}
-
-/**
- * {@link levenshteinDistance} normalised into `[0, 1]`.
- *
- * If the normalised distance is greater than `scoreCutoff`, `1` is returned.
- */
-export function levenshteinNormalizedDistanceImpl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: LevenshteinOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 1
-
-  const weights = parseWeights(options.weights)
-  const integral = integralWeights(weights)
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  const max = maximum(a, b, weights)
-  const cutoff =
-    options.scoreCutoff == null
-      ? Number.MAX_SAFE_INTEGER
-      : rawBound(options.scoreCutoff * max, integral)
-  const hint =
-    options.scoreHint == null ? cutoff : rawBound(options.scoreHint * max, integral)
-  const norm = normalize(distance_(a, b, weights, cutoff, hint), max)
-  return normDistCutoff(norm, options.scoreCutoff)
-}
-
-/**
- * {@link levenshteinSimilarity} normalised into `[0, 1]`, where `1` means identical.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
-export function levenshteinNormalizedSimilarityImpl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: LevenshteinOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 0
-
-  const weights = parseWeights(options.weights)
-  const integral = integralWeights(weights)
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
   const max = maximum(a, b, weights)
   const cutoff =
     options.scoreCutoff == null

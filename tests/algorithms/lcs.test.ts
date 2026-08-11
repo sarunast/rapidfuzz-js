@@ -14,17 +14,16 @@ it('handles the basic cases', () => {
 
 it('does not invert the normalized results against a single empty string', () => {
   expect(LCSseq.distance('abc', '')).toBe(3)
-  expect(LCSseq.normalizedDistance('abc', '')).toBe(1)
-  expect(LCSseq.normalizedSimilarity('abc', '')).toBe(0)
-  expect(LCSseq.normalizedDistance('abc', '', { scoreCutoff: 0.5 })).toBe(1)
+  expect(1 - (LCSseq.similarity('abc', '') ?? 0)).toBe(1)
+  expect(LCSseq.similarity('abc', '')).toBe(0)
 
-  expect(LCSseq.normalizedDistance('', '')).toBe(0)
-  expect(LCSseq.normalizedSimilarity('', '')).toBe(1)
+  expect(1 - (LCSseq.similarity('', '') ?? 0)).toBe(0)
+  expect(LCSseq.similarity('', '')).toBe(1)
 })
 
 it('is case insensitive with the default processor', () => {
   expect(
-    LCSseq.distance('new york mets', 'new YORK mets', { processor: defaultProcess }),
+    LCSseq.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)
 })
 
@@ -68,6 +67,12 @@ it('does not recover a NaN-to-NaN match from the alignment matrix', () => {
     ['insert', 0, 0],
     ['delete', 0, 1],
   ])
+})
+
+it('returns an exact successful score from the direct multiword band', () => {
+  const left = `${'a'.repeat(198)}xyz`
+  const right = `uvw${'a'.repeat(198)}`
+  expect(LCSseq.distance(left, right, { threshold: 3 })).toBe(3)
 })
 
 // Not ported — upstream tests `opcodes` through the shared `GenericScorer`

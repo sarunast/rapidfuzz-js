@@ -17,7 +17,7 @@ import {
   asSequence,
   convSequence,
   hasSurrogatePair,
-  isNone,
+  isMissing,
   FUZZ_FLAGS,
   type NormalizedScorer,
   withPreparedFlags,
@@ -47,7 +47,7 @@ export function wRatio_impl(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
+  if (isMissing(s1) || isMissing(s2)) return 0
 
   const UNBASE_SCALE = 0.95
 

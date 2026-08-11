@@ -10,17 +10,17 @@ it('handles the basic cases', () => {
   expect(Prefix.distance('aaaa', 'bbbb')).toBe(4)
 })
 
-it('applies score_cutoff correctly', () => {
+it('applies native distance thresholds', () => {
   expect(Prefix.distance('abcd', 'abcee')).toBe(2)
-  expect(Prefix.distance('abcd', 'abcee', { scoreCutoff: 4 })).toBe(2)
-  expect(Prefix.distance('abcd', 'abcee', { scoreCutoff: 3 })).toBe(2)
-  expect(Prefix.distance('abcd', 'abcee', { scoreCutoff: 2 })).toBe(2)
-  expect(Prefix.distance('abcd', 'abcee', { scoreCutoff: 1 })).toBe(2)
-  expect(Prefix.distance('abcd', 'abcee', { scoreCutoff: 0 })).toBe(1)
+  expect(Prefix.distance('abcd', 'abcee', { threshold: 4 })).toBe(2)
+  expect(Prefix.distance('abcd', 'abcee', { threshold: 3 })).toBe(2)
+  expect(Prefix.distance('abcd', 'abcee', { threshold: 2 })).toBe(2)
+  expect(Prefix.distance('abcd', 'abcee', { threshold: 1 })).toBeUndefined()
+  expect(Prefix.distance('abcd', 'abcee', { threshold: 0 })).toBeUndefined()
 })
 
 it('is case insensitive with the default processor', () => {
   expect(
-    Prefix.distance('new york mets', 'new YORK mets', { processor: defaultProcess }),
+    Prefix.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)
 })

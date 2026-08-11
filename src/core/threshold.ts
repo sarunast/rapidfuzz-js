@@ -12,3 +12,29 @@ export function qualifies(
 ): boolean {
   return direction === 'similarity' ? score >= threshold : score <= threshold
 }
+
+export function impossibleTrustedThreshold(
+  direction: Direction,
+  bounds: readonly [number, number],
+  threshold: number | null,
+): boolean {
+  return (
+    threshold !== null &&
+    (direction === 'similarity' ? threshold > bounds[1] : threshold < bounds[0])
+  )
+}
+
+export function trustedKernelThreshold(
+  direction: Direction,
+  bounds: readonly [number, number],
+  threshold: number | null,
+): number | null {
+  if (threshold === null) return null
+  return direction === 'similarity'
+    ? threshold <= bounds[0]
+      ? null
+      : threshold
+    : threshold >= bounds[1]
+      ? null
+      : threshold
+}

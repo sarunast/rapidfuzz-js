@@ -3,11 +3,11 @@ import { expect, it } from 'vitest'
 
 import { jaroWinklerSimilarity } from '../../src/algorithms/jaroWinkler/implementation.js'
 import { similarity as jaroWinklerMetric } from '../../src/algorithms/jaroWinkler/index.js'
-import { prepareScorerOf } from '../../src/algorithms/shared/scorerSupport.js'
 import { scoreMatrix } from '../../src/batch/index.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { createScorer } from '../../src/core/scorer.js'
 import { createMatcher } from '../../src/search/index.js'
+import { prepareScorerOf } from '../support/preparation.js'
 import { JaroWinkler } from '../support/scorers.js'
 
 it('handles sequences of numbers', () => {
@@ -23,20 +23,9 @@ it('clamps to 1.0 with a large prefix weight', () => {
   ).toBeCloseTo(1, 6)
 })
 
-// Not ported — see the equivalent in `jaro.test.ts` for why `distance` and
-// `similarity` read `scoreCutoff` as a normalised cutoff here. Values from
-// rapidfuzz 3.14.5.
-it('reads scoreCutoff as a normalised one, distance included', () => {
+it('reads thresholds on its natural normalized scale', () => {
   expect(JaroWinkler.similarity('abcd', 'abce')).toBeCloseTo(0.883333, 5)
-  expect(JaroWinkler.similarity('abcd', 'abce', { scoreCutoff: 0.95 })).toBe(0)
-  expect(JaroWinkler.distance('abcd', 'abce', { scoreCutoff: 0.1 })).toBe(1)
-  expect(JaroWinkler.distance('abcd', 'abce', { scoreCutoff: 0.5 })).toBeCloseTo(
-    0.116666,
-    5,
-  )
-  expect(() => JaroWinkler.similarity('abcd', 'abce', { scoreCutoff: 1.5 })).toThrow(
-    RangeError,
-  )
+  expect(JaroWinkler.similarity('abcd', 'abce', { threshold: 0.95 })).toBeUndefined()
 })
 
 it('rejects an out-of-range prefix weight', () => {
@@ -86,9 +75,10 @@ it('handles the edge case lengths found by fuzzing', () => {
 
 it('is case insensitive with the default processor', () => {
   expect(
-    JaroWinkler.similarity('new york mets', 'new YORK mets', {
-      processor: defaultProcess,
-    }),
+    JaroWinkler.similarity(
+      defaultProcess('new york mets'),
+      defaultProcess('new YORK mets'),
+    ),
   ).toBeCloseTo(1, 6)
 })
 
@@ -119,7 +109,7 @@ it('refuses a prefix weight the prepared path cannot use either', () => {
 // the Jaro cutoff the score has to clear collapses to the 0.7 floor rather
 // than being solved for.
 it('handles a prefix bonus that covers the whole score', () => {
-  const options = { prefixWeight: 0.25, scoreCutoff: 0.9 }
+  const options = { prefixWeight: 0.25, threshold: 0.9 }
   expect(jaroWinklerSimilarity('abcdx', 'abcdy', options)).toBeCloseTo(1, 12)
   expect(
     scoreMatrix(['abcdx'], ['abcdy'], {

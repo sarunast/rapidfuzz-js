@@ -1,189 +1,150 @@
 import {
-  damerauLevenshteinDistance,
-  damerauLevenshteinNormalizedDistance,
-  damerauLevenshteinNormalizedSimilarity,
-  damerauLevenshteinSimilarity,
-} from '../../src/algorithms/damerauLevenshtein/implementation.js'
+  distance as damerauDistance,
+  similarity as damerauSimilarity,
+} from '../../src/algorithms/damerauLevenshtein/index.js'
 import {
-  hammingDistance,
-  hammingNormalizedDistance,
-  hammingNormalizedSimilarity,
-  hammingSimilarity,
-} from '../../src/algorithms/hamming/implementation.js'
+  distance as hammingDistance,
+  similarity as hammingSimilarity,
+  type HammingDistanceConfiguration,
+  type HammingSimilarityConfiguration,
+} from '../../src/algorithms/hamming/index.js'
 import {
-  indelDistance,
-  indelNormalizedDistance,
-  indelNormalizedSimilarity,
-  indelSimilarity,
-} from '../../src/algorithms/indel/implementation.js'
+  distance as indelDistance,
+  similarity as indelSimilarity,
+} from '../../src/algorithms/indel/index.js'
+import { similarity as jaroSimilarity } from '../../src/algorithms/jaro/index.js'
 import {
-  jaroDistance,
-  jaroNormalizedDistance,
-  jaroNormalizedSimilarity,
-  jaroSimilarity,
-} from '../../src/algorithms/jaro/implementation.js'
+  similarity as jaroWinklerSimilarity,
+  type JaroWinklerConfiguration,
+} from '../../src/algorithms/jaroWinkler/index.js'
 import {
-  jaroWinklerDistance,
-  jaroWinklerNormalizedDistance,
-  jaroWinklerNormalizedSimilarity,
-  jaroWinklerSimilarity,
-} from '../../src/algorithms/jaroWinkler/implementation.js'
+  distance as lcsDistance,
+  similarity as lcsSimilarity,
+} from '../../src/algorithms/lcs/index.js'
 import {
-  lcsSeqDistance,
-  lcsSeqNormalizedDistance,
-  lcsSeqNormalizedSimilarity,
-  lcsSeqSimilarity,
-} from '../../src/algorithms/lcs/implementation.js'
+  distance as levenshteinDistance,
+  similarity as levenshteinSimilarity,
+  type LevenshteinDistanceConfiguration,
+  type LevenshteinSimilarityConfiguration,
+} from '../../src/algorithms/levenshtein/index.js'
 import {
-  levenshteinCosts,
-  levenshteinDistance,
-  levenshteinNormalizedDistance,
-  levenshteinNormalizedSimilarity,
-  levenshteinSimilarity,
-} from '../../src/algorithms/levenshtein/metric.js'
+  distance as osaDistance,
+  similarity as osaSimilarity,
+} from '../../src/algorithms/osa/index.js'
 import {
-  osaDistance,
-  osaNormalizedDistance,
-  osaNormalizedSimilarity,
-  osaSimilarity,
-} from '../../src/algorithms/osa/implementation.js'
+  distance as postfixDistance,
+  similarity as postfixSimilarity,
+} from '../../src/algorithms/postfix/index.js'
 import {
-  postfixDistance,
-  postfixNormalizedDistance,
-  postfixNormalizedSimilarity,
-  postfixSimilarity,
-} from '../../src/algorithms/postfix/implementation.js'
-import {
-  prefixDistance,
-  prefixNormalizedDistance,
-  prefixNormalizedSimilarity,
-  prefixSimilarity,
-} from '../../src/algorithms/prefix/implementation.js'
-/**
- * Port of RapidFuzz's `tests/distance/common.py` — one `GenericScorer` per
- * metric, each declaring the `maximum` its four entry points must agree on.
- */
-import { GenericScorer, maxLen, type TestOptions } from './common.js'
+  distance as prefixDistance,
+  similarity as prefixSimilarity,
+} from '../../src/algorithms/prefix/index.js'
+import type { Metric } from '../../src/core/metric.js'
+import { createScorer } from '../../src/core/scorer.js'
+import type { Sequence } from '../../src/core/types.js'
+import type { SimilarityConfiguration } from '../../src/core/types.js'
 
-export const DamerauLevenshtein: GenericScorer = new GenericScorer(
-  {
-    distance: damerauLevenshteinDistance,
-    similarity: damerauLevenshteinSimilarity,
-    normalizedDistance: damerauLevenshteinNormalizedDistance,
-    normalizedSimilarity: damerauLevenshteinNormalizedSimilarity,
-  },
-  (s1, s2) => ({ maximum: maxLen(s1, s2), symmetric: true }),
-)
-
-export const Hamming: GenericScorer = new GenericScorer(
-  {
-    distance: hammingDistance,
-    similarity: hammingSimilarity,
-    normalizedDistance: hammingNormalizedDistance,
-    normalizedSimilarity: hammingNormalizedSimilarity,
-  },
-  (s1, s2) => ({ maximum: maxLen(s1, s2), symmetric: true }),
-)
-
-export const Indel: GenericScorer = new GenericScorer(
-  {
-    distance: indelDistance,
-    similarity: indelSimilarity,
-    normalizedDistance: indelNormalizedDistance,
-    normalizedSimilarity: indelNormalizedSimilarity,
-  },
-  (s1, s2) => ({ maximum: s1.length + s2.length, symmetric: true }),
-)
-
-export const Jaro: GenericScorer = new GenericScorer(
-  {
-    distance: jaroDistance,
-    similarity: jaroSimilarity,
-    normalizedDistance: jaroNormalizedDistance,
-    normalizedSimilarity: jaroNormalizedSimilarity,
-  },
-  () => ({ maximum: 1, symmetric: true }),
-)
-
-export const JaroWinkler: GenericScorer = new GenericScorer(
-  {
-    distance: jaroWinklerDistance,
-    similarity: jaroWinklerSimilarity,
-    normalizedDistance: jaroWinklerNormalizedDistance,
-    normalizedSimilarity: jaroWinklerNormalizedSimilarity,
-  },
-  () => ({ maximum: 1, symmetric: true }),
-)
-
-export const LCSseq: GenericScorer = new GenericScorer(
-  {
-    distance: lcsSeqDistance,
-    similarity: lcsSeqSimilarity,
-    normalizedDistance: lcsSeqNormalizedDistance,
-    normalizedSimilarity: lcsSeqNormalizedSimilarity,
-  },
-  (s1, s2) => ({ maximum: maxLen(s1, s2), symmetric: true }),
-)
-
-/**
- * Mirrors `get_scorer_flags_levenshtein`.
- *
- * Reads the option through the production normalizer rather than destructuring
- * it, so the two spellings of `weights` cannot diverge between what the scorer
- * scores and what this harness expects it to score.
- */
-function levenshteinFlags(
-  s1: { length: number },
-  s2: { length: number },
-  options: TestOptions,
-) {
-  const { insertion, deletion, substitution } = levenshteinCosts(options.weights)
-  const indel = s1.length * deletion + s2.length * insertion
-
-  const maximum =
-    s1.length >= s2.length
-      ? Math.min(indel, s2.length * substitution + (s1.length - s2.length) * deletion)
-      : Math.min(indel, s1.length * substitution + (s2.length - s1.length) * insertion)
-
-  return { maximum, symmetric: insertion === deletion }
+interface ExecutionOptions {
+  readonly threshold?: number | undefined
 }
 
-export const Levenshtein: GenericScorer = new GenericScorer(
-  {
-    distance: levenshteinDistance,
-    similarity: levenshteinSimilarity,
-    normalizedDistance: levenshteinNormalizedDistance,
-    normalizedSimilarity: levenshteinNormalizedSimilarity,
-  },
-  levenshteinFlags,
+class MetricHarness<DistanceConfig extends object, SimilarityConfig extends object> {
+  readonly #distance: Metric<'distance', DistanceConfig>
+  readonly #similarity: Metric<'similarity', SimilarityConfig>
+
+  constructor(
+    distance: Metric<'distance', DistanceConfig>,
+    similarity: Metric<'similarity', SimilarityConfig>,
+  ) {
+    this.#distance = distance
+    this.#similarity = similarity
+  }
+
+  distance(
+    a: Sequence,
+    b: Sequence,
+    options?: DistanceConfig & ExecutionOptions,
+  ): number | undefined {
+    const scorer = createScorer(this.#distance, options)
+    return options?.threshold === undefined
+      ? scorer.score(a, b)
+      : scorer.score(a, b, { threshold: options.threshold })
+  }
+
+  similarity(
+    a: Sequence,
+    b: Sequence,
+    options?: SimilarityConfig & ExecutionOptions,
+  ): number | undefined {
+    const scorer = createScorer(this.#similarity, options)
+    return options?.threshold === undefined
+      ? scorer.score(a, b)
+      : scorer.score(a, b, { threshold: options.threshold })
+  }
+}
+
+type EmptyConfiguration = Record<never, never>
+
+export const DamerauLevenshtein = new MetricHarness<
+  EmptyConfiguration,
+  SimilarityConfiguration
+>(damerauDistance, damerauSimilarity)
+
+export const Hamming = new MetricHarness<
+  HammingDistanceConfiguration,
+  HammingSimilarityConfiguration
+>(hammingDistance, hammingSimilarity)
+
+export const Indel = new MetricHarness<EmptyConfiguration, SimilarityConfiguration>(
+  indelDistance,
+  indelSimilarity,
 )
 
-export const OSA: GenericScorer = new GenericScorer(
-  {
-    distance: osaDistance,
-    similarity: osaSimilarity,
-    normalizedDistance: osaNormalizedDistance,
-    normalizedSimilarity: osaNormalizedSimilarity,
-  },
-  (s1, s2) => ({ maximum: maxLen(s1, s2), symmetric: true }),
+export const LCSseq = new MetricHarness<EmptyConfiguration, SimilarityConfiguration>(
+  lcsDistance,
+  lcsSimilarity,
 )
 
-export const Postfix: GenericScorer = new GenericScorer(
-  {
-    distance: postfixDistance,
-    similarity: postfixSimilarity,
-    normalizedDistance: postfixNormalizedDistance,
-    normalizedSimilarity: postfixNormalizedSimilarity,
-  },
-  (s1, s2) => ({ maximum: maxLen(s1, s2), symmetric: true }),
+export const Levenshtein = new MetricHarness<
+  LevenshteinDistanceConfiguration,
+  LevenshteinSimilarityConfiguration
+>(levenshteinDistance, levenshteinSimilarity)
+
+export const OSA = new MetricHarness<EmptyConfiguration, SimilarityConfiguration>(
+  osaDistance,
+  osaSimilarity,
 )
 
-export const Prefix: GenericScorer = new GenericScorer(
-  {
-    distance: prefixDistance,
-    similarity: prefixSimilarity,
-    normalizedDistance: prefixNormalizedDistance,
-    normalizedSimilarity: prefixNormalizedSimilarity,
-  },
-  (s1, s2) => ({ maximum: maxLen(s1, s2), symmetric: true }),
+export const Postfix = new MetricHarness<EmptyConfiguration, SimilarityConfiguration>(
+  postfixDistance,
+  postfixSimilarity,
+)
+
+export const Prefix = new MetricHarness<EmptyConfiguration, SimilarityConfiguration>(
+  prefixDistance,
+  prefixSimilarity,
+)
+
+class SimilarityHarness<Config extends object> {
+  readonly #metric: Metric<'similarity', Config>
+
+  constructor(metric: Metric<'similarity', Config>) {
+    this.#metric = metric
+  }
+
+  similarity(
+    a: Sequence,
+    b: Sequence,
+    options?: Config & ExecutionOptions,
+  ): number | undefined {
+    const scorer = createScorer(this.#metric, options)
+    return options?.threshold === undefined
+      ? scorer.score(a, b)
+      : scorer.score(a, b, { threshold: options.threshold })
+  }
+}
+
+export const Jaro = new SimilarityHarness(jaroSimilarity)
+export const JaroWinkler = new SimilarityHarness<JaroWinklerConfiguration>(
+  jaroWinklerSimilarity,
 )

@@ -2,7 +2,6 @@
 import { expect, it } from 'vitest'
 
 import {
-  hammingDistance,
   hammingEditops,
   hammingOpcodes,
 } from '../../src/algorithms/hamming/implementation.js'
@@ -22,23 +21,30 @@ it('rejects differing lengths when padding is disabled', () => {
   expect(Hamming.distance('test', 'test', { pad: false })).toBe(0)
   expect(Hamming.distance('aaaa', 'bbbb', { pad: false })).toBe(4)
 
-  expect(() => hammingDistance('aaaa', 'aaaaa', { pad: false })).toThrow(
+  expect(() => Hamming.distance('aaaa', 'aaaaa', { pad: false })).toThrow(
     'Sequences are not the same length.',
   )
 })
 
-it('applies score_cutoff correctly', () => {
+it('bounds arbitrary array-like sequences without scanning the remainder', () => {
+  expect(Hamming.distance([1, 2, 3], [1, 9, 8], { threshold: 1 })).toBeUndefined()
+  expect(Hamming.distance([1, 2, 3], [1, 9, 8], { threshold: 2 })).toBe(2)
+  expect(Hamming.distance([1], [1, 2, 3], { threshold: 1 })).toBeUndefined()
+  expect(Hamming.distance([1, 2], [1, 9])).toBe(1)
+})
+
+it('applies native distance thresholds', () => {
   expect(Hamming.distance('South Korea', 'North Korea')).toBe(2)
-  expect(Hamming.distance('South Korea', 'North Korea', { scoreCutoff: 4 })).toBe(2)
-  expect(Hamming.distance('South Korea', 'North Korea', { scoreCutoff: 3 })).toBe(2)
-  expect(Hamming.distance('South Korea', 'North Korea', { scoreCutoff: 2 })).toBe(2)
-  expect(Hamming.distance('South Korea', 'North Korea', { scoreCutoff: 1 })).toBe(2)
-  expect(Hamming.distance('South Korea', 'North Korea', { scoreCutoff: 0 })).toBe(1)
+  expect(Hamming.distance('South Korea', 'North Korea', { threshold: 4 })).toBe(2)
+  expect(Hamming.distance('South Korea', 'North Korea', { threshold: 3 })).toBe(2)
+  expect(Hamming.distance('South Korea', 'North Korea', { threshold: 2 })).toBe(2)
+  expect(Hamming.distance('South Korea', 'North Korea', { threshold: 1 })).toBeUndefined()
+  expect(Hamming.distance('South Korea', 'North Korea', { threshold: 0 })).toBeUndefined()
 })
 
 it('is case insensitive with the default processor', () => {
   expect(
-    Hamming.distance('new york mets', 'new YORK mets', { processor: defaultProcess }),
+    Hamming.distance(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
   ).toBe(0)
 })
 

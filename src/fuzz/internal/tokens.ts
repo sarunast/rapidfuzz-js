@@ -34,13 +34,12 @@
  * for it, which is what lets a scoring branch pay only for what it reads. See
  * {@link PreparedTokenChoice}.
  *
- * Nothing here imports another `_fuzz/` module: `basic.ts` is a sibling, not a
- * dependency, and `ratio`/`partialRatio` must stay usable without tokenising
- * anything.
+ * Nothing here imports a public fuzz family: `partialWindow.ts` is a sibling,
+ * not a dependency, and the basic and partial similarities must stay usable
+ * without tokenising anything.
  */
 import {
   convSequence,
-  isSequence,
   type ChoicePreparer,
   type Sequence,
 } from '../../algorithms/shared/scorerSupport.js'
@@ -145,7 +144,7 @@ export function splitSequence(s: ArrayLike<unknown>): unknown[][] {
  * The reason it is a second function rather than a `typeof` at the top of the
  * shared one: the two callers never see each other's representation — the
  * prepared path asks only about converted sequences — and folding this in
- * measured **1.07x on `extractOne` over 2000 choices**, reproducibly and
+ * measured **1.07x in best-match search over 2000 choices**, reproducibly and
  * against a 1.006x null control. That path calls {@link containsWhitespace}
  * once per candidate over a dozen elements, where the call itself is the cost
  * and one more test is the difference between inlined and not.
@@ -654,8 +653,6 @@ export function tokenViewOf(sequence: ArrayLike<unknown>): PreparedTokenChoice {
  * here establishes that this module built it, which is what the fields are
  * actually being trusted on.
  */
-const tokenChoices = new WeakSet<object>()
-
 /**
  * Convert a choice once so every query row can reuse the result.
  *
@@ -665,26 +662,18 @@ const tokenChoices = new WeakSet<object>()
  * so a form built here and never read is paid for on every choice in the list.
  */
 export function tokenChoicePreparer(): ChoicePreparer {
-  return (choice) => {
-    if (!isSequence(choice)) return choice
-    return prepareTokenChoice(choice)
-  }
+  return prepareTokenChoice
 }
 
 /** Build a token choice after the caller has established the sequence contract. */
 export function prepareTokenChoice(choice: Sequence): PreparedTokenChoice {
-  const prepared: PreparedTokenChoice = { sequence: convSequence(choice) }
-  tokenChoices.add(prepared)
-  return prepared
+  return { sequence: convSequence(choice) }
 }
 
-/** Whether this module tokenised `value`, and so wrote every field on it. */
-function isPreparedTokenChoice(value: unknown): value is PreparedTokenChoice {
-  return typeof value === 'object' && value !== null && tokenChoices.has(value)
-}
-
-export function preparedTokenChoice(value: unknown): PreparedTokenChoice | null {
-  return isPreparedTokenChoice(value) ? value : null
+/** Read the opaque choice returned by this module's private preparer. */
+export function preparedTokenChoice(value: unknown): PreparedTokenChoice {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- private preparation protocol owns this value
+  return value as PreparedTokenChoice
 }
 
 export function difference(a: UniqueTokenSet, b: UniqueTokenSet): unknown[][] {

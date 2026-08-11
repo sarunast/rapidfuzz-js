@@ -1,5 +1,5 @@
 import type { Scorer } from '../core/scorer.js'
-import type { Direction, MaybeSequence, Sequence } from '../core/types.js'
+import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
 import type { Match } from './results.js'
 
 export type Items<T> =
@@ -8,10 +8,10 @@ export type Items<T> =
   | Iterable<T>
   | Readonly<Record<string, T>>
 
-export type Normalizer = (value: Sequence) => MaybeSequence
+export type { Normalizer } from '../core/types.js'
 export type MissingItemsPolicy = 'skip' | 'throw'
 
-export interface MatcherOptions<T, D extends Direction> {
+export interface MatcherOptions<T, D extends Direction = Direction> {
   readonly scorer: Scorer<D>
   readonly getText?: ((item: T) => MaybeSequence) | undefined
   readonly normalize?: Normalizer | undefined
@@ -23,6 +23,7 @@ export interface BestOptions {
 }
 
 export interface SearchOptions extends BestOptions {
+  /** Defaults to five; `null` returns every qualifying match. */
   readonly limit?: number | null | undefined
 }
 

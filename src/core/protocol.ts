@@ -11,6 +11,7 @@ interface Compilation<D extends Direction> {
   readonly bounds: readonly [number, number]
   readonly symmetric: boolean
   readonly score: (a: MaybeSequence, b: MaybeSequence, threshold: number | null) => number
+  readonly rawScore: (a: Sequence, b: Sequence, threshold: number | null) => number
   readonly prepareQuery: (query: Sequence) => PreparedKernel
   readonly prepareChoice: (choice: Sequence) => unknown
 }

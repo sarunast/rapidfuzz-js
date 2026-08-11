@@ -7,7 +7,7 @@
  * it chooses between.
  *
  * This is where nearly all of the library's time goes: `fuzz.ratio`, `WRatio`
- * and therefore `process.extract` all bottom out here.
+ * and therefore fuzz search all bottom out here.
  */
 
 import {
@@ -23,7 +23,6 @@ import {
   maskPoolOf,
   measureAffix,
   rowVector,
-  UNBOUNDED_MISSES,
   wideSlots,
 } from '../../shared/bitmask/blockMasks.js'
 import type { PatternMask } from '../../shared/bitmask/pattern.js'
@@ -1189,9 +1188,4 @@ export function lcsLengthPreparedBounded(
   let count = 0
   for (let word = 0; word < words; word++) count += popcount(~row[word])
   return count
-}
-
-/** Exact length of the longest common subsequence. */
-export function lcsLength(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
-  return lcsLengthRange(s1, 0, s1.length, s2, 0, s2.length, UNBOUNDED_MISSES)
 }

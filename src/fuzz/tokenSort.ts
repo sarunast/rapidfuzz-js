@@ -2,8 +2,6 @@ import { prepareLcsPattern } from '../algorithms/lcs/implementation.js'
 import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
 import { builtInMetric } from '../algorithms/shared/metricAdapter.js'
 import {
-  isNone,
-  isSequence,
   type PrepareScorer,
   type PreparedScorerFactory,
   type PreparedScore,
@@ -13,12 +11,7 @@ import {
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
 import type { Metric } from '../core/metric.js'
-import {
-  preparedTokenChoice,
-  prepareTokenChoice,
-  sortedOf,
-  tokenChoicePreparer,
-} from './internal/tokens.js'
+import { preparedTokenChoice, sortedOf, tokenChoicePreparer } from './internal/tokens.js'
 import { tokenSortRatio_impl, tokenSortRatioConverted } from './internal/tokenSort.js'
 import type { FuzzConfiguration, FuzzOptions } from './types.js'
 
@@ -27,7 +20,6 @@ export function prepareTokenSort(): PreparedScorerFactory {
   const choicePreparer = tokenChoicePreparer()
   const prepare: PrepareScorer = (query) => {
     const queryChoice = preparedTokenChoice(choicePreparer(query))
-    if (queryChoice === null) throw new TypeError('fuzz scorers expect a sequence')
     const held = queryChoice.sequence
     let pattern: PatternMask | null = null
     const patternOf = (): PatternMask => {
@@ -38,14 +30,7 @@ export function prepareTokenSort(): PreparedScorerFactory {
       return pattern
     }
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      if (isNone(rawChoice)) return 0
-      let choice = preparedTokenChoice(rawChoice)
-      if (choice === null) {
-        if (!isSequence(rawChoice)) {
-          throw new TypeError('fuzz scorers expect a string or an array-like sequence')
-        }
-        choice = prepareTokenChoice(rawChoice)
-      }
+      const choice = preparedTokenChoice(rawChoice)
       return tokenSortRatioConverted(
         held,
         choice.sequence,

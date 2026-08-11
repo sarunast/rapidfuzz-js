@@ -10,7 +10,7 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * composite scorers — `wRatio`, `tokenRatio`, `partialTokenRatio` — call the
  * cores, so one `wRatio` of two strings expands them into code points once
  * rather than once per component scorer. That expansion was the single largest
- * cost in `process.extract`, whose default scorer is `wRatio`.
+ * cost in repeated adaptive-fuzzy search.
  *
  * ## Why the set and combined scorers live together
  *
@@ -22,7 +22,7 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * `normDistance` and `indelDist` are here rather than anywhere shared because
  * `tokenSetRatioConverted` is their only caller.
  */
-import { asSequence, isNone } from '../../algorithms/shared/scorerSupport.js'
+import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
 import {
   type CharSet,
@@ -67,7 +67,7 @@ export function tokenSetRatio_impl(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
+  if (isMissing(s1) || isMissing(s2)) return 0
 
   const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
 
@@ -227,7 +227,7 @@ export function tokenRatio_impl(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
+  if (isMissing(s1) || isMissing(s2)) return 0
 
   const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
 
@@ -240,7 +240,7 @@ export function partialTokenSortRatio_impl(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
+  if (isMissing(s1) || isMissing(s2)) return 0
 
   const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
 
@@ -263,7 +263,7 @@ export function partialTokenSetRatio_impl(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
+  if (isMissing(s1) || isMissing(s2)) return 0
 
   const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
 
@@ -303,7 +303,7 @@ export function partialTokenRatio_impl(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
+  if (isMissing(s1) || isMissing(s2)) return 0
 
   const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
 

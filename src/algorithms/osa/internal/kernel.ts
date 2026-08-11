@@ -15,7 +15,7 @@ import {
   directLimit,
   wideSlots,
 } from '../../shared/bitmask/blockMasks.js'
-import { preparePattern, type PatternMask } from '../../shared/bitmask/pattern.js'
+import type { PatternMask } from '../../shared/bitmask/pattern.js'
 
 // Declared here rather than imported — see the note in `shared.ts`, which holds
 // the canonical definitions. Read once per element, where a cross-module
@@ -184,15 +184,6 @@ export function osaOneWordPrepared(
   return distance
 }
 
-/** Blocked 32-bit form of Hyyrö's OSA recurrence. */
-export function osaManyWords(
-  pattern: ArrayLike<unknown>,
-  text: ArrayLike<unknown>,
-): number {
-  const prepared = preparePattern(pattern, 0, pattern.length)
-  return osaPrepared(prepared, text)
-}
-
 /** OSA against immutable query masks for repeated process scoring. */
 let osaScratch = new Int32Array(0)
 
@@ -356,7 +347,7 @@ export function osaPrepared(
   return distance
 }
 
-/** Drop this module's scratch. See `resetBitVectorScratch` in `shared.ts`. */
+/** Benchmark/test seam that returns retained scratch to a deterministic baseline. */
 export function resetOsaScratch(): void {
   osaScratch = new Int32Array(0)
 }

@@ -2,29 +2,68 @@ import { snapshotSequence, validateSequence } from '../core/sequence.js'
 import type { MaybeSequence, Sequence } from '../core/types.js'
 import type { MatcherOptions, Normalizer } from './types.js'
 
-export function searchableSequence<T>(
-  item: T,
+export interface SequenceReader<T> {
+  (item: T): Sequence | null
+}
+
+export function sequenceReader<T>(
   options: MatcherOptions<T, import('../core/types.js').Direction>,
   own: boolean,
-): Sequence | null {
+): SequenceReader<T> {
   const policy = options.missingItems ?? 'skip'
-  if (item == null) {
-    if (policy === 'skip') return null
-    throw new TypeError('source item is missing')
+  const retain = own ? snapshotSequence : (value: Sequence): Sequence => value
+  const normalize = options.normalize
+
+  if (options.getText === undefined) {
+    if (normalize === undefined) {
+      return (item) => {
+        if (item == null) {
+          if (policy === 'skip') return null
+          throw new TypeError('source item is missing')
+        }
+        return retain(validateSequence(item))
+      }
+    }
+    return (item) => {
+      if (item == null) {
+        if (policy === 'skip') return null
+        throw new TypeError('source item is missing')
+      }
+      const normalized = normalize(validateSequence(item))
+      if (normalized == null) throw new TypeError('normalize returned a missing value')
+      return retain(validateSequence(normalized))
+    }
   }
-  const raw = options.getText === undefined ? item : options.getText(item)
-  if (raw == null) {
-    if (policy === 'skip') return null
-    throw new TypeError('getText returned a missing value')
+
+  const getText = options.getText
+  if (normalize === undefined) {
+    return (item) => {
+      if (item == null) {
+        if (policy === 'skip') return null
+        throw new TypeError('source item is missing')
+      }
+      const raw = getText(item)
+      if (raw == null) {
+        if (policy === 'skip') return null
+        throw new TypeError('getText returned a missing value')
+      }
+      return retain(validateSequence(raw))
+    }
   }
-  const sequence = validateSequence(raw)
-  if (options.normalize === undefined) {
-    return own ? snapshotSequence(sequence) : sequence
+  return (item) => {
+    if (item == null) {
+      if (policy === 'skip') return null
+      throw new TypeError('source item is missing')
+    }
+    const raw = getText(item)
+    if (raw == null) {
+      if (policy === 'skip') return null
+      throw new TypeError('getText returned a missing value')
+    }
+    const normalized = normalize(validateSequence(raw))
+    if (normalized == null) throw new TypeError('normalize returned a missing value')
+    return retain(validateSequence(normalized))
   }
-  const normalized = options.normalize(sequence)
-  if (normalized == null) throw new TypeError('normalize returned a missing value')
-  const valid = validateSequence(normalized)
-  return own ? snapshotSequence(valid) : valid
 }
 
 export function normalizeQuery(

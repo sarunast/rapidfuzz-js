@@ -130,7 +130,7 @@ function levenshteinOneWord(
  *
  * The same trade as `lcsLengthPrepared`'s two- and three-word cases, one width
  * further. Note whose inputs those are, because it is not the same set: nothing
- * in `fuzz.ts` reaches this kernel — every scorer there is built on
+ * in the fuzz family reaches this kernel — every scorer there is built on
  * `lcsSeqLength*`, and `dist/fuzz.js` does not import this module at all. What
  * arrives here is a Levenshtein scorer called directly, `levenshteinEditops`,
  * or an `extract`/`scoreMatrix` given one, so 33 to 128 elements is the band of
@@ -948,7 +948,7 @@ export function levenshteinPreparedRow(
  * {@link levenshteinManyWords}; only where the match masks come from differs.
  * Rebuilding them costs `O(|pattern|)` writes plus a `Map` clear per call, which
  * is the whole of the work when a short pattern is scored against many texts —
- * `cdist` and `extract` do exactly that.
+ * `scoreMatrix` and collection search do exactly that.
  *
  * No common affix is trimmed, for the reason given on {@link lcsLengthPrepared}:
  * trimming shortens the pattern by a different amount for every text, which is

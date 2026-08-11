@@ -31,12 +31,9 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
 import {
   alignRepresentation,
   convSequence,
-  isNone,
-  isSequence,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
-  scorerSequence,
   type ChoicePreparer,
   type PrepareScorer,
   type PreparedScorerFactory,
@@ -51,6 +48,7 @@ import {
   partialRatioImpl,
 } from './partialWindow.js'
 import {
+  type PreparedTokenChoice,
   hasWhitespaceOf,
   preparedTokenChoice,
   sortedOf,
@@ -130,22 +128,6 @@ function tokenisesInput(kind: PreparedFuzzKind): boolean {
 /** Build the internal query-caching hook shared by all fuzz scorers. */
 export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
   const usesTokens = tokenisesInput(kind)
-  // Every token scorer but one splits whatever it is handed, so converting a
-  // raw candidate up front costs nothing it would not spend anyway. `wRatio` is
-  // the exception, and the reason this is a second predicate rather than a
-  // reuse of `usesTokens`: its most common route answers with the base ratio
-  // without ever splitting, and the LCS kernels read a BMP string through
-  // `charCodeAt` exactly as they read code points. So it takes a candidate as
-  // it comes and expands it only on the branches that tokenise — which, over an
-  // `extract`, is the difference between one `Uint32Array` per candidate and
-  // none at all.
-  //
-  // The query is untouched by this. It is prepared once per `extract`, so
-  // converting it eagerly costs one allocation against the candidates'
-  // thousands, and holding it converted is what keeps the token branches
-  // comparable: a token of characters and a token of code points never compare
-  // elementwise equal, so the two sides have to meet in one form.
-  const convertsChoice = usesTokens && kind !== 'wRatio'
   // One preparer per scorer rather than per query: `prepareFuzz` runs once, at
   // the point each scorer below is built.
   const choicePreparer: ChoicePreparer = usesTokens
@@ -156,12 +138,10 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
     const queryTokenChoice = usesTokens
       ? preparedTokenChoice(choicePreparer(query))
       : null
-    const heldQuery = usesTokens
-      ? queryTokenChoice === null
-        ? null
+    const heldQuery =
+      queryTokenChoice === null
+        ? preparedScorerSequence(prepareScorerChoice(query))
         : queryTokenChoice.sequence
-      : preparedScorerSequence(prepareScorerChoice(query))
-    if (heldQuery === null) throw new TypeError('fuzz scorers expect a sequence')
     const a = heldQuery
     // Built on first use rather than up front: only four of the ten kinds score
     // through LCS masks, and `wRatio` reaches them only on some inputs.
@@ -223,18 +203,9 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
       (convertedCharSet ??= charSetOf(convSequence(a)))
 
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      if (isNone(rawChoice)) return 0
       const tokenChoice = usesTokens ? preparedTokenChoice(rawChoice) : null
-      // The choice's own view, when `process` prepared one. A choice reached
-      // without preparation gets a fresh view inside whichever core needs it.
       const choiceView = tokenChoice ?? undefined
-      let b = tokenChoice?.sequence ?? preparedScorerSequence(rawChoice)
-      if (b === null) {
-        if (!isSequence(rawChoice)) {
-          throw new TypeError('fuzz scorers expect a string or an array-like sequence')
-        }
-        b = convertsChoice ? convSequence(rawChoice) : scorerSequence(rawChoice)
-      }
+      const b = tokenChoice?.sequence ?? preparedScorerSequence(rawChoice)
       const cutoff = rawCutoff ?? 0
 
       switch (kind) {
@@ -273,7 +244,8 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
           // same sorted query once per candidate — the very thing the prepared
           // `partialRatio` path stopped doing.
           const sortedQuery = sortedOf(queryTokens)
-          const sortedChoice = sortedOf(choiceView ?? tokenViewOf(b))
+          // oxlint-disable-next-line typescript/consistent-type-assertions -- this switch arm is token-prepared
+          const sortedChoice = sortedOf(choiceView as PreparedTokenChoice)
           // `partialAlignmentConverted` would ignore both when the candidate is
           // the shorter side, but these are arguments, so they would be built on
           // the way in regardless. Both memoise, so the waste is one mask and one
@@ -306,9 +278,8 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
           )
         case 'wRatio': {
           if (a.length === 0 || b.length === 0 || cutoff > 100) return 0
-          if (tokenChoice === null) {
-            throw new TypeError('prepared fuzzy similarity expects a prepared choice')
-          }
+          // oxlint-disable-next-line typescript/consistent-type-assertions -- this switch arm is token-prepared
+          const preparedTokens = tokenChoice as PreparedTokenChoice
           const unbaseScale = 0.95
           const lenRatio = a.length > b.length ? a.length / b.length : b.length / a.length
           let dynamicCutoff = cutoff
@@ -332,10 +303,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
             // a wrong `false` would skip the token scorers outright, while a
             // wrong `true` only costs work.
             //
-            // The candidate reaches here unconverted, so its own test goes
-            // through whichever spelling it arrived in — a prepared view always
-            // holds code points, an unprepared candidate may still be a string.
-            if (!hasWhitespaceOf(queryTokens) && !hasWhitespaceOf(tokenChoice))
+            if (!hasWhitespaceOf(queryTokens) && !hasWhitespaceOf(preparedTokens))
               return result
             dynamicCutoff = Math.max(dynamicCutoff, result) / unbaseScale
             return Math.max(
@@ -349,7 +317,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
                 tokenForm(b),
                 dynamicCutoff,
                 queryView,
-                tokenChoice,
+                preparedTokens,
                 sortedPatternOf,
               ) * unbaseScale,
             )
@@ -384,7 +352,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
               tokenForm(b),
               dynamicCutoff,
               queryView,
-              tokenChoice,
+              preparedTokens,
               sortedPatternOf,
               sortedCharSetOf,
             ) *

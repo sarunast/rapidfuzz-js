@@ -1,6 +1,7 @@
 // Ported from RapidFuzz tests/distance/test_DamerauLevenshtein.py
 import { describe, expect, it } from 'vitest'
 
+import { resetDamerauScratch } from '../../src/algorithms/damerauLevenshtein/implementation.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { DamerauLevenshtein } from '../support/scorers.js'
 
@@ -32,8 +33,29 @@ describe('distance', () => {
 
 it('is case insensitive with the default processor', () => {
   expect(
-    DamerauLevenshtein.distance('new york mets', 'new YORK mets', {
-      processor: defaultProcess,
-    }),
+    DamerauLevenshtein.distance(
+      defaultProcess('new york mets'),
+      defaultProcess('new YORK mets'),
+    ),
   ).toBe(0)
+})
+
+it('grows and reuses wide retained rows', () => {
+  resetDamerauScratch()
+  const long = new Array<string>(0x8000).fill('a')
+  long[0] = 'b'
+  expect(DamerauLevenshtein.distance(long, new Array(65).fill('z'))).toBe(long.length)
+  expect(DamerauLevenshtein.distance(long, new Array(129).fill('z'))).toBe(long.length)
+  expect(DamerauLevenshtein.distance(long, new Array(100).fill('z'))).toBe(long.length)
+})
+
+it('rejects a generic sequence after the full bounded matrix', () => {
+  expect(DamerauLevenshtein.distance([1, 2], [3, 4], { threshold: 1 })).toBeUndefined()
+})
+
+it('applies normalized similarity thresholds to direct scoring', () => {
+  expect(DamerauLevenshtein.similarity('abcd', 'abce')).toBe(0.75)
+  expect(
+    DamerauLevenshtein.similarity('abcd', 'abce', { threshold: 0.8 }),
+  ).toBeUndefined()
 })

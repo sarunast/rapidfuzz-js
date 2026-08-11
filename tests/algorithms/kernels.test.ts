@@ -23,10 +23,8 @@ import { jaroSimilarity } from '../../src/algorithms/jaro/implementation.js'
 import {
   lcsSeqEditops,
   lcsSeqLengthRange,
-  lcsSeqSimilarity,
 } from '../../src/algorithms/lcs/implementation.js'
 import {
-  lcsLength,
   lcsLengthPrepared,
   lcsLengthPreparedBounded,
   lcsLengthRange,
@@ -39,14 +37,11 @@ import {
 } from '../../src/algorithms/levenshtein/internal/uniform.js'
 import {
   levenshteinDistance,
-  levenshteinNormalizedDistance,
   levenshteinNormalizedSimilarity,
-  levenshteinSimilarity,
   type LevenshteinWeights,
 } from '../../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../../src/algorithms/osa/implementation.js'
 import {
-  osaManyWords,
   osaOneWord,
   osaOneWordPrepared,
   osaOneWordRange,
@@ -61,10 +56,18 @@ import {
   rowBitSet,
   shiftedRowBitSet,
 } from '../../src/algorithms/shared/bitParallel.js'
-import { prepareScorerOf } from '../../src/algorithms/shared/scorerSupport.js'
 import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partial.js'
 import { ratio } from '../../src/fuzz/similarity.js'
 import { editopTuples } from '../support/common.js'
+import { prepareScorerOf } from '../support/preparation.js'
+
+function lcsLength(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
+  return lcsLengthRange(s1, 0, s1.length, s2, 0, s2.length, Number.MAX_SAFE_INTEGER)
+}
+
+function osaManyWords(pattern: ArrayLike<unknown>, text: ArrayLike<unknown>): number {
+  return osaPrepared(preparePattern(pattern, 0, pattern.length), text)
+}
 
 /** Textbook LCS, O(n*m). Slow and obviously right. */
 function lcsReference(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
@@ -820,16 +823,10 @@ describe('bounded kernels preserve unbounded results', () => {
         fc.integer({ min: 0, max: 20 }),
         (a, b, hint) => {
           const distance = levenshteinDistance(a, b)
-          const similarity = levenshteinSimilarity(a, b)
-          const normalizedDistance = levenshteinNormalizedDistance(a, b)
           const normalizedSimilarity = levenshteinNormalizedSimilarity(a, b)
 
           expect(levenshteinDistance(a, b, { scoreHint: hint })).toBe(distance)
           expect(levenshteinDistance(a, b, { scoreHint: distance })).toBe(distance)
-          expect(levenshteinSimilarity(a, b, { scoreHint: hint })).toBe(similarity)
-          expect(levenshteinNormalizedDistance(a, b, { scoreHint: hint / 20 })).toBe(
-            normalizedDistance,
-          )
           expect(levenshteinNormalizedSimilarity(a, b, { scoreHint: hint / 20 })).toBe(
             normalizedSimilarity,
           )
@@ -1877,7 +1874,7 @@ describe('long pairs that are nearly equal', () => {
         expect(prepare(source, {})(destination, null), `${alphabet} ${width}`).toBe(
           expected,
         )
-        expect(lcsSeqSimilarity(source, destination), `${alphabet} ${width}`).toBe(
+        expect(lcsLength(source, destination), `${alphabet} ${width}`).toBe(
           lcsReference(source, destination),
         )
       }

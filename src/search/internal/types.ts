@@ -1,18 +1,13 @@
-import type { Sequence } from '../../core/types.js'
-
 export interface StoredItem<T, K> {
   readonly item: T
   readonly key: K
-  readonly sequence: Sequence
   readonly prepared: unknown
 }
 
-export interface DriverMatch<T, K> {
-  readonly item: T
-  readonly key: K
-  readonly score: number
-}
+export type DriverMatch<T, K> = Match<T, K>
 
 export interface RawPreparedScore {
+  /** Returns the actual score when it qualifies; pruning may return only a miss. */
   (choice: unknown, threshold: number | null): number
 }
+import type { Match } from '../results.js'

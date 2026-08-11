@@ -14,7 +14,7 @@ import { expect, test } from 'vitest'
 
 import {
   levenshteinDistance,
-  levenshteinSimilarity,
+  levenshteinNormalizedSimilarity,
 } from '../../src/algorithms/levenshtein/metric.js'
 
 /** The whole matrix, no band and no common-affix trimming. */
@@ -143,7 +143,7 @@ test('the band holds when one side is far longer than the other', () => {
   )
 })
 
-// The similarity scorer converts its cutoff into a distance budget, so it
+// The normalized similarity scorer converts its cutoff into a distance budget, so it
 // reaches the band with a bound the caller never wrote.
 test('the similarity scorer bands to the same answers', () => {
   fc.assert(
@@ -153,7 +153,7 @@ test('the similarity scorer bands to the same answers', () => {
       whole,
       whole,
       whole,
-      fc.integer({ min: 0, max: 60 }),
+      fc.double({ min: 0, max: 1, noNaN: true }),
       (a, b, insertion, deletion, substitution, scoreCutoff) => {
         const distance = reference(a, b, insertion, deletion, substitution)
         const indel = a.length * deletion + b.length * insertion
@@ -161,8 +161,8 @@ test('the similarity scorer bands to the same answers', () => {
           a.length >= b.length
             ? Math.min(indel, b.length * substitution + (a.length - b.length) * deletion)
             : Math.min(indel, a.length * substitution + (b.length - a.length) * insertion)
-        const similarity = maximum - distance
-        const seen = levenshteinSimilarity(a, b, {
+        const similarity = maximum === 0 ? 1 : 1 - distance / maximum
+        const seen = levenshteinNormalizedSimilarity(a, b, {
           weights: { insertion, deletion, substitution },
           scoreCutoff,
         })

@@ -6,12 +6,14 @@ import {
   indelNormalizedSimilarity,
 } from '../src/algorithms/indel/implementation.js'
 import { jaroSimilarity } from '../src/algorithms/jaro/implementation.js'
-import { lcsSeqEditops, lcsSeqSimilarity } from '../src/algorithms/lcs/implementation.js'
+import {
+  lcsSeqEditops,
+  lcsSeqNormalizedSimilarity,
+} from '../src/algorithms/lcs/implementation.js'
 import { levenshteinEditops } from '../src/algorithms/levenshtein/editops.js'
 import {
   levenshteinDistance,
   levenshteinNormalizedSimilarity,
-  levenshteinSimilarity,
 } from '../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../src/algorithms/osa/implementation.js'
 import {
@@ -147,22 +149,24 @@ describe('levenshteinDistance, weighted', () => {
   })
 })
 
-describe('lcsSeqSimilarity', () => {
+describe('lcsSeqNormalizedSimilarity', () => {
   measure('32 chars, similar', () => {
-    for (const [a, b] of medium) lcsSeqSimilarity(a, b)
+    for (const [a, b] of medium) lcsSeqNormalizedSimilarity(a, b)
   })
   measure('128 chars, similar', () => {
-    for (const [a, b] of long) lcsSeqSimilarity(a, b)
+    for (const [a, b] of long) lcsSeqNormalizedSimilarity(a, b)
   })
   measure('4096 chars, cutoff 4000', () => {
-    for (const [a, b] of huge) lcsSeqSimilarity(a, b, { scoreCutoff: 4000 })
+    for (const [a, b] of huge)
+      lcsSeqNormalizedSimilarity(a, b, { scoreCutoff: 4000 / 4096 })
   })
   // The pair every other case here lacks: one the cutoff rejects on length
   // alone. No affix is worth measuring and no kernel should run, so this is
   // entirely the cost of deciding not to score — which is most of what an
   // `extract` under a running cutoff does, and none of what the pairs above do.
   measure('1024 vs 256 chars, cutoff rejects on length', () => {
-    for (const [a, b] of lengthSkewed) lcsSeqSimilarity(a, b, { scoreCutoff: 900 })
+    for (const [a, b] of lengthSkewed)
+      lcsSeqNormalizedSimilarity(a, b, { scoreCutoff: 900 / 1024 })
   })
 })
 
@@ -253,15 +257,17 @@ describe('lcsSeqEditops', () => {
 // the caller supplies any cutoff at all — including the `0` that `process`
 // substitutes for "no cutoff" on a similarity. `levenshteinDistance` above only
 // sees a finite budget when the caller asks for one, so it never covers this.
-describe('levenshteinSimilarity', () => {
+describe('levenshteinNormalizedSimilarity', () => {
   measure('128 chars, cutoff 0', () => {
-    for (const [a, b] of long) levenshteinSimilarity(a, b, { scoreCutoff: 0 })
+    for (const [a, b] of long) levenshteinNormalizedSimilarity(a, b, { scoreCutoff: 0 })
   })
   measure('1024 chars, cutoff 0', () => {
-    for (const [a, b] of veryLong) levenshteinSimilarity(a, b, { scoreCutoff: 0 })
+    for (const [a, b] of veryLong)
+      levenshteinNormalizedSimilarity(a, b, { scoreCutoff: 0 })
   })
   measure('4096 chars, cutoff 0', () => {
-    for (const [a, b] of hugeOne) levenshteinSimilarity(a, b, { scoreCutoff: 0 })
+    for (const [a, b] of hugeOne)
+      levenshteinNormalizedSimilarity(a, b, { scoreCutoff: 0 })
   })
 })
 

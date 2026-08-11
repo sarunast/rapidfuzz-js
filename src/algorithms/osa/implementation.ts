@@ -7,28 +7,18 @@ import {
   distanceCutoffFor,
   distCutoff,
   normalize,
-  normDistCutoff,
   normSimCutoff,
-  simCutoff,
   type ScorerOptions,
   type Sequence,
   DISTANCE_FLAGS,
-  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  SIMILARITY_FLAGS,
-  type MaybeSequence,
-  isNone,
-  asSequence,
-  isSequence,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
-  scorerSequence,
   type PrepareScorer,
   type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
-  type NormalizedScorer,
   type Scorer,
 } from '../shared/scorerSupport.js'
 import { osaOneWordRange, osaOneWordPrepared, osaPrepared } from './internal/kernel.js'
@@ -51,7 +41,7 @@ function distance_(
   if (len2 === 0) return len1
 
   // Every edit OSA can make changes the length by at most one, so the length
-  // difference is a lower bound on the distance. Under `process.extract` this
+  // difference is a lower bound on the distance. During search this
   // rejects the badly sized candidates for the cost of a subtraction, without
   // the affix scan or the kernel running at all.
   if (Math.abs(len1 - len2) > cutoff) return cutoff + 1
@@ -113,81 +103,30 @@ function osaDistance_impl(
 }
 
 /**
- * OSA similarity: `max(|s1|, |s2|) - osaDistance(s1, s2)`.
+ * OSA similarity normalised into `[0, 1]`, where `1` means identical.
  *
- * If the similarity is smaller than `scoreCutoff`, `0` is returned.
+ * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
  */
-function osaSimilarity_impl(
+function osaNormalizedSimilarity_impl(
   s1: Sequence,
   s2: Sequence,
   options: ScorerOptions = {},
 ): number {
   const [a, b] = conv(s1, s2, options.processor)
   const max = maximum(a, b)
-  const cutoff = distanceCutoffFor('similarity', options.scoreCutoff, max)
-  return simCutoff(max - distance_(a, b, cutoff), options.scoreCutoff)
-}
-
-/**
- * {@link osaDistance} normalised into `[0, 1]`.
- *
- * If the normalised distance is greater than `scoreCutoff`, `1` is returned.
- */
-function osaNormalizedDistance_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: ScorerOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 1
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  const max = maximum(a, b)
-  const cutoff = distanceCutoffFor('normalizedDistance', options.scoreCutoff, max)
-  return normDistCutoff(normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
-}
-
-/**
- * {@link osaSimilarity} normalised into `[0, 1]`, where `1` means identical.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
-function osaNormalizedSimilarity_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: ScorerOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 0
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  const max = maximum(a, b)
   const cutoff = distanceCutoffFor('normalizedSimilarity', options.scoreCutoff, max)
   return normSimCutoff(1 - normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
 }
 
-type PreparedOsaKind =
-  | 'distance'
-  | 'similarity'
-  | 'normalizedDistance'
-  | 'normalizedSimilarity'
+type PreparedOsaKind = 'distance' | 'normalizedSimilarity'
 
 function prepareOsa(kind: PreparedOsaKind): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
-    if (a === null) throw new TypeError('expected a sequence')
     const pattern = preparePattern(a, 0, a.length)
 
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      if (isNone(rawChoice)) {
-        if (kind === 'normalizedDistance') return 1
-        if (kind === 'normalizedSimilarity') return 0
-      }
-      let b = preparedScorerSequence(rawChoice)
-      if (b === null) {
-        if (!isSequence(rawChoice)) {
-          throw new TypeError('expected a string or an array-like sequence')
-        }
-        b = scorerSequence(rawChoice)
-      }
+      const b = preparedScorerSequence(rawChoice)
 
       const max = Math.max(a.length, b.length)
       const cutoff = distanceCutoffFor(kind, rawCutoff, max)
@@ -211,10 +150,6 @@ function prepareOsa(kind: PreparedOsaKind): PreparedScorerFactory {
       switch (kind) {
         case 'distance':
           return distCutoff(distance, rawCutoff)
-        case 'similarity':
-          return simCutoff(max - distance, rawCutoff)
-        case 'normalizedDistance':
-          return normDistCutoff(normalize(distance, max), rawCutoff)
         case 'normalizedSimilarity':
           return normSimCutoff(1 - normalize(distance, max), rawCutoff)
       }
@@ -224,25 +159,13 @@ function prepareOsa(kind: PreparedOsaKind): PreparedScorerFactory {
   return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
-// Scorer flags let `process` tell distances from similarities.
 export const osaDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
   osaDistance_impl,
   DISTANCE_FLAGS,
   prepareOsa('distance'),
 )
-export const osaSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
-  osaSimilarity_impl,
-  SIMILARITY_FLAGS,
-  prepareOsa('similarity'),
+export const osaNormalizedSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
+  osaNormalizedSimilarity_impl,
+  NORMALIZED_SIMILARITY_FLAGS,
+  prepareOsa('normalizedSimilarity'),
 )
-export const osaNormalizedDistance: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
-  osaNormalizedDistance_impl,
-  NORMALIZED_DISTANCE_FLAGS,
-  prepareOsa('normalizedDistance'),
-)
-export const osaNormalizedSimilarity: NormalizedScorer =
-  /* @__PURE__ */ withPreparedFlags(
-    osaNormalizedSimilarity_impl,
-    NORMALIZED_SIMILARITY_FLAGS,
-    prepareOsa('normalizedSimilarity'),
-  )

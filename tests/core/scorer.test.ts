@@ -11,6 +11,7 @@ import * as osa from '../../src/algorithms/osa/index.js'
 import * as postfix from '../../src/algorithms/postfix/index.js'
 import * as prefix from '../../src/algorithms/prefix/index.js'
 import { scorerCompilation } from '../../src/core/scorer.js'
+import { trustedKernelThreshold } from '../../src/core/threshold.js'
 import * as fuzz from '../../src/fuzz/index.js'
 import {
   bestMatch,
@@ -21,6 +22,11 @@ import {
 } from '../../src/index.js'
 
 describe('Metric and Scorer contracts', () => {
+  test('trusted kernel thresholds normalize no-op distance bounds once', () => {
+    expect(trustedKernelThreshold('distance', [0, 10], 10)).toBeNull()
+    expect(trustedKernelThreshold('distance', [0, 10], 9)).toBe(9)
+  })
+
   test('algorithm families keep their natural scales', () => {
     expect(fuzz.similarity('abc', 'axc')).toBeCloseTo(200 / 3)
     for (const metric of [
@@ -77,12 +83,30 @@ describe('Metric and Scorer contracts', () => {
     expect(fuzzy.score('abc', 'axc', { threshold: 80 })).toBeUndefined()
     expect(normalized.score('abc', 'axc', { threshold: 0.6 })).toBeCloseTo(2 / 3)
     expect(normalized.score('abc', 'axc', { threshold: 0.8 })).toBeUndefined()
+    expect(normalized.score('abc', 'axc', { threshold: -1 })).toBeCloseTo(2 / 3)
     expect(distance.score('abc', 'axc', { threshold: 1 })).toBe(1)
     expect(distance.score('abc', 'axc', { threshold: 0 })).toBeUndefined()
     for (const threshold of [Number.NaN, Infinity, -Infinity]) {
       expect(() => fuzzy.score('a', 'a', { threshold })).toThrow(RangeError)
     }
     expect(fuzzy.score('a', 'a', { threshold: 101 })).toBeUndefined()
+  })
+
+  test('compiled algorithm configuration owns nested mutable values', () => {
+    const objectWeights = { insertion: 1, deletion: 1, substitution: 2 }
+    const tupleWeights: [number, number, number] = [1, 1, 2]
+    const fromObject = createScorer(levenshtein.distance, { weights: objectWeights })
+    const fromTuple = createScorer(levenshtein.distance, { weights: tupleWeights })
+
+    objectWeights.deletion = 100
+    objectWeights.substitution = 100
+    tupleWeights[1] = 100
+    tupleWeights[2] = 100
+
+    expect(fromObject.symmetric).toBe(true)
+    expect(fromTuple.symmetric).toBe(true)
+    expect(fromObject.score('a', 'b')).toBe(2)
+    expect(fromTuple.score('a', 'b')).toBe(2)
   })
 
   test('missing and invalid inputs follow the scorer direction', () => {
@@ -98,6 +122,9 @@ describe('Metric and Scorer contracts', () => {
         TypeError,
       )
     }
+    expect(() => Reflect.apply(fuzz.similarity, undefined, [Number.NaN, 'abc'])).toThrow(
+      TypeError,
+    )
     expect(compatible.score('', '')).toBe(1)
     expect(levenshtein.similarity(null, 'abc')).toBe(0)
   })
@@ -134,6 +161,10 @@ describe('Metric and Scorer contracts', () => {
       key: 0,
       score: 5,
     })
+    expect(createMatcher(['a', 'b'], { scorer: custom }).search('a')).toEqual([
+      { item: 'a', key: 0, score: 5 },
+      { item: 'b', key: 1, score: 2 },
+    ])
 
     for (const result of [Number.NaN, Infinity, -1]) {
       const broken = createScorer(() => result, {

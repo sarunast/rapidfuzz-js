@@ -11,11 +11,11 @@ function numeric(value: unknown): number {
 }
 
 const items = [
-  { item: 'first', key: 0, sequence: 'first', prepared: 2 },
-  { item: 'second', key: 1, sequence: 'second', prepared: 5 },
-  { item: 'tie', key: 2, sequence: 'tie', prepared: 5 },
-  { item: 'last', key: 3, sequence: 'last', prepared: 1 },
-  { item: 'last tie', key: 4, sequence: 'last tie', prepared: 1 },
+  { item: 'first', key: 0, prepared: 2 },
+  { item: 'second', key: 1, prepared: 5 },
+  { item: 'tie', key: 2, prepared: 5 },
+  { item: 'last', key: 3, prepared: 1 },
+  { item: 'last tie', key: 4, prepared: 1 },
 ]
 
 describe('specialized search drivers', () => {
@@ -62,5 +62,39 @@ describe('specialized search drivers', () => {
     expect(topDistance(items, numeric, 2, 1)).toEqual([
       { item: 'last', key: 3, score: 1 },
     ])
+    expect(topSimilarity(items, numeric, 9, 1)).toEqual([])
+    expect(topDistance(items, numeric, 0, 1)).toEqual([])
+    expect(topSimilarity(items, numeric, 3, null).map((entry) => entry.key)).toEqual([
+      1, 2,
+    ])
+    expect(topDistance(items, numeric, 2, null).map((entry) => entry.key)).toEqual([
+      3, 4, 0,
+    ])
+    expect(topSimilarity(items, numeric, null, 0)).toEqual([])
+    expect(topDistance(items, numeric, null, 0)).toEqual([])
+    expect(topSimilarity(items, numeric, 9, 2)).toEqual([])
+    expect(topDistance(items, numeric, 0, 2)).toEqual([])
+  })
+
+  it('keeps a bounded heap and tightens the active scorer cutoff', () => {
+    const similarityCutoffs: Array<number | null> = []
+    const similarity = (value: unknown, cutoff: number | null): number => {
+      similarityCutoffs.push(cutoff)
+      return numeric(value)
+    }
+    expect(topSimilarity(items, similarity, null, 2).map((entry) => entry.key)).toEqual([
+      1, 2,
+    ])
+    expect(similarityCutoffs).toEqual([null, null, 2, 5, 5])
+
+    const distanceCutoffs: Array<number | null> = []
+    const distance = (value: unknown, cutoff: number | null): number => {
+      distanceCutoffs.push(cutoff)
+      return numeric(value)
+    }
+    expect(topDistance(items, distance, null, 2).map((entry) => entry.key)).toEqual([
+      3, 4,
+    ])
+    expect(distanceCutoffs).toEqual([null, null, 5, 5, 2])
   })
 })

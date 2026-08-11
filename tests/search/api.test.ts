@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, expectTypeOf, test } from 'vitest'
 
 import * as damerau from '../../src/algorithms/damerauLevenshtein/index.js'
 import * as hamming from '../../src/algorithms/hamming/index.js'
@@ -19,6 +19,7 @@ import {
   normalizeText,
   search,
 } from '../../src/index.js'
+import type { Match } from '../../src/index.js'
 
 describe('one-shot search and Matcher', () => {
   const scorer = createScorer(fuzz.similarity)
@@ -49,6 +50,27 @@ describe('one-shot search and Matcher', () => {
     ])
   })
 
+  test('one-shot operations infer collection key types', () => {
+    const arrayBest = bestMatch('a', ['a'], { scorer })
+    const mapBest = bestMatch('a', new Map([[Symbol.for('a'), 'a']]), { scorer })
+    const objectResults = search('a', { first: 'a' }, { scorer })
+    const iterableResults = search('a', new Set(['a']), { scorer })
+    expectTypeOf(arrayBest?.key).toEqualTypeOf<number | undefined>()
+    expectTypeOf(mapBest?.key).toEqualTypeOf<symbol | undefined>()
+    expectTypeOf(objectResults).toEqualTypeOf<readonly Match<string, string>[]>()
+    expectTypeOf(iterableResults).toEqualTypeOf<readonly Match<string, number>[]>()
+
+    expectTypeOf(createMatcher(['a'], { scorer }).best('a')).toEqualTypeOf<
+      Match<string, number> | undefined
+    >()
+    expectTypeOf(createMatcher(new Map([[1, 'a']]), { scorer }).best('a')).toEqualTypeOf<
+      Match<string, number> | undefined
+    >()
+    expectTypeOf(createMatcher({ first: 'a' }, { scorer }).best('a')).toEqualTypeOf<
+      Match<string, string> | undefined
+    >()
+  })
+
   test('one-shot and Matcher results agree and normalize once per retained value', () => {
     const items = ['Alpha', null, 'Alpine', 'Beta']
     const matcher = createMatcher(items, { scorer, normalize: normalizeText })
@@ -59,12 +81,14 @@ describe('one-shot search and Matcher', () => {
       search('alp', items, { scorer, normalize: normalizeText, limit: null }),
     ).toEqual(matcher.search('alp', { limit: null }))
     expect(bestMatch('none', items, { scorer, threshold: 100 })).toBeUndefined()
+    expect(bestMatch('none', items, { scorer, threshold: 101 })).toBeUndefined()
     expect(search('alp', items, { scorer, limit: 0 })).toEqual([])
     expect(search('same', ['same', 'same'], { scorer, limit: null })).toEqual([
       { item: 'same', key: 0, score: 100 },
       { item: 'same', key: 1, score: 100 },
     ])
     expect(search('none', items, { scorer, threshold: 100, limit: null })).toEqual([])
+    expect(search('none', items, { scorer, threshold: 101, limit: null })).toEqual([])
   })
 
   test('distance scorers use best-first ordering and maximum thresholds', () => {
@@ -151,10 +175,48 @@ describe('one-shot search and Matcher', () => {
       score: 0,
     })
     expect(bestMatch(null, ['alpha'], { scorer, threshold: 1 })).toBeUndefined()
+    expect(bestMatch(null, [null], { scorer })).toBeUndefined()
+    expect(bestMatch(null, new Map([['only', 'alpha']]), { scorer })?.key).toBe('only')
+    expect(
+      bestMatch(
+        null,
+        new Map<string, string | null>([
+          ['missing', null],
+          ['only', 'alpha'],
+        ]),
+        {
+          scorer,
+        },
+      )?.key,
+    ).toBe('only')
+    expect(bestMatch(null, new Map(), { scorer })).toBeUndefined()
     expect(search(null, [null, 'alpha', 'beta'], { scorer, limit: 1 })).toEqual([
       { item: 'alpha', key: 1, score: 0 },
     ])
+    expect(search(null, [null, 'alpha', 'beta'], { scorer, limit: 2 })).toEqual([
+      { item: 'alpha', key: 1, score: 0 },
+      { item: 'beta', key: 2, score: 0 },
+    ])
+    expect(search('none', ['alpha'], { scorer, threshold: 100, limit: 1 })).toEqual([])
     expect(search(null, ['alpha'], { scorer, threshold: 1, limit: null })).toEqual([])
+    expect(search(null, new Map([['a', 'alpha']]), { scorer, limit: 1 })).toEqual([
+      { item: 'alpha', key: 'a', score: 0 },
+    ])
+    expect(
+      search(
+        null,
+        new Map<string, string | null>([
+          ['missing', null],
+          ['a', 'alpha'],
+          ['b', 'beta'],
+        ]),
+        { scorer, limit: 2 },
+      ),
+    ).toEqual([
+      { item: 'alpha', key: 'a', score: 0 },
+      { item: 'beta', key: 'b', score: 0 },
+    ])
+    expect(search(null, new Map(), { scorer, limit: null })).toEqual([])
     expect(matcher.best(null, { threshold: 1 })).toBeUndefined()
     expect(matcher.search(null, { limit: 1 })).toEqual([
       { item: 'alpha', key: 0, score: 0 },
@@ -162,6 +224,100 @@ describe('one-shot search and Matcher', () => {
     expect(matcher.search(null, { threshold: 1, limit: null })).toEqual([])
     expect(createMatcher([], { scorer }).best(null)).toBeUndefined()
     expect(matcher.search('alpha', { limit: 0 })).toEqual([])
+    expect(matcher.search('alpha', { threshold: 101 })).toEqual([])
+  })
+
+  test('one-shot keyed heaps retain only the best finite result set', () => {
+    const numeric = createScorer((_query, choice) => Number(choice), {
+      direction: 'similarity',
+      bounds: [0, 10],
+      symmetric: false,
+    })
+    const choices = new Map<string, string | null>([
+      ['missing', null],
+      ['one', '1'],
+      ['two', '2'],
+      ['three', '3'],
+      ['four', '4'],
+      ['lower', '3'],
+      ['zero', '0'],
+    ])
+    expect(search('0', choices, { scorer: numeric, limit: 2 })).toEqual([
+      { item: '4', key: 'four', score: 4 },
+      { item: '3', key: 'three', score: 3 },
+    ])
+    expect(bestMatch('0', choices, { scorer: numeric, threshold: 3 })).toEqual({
+      item: '4',
+      key: 'four',
+      score: 4,
+    })
+    expect(bestMatch('same', new Map([['exact', 'same']]), { scorer })).toEqual({
+      item: 'same',
+      key: 'exact',
+      score: 100,
+    })
+    expect(search('0', ['2', '2', '2'], { scorer: numeric, limit: 2 })).toEqual([
+      { item: '2', key: 0, score: 2 },
+      { item: '2', key: 1, score: 2 },
+    ])
+    expect(
+      search(
+        '0',
+        new Map([
+          ['low', '1'],
+          ['high', '4'],
+        ]),
+        { scorer: numeric, threshold: 3, limit: 2 },
+      ),
+    ).toEqual([{ item: '4', key: 'high', score: 4 }])
+  })
+
+  test('resolves extraction, normalization, and missing policies once per run', () => {
+    const items = [null, { text: null }, { text: ' Alpha ' }]
+    const options = {
+      scorer,
+      getText: (item: { text: string | null } | null) => item?.text,
+      normalize: normalizeText,
+    }
+    expect(bestMatch('alpha', items, options)).toEqual({
+      item: items[2],
+      key: 2,
+      score: 100,
+    })
+    expect(createMatcher(items, options).best('alpha')?.key).toBe(2)
+    expect(() =>
+      bestMatch('a', [null], {
+        scorer,
+        normalize: normalizeText,
+        missingItems: 'throw',
+      }),
+    ).toThrow(TypeError)
+    expect(() =>
+      bestMatch('a', [null], {
+        scorer,
+        getText: (item: string | null) => item,
+        missingItems: 'throw',
+      }),
+    ).toThrow(TypeError)
+    expect(() =>
+      bestMatch('a', [{ text: null }], {
+        ...options,
+        missingItems: 'throw' as const,
+      }),
+    ).toThrow(TypeError)
+    expect(() =>
+      bestMatch('a', [null], {
+        ...options,
+        missingItems: 'throw' as const,
+      }),
+    ).toThrow(TypeError)
+    expect(() =>
+      bestMatch('query', [{ text: 'a' }], {
+        scorer,
+        getText: (item) => item.text,
+        normalize: (value) => (value === 'query' ? value : null),
+      }),
+    ).toThrow(TypeError)
   })
 
   test('Matcher candidate drivers never access the public score method', () => {

@@ -4,27 +4,17 @@ import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
   conv,
-  normDistCutoff,
   normSimCutoff,
   type ScorerOptions,
   type Sequence,
-  DISTANCE_FLAGS,
-  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  SIMILARITY_FLAGS,
-  type MaybeSequence,
-  isNone,
-  asSequence,
-  isSequence,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
-  scorerSequence,
   type PrepareScorer,
   type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
-  type NormalizedScorer,
   type Scorer,
 } from '../shared/scorerSupport.js'
 
@@ -113,84 +103,7 @@ function jaroWinklerSimilarity_impl(
   )
 }
 
-/**
- * Jaro-Winkler distance, i.e. `1 - jaroWinklerSimilarity(s1, s2)`.
- *
- * If the distance is greater than `scoreCutoff`, `1` is returned. See
- * {@link jaroWinklerSimilarity} for why the clamp is the normalised one.
- */
-function jaroWinklerDistance_impl(
-  s1: Sequence,
-  s2: Sequence,
-  options: JaroWinklerOptions = {},
-): number {
-  const [a, b] = conv(s1, s2, options.processor)
-  const cutoff = options.scoreCutoff
-  return normDistCutoff(
-    1 -
-      directSimilarity(
-        a,
-        b,
-        options.prefixWeight ?? 0.1,
-        cutoff == null ? 0 : 1 - cutoff,
-      ),
-    cutoff,
-  )
-}
-
-/**
- * Jaro-Winkler distance. Identical to {@link jaroWinklerDistance} — the metric
- * is already normalised into `[0, 1]`.
- *
- * If the normalised distance is greater than `scoreCutoff`, `1` is returned.
- */
-function jaroWinklerNormalizedDistance_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: JaroWinklerOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 1
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  return normDistCutoff(
-    1 -
-      directSimilarity(
-        a,
-        b,
-        options.prefixWeight ?? 0.1,
-        options.scoreCutoff == null ? 0 : 1 - options.scoreCutoff,
-      ),
-    options.scoreCutoff,
-  )
-}
-
-/**
- * Jaro-Winkler similarity. Identical to {@link jaroWinklerSimilarity} — the
- * metric is already normalised into `[0, 1]`.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
-function jaroWinklerNormalizedSimilarity_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: JaroWinklerOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 0
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  return normSimCutoff(
-    directSimilarity(a, b, options.prefixWeight ?? 0.1, options.scoreCutoff ?? 0),
-    options.scoreCutoff,
-  )
-}
-
-type PreparedJaroWinklerKind =
-  | 'distance'
-  | 'similarity'
-  | 'normalizedDistance'
-  | 'normalizedSimilarity'
-
-function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparedScorerFactory {
+function prepareJaroWinkler(): PreparedScorerFactory {
   const prepare: PrepareScorer = (query, kwargs) => {
     const rawPrefixWeight = Reflect.get(kwargs, 'prefixWeight')
     const prefixWeight = rawPrefixWeight == null ? 0.1 : rawPrefixWeight
@@ -200,27 +113,10 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparedScorerFactor
       throw new RangeError('prefix_weight has to be in the range 0.0 - 1.0')
     }
     const a = preparedScorerSequence(prepareScorerChoice(query))
-    if (a === null) throw new TypeError('expected a sequence')
     const pattern = preparePattern(a, 0, a.length)
 
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      if (isNone(rawChoice)) {
-        if (kind === 'normalizedDistance') return 1
-        if (kind === 'normalizedSimilarity') return 0
-      }
-      let b = preparedScorerSequence(rawChoice)
-      if (b === null) {
-        if (!isSequence(rawChoice)) {
-          throw new TypeError('expected a string or an array-like sequence')
-        }
-        b = scorerSequence(rawChoice)
-      }
-      const similarityCutoff =
-        kind === 'distance' || kind === 'normalizedDistance'
-          ? rawCutoff === null
-            ? 0
-            : 1 - rawCutoff
-          : (rawCutoff ?? 0)
+      const b = preparedScorerSequence(rawChoice)
       // The common-prefix bonus and Jaro's transposition pass both compare the
       // two sequences elementwise, so they have to agree on how a character is
       // spelled.
@@ -228,48 +124,19 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparedScorerFactor
         alignRepresentation(a, b),
         alignRepresentation(b, a),
         prefixWeight,
-        similarityCutoff,
+        rawCutoff ?? 0,
         pattern,
       )
-
-      // Jaro's score is normalised, so `distance` and `normalizedDistance` are
-      // the same metric read the same way — and likewise the two similarities.
-      switch (kind) {
-        case 'distance':
-        case 'normalizedDistance':
-          return normDistCutoff(1 - similarity, rawCutoff)
-        case 'similarity':
-        case 'normalizedSimilarity':
-          return normSimCutoff(similarity, rawCutoff)
-      }
+      return normSimCutoff(similarity, rawCutoff)
     }
     return score
   }
   return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
-// Scorer flags let `process` tell distances from similarities.
 export const jaroWinklerSimilarity: Scorer<JaroWinklerOptions> =
   /* @__PURE__ */ withPreparedFlags(
     jaroWinklerSimilarity_impl,
-    SIMILARITY_FLAGS,
-    prepareJaroWinkler('similarity'),
-  )
-export const jaroWinklerDistance: Scorer<JaroWinklerOptions> =
-  /* @__PURE__ */ withPreparedFlags(
-    jaroWinklerDistance_impl,
-    DISTANCE_FLAGS,
-    prepareJaroWinkler('distance'),
-  )
-export const jaroWinklerNormalizedDistance: NormalizedScorer<JaroWinklerOptions> =
-  /* @__PURE__ */ withPreparedFlags(
-    jaroWinklerNormalizedDistance_impl,
-    NORMALIZED_DISTANCE_FLAGS,
-    prepareJaroWinkler('normalizedDistance'),
-  )
-export const jaroWinklerNormalizedSimilarity: NormalizedScorer<JaroWinklerOptions> =
-  /* @__PURE__ */ withPreparedFlags(
-    jaroWinklerNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,
-    prepareJaroWinkler('normalizedSimilarity'),
+    prepareJaroWinkler(),
   )

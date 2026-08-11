@@ -2,27 +2,17 @@ import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
   conv,
-  normDistCutoff,
   normSimCutoff,
   type ScorerOptions,
   type Sequence,
-  DISTANCE_FLAGS,
-  NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  SIMILARITY_FLAGS,
-  type MaybeSequence,
-  isNone,
-  asSequence,
-  isSequence,
   withChoicePreparer,
   prepareScorerChoice,
   preparedScorerSequence,
-  scorerSequence,
   type PrepareScorer,
   type PreparedScorerFactory,
   type PreparedScore,
   withPreparedFlags,
-  type NormalizedScorer,
   type Scorer,
 } from '../shared/scorerSupport.js'
 
@@ -470,56 +460,23 @@ function jaroOneWord(
   )
 }
 
-type PreparedJaroKind =
-  | 'distance'
-  | 'similarity'
-  | 'normalizedDistance'
-  | 'normalizedSimilarity'
-
-export function prepareJaro(kind: PreparedJaroKind): PreparedScorerFactory {
+export function prepareJaro(): PreparedScorerFactory {
   const prepare: PrepareScorer = (query) => {
     const a = preparedScorerSequence(prepareScorerChoice(query))
-    if (a === null) throw new TypeError('expected a sequence')
     const pattern = preparePattern(a, 0, a.length)
 
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      if (isNone(rawChoice)) {
-        if (kind === 'normalizedDistance') return 1
-        if (kind === 'normalizedSimilarity') return 0
-      }
-      let b = preparedScorerSequence(rawChoice)
-      if (b === null) {
-        if (!isSequence(rawChoice)) {
-          throw new TypeError('expected a string or an array-like sequence')
-        }
-        b = scorerSequence(rawChoice)
-      }
+      const b = preparedScorerSequence(rawChoice)
 
-      const similarityCutoff =
-        kind === 'distance' || kind === 'normalizedDistance'
-          ? rawCutoff === null
-            ? 0
-            : 1 - rawCutoff
-          : (rawCutoff ?? 0)
       // The transposition pass compares the two sequences elementwise, so they
       // have to agree on how a character is spelled.
       const similarity = jaroSimilarityPrepared_(
         alignRepresentation(a, b),
         pattern,
         alignRepresentation(b, a),
-        similarityCutoff,
+        rawCutoff ?? 0,
       )
-
-      // Jaro's score is normalised, so `distance` and `normalizedDistance` are
-      // the same metric read the same way — and likewise the two similarities.
-      switch (kind) {
-        case 'distance':
-        case 'normalizedDistance':
-          return normDistCutoff(1 - similarity, rawCutoff)
-        case 'similarity':
-        case 'normalizedSimilarity':
-          return normSimCutoff(similarity, rawCutoff)
-      }
+      return normSimCutoff(similarity, rawCutoff)
     }
     return score
   }
@@ -550,85 +507,8 @@ function jaroSimilarity_impl(
   )
 }
 
-/**
- * Jaro distance, i.e. `1 - jaroSimilarity(s1, s2)`.
- *
- * If the distance is greater than `scoreCutoff`, `1` is returned. See
- * {@link jaroSimilarity} for why the clamp is the normalised one.
- */
-function jaroDistance_impl(
-  s1: Sequence,
-  s2: Sequence,
-  options: ScorerOptions = {},
-): number {
-  const [a, b] = conv(s1, s2, options.processor)
-  const cutoff = options.scoreCutoff
-  return normDistCutoff(
-    1 - jaroSimilarity_(a, b, cutoff == null ? 0 : 1 - cutoff),
-    cutoff,
-  )
-}
-
-/**
- * Jaro distance. Identical to {@link jaroDistance} — the metric is already
- * normalised into `[0, 1]`.
- *
- * If the normalised distance is greater than `scoreCutoff`, `1` is returned.
- */
-function jaroNormalizedDistance_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: ScorerOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 1
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  const cutoff = options.scoreCutoff
-  return normDistCutoff(
-    1 - jaroSimilarity_(a, b, cutoff == null ? 0 : 1 - cutoff),
-    cutoff,
-  )
-}
-
-/**
- * Jaro similarity. Identical to {@link jaroSimilarity} — the metric is already
- * normalised into `[0, 1]`.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
-function jaroNormalizedSimilarity_impl(
-  s1: MaybeSequence,
-  s2: MaybeSequence,
-  options: ScorerOptions = {},
-): number {
-  if (isNone(s1) || isNone(s2)) return 0
-
-  const [a, b] = conv(asSequence(s1), asSequence(s2), options.processor)
-  return normSimCutoff(
-    jaroSimilarity_(a, b, options.scoreCutoff ?? 0),
-    options.scoreCutoff,
-  )
-}
-
-// Scorer flags let `process` tell distances from similarities.
 export const jaroSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
   jaroSimilarity_impl,
-  SIMILARITY_FLAGS,
-  prepareJaro('similarity'),
+  NORMALIZED_SIMILARITY_FLAGS,
+  prepareJaro(),
 )
-export const jaroDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
-  jaroDistance_impl,
-  DISTANCE_FLAGS,
-  prepareJaro('distance'),
-)
-export const jaroNormalizedDistance: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
-  jaroNormalizedDistance_impl,
-  NORMALIZED_DISTANCE_FLAGS,
-  prepareJaro('normalizedDistance'),
-)
-export const jaroNormalizedSimilarity: NormalizedScorer =
-  /* @__PURE__ */ withPreparedFlags(
-    jaroNormalizedSimilarity_impl,
-    NORMALIZED_SIMILARITY_FLAGS,
-    prepareJaro('normalizedSimilarity'),
-  )

@@ -2,7 +2,7 @@
 // not retain scratch across calls the way these kernels do.
 //
 // The kernels reuse module-level buffers that grow on demand and never shrink,
-// and `_bitVector/shared.ts` additionally keeps a shared symbol table that widens
+// and the shared bitmask builder additionally keeps a symbol table that widens
 // permanently, a one-entry mask memo and a generation counter. The benchmarks
 // clear all of that between cases so that a case's number does not depend on
 // which case ran before it — see `bench/_harness.ts`.
@@ -30,7 +30,7 @@ import {
 } from '../../src/algorithms/jaro/implementation.js'
 import {
   lcsSeqEditops,
-  lcsSeqSimilarity,
+  lcsSeqNormalizedSimilarity,
 } from '../../src/algorithms/lcs/implementation.js'
 import { levenshteinEditops } from '../../src/algorithms/levenshtein/editops.js'
 import { resetWeightedScratch } from '../../src/algorithms/levenshtein/internal/scratch.js'
@@ -69,7 +69,7 @@ function workload(): unknown[] {
       levenshteinDistance(a, b, { weights: [1.5, 2.25, 3.5] }),
       levenshteinDistance(a, b, { scoreCutoff: 4, scoreHint: 2 }),
       indelDistance(a, b),
-      lcsSeqSimilarity(a, b),
+      lcsSeqNormalizedSimilarity(a, b),
       osaDistance(a, b),
       damerauLevenshteinDistance(a, b),
       jaroSimilarity(a, b),
@@ -156,7 +156,7 @@ describe('widening the shared table from each mask builder', () => {
     expect(levenshteinDistance(cyrillic, edited)).toBe(
       levenshteinDistance(edited, cyrillic),
     )
-    expect(lcsSeqSimilarity(cyrillic, edited)).toBeGreaterThan(0)
+    expect(lcsSeqNormalizedSimilarity(cyrillic, edited)).toBeGreaterThan(0)
     expect(indelDistance(cyrillic, edited)).toBeGreaterThan(0)
   })
 
@@ -171,7 +171,9 @@ describe('widening the shared table from each mask builder', () => {
     expect(levenshteinDistance(source, destination)).toBe(
       levenshteinDistance(cyrillic, edited),
     )
-    expect(lcsSeqSimilarity(source, destination)).toBe(lcsSeqSimilarity(cyrillic, edited))
+    expect(lcsSeqNormalizedSimilarity(source, destination)).toBe(
+      lcsSeqNormalizedSimilarity(cyrillic, edited),
+    )
   })
 
   it('widens from a single-word pattern', () => {
@@ -180,6 +182,6 @@ describe('widening the shared table from each mask builder', () => {
     const short = cyrillic.slice(0, 20)
     const shortEdited = edited.slice(0, 20)
     expect(levenshteinDistance(short, shortEdited)).toBeGreaterThan(1)
-    expect(lcsSeqSimilarity(short, shortEdited)).toBeGreaterThan(0)
+    expect(lcsSeqNormalizedSimilarity(short, shortEdited)).toBeGreaterThan(0)
   })
 })

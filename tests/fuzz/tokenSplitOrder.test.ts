@@ -8,7 +8,7 @@
 // insertion order of the maps behind `UniqueTokenSet` — so the accessors must
 // give one answer whichever order they are driven in.
 //
-// These reach into `_fuzz/tokens.js` on purpose. The invariant is internal, and
+// These reach into `fuzz/internal/tokens.js` on purpose. The invariant is internal, and
 // asserting it through the public scorers alone would only test the access order
 // those scorers happen to use today.
 import { describe, expect, it } from 'vitest'

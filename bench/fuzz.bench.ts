@@ -124,7 +124,7 @@ describe('token scorers', () => {
   })
 })
 
-// WRatio is what `process.extract` defaults to, so it is the single hottest
+// Adaptive fuzzy similarity is a common search scorer, so it is the single hottest
 // path in the library for anyone using it as intended.
 describe('wRatio', () => {
   measure('32 chars', () => {

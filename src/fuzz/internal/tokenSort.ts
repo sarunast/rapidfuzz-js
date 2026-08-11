@@ -1,5 +1,5 @@
 import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
-import { asSequence, isNone } from '../../algorithms/shared/scorerSupport.js'
+import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
 import {
   convertProcessedPair,
@@ -31,7 +31,7 @@ export function tokenSortRatioConverted(
   // parameter values, which JavaScript evaluates ahead of the body — so the
   // guard sat behind the very work it exists to skip. `wRatio` reaches a cutoff
   // above 100 whenever its base ratio clears 95, by dividing the running best by
-  // 0.95, and that is the common case in `extractOne` rather than a corner one.
+  // 0.95, and that is the common case in best-match search rather than a corner one.
   if (scoreCutoff > 100) return 0
 
   const sortedA = sortedOf(viewA ?? tokenViewOf(a))
@@ -59,7 +59,7 @@ export function tokenSortRatio_impl(
   s2: FuzzInput,
   options: FuzzOptions = {},
 ): number {
-  if (isNone(s1) || isNone(s2)) return 0
+  if (isMissing(s1) || isMissing(s2)) return 0
 
   const [a, b] = convertProcessedPair(asSequence(s1), asSequence(s2), options.processor)
 
