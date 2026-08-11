@@ -21,6 +21,7 @@ import {
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
+  sharesWideAffix,
   type PrepareScorer,
   type PreparedScore,
   withPreparedFlags,
@@ -534,15 +535,30 @@ function distance_(
   }
 
   const bounded = Number.isFinite(scoreCutoff) && scoreCutoff < Number.MAX_SAFE_INTEGER
-  const minInsertDelete =
-    textInsert > 0 && sourceDelete > 0 ? Math.min(textInsert, sourceDelete) : Infinity
+  const step = sourceDelete + textInsert
 
-  // Nothing the row loop touches feeds back into the band width, so it is a
-  // constant for the whole matrix rather than a per-row quantity.
-  const radius =
-    bounded && Number.isFinite(minInsertDelete)
-      ? Math.floor(scoreCutoff / minInsertDelete) + 1
+  // How far off the corridor between the two ends the budget can pay to go.
+  //
+  // Every alignment deletes at least `difference` elements of the longer side,
+  // which is `minimum` above and is already known to fit the budget. Beyond
+  // that, each insertion has to be matched by another deletion — the two
+  // lengths are fixed — so a step off the corridor and back costs
+  // `sourceDelete + textInsert`, and the budget buys `excursion` of them.
+  //
+  // The corridor itself runs from `sourceIndex - difference` to `sourceIndex`,
+  // so the reachable columns are that widened by the excursion at both ends.
+  // Nothing the row loop touches feeds back into it, so both spans are
+  // constants for the whole matrix rather than per-row quantities.
+  //
+  // The `+ 1` is the same slack the old symmetric radius carried: it costs one
+  // diagonal either side and keeps a fractional weighting whose quotient lands
+  // a hair below a whole number from banding one diagonal too tight.
+  const difference = sourceLength - textLength
+  const excursion =
+    bounded && step > 0
+      ? Math.floor((scoreCutoff - difference * sourceDelete) / step) + 1
       : Math.max(sourceLength, textLength)
+  const belowSpan = bounded && step > 0 ? difference + excursion : excursion
 
   return integerRowFits(sourceLength, textLength, sourceDelete, textInsert, replace)
     ? weightedIntegerDp(
@@ -554,7 +570,8 @@ function distance_(
         sourceDelete,
         textInsert,
         replace,
-        radius,
+        belowSpan,
+        excursion,
       )
     : weightedFloatDp(
         source,
@@ -565,7 +582,8 @@ function distance_(
         sourceDelete,
         textInsert,
         replace,
-        radius,
+        belowSpan,
+        excursion,
       )
 }
 
@@ -618,18 +636,23 @@ function weightedIntegerDp(
   sourceDelete: number,
   textInsert: number,
   replace: number,
-  radius: number,
+  belowSpan: number,
+  aboveSpan: number,
 ): number {
   const row = weightedIntegerRow(textLength + 1)
   for (let j = 0; j <= textLength; j++) row[j] = j * textInsert
 
   for (let i = 1; i <= sourceLength; i++) {
-    let prevDiag = row[0]
+    const low = Math.max(1, i - belowSpan)
+    const high = Math.min(textLength, i + aboveSpan)
+    // The diagonal predecessor of the row's first cell, read before column zero
+    // is overwritten. Once the band has left column one that is the previous
+    // row's own first cell, which the band's one-column-a-row drift leaves
+    // exactly here; the two coincide only while `low` is one.
+    let prevDiag = row[low - 1]
     row[0] = i * sourceDelete
     const a = source[prefix + i - 1]
 
-    const low = Math.max(1, i - radius)
-    const high = Math.min(textLength, i + radius)
     if (low > 1) row[low - 1] = INT_ROW_SENTINEL
 
     for (let j = low; j <= high; j++) {
@@ -658,18 +681,20 @@ function weightedFloatDp(
   sourceDelete: number,
   textInsert: number,
   replace: number,
-  radius: number,
+  belowSpan: number,
+  aboveSpan: number,
 ): number {
   const row = weightedFloatRow(textLength + 1)
   for (let j = 0; j <= textLength; j++) row[j] = j * textInsert
 
   for (let i = 1; i <= sourceLength; i++) {
-    let prevDiag = row[0]
+    const low = Math.max(1, i - belowSpan)
+    const high = Math.min(textLength, i + aboveSpan)
+    // See {@link weightedIntegerDp} for why the diagonal is read from `low - 1`.
+    let prevDiag = row[low - 1]
     row[0] = i * sourceDelete
     const a = source[prefix + i - 1]
 
-    const low = Math.max(1, i - radius)
-    const high = Math.min(textLength, i + radius)
     if (low > 1) row[low - 1] = Infinity
 
     for (let j = low; j <= high; j++) {
@@ -992,6 +1017,41 @@ function preparedBandWorthwhile(
   )
 }
 
+/**
+ * Fewest words a pattern has to span before trimming an affix beats holding
+ * its masks.
+ *
+ * The held pattern's whole advantage is the mask build it does not repeat per
+ * choice; trimming's is the elements the kernel never reaches, and each of
+ * those is worth one step *per word*. So the two scale differently, and below
+ * four words trimming loses even when the affix is nearly the whole input: at
+ * two words a pair sharing 56 of 64 elements measured 0.83x, and at three words
+ * an affix of 84 in 96 bought 1.13x against 0.92x on the near-copies beside it.
+ * Four words is where the win clears what the probe costs — 1.5x there, 2.6x at
+ * eight words and 9.2x at sixteen.
+ */
+const AFFIX_TRIM_WORDS = 4
+
+/**
+ * Whether the pair is better served by trimming its common affix than by the
+ * held pattern the length gate has just approved.
+ *
+ * {@link preparedDistanceWorthwhile} answers from lengths, and lengths cannot
+ * see an affix: a query and a choice of 512 elements that agree on 480 of them
+ * look exactly like two unrelated ones. The held pattern reads all 512 either
+ * way, where the unprepared kernel trims first and scores 32.
+ *
+ * The same relaxation the LCS metrics take, in the opposite direction — there
+ * the probe lets a pair *onto* the held masks that a length gate refused, here
+ * it takes one *off* them. That is why it asks {@link sharesWideAffix} for a
+ * quarter rather than {@link sharesAffix}'s eighth, and why a pattern narrower
+ * than {@link AFFIX_TRIM_WORDS} is not asked at all.
+ */
+function worthTrimming(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
+  const words = (Math.min(a.length, b.length) + 31) >>> 5
+  return words >= AFFIX_TRIM_WORDS && sharesWideAffix(a, b)
+}
+
 function prepareLevenshtein(kind: PreparedLevenshteinKind): PrepareScorer {
   const prepare: PrepareScorer = (query, kwargs) => {
     const weights = parseWeights(Reflect.get(kwargs, 'weights'))
@@ -1019,7 +1079,10 @@ function prepareLevenshtein(kind: PreparedLevenshteinKind): PrepareScorer {
           return levenshteinSmallBand(pattern, a.length, b, 0, b.length, budget)
         }
       }
-      if (preparedDistanceWorthwhile(uniform, a.length, b.length, cutoff, hint)) {
+      if (
+        preparedDistanceWorthwhile(uniform, a.length, b.length, cutoff, hint) &&
+        !worthTrimming(a, b)
+      ) {
         pattern ??= preparePattern(a, 0, a.length)
         return levenshteinPrepared(pattern, b, 0, b.length)
       }

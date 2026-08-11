@@ -688,7 +688,42 @@ const AFFIX_PROBE_LIMIT = 32
  * as it did before this probe existed.
  */
 export function sharesAffix(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
-  const probe = Math.min(Math.min(a.length, b.length) >>> 3, AFFIX_PROBE_LIMIT)
+  return hasAffix(a, b, Math.min(Math.min(a.length, b.length) >>> 3, AFFIX_PROBE_LIMIT))
+}
+
+/**
+ * {@link sharesAffix} asking for a quarter rather than an eighth, and up to 64
+ * elements rather than 32.
+ *
+ * Levenshtein's held pattern reads either representation and rebuilds nothing,
+ * so the pair it is deciding for has already passed a gate that says the held
+ * masks are worth it — which makes a false "yes" here cost the whole of that,
+ * where for the LCS metrics it costs only what a length gate was refusing
+ * anyway. An eighth is too little evidence for that: a near-copy list edited
+ * one element in twenty clears an eighth of a 128-element pair, and calling
+ * those an affix measured 0.74x. A quarter refuses them and keeps the 1.5x on
+ * pairs that really do share their front.
+ *
+ * The wider ceiling follows the same asymmetry. Over-reporting is the safe
+ * direction for {@link sharesAffix} and the expensive one here, so the demand
+ * keeps rising with the input for twice as long before it flattens.
+ */
+export function sharesWideAffix(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
+  return hasAffix(
+    a,
+    b,
+    Math.min(Math.min(a.length, b.length) >>> 2, 2 * AFFIX_PROBE_LIMIT),
+  )
+}
+
+/**
+ * Whether `probe` elements match at either end. Shared by the two questions
+ * above, which differ only in how many elements they ask for.
+ *
+ * A probe of zero reports `true` — an input too short to hold one has nothing
+ * to trim, and both callers reach the same verdict from lengths alone.
+ */
+function hasAffix(a: ArrayLike<unknown>, b: ArrayLike<unknown>, probe: number): boolean {
   const lastA = a.length - 1
   const lastB = b.length - 1
   if (typeof a === 'string') {

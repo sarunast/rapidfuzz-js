@@ -1772,6 +1772,18 @@ export function levenshteinUniform(
   if (s1.length === 0) return s2.length
   if (s2.length === 0) return s1.length
 
+  // Ahead of the affix scan, because trimming cannot change this answer: a
+  // common prefix and suffix are removed from both sides in equal counts, so
+  // the trimmed difference is the untrimmed one. What the two `.length`s say
+  // about reachability, they say without reading an element — and the pair this
+  // rejects is the one the scan is worst on, since a choice that shares a long
+  // prefix with the query and misses the cutoff on length alone had that whole
+  // prefix walked before anything looked at the lengths. Measured at 64x over
+  // 1024 elements against a 256-element prefix of themselves, and 5x on the
+  // same lengths sharing nothing at all.
+  const lengthDifference = Math.abs(s1.length - s2.length)
+  if (lengthDifference > scoreCutoff) return scoreCutoff + 1
+
   // Allocating the shared table is deferred to the three kernels that read it,
   // rather than paid by every comparison. `measureAffix` compares the two
   // sequences directly, and the outcomes reachable before those kernels —
@@ -1790,9 +1802,6 @@ export function levenshteinUniform(
 
   if (len1 === 0) return len2
   if (len2 === 0) return len1
-
-  const lengthDifference = Math.abs(len1 - len2)
-  if (lengthDifference > scoreCutoff) return scoreCutoff + 1
 
   // Left above the one-word branch, which never calls it. Moving it below was
   // measured: the difference does not clear the noise, in the suite or in
