@@ -16,10 +16,10 @@ import {
 } from './snapshot.js'
 import type {
   BestOptions,
+  ItemIterable,
   Items,
   Matcher,
   MatcherOptions,
-  SearchIterOptions,
   SearchOptions,
 } from './types.js'
 
@@ -62,7 +62,7 @@ export function createMatcher<K, T, D extends Direction>(
   options: MatcherOptions<T, D>,
 ): Matcher<T, K, D>
 export function createMatcher<T, D extends Direction>(
-  items: Iterable<T>,
+  items: ItemIterable<T>,
   options: MatcherOptions<T, D>,
 ): Matcher<T, number, D>
 export function createMatcher<T, D extends Direction>(
@@ -172,7 +172,7 @@ export function createMatcher<T, D extends Direction>(
   }
   const searchIter = (
     query: MaybeSequence,
-    call?: SearchIterOptions,
+    call?: BestOptions,
   ): IterableIterator<Match<T, unknown>> => {
     // Read where the call is made, not where iteration starts: a caller who
     // mutates their options object between the two would otherwise change a

@@ -111,6 +111,11 @@ number, what a measurement found, what a non-obvious ordering protects. It does
 not narrate the code beside it, restate a type, or reproduce the investigation
 that produced it — a date, a version and the conclusion carry that.
 
+**Types carry no comments unless asked for.** A type declaration, its members
+and its parameters are read as code, not documentation. Behaviour a caller
+needs to know goes in README.md; a rule the compiler enforces needs no prose
+beside it.
+
 ## Coverage is 100%, and that is enforced
 
 `pnpm coverage` passes `--coverage.thresholds.100` and fails below it on all

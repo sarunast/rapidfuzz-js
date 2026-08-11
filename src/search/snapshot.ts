@@ -1,6 +1,6 @@
 import { snapshotSequence, validateSequence } from '../core/sequence.js'
-import type { Direction, MaybeSequence, Sequence } from '../core/types.js'
-import type { MatcherOptions, Normalizer } from './types.js'
+import type { Direction, MaybeSequence, Normalizer, Sequence } from '../core/types.js'
+import type { MatcherOptions } from './types.js'
 
 export type SequenceReader<T> = (item: T) => Sequence | null
 

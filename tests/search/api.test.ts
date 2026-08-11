@@ -21,6 +21,7 @@ import {
   searchIter,
 } from '../../src/index.js'
 import type { Match, Sequence } from '../../src/index.js'
+import type { ItemIterable } from '../../src/search/types.js'
 
 describe('one-shot search and Matcher', () => {
   const scorer = createScorer(fuzz.similarity)
@@ -87,6 +88,10 @@ describe('one-shot search and Matcher', () => {
     expectTypeOf(createMatcher({ first: 'a' }, { scorer }).best('a')).toEqualTypeOf<
       Match<string, string> | undefined
     >()
+    // A string is an `Iterable<string>`, and the runtime refuses one; without
+    // the `& object` in `ItemIterable` the two disagree and this compiles.
+    expectTypeOf<string>().not.toExtend<ItemIterable<string>>()
+    expectTypeOf<readonly string[]>().toExtend<ItemIterable<string>>()
   })
 
   test('one-shot and Matcher results agree and normalize once per retained value', () => {

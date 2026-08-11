@@ -2,13 +2,14 @@ import type { Scorer } from '../core/scorer.js'
 import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
 import type { Match } from './results.js'
 
+export type ItemIterable<T> = Iterable<T> & object
+
 export type Items<T> =
   | readonly T[]
   | ReadonlyMap<unknown, T>
-  | Iterable<T>
+  | ItemIterable<T>
   | Readonly<Record<string, T>>
 
-export type { Normalizer } from '../core/types.js'
 export type MissingItemsPolicy = 'skip' | 'throw'
 
 export interface MatcherOptions<T, D extends Direction = Direction> {
@@ -27,15 +28,16 @@ export interface SearchOptions extends BestOptions {
   readonly limit?: number | null | undefined
 }
 
-export type SearchIterOptions = BestOptions
-
 export interface Matcher<T, K, D extends Direction = Direction> {
   readonly size: number
   readonly scorer: Scorer<D>
-  best(query: MaybeSequence, options?: BestOptions): Match<T, K> | undefined
-  search(query: MaybeSequence, options?: SearchOptions): readonly Match<T, K>[]
-  searchIter(
+  readonly best: (query: MaybeSequence, options?: BestOptions) => Match<T, K> | undefined
+  readonly search: (
     query: MaybeSequence,
-    options?: SearchIterOptions,
-  ): IterableIterator<Match<T, K>>
+    options?: SearchOptions,
+  ) => readonly Match<T, K>[]
+  readonly searchIter: (
+    query: MaybeSequence,
+    options?: BestOptions,
+  ) => IterableIterator<Match<T, K>>
 }

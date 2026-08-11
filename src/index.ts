@@ -10,17 +10,14 @@ export type {
   Scorer,
   ThresholdOptions,
 } from './core/scorer.js'
-export type { Direction, MaybeSequence, Sequence } from './core/types.js'
+export type { Direction, MaybeSequence, Normalizer, Sequence } from './core/types.js'
 export type {
   BestOptions,
-  Items,
   Match,
   Matcher,
   MatcherOptions,
   MissingItemsPolicy,
-  Normalizer,
   SearchOptions,
-  SearchIterOptions,
 } from './search/index.js'
 export type {
   BatchOptions,

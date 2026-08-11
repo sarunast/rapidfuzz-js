@@ -1,7 +1,7 @@
 import type { MetricCompilation, PreparedKernel } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
-import type { Direction, MaybeSequence } from '../core/types.js'
+import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
 import { assertCollection, collectionEntries } from './collection.js'
 import { pushHeap, replaceHeapRoot } from './internal/heap.js'
 import type { Match, ScoredEntry } from './results.js'
@@ -14,10 +14,9 @@ import {
 } from './snapshot.js'
 import type {
   BestOptions,
+  ItemIterable,
   Items,
   MatcherOptions,
-  Normalizer,
-  SearchIterOptions,
   SearchOptions,
 } from './types.js'
 
@@ -80,7 +79,7 @@ export function bestMatch<K, T, D extends Direction>(
 ): Match<T, K> | undefined
 export function bestMatch<T, D extends Direction>(
   query: MaybeSequence,
-  items: Iterable<T>,
+  items: ItemIterable<T>,
   options: MatcherOptions<T, D> & BestOptions,
 ): Match<T, number> | undefined
 export function bestMatch<T, D extends Direction>(
@@ -189,7 +188,7 @@ export function search<K, T, D extends Direction>(
 ): readonly Match<T, K>[]
 export function search<T, D extends Direction>(
   query: MaybeSequence,
-  items: Iterable<T>,
+  items: ItemIterable<T>,
   options: MatcherOptions<T, D> & SearchOptions,
 ): readonly Match<T, number>[]
 export function search<T, D extends Direction>(
@@ -323,32 +322,32 @@ export function search<T, D extends Direction>(
 export function searchIter<T, D extends Direction>(
   query: MaybeSequence,
   items: readonly T[],
-  options: MatcherOptions<T, D> & SearchIterOptions,
+  options: MatcherOptions<T, D> & BestOptions,
 ): IterableIterator<Match<T, number>>
 export function searchIter<K, T, D extends Direction>(
   query: MaybeSequence,
   items: ReadonlyMap<K, T>,
-  options: MatcherOptions<T, D> & SearchIterOptions,
+  options: MatcherOptions<T, D> & BestOptions,
 ): IterableIterator<Match<T, K>>
 export function searchIter<T, D extends Direction>(
   query: MaybeSequence,
-  items: Iterable<T>,
-  options: MatcherOptions<T, D> & SearchIterOptions,
+  items: ItemIterable<T>,
+  options: MatcherOptions<T, D> & BestOptions,
 ): IterableIterator<Match<T, number>>
 export function searchIter<T, D extends Direction>(
   query: MaybeSequence,
   items: Readonly<Record<string, T>>,
-  options: MatcherOptions<T, D> & SearchIterOptions,
+  options: MatcherOptions<T, D> & BestOptions,
 ): IterableIterator<Match<T, string>>
 export function searchIter<T, D extends Direction>(
   query: MaybeSequence,
   items: Items<T>,
-  options: MatcherOptions<T, D> & SearchIterOptions,
+  options: MatcherOptions<T, D> & BestOptions,
 ): IterableIterator<Match<T, unknown>>
 export function searchIter<T, D extends Direction>(
   query: MaybeSequence,
   items: Items<T>,
-  options: MatcherOptions<T, D> & SearchIterOptions,
+  options: MatcherOptions<T, D> & BestOptions,
 ): IterableIterator<Match<T, unknown>> {
   // Call options and collection shape are read and checked here, so a caller
   // who mutates their options object before iterating cannot change a search

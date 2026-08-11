@@ -169,10 +169,13 @@ matcher.search('new york', { limit: null }) // every result, best first
 matcher.searchIter('new york', { threshold: 60 }) // lazy, source order
 ```
 
-Arrays and iterables use source positions as keys. Maps retain map keys. Plain
+Arrays and iterables use source positions as keys. Maps retain map keys — any
+map-shaped value is read as a map, including one typed as an iterable of
+entries, since nothing at runtime can tell which of the two was meant. Plain
 objects retain property names. Missing source items and missing `getText`
 results are skipped by default without compacting those keys; use
-`missingItems: 'throw'` to reject them instead.
+`missingItems: 'throw'` to reject them instead. A single string is not a
+collection of its characters and is rejected.
 
 Strings are retained. Non-string array-like sequences are shallow-copied into
 Matcher-owned storage, so later top-level mutations do not change search
