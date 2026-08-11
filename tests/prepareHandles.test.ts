@@ -130,9 +130,9 @@ function optionSets(
  * What a direct call looks like for the same options — the oracle every
  * differential below compares against.
  *
- * Spelled with both keys present, because that is what a handle sends: absence
- * is `undefined` on both sides, so the only difference a scorer could observe
- * is the one the `undefined` row exists to pin — no options argument at all.
+ * The options object is forwarded, not rebuilt, because that is what a handle
+ * does: the call it stands in for is the one the caller would have written, and
+ * the two ways of writing it are with an options argument and without.
  */
 function direct(
   scorer: SearchScorer,
@@ -141,10 +141,7 @@ function direct(
   options: PreparedCallOptions | undefined,
 ): number {
   if (options === undefined) return callUntyped(scorer, query, choice)
-  return callUntyped(scorer, query, choice, {
-    scoreCutoff: options.scoreCutoff,
-    scoreHint: options.scoreHint,
-  })
+  return callUntyped(scorer, query, choice, options)
 }
 
 describe('a prepared handle scores what a direct call scores', () => {
@@ -487,6 +484,57 @@ describe('a handle refuses an operand that is not a sequence', () => {
   })
 })
 
+describe('a handle refuses what a processor returns, if it is not a sequence', () => {
+  // The type says a processor returns a `Sequence`, and the type is the
+  // caller's own claim — so these go through `callUntyped`, as every other
+  // JavaScript-shaped misuse here does. What makes it worth checking is the
+  // scorer that would not: a built-in refuses `42` eventually, in its own words
+  // and from a call the caller never made, and a third-party scorer refuses it
+  // never — handed `42` on both sides it compares them and returns a number.
+  const returnsANumber = (): number => 42
+  const refused = /processor must return a string or an array-like sequence/
+  const third = (a: unknown, b: unknown): number => (a === b ? 100 : 0)
+
+  it('at build time, on both handles and for any scorer', () => {
+    for (const scorer of [ratio, levenshteinDistance, third]) {
+      const options = { scorer, processor: returnsANumber }
+      expect(() => callUntyped(prepareQuery, 'abc', options)).toThrow(refused)
+      expect(() => callUntyped(prepareChoice, 'abc', options)).toThrow(refused)
+    }
+  })
+
+  it('at call time, when only the later operand is the one it fails on', () => {
+    // Builds cleanly, so the throw is the raw-operand path inside the call
+    // rather than the one at construction.
+    const exceptFor = (s: Sequence): Sequence | number =>
+      s === 'abc' ? s : returnsANumber()
+    const pq = callUntyped(prepareQuery, 'abc', { scorer: third, processor: exceptFor })
+    const pc = callUntyped(prepareChoice, 'abc', { scorer: third, processor: exceptFor })
+
+    expect(() => callUntyped(pq, 'abd')).toThrow(refused)
+    expect(() => callUntyped(pc, 'abd')).toThrow(refused)
+    // The operand it does accept still scores, so the guard is not refusing
+    // everything.
+    expect(callUntyped(pq, 'abc')).toBe(100)
+  })
+
+  it('and so does every other entry point that runs one', () => {
+    // The check is at the search boundary, not in the handles — so `extract`
+    // and the rest stop on it too, where a third-party scorer used to be handed
+    // whatever the processor said.
+    const options = { scorer: third, processor: returnsANumber }
+    expect(() => callUntyped(extract, 'abc', ['abd'], options)).toThrow(refused)
+    expect(() => callUntyped(extractOne, 'abc', ['abd'], options)).toThrow(refused)
+    expect(() => [...callUntyped(extractIter, 'abc', ['abd'], options)]).toThrow(refused)
+    expect(() => callUntyped(prepareChoices, ['abd'], options)).toThrow(refused)
+    expect(() => callUntyped(prepareChoices, new Map([[0, 'abd']]), options)).toThrow(
+      refused,
+    )
+    expect(() => callUntyped(scoreMatrix, ['abc'], ['abd'], options)).toThrow(refused)
+    expect(() => callUntyped(scorePairs, ['abc'], ['abd'], options)).toThrow(refused)
+  })
+})
+
 describe('a handle cannot be edited after it is built', () => {
   const pq = prepareQuery('abc', { scorer: ratio })
   const pc = prepareChoice('abd', { scorer: ratio })
@@ -593,6 +641,13 @@ describe('a prepared handle is not a scorer, and is refused as one', () => {
       expect(() => callUntyped(extract, handle, ['abc'], {})).toThrow(asQuery)
       expect(() => callUntyped(extractOne, handle, ['abc'], {})).toThrow(asQuery)
       expect(() => [...callUntyped(extractIter, handle, ['abc'], {})]).toThrow(asQuery)
+
+      // Including the limit that returns before anything is prepared. A query
+      // that is a mistake at `limit: 5` is the same mistake at `limit: 0`, and
+      // the early return is the one path that never reaches `prepare`.
+      for (const limit of [0, -1]) {
+        expect(() => callUntyped(extract, handle, ['abc'], { limit })).toThrow(asQuery)
+      }
     })
   }
 
