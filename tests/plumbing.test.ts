@@ -8,7 +8,13 @@
 // write.
 import { describe, expect, it } from 'vitest'
 
-import { callScorer, prepareScorerOf, scorerFlagsOf, toRecord } from '../src/_common.js'
+import {
+  callScorer,
+  prepareScorerOf,
+  scorerFlagsOf,
+  toRecord,
+  type Sequence,
+} from '../src/_common.js'
 import { scoreArrayFactory, type ScoreArrayKind } from '../src/_scoreArray.js'
 import { configure } from '../src/configure.js'
 import { hammingDistance } from '../src/distance/hamming.js'
@@ -19,7 +25,13 @@ import {
   prefixNormalizedSimilarity,
 } from '../src/distance/prefix.js'
 import { partialRatio, ratio, tokenSortRatio, wRatio } from '../src/fuzz.js'
-import { extract, extractIter, extractOne, scoreMatrix } from '../src/search.js'
+import {
+  extract,
+  extractIter,
+  extractOne,
+  scoreMatrix,
+  scorePairs,
+} from '../src/search.js'
 import { callUntyped } from './common.js'
 
 const KINDS: readonly ScoreArrayKind[] = [
@@ -52,7 +64,39 @@ describe('every score array kind allocates and views', () => {
   it('refuses a kind it has no factory for', () => {
     const missing: ScoreArrayKind = KINDS[KINDS.length]
     expect(() => scoreArrayFactory(missing)).toThrow(RangeError)
-    expect(() => scoreMatrix(['ab'], ['ac'], { into: missing })).not.toThrow()
+  })
+
+  it('while an absent `into` is not a bad kind but a default', () => {
+    // `KINDS[KINDS.length]` is `undefined`, which both entry points read as
+    // "not given" before they ever reach a factory — as they do `null`, which
+    // is this package's other spelling of a missing value. That is what the
+    // test above and this one disagree about, and deliberately.
+    const absent: ScoreArrayKind = KINDS[KINDS.length]
+    expect(scoreMatrix(['ab'], ['ac'], { into: absent }).data).toBeInstanceOf(
+      Float64Array,
+    )
+    expect(scorePairs(['ab'], ['ac'], { into: absent })).toBeInstanceOf(Float64Array)
+    expect(callUntyped(scoreMatrix, ['ab'], ['ac'], { into: null }).data).toBeInstanceOf(
+      Float64Array,
+    )
+    expect(callUntyped(scorePairs, ['ab'], ['ac'], { into: null })).toBeInstanceOf(
+      Float64Array,
+    )
+  })
+
+  it('and a kind that is not one at all is refused by both entry points', () => {
+    // `scoreMatrix` used to fall through to `f64` here, where `scorePairs`
+    // threw: the same option, the same value, two answers. It dispatches on the
+    // kind to keep the element type a literal, and the default arm of that
+    // switch was doing double duty as a fallback.
+    for (const bogus of ['wat', 'F64', 1, {}]) {
+      expect(() => callUntyped(scoreMatrix, ['ab'], ['ac'], { into: bogus })).toThrow(
+        RangeError,
+      )
+      expect(() => callUntyped(scorePairs, ['ab'], ['ac'], { into: bogus })).toThrow(
+        RangeError,
+      )
+    }
   })
 })
 
@@ -100,6 +144,83 @@ describe('options copied into a record', () => {
   })
 })
 
+describe('the options a scorer is handed spell absence its own way', () => {
+  // `null` is this module's spelling of "not given"; a scorer's options are a
+  // public type, where it is `undefined`. Every entry point has to agree, or a
+  // third-party scorer reading `options.scoreCutoff === undefined` gets a
+  // different answer from `extract` than from `scoreMatrix`.
+  const absence = (
+    _a: unknown,
+    _b: unknown,
+    options?: { scoreCutoff?: number },
+  ): number => (options?.scoreCutoff === undefined ? 100 : 0)
+
+  it('as undefined, from every path, when no cutoff was given', () => {
+    expect(callUntyped(absence, 'ab', 'ab')).toBe(100)
+    expect(callUntyped(extract, 'ab', ['ab'], { scorer: absence })[0].score).toBe(100)
+    expect([
+      ...callUntyped(scoreMatrix, ['ab'], ['ab'], { scorer: absence }).data,
+    ]).toEqual([100])
+    expect([...callUntyped(scorePairs, ['ab'], ['ab'], { scorer: absence })]).toEqual([
+      100,
+    ])
+  })
+
+  it('and the object is not shared between calls', () => {
+    // One per call, as a hand-written loop would produce. A scorer that keeps
+    // what it is handed must not find the next pair's options in it.
+    const seen: unknown[] = []
+    const keep = (_a: unknown, _b: unknown, options?: object): number => {
+      seen.push(options)
+      return 1
+    }
+    callUntyped(scoreMatrix, ['ab', 'cd'], ['ab', 'cd'], { scorer: keep })
+    expect(seen.length).toBeGreaterThan(1)
+    expect(new Set(seen).size).toBe(seen.length)
+
+    seen.length = 0
+    callUntyped(scorePairs, ['ab', 'cd'], ['ab', 'cd'], { scorer: keep })
+    expect(new Set(seen).size).toBe(seen.length)
+  })
+})
+
+describe('a processor that returns a non-sequence for one choice only', () => {
+  // Deterministic, and still a broken output contract — so surviving the query
+  // proves nothing about a later choice. Who is about to be handed the value is
+  // what decides: a built-in refuses it in its own kernel, a third-party scorer
+  // refuses nothing, and only the second needs a check on the per-choice path.
+  const forOneChoice = (value: Sequence): Sequence | number =>
+    value === 'bad' ? 42 : value
+  const third = (a: unknown, b: unknown): number => (a === b ? 100 : 0)
+
+  it('is refused before a third-party scorer sees it', () => {
+    expect(() =>
+      callUntyped(extract, 'foo', ['foo', 'bad'], {
+        scorer: third,
+        processor: forOneChoice,
+      }),
+    ).toThrow(/processor must return a string or an array-like sequence/)
+  })
+
+  it('and a built-in still refuses it itself', () => {
+    expect(() =>
+      callUntyped(extract, 'foo', ['foo', 'bad'], {
+        scorer: ratio,
+        processor: forOneChoice,
+      }),
+    ).toThrow(TypeError)
+  })
+
+  it('while the choices it does process still score', () => {
+    expect(
+      callUntyped(extract, 'foo', ['foo', 'other'], {
+        scorer: third,
+        processor: forOneChoice,
+      })[0].score,
+    ).toBe(100)
+  })
+})
+
 describe('choices that are not a collection', () => {
   it('yields nothing for a primitive', () => {
     expect(callUntyped(extractOne, 'ab', 42)).toBeUndefined()
@@ -108,6 +229,58 @@ describe('choices that are not a collection', () => {
 
   it('throws for null, which has no keys to walk', () => {
     expect(() => callUntyped(extractOne, 'ab', null)).toThrow(TypeError)
+  })
+
+  it('refuses a bare string, at every limit', () => {
+    // A string satisfies `Iterable<string>`, so this type-checks and would
+    // otherwise score six one-character choices. `limit <= 0` returns before
+    // anything is enumerated, so it needs the check of its own that it now has.
+    const notACollection = /choices must be a collection, not a single string/
+    expect(() => callUntyped(extract, 'foo', 'foobar')).toThrow(notACollection)
+    expect(() => callUntyped(extract, 'foo', 'foobar', { limit: 0 })).toThrow(
+      notACollection,
+    )
+    expect(() => callUntyped(extract, 'foo', 'foobar', { limit: -1 })).toThrow(
+      notACollection,
+    )
+  })
+})
+
+describe('an object that looks like a Map without being one', () => {
+  // `isMapLike` is structural on purpose, so a `Map` from another realm still
+  // reads as one. Four names decided it — `get`, `has` and `entries` callable,
+  // `size` a number — and a plain object of choices carrying those was read as
+  // an empty map instead: no choices, no error, an empty result.
+  const collides = {
+    get: (): string => 'x',
+    has: (): boolean => true,
+    entries: (): IterableIterator<[unknown, string]> => [][Symbol.iterator](),
+    size: 2,
+  }
+
+  it('is not read as an empty map', () => {
+    expect(() => callUntyped(extract, 'foo', collides, { scorer: ratio })).toThrow(
+      TypeError,
+    )
+  })
+
+  it('while a real Map, and one from another realm, still are', () => {
+    const real = new Map([['k', 'foo']])
+    expect(callUntyped(extract, 'foo', real, { scorer: ratio })[0].key).toBe('k')
+
+    // The reason the test is structural rather than `instanceof`: this object
+    // implements the whole contract without being a `Map`, which is what a
+    // cross-realm one looks like from here.
+    const iterable: [unknown, string][] = [['k', 'foo']]
+    const crossRealm = {
+      get: (): string => 'foo',
+      has: (): boolean => true,
+      entries: (): IterableIterator<[unknown, string]> => iterable[Symbol.iterator](),
+      size: 1,
+      [Symbol.iterator]: (): IterableIterator<[unknown, string]> =>
+        iterable[Symbol.iterator](),
+    }
+    expect(callUntyped(extract, 'foo', crossRealm, { scorer: ratio })[0].key).toBe('k')
   })
 })
 

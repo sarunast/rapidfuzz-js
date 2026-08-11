@@ -143,10 +143,7 @@ export interface ExtractOptions extends SearchOptions {
  * this is a branch removed, not a case dropped.
  */
 function* entriesOf<T>(choices: Choices<T>): Generator<[unknown, T]> {
-  // See {@link Choices}: a string is admitted by the type and is never meant.
-  if (typeof choices === 'string') {
-    throw new TypeError('choices must be a collection, not a single string')
-  }
+  assertChoicesCollection(choices)
 
   if (isMapLike<unknown, T>(choices)) {
     yield* choices.entries()
@@ -183,6 +180,24 @@ function* entriesOf<T>(choices: Choices<T>): Generator<[unknown, T]> {
  * `hasattr(choices, "items")`, which is likewise structural — its docs promise
  * a pandas `Series` works, and a `Series` is not a `dict`.
  */
+/**
+ * Refuse the one collection the type admits and never means.
+ *
+ * See {@link Choices}: a string satisfies `Iterable<string>`, so `extract('foo',
+ * 'foobar')` type-checks and would score six single-character choices.
+ *
+ * Its own function rather than a line inside {@link entriesOf} because one path
+ * never reaches that generator: `extract` returns `[]` for `limit <= 0` before
+ * enumerating anything, and a collection that is a mistake at `limit: 5` is the
+ * same mistake at `limit: 0` — the same reason {@link checkIndex} and
+ * {@link assertNotPreparedQuery} are called there.
+ */
+function assertChoicesCollection(choices: unknown): void {
+  if (typeof choices === 'string') {
+    throw new TypeError('choices must be a collection, not a single string')
+  }
+}
+
 function isMapLike<K, V>(value: unknown): value is ReadonlyMap<K, V> {
   if (typeof value !== 'object' || value === null) return false
 
@@ -190,7 +205,13 @@ function isMapLike<K, V>(value: unknown): value is ReadonlyMap<K, V> {
     typeof Reflect.get(value, 'get') === 'function' &&
     typeof Reflect.get(value, 'has') === 'function' &&
     typeof Reflect.get(value, 'entries') === 'function' &&
-    typeof Reflect.get(value, 'size') === 'number'
+    typeof Reflect.get(value, 'size') === 'number' &&
+    // And iterable, which is the rest of the `ReadonlyMap` contract and the
+    // part a plain object of choices is least likely to have by accident. The
+    // four above are all names a record of choices could carry — `size` is a
+    // number, `get`/`has`/`entries` are functions — and an object that has them
+    // was read as an empty map rather than as four choices.
+    typeof Reflect.get(value, Symbol.iterator) === 'function'
   )
 }
 
@@ -1018,19 +1039,27 @@ function processedOperand(value: unknown, processor: Processor): Sequence {
  * sign, both orders. Four duplicated loops for nothing measurable.
  */
 function score<T>(state: Prepared, choice: T, scoreCutoff: number | null): number {
-  // The one processor call in this module that does *not* check what comes
-  // back, and the only one that runs per choice rather than per call. Measured:
+  // The only processor call in this module that runs per choice rather than
+  // per call, so it is the only one where checking the result is measurable:
   // routing it through `processedOperand` cost 0.92x on `extractOne > 2000
-  // choices, defaultProcess` and 0.95-0.97x across the rest of the processor
-  // cases, which is the whole per-choice budget for a test that cannot fail
-  // here first — `prepare` ran the same processor over the query before this
-  // loop started, and a processor that returns a sequence for one input and a
-  // number for the next is already outside the determinism this module
-  // documents.
+  // choices, defaultProcess` and 0.95-0.97x across the other processor cases.
+  //
+  // A processor may return a non-sequence for one input and not another —
+  // `(x) => (x === 'bad' ? 42 : x)` is perfectly deterministic and still breaks
+  // its own output contract — so the query having survived `prepare` proves
+  // nothing about this choice. What decides it is who is about to be handed the
+  // value: a built-in refuses a non-sequence itself, in the kernel, and a
+  // third-party scorer refuses nothing. So the check runs on exactly the path
+  // that would otherwise score `42` against `42` and return a number, and the
+  // built-in path — prepared or not — pays for none of it.
   const processed =
     state.processor != null ? state.processor(queryAsSequence(choice)) : choice
   if (state.preparedScore !== null) {
     return state.preparedScore(processed, scoreCutoff, state.scoreHint)
+  }
+
+  if (state.processor != null && !state.builtIn && !isSequence(processed)) {
+    throw new TypeError('processor must return a string or an array-like sequence')
   }
 
   // `null` is this module's spelling of "not given", and `PreparedScore` above
@@ -1350,6 +1379,7 @@ export function extract<T>(
   if (limit <= 0) {
     assertNotPreparedHandle(options.scorer)
     assertNotPreparedQuery(query)
+    assertChoicesCollection(choices)
     checkIndex(options, choices)
     return []
   }
@@ -1541,7 +1571,6 @@ export function scoreMatrix(
   const processor = options.processor ?? null
   const scoreCutoff = options.scoreCutoff ?? null
   const scoreHint = options.scoreHint ?? null
-
   const applyProcessor = (value: unknown): unknown =>
     processor != null && !isNone(value) ? processedOperand(value, processor) : value
 
@@ -1610,7 +1639,18 @@ export function scoreMatrix(
         const value =
           prepared !== null
             ? prepared(preparedChoices[j], scoreCutoff, scoreHint)
-            : callScorer(scorer, query, choice, { scoreCutoff, scoreHint })
+            : // `null` is this module's spelling of "not given" and
+              // `PreparedScore` takes it; a scorer's own options are a public
+              // type, where absence is `undefined`. `score` converts between
+              // the two for the same reason — a third-party scorer typed
+              // against `ScorerOptions` was otherwise handed
+              // `{ scoreCutoff: null }`, which its own signature says it cannot
+              // get and `extract` never sent. Built here rather than hoisted,
+              // so no two calls share one object.
+              callScorer(scorer, query, choice, {
+                scoreCutoff: options.scoreCutoff,
+                scoreHint: options.scoreHint,
+              })
         const scaled = value * multiplier
         // Rounded once, before either store: writing the same already-integral
         // value into both triangles is what keeps them from drifting apart.
@@ -1642,8 +1682,14 @@ export function scoreMatrix(
       return buildScoreMatrix('u8', rows, cols, 'scoreMatrix', fill)
     case 'u8c':
       return buildScoreMatrix('u8c', rows, cols, 'scoreMatrix', fill)
-    default:
+    case 'f64':
       return buildScoreMatrix('f64', rows, cols, 'scoreMatrix', fill)
+    // `f64` above rather than here, so an `into` that is not a kind at all is
+    // refused instead of quietly becoming the default. `scorePairs` already
+    // refuses it, through `scoreArrayFactory`, and the two entry points
+    // disagreeing about the same option was the whole of the difference.
+    default:
+      throw new RangeError(`unknown score array kind: ${String(options.into)}`)
   }
 }
 
@@ -1677,8 +1723,6 @@ export function scorePairs(
   assertNotPreparedHandle(options.scorer)
   const scorer = options.scorer ?? ratio
   const processor = options.processor ?? null
-  const scoreCutoff = options.scoreCutoff ?? null
-  const scoreHint = options.scoreHint ?? null
   const multiplier = options.scoreMultiplier ?? 1
 
   const applyProcessor = (value: unknown): unknown =>
@@ -1709,7 +1753,11 @@ export function scorePairs(
       scorer,
       applyProcessor(queries[i]),
       applyProcessor(choices[i]),
-      { scoreCutoff, scoreHint },
+      // See {@link scoreMatrix}: absence reaches a scorer as `undefined`, which
+      // is what its options type spells. One object per call, not one hoisted
+      // out of the loop, so a scorer that keeps what it is handed does not find
+      // it shared with the next pair.
+      { scoreCutoff: options.scoreCutoff, scoreHint: options.scoreHint },
     )
     const scaled = value * multiplier
     out[i] = integral ? roundHalfAwayFromZero(scaled) : scaled
