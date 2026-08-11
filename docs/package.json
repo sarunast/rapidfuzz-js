@@ -1,0 +1,24 @@
+{
+  "name": "rapidfuzz-js-docs",
+  "private": true,
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.41.7",
+    "astro": "^7.1.6",
+    "rapidfuzz-js": "link:..",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "starlight-typedoc": "^0.23.0",
+    "typedoc": "^0.28.20",
+    "typedoc-plugin-markdown": "^4.12.0"
+  }
+}
