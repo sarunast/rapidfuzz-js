@@ -369,6 +369,33 @@ export function resetPartialRatioScratch(startGeneration = 0): void {
   bisectionGeneration = startGeneration
 }
 
+/**
+ * Shortest window of `s2` that a needle of `len1` could still score at `cutoff`.
+ *
+ * A window of `m` elements has `maximum = len1 + m` and at most `m` elements in
+ * common, so its similarity cannot exceed `2m / (len1 + m)` — the same ceiling
+ * {@link indelNormSimHeld} computes and rejects on, reached without calling it.
+ * Rearranged, a window is worth visiting when `m >= cutoff * len1 / (2 - cutoff)`.
+ * `cutoff` is at most 1 wherever this is called, so the divisor is at least 1.
+ *
+ * Deliberately **floored** rather than rounded up to the exact threshold, and
+ * that is what makes it safe to use as a loop bound: flooring can only answer
+ * below the true minimum, never above, so the scans may visit a window the
+ * kernel goes on to reject but can never skip one it would have scored. The
+ * exact test stays where it was, in the one place that also produces the score,
+ * and no second floating-point convention is introduced for the same question.
+ * A window of no elements is not a window, hence the lower clamp; there is no
+ * upper one, because `cutoff` of 1 already lands exactly on `len1`.
+ *
+ * Module scope, not a closure over the scan: it is called once per scan and once
+ * per improving window, and two more closures per call is a cost the shortest
+ * scans could feel.
+ */
+function minimumWindow(len1: number, cutoff: number): number {
+  const estimate = Math.floor((cutoff * len1) / (2 - cutoff))
+  return estimate < 1 ? 1 : estimate
+}
+
 /** Port of `_partial_ratio_impl`. Assumes `s1.length <= s2.length`. */
 export function partialRatioImpl(
   s1: ArrayLike<unknown>,
@@ -473,6 +500,13 @@ function partialRatioScan(
   let cutoff = scoreCutoff
 
   /**
+   * Shortest window {@link cutoff} still admits — see {@link minimumWindow}.
+   *
+   * Raised in {@link acceptKnownScore}, which is the only place `cutoff` moves.
+   */
+  let minWindow = minimumWindow(len1, cutoff)
+
+  /**
    * Take `score` as the window's, without scoring it.
    *
    * Returns true once a perfect alignment is found and the search can stop.
@@ -486,6 +520,7 @@ function partialRatioScan(
 
     res.score = score
     cutoff = score
+    minWindow = minimumWindow(len1, score)
     res.destStart = start
     res.destEnd = end
 
@@ -521,7 +556,10 @@ function partialRatioScan(
    * running best but never end the search.
    */
   const scanPrefix = (): void => {
-    for (let i = 1; i < len1; i++) {
+    // Every window here is longer than the last, so a `cutoff` that rises
+    // mid-scan can only have made windows already behind us unviable. The start
+    // is the whole of the prune.
+    for (let i = minWindow; i < len1; i++) {
       if (!holds(i - 1)) continue
       consider(0, i)
     }
@@ -530,6 +568,10 @@ function partialRatioScan(
   /** Windows running off the end of `s2`, likewise shorter. */
   const scanSuffix = (): boolean => {
     for (let i = len2 - len1; i < len2; i++) {
+      // Shortening, so the first window too short to reach the cutoff is the
+      // last one worth visiting — including when `consider` below has just
+      // raised the cutoff.
+      if (len2 - i < minWindow) break
       if (!holds(i)) continue
       if (consider(i, len2)) return true
     }

@@ -13,7 +13,9 @@ The recorded comparison shows that `rapidfuzz-js`:
 - is about 16× faster than `fuzzball` for `ratio` and 5× faster for best-match
   search;
 - makes repeated scoring 1.19–7.22× faster in the measured prepared-query and
-  prepared-choice workloads; and
+  prepared-choice workloads;
+- makes prepared token-sort search 2.74× faster than Python RapidFuzz and
+  16.92× faster than `fuzzball` on the measured stable-catalog workload; and
 - is slower than Python RapidFuzz on most substantial workloads, especially
   operations completed entirely inside its C++ extension.
 
@@ -53,10 +55,10 @@ Each cell describes `rapidfuzz-js` relative to the library in that column.
 
 | Input                      | `fastest-levenshtein` | `leven`              | `js-levenshtein`    | `fuzzball`           |
 | -------------------------- | --------------------- | -------------------- | ------------------- | -------------------- |
-| 8 characters, 200 pairs    | ❌ 1.07× slower       | ✅ **1.41× faster**  | ❌ 1.73× slower     | ✅ **2.95× faster**  |
-| 32 characters, 200 pairs   | ✅ **1.07× faster**   | ✅ **2.92× faster**  | ✅ **1.90× faster** | ✅ **11.37× faster** |
-| 128 characters, 200 pairs  | ✅ **1.34× faster**   | ✅ **9.50× faster**  | ✅ **5.31× faster** | ✅ **15.41× faster** |
-| 1,024 characters, 25 pairs | ✅ **1.55× faster**   | ✅ **18.57× faster** | ✅ **9.78× faster** | ✅ **19.57× faster** |
+| 8 characters, 200 pairs    | ❌ 1.06× slower       | ✅ **1.42× faster**  | ❌ 1.70× slower     | ✅ **2.97× faster**  |
+| 32 characters, 200 pairs   | ✅ **1.09× faster**   | ✅ **3.10× faster**  | ✅ **1.94× faster** | ✅ **11.69× faster** |
+| 128 characters, 200 pairs  | ✅ **1.36× faster**   | ✅ **9.56× faster**  | ✅ **5.22× faster** | ✅ **15.53× faster** |
+| 1,024 characters, 25 pairs | ✅ **1.62× faster**   | ✅ **18.66× faster** | ✅ **9.84× faster** | ✅ **19.83× faster** |
 
 For eight-character inputs, `fastest-levenshtein` and `js-levenshtein` were
 faster. `rapidfuzz-js` moved ahead of `fastest-levenshtein` at 32 characters
@@ -66,11 +68,11 @@ and widened the lead as input length increased.
 
 | Workload                             | Compared with                   | Result for `rapidfuzz-js` |
 | ------------------------------------ | ------------------------------- | ------------------------- |
-| `ratio`, 200 sentence pairs          | `fuzzball`                      | ✅ **15.9× faster**       |
-| `ratio`, 200 sentence pairs          | `string-similarity`             | ✅ **26.9× faster**       |
-| Best of 2,000 choices for 20 queries | `fuzzball`                      | ✅ **5.0× faster**        |
-| Best of 2,000 choices for 20 queries | `string-similarity`             | ✅ **20.5× faster**       |
-| Best of 2,000 choices for 20 queries | `fuse.js` with a prebuilt index | ✅ **58.4× faster**       |
+| `ratio`, 200 sentence pairs          | `fuzzball`                      | ✅ **16.35× faster**      |
+| `ratio`, 200 sentence pairs          | `string-similarity`             | ✅ **27.43× faster**      |
+| Best of 2,000 choices for 20 queries | `fuzzball`                      | ✅ **5.34× faster**       |
+| Best of 2,000 choices for 20 queries | `string-similarity`             | ✅ **21.87× faster**      |
+| Best of 2,000 choices for 20 queries | `fuse.js` with a prebuilt index | ✅ **62.61× faster**      |
 
 The comparisons do not all use the same algorithm:
 
@@ -169,7 +171,7 @@ there is no reusable operand. The similarity and search comparison uses raw
 come from repeated token scoring or processing. Those are different workloads.
 
 Fuse is also not an unindexed comparison: its index is built before the timed
-search loop. Its 58.4× loss in the search table already compares a prebuilt Fuse
+search loop. Its 62.61× loss in the search table already compares a prebuilt Fuse
 index with an unindexed `rapidfuzz-js` scan, although the two libraries use
 different matching algorithms.
 
@@ -178,6 +180,61 @@ such as autocomplete catalogs, deduplication batches, record linkage, and
 many-query ranking. For a one-off pair, preparation adds setup that may not be
 recovered. Prepared operands must also be rebuilt after their source data
 changes.
+
+### Preparation versus other libraries
+
+Two cross-library workloads isolate how preparation changes the result.
+
+For a fixed 128-character Levenshtein query scored against 200 choices:
+
+| Comparison            | External time | Prepared `rapidfuzz-js` | Preparation gain | Overall result       |
+| --------------------- | ------------: | ----------------------: | ---------------: | -------------------- |
+| `rapidfuzz-js` direct |      0.411 ms |                0.341 ms |     ✅ **1.20×** | Preparation alone    |
+| `fastest-levenshtein` |      0.905 ms |                0.321 ms |                — | ✅ **2.82× faster**  |
+| `leven`               |       9.19 ms |                0.319 ms |                — | ✅ **28.78× faster** |
+| `js-levenshtein`      |       4.45 ms |                0.319 ms |                — | ✅ **13.95× faster** |
+| `fuzzball`            |       9.13 ms |                0.317 ms |                — | ✅ **28.84× faster** |
+| Python RapidFuzz      |      0.280 ms |                0.324 ms |                — | ❌ 1.15× slower      |
+
+Preparation makes the JavaScript path 1.20× faster than its own direct call. It
+also narrows the Python gap from 1.47× slower to 1.15× slower. The much larger
+leads over the JavaScript competitors combine this preparation benefit with
+`rapidfuzz-js`'s bit-parallel Levenshtein implementation; preparation alone
+does not explain a 28× difference.
+
+Token-sort search shows a larger preparation effect because tokenization and
+sorting can be reused for the whole collection. The paired JavaScript and
+`fuzzball` pass measures preparation directly:
+
+| 20 queries × 2,000 titles       |    Time | Result                              |
+| ------------------------------- | ------: | ----------------------------------- |
+| `rapidfuzz-js`, raw titles      | 30.9 ms | Baseline                            |
+| `rapidfuzz-js`, prepared titles | 6.24 ms | ✅ **4.95× faster than raw**        |
+| `fuzzball`, raw titles          |  107 ms | ✅ **prepared JS is 16.92× faster** |
+
+The separately sequenced Python pass compares both JavaScript modes with the
+same Python measurement:
+
+| 20 queries × 2,000 titles       |    Time | Result versus Python |
+| ------------------------------- | ------: | -------------------- |
+| `rapidfuzz-js`, raw titles      | 67.3 ms | ❌ 3.52× slower      |
+| `rapidfuzz-js`, prepared titles | 6.98 ms | ✅ **2.74× faster**  |
+| Python RapidFuzz, raw titles    | 19.1 ms | Reference            |
+
+The raw JavaScript time moved between the same-process and cross-runtime passes,
+which is why the preparation gain is taken from the paired 30.9 ms versus
+6.24 ms measurement. This avoids presenting timing drift as preparation
+speedup.
+
+Neither `fuzzball` nor Python RapidFuzz exposes a persistent prepared-choice
+collection for this scorer. They prepare a query within a search operation but
+process the title collection again for each new query. `prepareChoices` pays
+that title-side work once and reuses it across the 20 searches.
+
+`string-similarity` and Fuse are not included in this prepared token table
+because they do not implement the same token-sort scorer. Fuse's prebuilt Bitap
+index is covered separately in the best-match table; comparing it here would
+mix preparation gains with a different matching algorithm.
 
 ## Python RapidFuzz comparison
 
@@ -189,48 +246,50 @@ complete workload in each row, not for one string pair.
 
 | Workload                                            | `rapidfuzz-js` | Python RapidFuzz | Result for `rapidfuzz-js` |
 | --------------------------------------------------- | -------------: | ---------------: | ------------------------- |
-| Levenshtein, 200 pairs × 8 characters               |        13.3 µs |          24.1 µs | ✅ **1.81× faster**       |
-| Levenshtein, 200 pairs × 32 characters              |        39.7 µs |          33.4 µs | ❌ 1.19× slower           |
-| Levenshtein, 200 pairs × 128 characters             |         393 µs |           224 µs | ❌ 1.76× slower           |
-| Levenshtein, 25 pairs × 1,024 characters            |        2.27 ms |          1.04 ms | ❌ 2.19× slower           |
-| Indel distance, 200 pairs × 128 characters          |         329 µs |          68.0 µs | ❌ 4.84× slower           |
-| LCSseq similarity, 200 pairs × 128 characters       |         332 µs |          67.7 µs | ❌ 4.90× slower           |
-| OSA distance, 200 pairs × 128 characters            |         717 µs |           257 µs | ❌ 2.79× slower           |
-| Damerau-Levenshtein, 200 pairs × 128 characters     |        11.4 ms |          5.58 ms | ❌ 2.04× slower           |
-| Hamming distance, 200 pairs × 128 characters        |        82.1 µs |          16.0 µs | ❌ 5.12× slower           |
-| Jaro similarity, 200 pairs × 128 characters         |         542 µs |           205 µs | ❌ 2.64× slower           |
-| Jaro-Winkler similarity, 200 pairs × 128 characters |         569 µs |           201 µs | ❌ 2.83× slower           |
-| Prefix distance, 200 pairs × 128 characters         |        12.9 µs |          12.5 µs | ❌ 1.03× slower           |
-| Postfix distance, 200 pairs × 128 characters        |        12.2 µs |          12.3 µs | ≈ Same speed              |
+| Levenshtein, 200 pairs × 8 characters               |        13.4 µs |          24.3 µs | ✅ **1.82× faster**       |
+| Levenshtein, 200 pairs × 32 characters              |        39.6 µs |          34.0 µs | ❌ 1.17× slower           |
+| Levenshtein, 200 pairs × 128 characters             |         395 µs |           227 µs | ❌ 1.74× slower           |
+| Levenshtein, 25 pairs × 1,024 characters            |        2.24 ms |          1.03 ms | ❌ 2.18× slower           |
+| Fixed-query Levenshtein, direct, 1 × 200 × 128      |         413 µs |           280 µs | ❌ 1.47× slower           |
+| Fixed-query Levenshtein, prepared, 1 × 200 × 128    |         324 µs |           280 µs | ❌ 1.15× slower           |
+| Indel distance, 200 pairs × 128 characters          |         335 µs |          69.1 µs | ❌ 4.85× slower           |
+| LCSseq similarity, 200 pairs × 128 characters       |         334 µs |          68.8 µs | ❌ 4.86× slower           |
+| OSA distance, 200 pairs × 128 characters            |         759 µs |           251 µs | ❌ 3.02× slower           |
+| Damerau-Levenshtein, 200 pairs × 128 characters     |        10.9 ms |          5.42 ms | ❌ 2.01× slower           |
+| Hamming distance, 200 pairs × 128 characters        |        80.2 µs |          15.5 µs | ❌ 5.15× slower           |
+| Jaro similarity, 200 pairs × 128 characters         |         613 µs |           201 µs | ❌ 3.05× slower           |
+| Jaro-Winkler similarity, 200 pairs × 128 characters |         625 µs |           202 µs | ❌ 3.09× slower           |
+| Prefix distance, 200 pairs × 128 characters         |        12.8 µs |          12.3 µs | ❌ 1.04× slower           |
+| Postfix distance, 200 pairs × 128 characters        |        12.2 µs |          12.2 µs | ≈ Same speed              |
 
 ### Fuzzy scorers
 
 | Workload                             | `rapidfuzz-js` | Python RapidFuzz | Result for `rapidfuzz-js` |
 | ------------------------------------ | -------------: | ---------------: | ------------------------- |
-| `ratio`, 200 sentence pairs          |        41.9 µs |          47.0 µs | ✅ **1.12× faster**       |
-| `partialRatio`, 200 sentence pairs   |         900 µs |           414 µs | ❌ 2.17× slower           |
-| `tokenSortRatio`, 200 sentence pairs |         346 µs |           228 µs | ❌ 1.52× slower           |
-| `tokenSetRatio`, 200 sentence pairs  |         523 µs |           267 µs | ❌ 1.96× slower           |
-| `wRatio`, 200 sentence pairs         |         763 µs |           395 µs | ❌ 1.93× slower           |
-| `qRatio`, 200 sentence pairs         |        44.4 µs |          46.6 µs | ✅ **1.05× faster**       |
+| `ratio`, 200 sentence pairs          |        41.5 µs |          47.3 µs | ✅ **1.14× faster**       |
+| `partialRatio`, 200 sentence pairs   |        1.02 ms |           412 µs | ❌ 2.46× slower           |
+| `tokenSortRatio`, 200 sentence pairs |         355 µs |           225 µs | ❌ 1.58× slower           |
+| `tokenSetRatio`, 200 sentence pairs  |         559 µs |           270 µs | ❌ 2.07× slower           |
+| `wRatio`, 200 sentence pairs         |         794 µs |           395 µs | ❌ 2.01× slower           |
+| `qRatio`, 200 sentence pairs         |        44.2 µs |          47.3 µs | ✅ **1.07× faster**       |
 
 ### Search and batch scoring
 
 | Workload                                               | `rapidfuzz-js` | Python RapidFuzz | Result for `rapidfuzz-js` |
 | ------------------------------------------------------ | -------------: | ---------------: | ------------------------- |
-| `extractOne` + `ratio`, 20 queries × 2,000 choices     |        2.71 ms |          1.52 ms | ❌ 1.79× slower           |
-| `extractOne` + `tokenSortRatio`, 20 × 2,000 raw titles |        31.7 ms |          19.5 ms | ❌ 1.63× slower           |
-| `extractOne` + `tokenSortRatio`, prepared JS titles    |        6.35 ms |          19.5 ms | ✅ **3.07× faster**       |
-| `scoreMatrix` + `ratio`, 50 × 200                      |         759 µs |           234 µs | ❌ 3.25× slower           |
-| `scoreMatrix` + `tokenSortRatio`, 50 × 200             |        2.18 ms |          4.25 ms | ✅ **1.95× faster**       |
-| `scorePairs` + `ratio`, 200 pairs                      |        45.2 µs |          23.4 µs | ❌ 1.93× slower           |
+| `extractOne` + `ratio`, 20 queries × 2,000 choices     |        2.77 ms |          1.53 ms | ❌ 1.81× slower           |
+| `extractOne` + `tokenSortRatio`, 20 × 2,000 raw titles |        67.3 ms |          19.1 ms | ❌ 3.52× slower           |
+| `extractOne` + `tokenSortRatio`, prepared JS titles    |        6.98 ms |          19.1 ms | ✅ **2.74× faster**       |
+| `scoreMatrix` + `ratio`, 50 × 200                      |         782 µs |           231 µs | ❌ 3.39× slower           |
+| `scoreMatrix` + `tokenSortRatio`, 50 × 200             |        2.13 ms |          4.23 ms | ✅ **1.99× faster**       |
+| `scorePairs` + `ratio`, 200 pairs                      |        45.9 µs |          23.6 µs | ❌ 1.95× slower           |
 
 ### Edit operations
 
 | Workload                                        | `rapidfuzz-js` | Python RapidFuzz | Result for `rapidfuzz-js` |
 | ----------------------------------------------- | -------------: | ---------------: | ------------------------- |
-| Levenshtein editops, 200 pairs × 128 characters |        1.32 ms |           323 µs | ❌ 4.08× slower           |
-| LCSseq editops, 200 pairs × 128 characters      |         590 µs |           138 µs | ❌ 4.26× slower           |
+| Levenshtein editops, 200 pairs × 128 characters |        1.32 ms |           326 µs | ❌ 4.06× slower           |
+| LCSseq editops, 200 pairs × 128 characters      |         598 µs |           137 µs | ❌ 4.35× slower           |
 
 ### What the expanded comparison shows
 
@@ -255,9 +314,10 @@ normalization, tokenization, and reusable setup into the batch path.
 ### Prepared search changes the result
 
 The two token-search rows use the same 20 queries, 2,000 titles, scorer, and
-Python measurement. With raw JavaScript titles, Python is 1.63× faster. Reusing
-a `prepareChoices` index reduces the JavaScript batch from 31.7 ms to 6.35 ms—a
-4.99× improvement—and makes `rapidfuzz-js` 3.07× faster than Python.
+Python measurement. With raw JavaScript titles, Python is 3.52× faster. Reusing
+a `prepareChoices` index changes the outcome and makes `rapidfuzz-js` 2.74×
+faster than Python. The paired same-process comparison above measures the
+preparation improvement itself at 4.95×.
 
 The prepared index is built before the timed search loop, representing a stable
 catalog searched repeatedly. Its construction and retained memory are not
