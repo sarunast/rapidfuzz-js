@@ -1182,6 +1182,11 @@ describe('the banded Levenshtein kernel agrees with the dynamic program', () => 
   // the small band, 31/32 hands the small band over to the blocked band.
   const budgets = [0, 1, 3, 4, 8, 31, 32, 33, 64, 65, 96, 200, 1000]
 
+  it('initializes both partial and complete opening word ranges', () => {
+    expectBounded('a'.repeat(64), 'b'.repeat(64), 32)
+    expectBounded('a'.repeat(96), 'b'.repeat(33), 95)
+  })
+
   it.each(budgets)('is exact at a budget of %i', (budget) => {
     fc.assert(
       fc.property(

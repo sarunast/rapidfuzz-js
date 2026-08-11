@@ -93,6 +93,7 @@ describe('fuzz preparation invariants', () => {
     expect(partialTokenRatioConverted('a a', 'b b', 0)).toBeGreaterThanOrEqual(0)
 
     const prepareChoice = tokenChoicePreparer()
+    expect(() => preparedTokenChoice({})).toThrow(TypeError)
     expect(preparedTokenChoice(prepareChoice('a b')).sequence).toBeDefined()
     const nanChoice = preparedTokenChoice(prepareChoice([Number.NaN, ' ', Number.NaN]))
     expect(sortedOf(nanChoice)).toEqual([Number.NaN, 32, Number.NaN])

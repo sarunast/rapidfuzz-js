@@ -48,7 +48,6 @@ import {
   partialRatioImpl,
 } from './partialWindow.js'
 import {
-  type PreparedTokenChoice,
   hasWhitespaceOf,
   preparedTokenChoice,
   sortedOf,
@@ -244,8 +243,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
           // same sorted query once per candidate — the very thing the prepared
           // `partialRatio` path stopped doing.
           const sortedQuery = sortedOf(queryTokens)
-          // oxlint-disable-next-line typescript/consistent-type-assertions -- this switch arm is token-prepared
-          const sortedChoice = sortedOf(choiceView as PreparedTokenChoice)
+          const sortedChoice = sortedOf(preparedTokenChoice(rawChoice))
           // `partialAlignmentConverted` would ignore both when the candidate is
           // the shorter side, but these are arguments, so they would be built on
           // the way in regardless. Both memoise, so the waste is one mask and one
@@ -278,8 +276,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
           )
         case 'wRatio': {
           if (a.length === 0 || b.length === 0 || cutoff > 100) return 0
-          // oxlint-disable-next-line typescript/consistent-type-assertions -- this switch arm is token-prepared
-          const preparedTokens = tokenChoice as PreparedTokenChoice
+          const preparedTokens = preparedTokenChoice(rawChoice)
           const unbaseScale = 0.95
           const lenRatio = a.length > b.length ? a.length / b.length : b.length / a.length
           let dynamicCutoff = cutoff

@@ -17,12 +17,6 @@
  * A boundary between any two of them would run through the middle of that
  * agreement.
  *
- * One piece is structural rather than stylistic: `tokenChoices` is an
- * identity-based brand registry, so it has to be a singleton, and an ESM importer
- * cannot assign an imported binding — see `blockMasks.ts` for the same
- * constraint met the other way. {@link tokenChoicePreparer} writes to it and
- * `isPreparedTokenChoice` reads it.
- *
  * `nextIdentityOrdinal` is shared between the object and symbol tiebreaks, but
  * that is convenience rather than necessity: {@link typeOrder} separates the two
  * kinds before either tiebreak is reached, so independent counters would order
@@ -576,12 +570,13 @@ export function uniqueTokens(tokens: readonly unknown[][]): UniqueTokenSet {
  * choice for the whole call, so the first row that needs a form pays for it and
  * every later row reuses it.
  */
-export interface PreparedTokenChoice {
-  readonly sequence: ArrayLike<unknown>
+export class PreparedTokenChoice {
   split?: unknown[][]
   unique?: UniqueTokenSet
   sorted?: unknown[]
   hasWhitespace?: boolean
+
+  constructor(readonly sequence: ArrayLike<unknown>) {}
 }
 
 /** The tokens of `choice`, split on first use. */
@@ -639,20 +634,8 @@ export function hasWhitespaceOf(choice: PreparedTokenChoice): boolean {
  * the call that made it.
  */
 export function tokenViewOf(sequence: ArrayLike<unknown>): PreparedTokenChoice {
-  return { sequence }
+  return new PreparedTokenChoice(sequence)
 }
-
-/**
- * The records this module tokenised, so one can be recognised again.
- *
- * `process` hands a prepared choice back to the scorer as an `unknown`, and
- * that has to be checked before its fields are believed. Reading the fields and
- * testing each one is both slower and weaker than this: it runs once per scored
- * choice — and walks every token, to make `split` an array of arrays honestly —
- * yet still only establishes that something has the right shape. Membership
- * here establishes that this module built it, which is what the fields are
- * actually being trusted on.
- */
 /**
  * Convert a choice once so every query row can reuse the result.
  *
@@ -667,13 +650,16 @@ export function tokenChoicePreparer(): ChoicePreparer {
 
 /** Build a token choice after the caller has established the sequence contract. */
 export function prepareTokenChoice(choice: Sequence): PreparedTokenChoice {
-  return { sequence: convSequence(choice) }
+  return new PreparedTokenChoice(convSequence(choice))
 }
 
 /** Read the opaque choice returned by this module's private preparer. */
 export function preparedTokenChoice(value: unknown): PreparedTokenChoice {
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- private preparation protocol owns this value
-  return value as PreparedTokenChoice
+  if (!(value instanceof PreparedTokenChoice)) {
+    throw new TypeError('invalid prepared token choice')
+  }
+
+  return value
 }
 
 export function difference(a: UniqueTokenSet, b: UniqueTokenSet): unknown[][] {
