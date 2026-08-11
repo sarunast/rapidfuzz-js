@@ -174,6 +174,68 @@ queries ask for derived forms. Build one per list you query repeatedly, not one
 per call. It is frozen once built — `values` and `keys` are there to be read,
 and choices that change need a new index rather than an edited one.
 
+### Prepare one query or one choice
+
+`prepareChoices` helps callers who go through `extract*`. A caller scoring pairs
+directly — a custom ranker, a join, a loop over `wRatio(query, choice)` — pays
+for both halves on every call, because nothing holds either. `prepareQuery` and
+`prepareChoice` hand over one half each:
+
+```ts
+import { prepareChoice, prepareQuery, tokenSortRatio } from 'rapidfuzz-js'
+
+const query = prepareQuery('new york mets', { scorer: tokenSortRatio })
+const scores = titles.map((title) => query(title))
+
+const choice = prepareChoice(title, { scorer: tokenSortRatio })
+const ranked = queries.map((q) => choice(q))
+```
+
+Both return a frozen callable carrying the `scorer` and `processor` it was built
+for. The two compose, and that is where they are worth the most — neither half
+is prepared twice:
+
+```ts
+const prepared = titles.map((t) => prepareChoice(t, { scorer: tokenSortRatio }))
+for (const q of queries) {
+  const query = prepareQuery(q, { scorer: tokenSortRatio })
+  for (const title of prepared) query(title)
+}
+```
+
+**The operand order never changes.** `query(choice)` and `choice(query)` are
+both `scorer(query, choice)` — a handle holds a side, it does not swap the two.
+That matters for asymmetric scorers, such as a weighted Levenshtein whose
+insertion cost differs from its deletion cost.
+
+Only `scoreCutoff` and `scoreHint` are per call; naming a scorer or processor
+there is a type error, and the two halves of a composed call must have been
+prepared with the same ones. Measured against a plain `scorer(query, choice)`
+loop, 40 queries over 2000 five-word choices, lower is better:
+
+| scorer                | `query(choice)` | composed | `choice(query)` + `defaultProcess` |
+| --------------------- | --------------- | -------- | ---------------------------------- |
+| `ratio`               | `0.33`          | `0.41`   | `0.57`                             |
+| `wRatio`              | `0.64`          | `0.37`   | `0.66`                             |
+| `tokenSortRatio`      | `0.48`          | `0.14`   | `0.54`                             |
+| `levenshteinDistance` | `0.80`          | `0.85`   | `0.78`                             |
+
+Two differences from `extract*` worth knowing. A missing operand — `null`,
+`undefined` or `NaN` — is refused rather than dropped, at build time and on
+every call, because a single score has no "skip this one" to return. And a
+third-party scorer is called exactly as the loop would have called it:
+`scorer(query, choice)` with two arguments when the handle is called with no
+options, and with the caller's own options object — not a rebuilt one — when it
+is.
+
+**A handle is a snapshot, and freezing the handle does not freeze the operand.**
+The `Object.freeze` seals the handle's own properties; an array operand, or a
+mutable sequence a processor returned, is left as it was. So the rule is the one
+[`prepareChoices`](#prepare-choices-once-for-many-queries) keeps: do not mutate
+an operand after preparing it — the prepared state would go on describing what
+it used to be — and keep the processor deterministic. Rebuild the handle
+instead.
+
 ### Configure a scorer
 
 Use `configure` when a search operation needs scorer-specific options:
@@ -270,6 +332,8 @@ prefix, such as `levenshteinDistance` and `jaroSimilarity`.
 - `extractOne`
 - `extractIter`
 - `prepareChoices`
+- `prepareQuery`
+- `prepareChoice`
 - `scoreMatrix`
 - `scorePairs`
 
@@ -308,9 +372,12 @@ Other differences to keep in mind:
   pandas integration.
 - A raw `scoreCutoff` must be finite. Fractional distance cutoffs are truncated,
   matching RapidFuzz's C++ extension.
-- `prepareChoices` has no counterpart. RapidFuzz caches the query side of a
-  scorer and nothing else; this prepares the choice side, which is the half a
-  run of queries pays repeatedly.
+- `prepareChoices`, `prepareQuery` and `prepareChoice` have no counterpart.
+  RapidFuzz caches the query side of a scorer inside `process` and hands a
+  caller neither half; these expose both — the choice side of a whole
+  collection, a single query, and a single choice.
+- `prepareQuery` and `prepareChoice` refuse a missing operand rather than
+  treating it as a missing value, unlike every scorer and `extract*`.
 
 The implementation is tested against RapidFuzz 3.14.5. Where RapidFuzz's C++
 and pure-Python implementations disagree, this package follows the public C++

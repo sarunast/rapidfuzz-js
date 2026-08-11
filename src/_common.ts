@@ -198,6 +198,46 @@ export const PREPARE_CHOICE: unique symbol = Symbol('rapidfuzz.prepareChoice')
  * exported binding for the emitted declarations to refer to it.
  */
 export const PREPARED_CHOICES: unique symbol = Symbol('rapidfuzz.preparedChoices')
+/**
+ * Brands on the two callable handles `search.prepareQuery` and
+ * `search.prepareChoice` return, here for the same reason as the one above.
+ */
+export const PREPARED_QUERY_HANDLE: unique symbol = Symbol('rapidfuzz.preparedQuery')
+export const PREPARED_CHOICE_HANDLE: unique symbol = Symbol('rapidfuzz.preparedChoice')
+
+/**
+ * Whether a value is one of the two prepared handles.
+ *
+ * A brand test rather than a shape test, for the reason the brands exist: a
+ * handle is an ordinary function carrying two ordinary properties, and every
+ * one of those is something a third-party scorer could also have.
+ */
+export function isPreparedHandle(value: unknown): boolean {
+  return (
+    typeof value === 'function' &&
+    (PREPARED_QUERY_HANDLE in value || PREPARED_CHOICE_HANDLE in value)
+  )
+}
+
+/**
+ * Refuse a prepared handle where a scorer is expected.
+ *
+ * A handle is a function of two arguments returning a number, so it satisfies
+ * {@link ErasedScorer} — parameters are contravariant and `never` is assignable
+ * to everything — and type-checks at every seam that takes a scorer. What
+ * happens then is not an error but a wrong number: {@link callScorer} hands the
+ * handle the *choice* as its options bag, and {@link scorerFlagsOf} falls back
+ * to the fuzz defaults, so an exact match scores `0` and a distance handle also
+ * gets the direction backwards.
+ *
+ * In `_common.ts` rather than in `search.ts` so that `configure.ts` and
+ * `match.ts` can ask without importing the search module.
+ */
+export function assertNotPreparedHandle(value: unknown): void {
+  if (isPreparedHandle(value)) {
+    throw new TypeError('a prepared query or choice cannot be used as a scorer')
+  }
+}
 
 const PREPARED_SEQUENCE = Symbol('rapidfuzz.preparedSequence')
 
@@ -206,7 +246,14 @@ interface PreparedSequence {
   readonly value: ArrayLike<unknown>
 }
 
-export type PrepareChoice = (choice: unknown) => unknown
+/**
+ * The per-choice preparation a scorer's factory offers.
+ *
+ * Named for what it is rather than for what it does, because `prepareChoice` is
+ * a public entry point in `search.ts` now and a type sharing its name is one
+ * import away from shadowing it.
+ */
+export type ChoicePreparer = (choice: unknown) => unknown
 
 export interface PreparedScore {
   (choice: unknown, scoreCutoff: number | null, scoreHint: number | null): number
@@ -235,7 +282,7 @@ export interface PreparedScore {
  */
 export interface PrepareScorer {
   (query: Sequence, kwargs: Readonly<Record<string, unknown>>): PreparedScore
-  [PREPARE_CHOICE]?: PrepareChoice
+  [PREPARE_CHOICE]?: ChoicePreparer
 }
 
 /**
@@ -244,9 +291,9 @@ export interface PrepareScorer {
  */
 export function withChoicePreparer(
   prepare: PrepareScorer,
-  prepareChoice: PrepareChoice,
+  choicePreparer: ChoicePreparer,
 ): PrepareScorer {
-  prepare[PREPARE_CHOICE] = prepareChoice
+  prepare[PREPARE_CHOICE] = choicePreparer
   return prepare
 }
 
@@ -752,14 +799,44 @@ export type ErasedScorer = (s1: never, s2: never, options?: never) => number
  * only know they hold *some* scorer. This is the one place the two meet, and it
  * stays honest by routing through `Reflect.apply` and checking the result,
  * rather than asserting a signature nothing has verified.
+ *
+ * `options` is `object` rather than a record because this function does not
+ * read it — it hands it to the scorer untouched. Requiring a record would mean
+ * a caller holding an options *interface* had to copy it key by key to satisfy
+ * the parameter (an interface has no implicit index signature), and that copy
+ * is observable: a scorer that reads `Object.keys`, a getter, or the identity
+ * of what it was passed would see the copy rather than what the caller wrote.
  */
 export function callScorer(
   scorer: ErasedScorer,
   s1: unknown,
   s2: unknown,
-  options: Readonly<Record<string, unknown>>,
+  options: object,
 ): number {
   const result: unknown = Reflect.apply(scorer, undefined, [s1, s2, options])
+
+  if (typeof result !== 'number') {
+    throw new TypeError('scorer did not return a number')
+  }
+
+  return result
+}
+
+/**
+ * Call a scorer with no options argument at all.
+ *
+ * The one caller is a prepared handle invoked without call options, which is
+ * standing in for `scorer(query, choice)` — so it makes that call rather than
+ * one with two `undefined` fields. The difference is observable to any scorer
+ * that tests `options === undefined` or reads `arguments.length`, which is
+ * exactly the third-party scorer this path exists for.
+ *
+ * A sibling rather than an optional fourth parameter on {@link callScorer},
+ * because that function is on every non-prepared scoring path in the package
+ * and its call sites are measured where they stand.
+ */
+export function callScorerBare(scorer: ErasedScorer, s1: unknown, s2: unknown): number {
+  const result: unknown = Reflect.apply(scorer, undefined, [s1, s2])
 
   if (typeof result !== 'number') {
     throw new TypeError('scorer did not return a number')

@@ -6,18 +6,23 @@
  * `dtype`.
  */
 import {
+  assertNotPreparedHandle,
   callScorer,
+  callScorerBare,
   isNone,
   isBuiltInScorer,
+  isPreparedHandle,
   isSequence,
   NO_OPTIONS,
   PREPARE_CHOICE,
+  PREPARED_CHOICE_HANDLE,
   PREPARED_CHOICES,
+  PREPARED_QUERY_HANDLE,
   prepareScorerOf,
   scorerFlagsOf,
   type ErasedScorer,
   type MaybeSequence,
-  type PrepareChoice,
+  type ChoicePreparer,
   type PreparedScore,
   type Processor,
   type Sequence,
@@ -196,15 +201,23 @@ function isIterable<T>(choices: Choices<T>): choices is Iterable<T> {
   return typeof Reflect.get(choices, Symbol.iterator) === 'function'
 }
 
-/** The two options an index bakes in, because they decide what it may hold. */
-export interface PrepareChoicesOptions {
+/**
+ * The two options every `prepare*` entry point bakes in, because they decide
+ * what a prepared operand may hold.
+ *
+ * Shared by {@link prepareChoices}, {@link prepareQuery} and
+ * {@link prepareChoice}, which is why neither field says *which* half it is
+ * applied to. The rest of a call — the cutoff, the hint, `limit` — stays where
+ * it was, because none of them changes what preparing produces.
+ */
+export interface PrepareOptions {
   /**
-   * Applied to every choice once, here, instead of once per query. `extract*`
-   * still applies it to the query — the index remembers which one it was.
+   * Applied once, when the operand is prepared, instead of once per later call.
+   * Whatever this is paired with has to have been prepared with the same one.
    */
   readonly processor?: Processor | undefined
   /**
-   * The scorer the index is for. Defaults to {@link wRatio}, as `extract*`
+   * The scorer this is prepared for. Defaults to {@link wRatio}, as `extract*`
    * does, and every later call has to name the same one.
    */
   readonly scorer?: SearchScorer | undefined
@@ -229,7 +242,7 @@ export interface PrepareChoicesOptions {
  * The value and both arrays are frozen, so the `readonly` above holds at run
  * time too. Read them freely; to change the choices, build another index.
  */
-export interface PreparedChoices<T, K> {
+export interface PreparedChoiceIndex<T, K> {
   readonly [PREPARED_CHOICES]: true
   /** The scorer this index was built for. */
   readonly scorer: SearchScorer
@@ -265,7 +278,7 @@ const indexPayloads = new WeakMap<object, readonly unknown[]>()
  * the scoring loops, and without this it would be scored against prepared state
  * that is not there. Saying so beats scoring it wrong.
  */
-function payloadOf(index: PreparedChoices<unknown, unknown>): readonly unknown[] {
+function payloadOf(index: PreparedChoiceIndex<unknown, unknown>): readonly unknown[] {
   const prepared = indexPayloads.get(index)
   if (prepared === undefined) {
     throw new TypeError('a prepared choice index cannot be copied; pass the original')
@@ -321,24 +334,25 @@ function payloadOf(index: PreparedChoices<unknown, unknown>): readonly unknown[]
  */
 export function prepareChoices<K, V>(
   choices: ReadonlyMap<K, V>,
-  options?: PrepareChoicesOptions,
-): PreparedChoices<V, K>
+  options?: PrepareOptions,
+): PreparedChoiceIndex<V, K>
 export function prepareChoices<T>(
   choices: readonly T[] | Iterable<T>,
-  options?: PrepareChoicesOptions,
-): PreparedChoices<T, number>
+  options?: PrepareOptions,
+): PreparedChoiceIndex<T, number>
 export function prepareChoices<C extends Readonly<Record<string, unknown>>>(
   choices: C,
-  options?: PrepareChoicesOptions,
-): PreparedChoices<ObjectValue<C>, ObjectKey<C>>
+  options?: PrepareOptions,
+): PreparedChoiceIndex<ObjectValue<C>, ObjectKey<C>>
 export function prepareChoices<T>(
   choices: Choices<T>,
-  options?: PrepareChoicesOptions,
-): PreparedChoices<T, unknown>
+  options?: PrepareOptions,
+): PreparedChoiceIndex<T, unknown>
 export function prepareChoices<T>(
   choices: Choices<T>,
-  options: PrepareChoicesOptions = {},
-): PreparedChoices<T, unknown> {
+  options: PrepareOptions = {},
+): PreparedChoiceIndex<T, unknown> {
+  assertNotPreparedHandle(options.scorer)
   const scorer = options.scorer ?? wRatio
   const processor = options.processor ?? null
 
@@ -366,12 +380,12 @@ export function prepareChoices<T>(
     }
   }
 
-  const prepareChoice = choicePreparerOf(scorer)
-  if (prepareChoice !== null) {
-    for (let i = 0; i < prepared.length; i++) prepared[i] = prepareChoice(prepared[i])
+  const choicePreparer = choicePreparerOf(scorer)
+  if (choicePreparer !== null) {
+    for (let i = 0; i < prepared.length; i++) prepared[i] = choicePreparer(prepared[i])
   }
 
-  const index: PreparedChoices<T, unknown> = {
+  const index: PreparedChoiceIndex<T, unknown> = {
     [PREPARED_CHOICES]: true,
     scorer,
     processor,
@@ -412,8 +426,407 @@ export function prepareChoices<T>(
  * a scorer that caches a query and still wants its choices as they came. Both
  * get an index; it holds the processed choices and stops there.
  */
-function choicePreparerOf(scorer: SearchScorer): PrepareChoice | null {
+function choicePreparerOf(scorer: SearchScorer): ChoicePreparer | null {
   return prepareScorerOf(scorer)?.[PREPARE_CHOICE] ?? null
+}
+
+/**
+ * The two bounds a prepared handle still takes on each call.
+ *
+ * Deliberately just these two. The scorer and the processor are baked in — they
+ * decide what a prepared operand *is*, so accepting either per call could only
+ * mean a handle that had prepared for the wrong one — and the type is what says
+ * so: `pq(choice, { scorer })` is an excess property, not a run time refusal.
+ *
+ * Absence is spelled `undefined` here rather than `null`, because these are the
+ * caller's options and a scorer's own options spell it that way. Both of those
+ * are what let a scorer with no prepared form be handed this object as it
+ * stands: a handle called with options passes the caller's own object through,
+ * and one called without passes no options argument at all. `pq(choice)` and
+ * `pq(choice, {})` are therefore different calls, exactly as they would be
+ * written by hand.
+ */
+export interface PreparedCallOptions {
+  /** Bound on the returned score, in the scorer's own convention. */
+  readonly scoreCutoff?: number | undefined
+  /** Performance hint forwarded to built-in scorers; it never changes results. */
+  readonly scoreHint?: number | undefined
+}
+
+/**
+ * A query prepared for one scorer, callable against choices.
+ *
+ * Returned by {@link prepareQuery}. Frozen, reusable, and safe to hold for as
+ * long as the query is worth scoring against.
+ */
+export interface PreparedQuery {
+  (choice: Sequence | PreparedChoice, options?: PreparedCallOptions): number
+  readonly [PREPARED_QUERY_HANDLE]: true
+  /** The scorer this query was prepared for. */
+  readonly scorer: SearchScorer
+  /** The processor already applied to it, and owed to whatever it scores. */
+  readonly processor: Processor | null
+}
+
+/**
+ * A choice prepared for one scorer, callable against queries.
+ *
+ * Returned by {@link prepareChoice}. Note the operand order this implies and
+ * does *not* change: `preparedChoice(query)` is `scorer(query, choice)`, the
+ * same way round as everywhere else in this package. A handle holds the side it
+ * holds; it does not swap the two.
+ */
+export interface PreparedChoice {
+  (query: Sequence | PreparedQuery, options?: PreparedCallOptions): number
+  readonly [PREPARED_CHOICE_HANDLE]: true
+  /** The scorer this choice was prepared for. */
+  readonly scorer: SearchScorer
+  /** The processor already applied to it, and owed to whatever it scores. */
+  readonly processor: Processor | null
+}
+
+/** What a prepared query holds: the processed sequence and the scorer's state. */
+interface QueryPayload {
+  readonly processed: Sequence
+  readonly preparedScore: PreparedScore | null
+}
+
+/**
+ * What a prepared choice holds.
+ *
+ * Both forms, because they go to different places. `scored` is what the
+ * scorer's own hook made of the choice — a converted sequence, a tokenisation
+ * memo — and only a `PreparedScore` from the same factory understands it;
+ * `processed` is the plain sequence, which is the only thing that may be handed
+ * to the scorer's public signature. Feeding the first where the second belongs
+ * is silently wrong rather than an error: `levenshteinDistance` reads a record
+ * with no `length` as a one-element sequence and answers `4` where the truth is
+ * `0`.
+ */
+interface ChoicePayload {
+  readonly processed: Sequence
+  readonly scored: unknown
+}
+
+/**
+ * Provenance for the handles, on the same footing as {@link indexPayloads}.
+ *
+ * The fast path never reads either table — a handle called on a raw operand
+ * runs entirely out of its own closure. These exist for the composed calls,
+ * where the operand is a handle someone else built and "someone else" has to
+ * include a forger: `Object.assign(() => 123, realHandle)` copies the brand and
+ * both identity fields, and cannot copy an entry in a table keyed by the
+ * original.
+ */
+const queryPayloads = new WeakMap<object, QueryPayload>()
+const choicePayloads = new WeakMap<object, ChoicePayload>()
+
+function queryPayloadOf(handle: PreparedQuery): QueryPayload {
+  const payload = queryPayloads.get(handle)
+  if (payload === undefined) {
+    throw new TypeError('a prepared query cannot be copied; pass the original')
+  }
+  return payload
+}
+
+function choicePayloadOf(handle: PreparedChoice): ChoicePayload {
+  const payload = choicePayloads.get(handle)
+  if (payload === undefined) {
+    throw new TypeError('a prepared choice cannot be copied; pass the original')
+  }
+  return payload
+}
+
+function isPreparedQuery(value: unknown): value is PreparedQuery {
+  return typeof value === 'function' && PREPARED_QUERY_HANDLE in value
+}
+
+function isPreparedChoice(value: unknown): value is PreparedChoice {
+  return typeof value === 'function' && PREPARED_CHOICE_HANDLE in value
+}
+
+/**
+ * Refuse two handles that were not prepared the same way.
+ *
+ * Both tests are identity, in both directions, `null` included — stricter than
+ * {@link checkIndex}, which tolerates an absent processor because the index is
+ * the one supplying it. Here neither side supplies anything to the other: a
+ * query normalised by a processor, scored against a choice that was not, is a
+ * plausible number with nothing to see. Two scorers that compute the same thing
+ * still prepare an operand differently, so semantic equality would not do even
+ * if it could be asked.
+ */
+function checkPairing(
+  scorer: SearchScorer,
+  processor: Processor | null,
+  other: PreparedQuery | PreparedChoice,
+  noun: string,
+): void {
+  if (other.scorer !== scorer) {
+    throw new TypeError(`scorer differs from the one this prepared ${noun} was built for`)
+  }
+  if (other.processor !== processor) {
+    throw new TypeError(
+      `processor differs from the one this prepared ${noun} was built for`,
+    )
+  }
+}
+
+/**
+ * The one place a prepared pair is scored, whichever half was prepared.
+ *
+ * Deliberately not {@link score}, which reads its hint off the state because an
+ * `extract` run has one hint for every choice, where a handle takes one per
+ * call. Threading a per-call hint through `score` would put an extra argument
+ * in nine hot-loop call sites, to chase a difference the comment above it
+ * already measured at 0.99-1.03x with no consistent sign.
+ */
+function scorePreparedPair(
+  scorer: SearchScorer,
+  query: Sequence,
+  preparedScore: PreparedScore | null,
+  choice: unknown,
+  options: PreparedCallOptions | undefined,
+): number {
+  if (preparedScore !== null) {
+    return preparedScore(choice, options?.scoreCutoff ?? null, options?.scoreHint ?? null)
+  }
+
+  // A handle called with no options is replacing `scorer(q, c)`, so it makes
+  // that call — two arguments, not three with two `undefined` fields. See
+  // {@link callScorerBare}.
+  if (options === undefined) return callScorerBare(scorer, query, choice)
+
+  // And when there are options, the scorer gets the caller's object itself, not
+  // a rebuilt `{ scoreCutoff, scoreHint }` — for the same reason. Rebuilding
+  // turns `pq(choice, {})` into a call carrying two `undefined` fields, which
+  // `Object.keys`, a getter, or an identity test can all see, and this path
+  // exists precisely for the third-party scorer that might look.
+  return callScorer(scorer, query, choice, options)
+}
+
+/**
+ * Prepare a query once, to score it against many choices.
+ *
+ * The half `extract*` already prepares, handed to a caller who is not going
+ * through `extract*` — a custom ranker, a join, a loop over pairs. The scorer
+ * and the processor are baked in; the cutoff and the hint stay per call:
+ *
+ * ```ts
+ * const query = prepareQuery('new york mets', { scorer: tokenSortRatio })
+ * const scores = titles.map((title) => query(title))
+ * ```
+ *
+ * It composes with {@link prepareChoice}, and that is where the two together
+ * are worth the most — `query(preparedChoice)` pays for neither half. Both
+ * orders are the same call: the operand order a handle scores in is always
+ * `scorer(query, choice)`, whichever of the two you happen to be holding.
+ *
+ * Two ways this is stricter than `extract*`, both deliberate. A missing
+ * operand — `null`, `undefined`, `NaN` — is refused rather than dropped, here
+ * and on every later call: dropping a choice is a decision `extract` can make
+ * because it is producing a list, and a single score has no such answer to give.
+ * And the scorer may not be a prepared handle, which would otherwise type-check
+ * and score every pair wrongly in silence.
+ *
+ * **A handle is a snapshot, and the handle being frozen does not freeze what it
+ * was built from.** `Object.freeze` here seals the three properties this
+ * function returns; it does nothing to an array operand, or to a mutable
+ * sequence a processor returned. So the caller keeps the same two rules an
+ * index keeps: the operand must not change after preparation — rewriting an
+ * element leaves the prepared state describing what the operand used to be,
+ * while the handle still names the array — and the processor must be
+ * deterministic, since it runs once here and once per raw operand later.
+ * Rebuild the handle instead. Neither can be enforced without deep-freezing or
+ * copying the caller's values, and both would change what the results are.
+ */
+export function prepareQuery(
+  query: Sequence,
+  options: PrepareOptions = {},
+): PreparedQuery {
+  assertNotPreparedHandle(options.scorer)
+  const scorer = options.scorer ?? wRatio
+  const processor = options.processor ?? null
+  const processed = processOperand(query, processor)
+  const factory = prepareScorerOf(scorer)
+  const preparedScore = factory !== null ? factory(processed, NO_OPTIONS) : null
+
+  const call = (
+    choice: Sequence | PreparedChoice,
+    callOptions?: PreparedCallOptions,
+  ): number => {
+    if (isPreparedChoice(choice)) {
+      checkPairing(scorer, processor, choice, 'choice')
+      const payload = choicePayloadOf(choice)
+      // The ternary cannot take its second arm while `preparedScore` is
+      // non-null: the identity test above means both sides agree about whether
+      // this scorer has a factory, and only a factory produces a `scored` that
+      // differs from `processed`. Written out anyway, because it makes "a
+      // hooked payload never reaches a public scorer signature" a property of
+      // these eight lines rather than a deduction across three modules — and
+      // the second arm is reached in earnest by every scorer with no factory.
+      return scorePreparedPair(
+        scorer,
+        processed,
+        preparedScore,
+        preparedScore !== null ? payload.scored : payload.processed,
+        callOptions,
+      )
+    }
+
+    return scorePreparedPair(
+      scorer,
+      processed,
+      preparedScore,
+      processOperand(choice, processor),
+      callOptions,
+    )
+  }
+
+  // A literal with no contextual type widens `true` to `boolean`, which is not
+  // the brand's type — so the annotation is on a declaration of its own. An
+  // annotation, not an assertion: it is checked against the initialiser.
+  const brand: { readonly [PREPARED_QUERY_HANDLE]: true } = {
+    [PREPARED_QUERY_HANDLE]: true,
+  }
+  const handle: PreparedQuery = Object.freeze(
+    Object.assign(call, brand, { scorer, processor }),
+  )
+  queryPayloads.set(handle, { processed, preparedScore })
+  return handle
+}
+
+/**
+ * Prepare a choice once, to score many queries against it.
+ *
+ * The mirror of {@link prepareQuery}, and the half `extract*` never had: a
+ * choice, holding whatever its scorer wants a choice to hold.
+ *
+ * ```ts
+ * const choice = prepareChoice(title, { scorer: tokenSortRatio })
+ * const scores = queries.map((query) => choice(query))
+ * ```
+ *
+ * `choice(query)` is `scorer(query, choice)` — the operand order does not
+ * follow which half is written first. That matters for the scorers where it is
+ * observable: weighted Levenshtein with an insertion cost that differs from its
+ * deletion cost is not symmetric, and neither is an arbitrary third-party
+ * scorer.
+ *
+ * Where this pays is composition and the processor: `preparedChoice(query)`
+ * against a raw query takes the scorer's ordinary path with the processor
+ * already spent, while `preparedQuery(preparedChoice)` pays for neither half.
+ * A prepared choice on its own, scored against raw queries with no processor,
+ * is not much cheaper than calling the scorer — the query is the side these
+ * scorers cache.
+ *
+ * The snapshot rule {@link prepareQuery} states holds here too, and one degree
+ * more sharply: the choice-side state is built now, while the reversed one a
+ * symmetric scorer uses is built on the first raw query. A choice mutated
+ * between those two moments would leave the handle holding two states of the
+ * same operand taken at different times.
+ */
+export function prepareChoice(
+  choice: Sequence,
+  options: PrepareOptions = {},
+): PreparedChoice {
+  assertNotPreparedHandle(options.scorer)
+  const scorer = options.scorer ?? wRatio
+  const processor = options.processor ?? null
+  const processed = processOperand(choice, processor)
+  // Eagerly, unlike the reversal below, and measured: building this on first
+  // composed use instead cost 1.09-1.13x on composed `tokenSortRatio` over two
+  // runs — the strongest number this API has — and 1.03-1.06x on composed
+  // `wRatio`, against a ±3.5% noise floor read off the column neither variant
+  // touches. What it bought was ~195 bytes a handle, and only for a handle
+  // whose choice-side state is never used: over 2000 prepared choices it saved
+  // 0.39 MB built-but-never-called and 0.38 MB of 6.1 MB scored against raw
+  // queries, while *costing* 0.14-0.19 MB once anything composed. The
+  // asymmetry is the point — a memo has to be paid for on the path that reads
+  // it, and this one is read by the path worth protecting.
+  const choicePreparer = choicePreparerOf(scorer)
+  const scored = choicePreparer !== null ? choicePreparer(processed) : processed
+
+  // Scored against a raw query, a symmetric scorer can be given the *choice* as
+  // its prepared query and the query as its choice: the pair is the same pair,
+  // and the expensive half is now the one held. It is what makes this handle
+  // worth having on its own rather than only in composition — 0.54-0.81x
+  // against the direct path on every scorer family measured.
+  //
+  // Built on first use, not at construction. A choice that is only ever
+  // composed with a prepared query never scores through this, and building it
+  // eagerly cost that path 2.5-8.3%.
+  //
+  // `null` means "no reversal available", `undefined` means "not asked yet".
+  let reversed: PreparedScore | null | undefined = undefined
+  const reversedScore = (): PreparedScore | null => {
+    if (reversed === undefined) {
+      const factory = prepareScorerOf(scorer)
+      // No `isBuiltInScorer` test, which would be dead: a factory is only ever
+      // recorded alongside the built-in registration, so having one already
+      // proves this package built the scorer. That matters, because
+      // `scorerFlagsOf` answers `symmetric: true` for anything it does not
+      // know — a third-party scorer would otherwise be claiming a symmetry it
+      // never promised, and reaching here at all is what that test guarded.
+      reversed =
+        factory !== null && scorerFlagsOf(scorer).symmetric
+          ? factory(processed, NO_OPTIONS)
+          : null
+    }
+    return reversed
+  }
+
+  const call = (
+    query: Sequence | PreparedQuery,
+    callOptions?: PreparedCallOptions,
+  ): number => {
+    if (isPreparedQuery(query)) {
+      checkPairing(scorer, processor, query, 'query')
+      // Before the handle is invoked, not after. A forged query carries the
+      // brand and passes both identity tests, and calling it would run the
+      // forger's body and hand back whatever it liked — so provenance is
+      // established while refusing is still possible.
+      queryPayloadOf(query)
+      return query(handle, callOptions)
+    }
+
+    // Note what is *not* here: building the scorer's factory per call, around
+    // the query, which is what an earlier sketch did. That measured 1.69x on
+    // `ratio` and 1.31x on `levenshteinDistance` — a prepared query pays for
+    // itself over many choices, and this call has exactly one. The reversal
+    // above is the same idea done once per handle instead of once per call.
+    const processedQuery = processOperand(query, processor)
+    const prepared = reversedScore()
+    return scorePreparedPair(
+      scorer,
+      processedQuery,
+      prepared,
+      prepared !== null ? processedQuery : processed,
+      callOptions,
+    )
+  }
+
+  const brand: { readonly [PREPARED_CHOICE_HANDLE]: true } = {
+    [PREPARED_CHOICE_HANDLE]: true,
+  }
+  const handle: PreparedChoice = Object.freeze(
+    Object.assign(call, brand, { scorer, processor }),
+  )
+  choicePayloads.set(handle, { processed, scored })
+  return handle
+}
+
+/**
+ * Validate a raw operand and apply the processor, if there is one.
+ *
+ * Validated even when there is no processor to run, which is what makes a
+ * missing operand a refusal rather than a wrong answer several frames later:
+ * `levenshteinDistance(someFunction, 'abcd')` returns `4` today, having read
+ * the function's `length`.
+ */
+function processOperand(value: unknown, processor: Processor | null): Sequence {
+  const sequence = queryAsSequence(value)
+  return processor !== null ? processor(sequence) : sequence
 }
 
 /**
@@ -426,8 +839,8 @@ function choicePreparerOf(scorer: SearchScorer): PrepareChoice | null {
  * "built here".
  */
 function isIndex<T>(
-  choices: Choices<T> | PreparedChoices<T, unknown>,
-): choices is PreparedChoices<T, unknown> {
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
+): choices is PreparedChoiceIndex<T, unknown> {
   return typeof choices === 'object' && choices !== null && PREPARED_CHOICES in choices
 }
 
@@ -444,7 +857,7 @@ function isIndex<T>(
  */
 function checkIndex<T>(
   options: SearchOptions,
-  choices: Choices<T> | PreparedChoices<T, unknown>,
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
 ): void {
   if (!isIndex(choices)) return
 
@@ -465,8 +878,11 @@ function checkIndex<T>(
 /** The scorer a call runs, which an index supplies when the options do not. */
 function scorerFor<T>(
   options: SearchOptions,
-  choices: Choices<T> | PreparedChoices<T, unknown>,
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
 ): SearchScorer {
+  // Once per call, never per choice — and only on the options, since an index
+  // was refused one at the point it was built.
+  assertNotPreparedHandle(options.scorer)
   if (options.scorer !== undefined) return options.scorer
   return isIndex(choices) ? choices.scorer : wRatio
 }
@@ -503,13 +919,23 @@ interface Prepared {
 function prepare<T>(
   query: MaybeSequence,
   options: SearchOptions,
-  choices: Choices<T> | PreparedChoices<T, unknown>,
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
 ): Prepared | null {
   const scorer = scorerFor(options, choices)
   const index = isIndex(choices) ? choices : null
   // Before the `isNone` return below, so a bad index is refused whatever the
   // query is.
   checkIndex(options, choices)
+  // A handle here is a caller who expected `extract(preparedQuery, choices)` to
+  // work. It falls through to `queryAsSequence` otherwise, where "expected a
+  // string or an array-like sequence" is true and says nothing about what to do
+  // instead. Once per call, not per choice — `queryAsSequence` runs per choice
+  // whenever a processor is set.
+  if (isPreparedHandle(query)) {
+    throw new TypeError(
+      'a prepared query or choice cannot be used as a query here; call the handle instead',
+    )
+  }
   const { worstScore, optimalScore } = scorerFlagsOf(scorer)
   const lowestScoreWorst = optimalScore > worstScore
 
@@ -579,7 +1005,7 @@ function score<T>(state: Prepared, choice: T, scoreCutoff: number | null): numbe
  */
 export function extractIter<T, K>(
   query: MaybeSequence,
-  choices: PreparedChoices<T, K>,
+  choices: PreparedChoiceIndex<T, K>,
   options?: SearchOptions,
 ): Generator<ExtractResult<T, K>>
 export function extractIter<K, V>(
@@ -599,12 +1025,12 @@ export function extractIter<C extends Readonly<Record<string, unknown>>>(
 ): Generator<ExtractResult<ObjectValue<C>, ObjectKey<C>>>
 export function extractIter<T>(
   query: MaybeSequence,
-  choices: Choices<T> | PreparedChoices<T, unknown>,
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
   options?: SearchOptions,
 ): Generator<ExtractResult<T>>
 export function* extractIter<T>(
   query: MaybeSequence,
-  choices: Choices<T> | PreparedChoices<T, unknown>,
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
   options: SearchOptions = {},
 ): Generator<ExtractResult<T>> {
   if (isIndex(choices)) {
@@ -661,7 +1087,7 @@ export function* extractIter<T>(
  */
 export function extractOne<T, K>(
   query: MaybeSequence,
-  choices: PreparedChoices<T, K>,
+  choices: PreparedChoiceIndex<T, K>,
   options?: SearchOptions,
 ): ExtractResult<T, K> | undefined
 export function extractOne<K, V>(
@@ -681,12 +1107,12 @@ export function extractOne<C extends Readonly<Record<string, unknown>>>(
 ): ExtractResult<ObjectValue<C>, ObjectKey<C>> | undefined
 export function extractOne<T>(
   query: MaybeSequence,
-  choices: Choices<T> | PreparedChoices<T, unknown>,
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
   options?: SearchOptions,
 ): ExtractResult<T> | undefined
 export function extractOne<T>(
   query: MaybeSequence,
-  choices: Choices<T> | PreparedChoices<T, unknown>,
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
   options: SearchOptions = {},
 ): ExtractResult<T> | undefined {
   if (isIndex(choices)) {
@@ -778,7 +1204,7 @@ export function extractOne<T>(
 /** The best `limit` matches, ordered best first. */
 export function extract<T, K>(
   query: MaybeSequence,
-  choices: PreparedChoices<T, K>,
+  choices: PreparedChoiceIndex<T, K>,
   options?: ExtractOptions,
 ): ExtractResult<T, K>[]
 export function extract<K, V>(
@@ -798,12 +1224,12 @@ export function extract<C extends Readonly<Record<string, unknown>>>(
 ): ExtractResult<ObjectValue<C>, ObjectKey<C>>[]
 export function extract<T>(
   query: MaybeSequence,
-  choices: Choices<T> | PreparedChoices<T, unknown>,
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
   options?: ExtractOptions,
 ): ExtractResult<T>[]
 export function extract<T>(
   query: MaybeSequence,
-  choices: Choices<T> | PreparedChoices<T, unknown>,
+  choices: Choices<T> | PreparedChoiceIndex<T, unknown>,
   options: ExtractOptions = {},
 ): ExtractResult<T>[] {
   const limit = options.limit === undefined ? 5 : options.limit
@@ -877,6 +1303,7 @@ export function extract<T>(
   // the same reason it is at `limit: 5`. Checked rather than prepared: no
   // processor runs and no query is built for a call that asked for nothing.
   if (limit <= 0) {
+    assertNotPreparedHandle(options.scorer)
     checkIndex(options, choices)
     return []
   }
@@ -1063,6 +1490,7 @@ export function scoreMatrix(
   choices: readonly MaybeSequence[],
   options: ScoreOptions<ScoreArrayKind> = {},
 ): ScoreMatrix<ScoreArray> {
+  assertNotPreparedHandle(options.scorer)
   const scorer = options.scorer ?? ratio
   const processor = options.processor ?? null
   const scoreCutoff = options.scoreCutoff ?? null
@@ -1094,7 +1522,7 @@ export function scoreMatrix(
   // its choices as they came — so the absence is real, and `preparedChoices`
   // has to fall back to the unconverted choices rather than to a default
   // converter that would disagree with what the scorer expects.
-  let prepareMatrixChoice: PrepareChoice | null = null
+  let prepareMatrixChoice: ChoicePreparer | null = null
   if (factory !== null) {
     for (let i = 0; i < processedQueries.length; i++) {
       const query = processedQueries[i]
@@ -1200,6 +1628,7 @@ export function scorePairs(
   choices: readonly MaybeSequence[],
   options: ScoreOptions<ScoreArrayKind> = {},
 ): ScoreArray {
+  assertNotPreparedHandle(options.scorer)
   const scorer = options.scorer ?? ratio
   const processor = options.processor ?? null
   const scoreCutoff = options.scoreCutoff ?? null

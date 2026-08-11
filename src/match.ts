@@ -10,7 +10,12 @@
  *
  * These two express the question directly. Neither has a Python counterpart.
  */
-import { callScorer, scorerFlagsOf, toRecord } from './_common.js'
+import {
+  assertNotPreparedHandle,
+  callScorer,
+  scorerFlagsOf,
+  toRecord,
+} from './_common.js'
 
 /**
  * A scorer's own options, with `threshold` in place of `scoreCutoff`.
@@ -64,6 +69,10 @@ export function matchScore<I, O extends object>(
   s2: I,
   options: MatchOptions<O>,
 ): number | undefined {
+  // A prepared handle satisfies the scorer signature and would be handed `s2`
+  // as its options bag. {@link isMatch} delegates here, so this is the module's
+  // only seam.
+  assertNotPreparedHandle(scorer)
   // `threshold` is destructured out rather than forwarded: it is this module's
   // spelling of the cutoff, not an option any scorer knows.
   const { threshold, ...forScorer } = options

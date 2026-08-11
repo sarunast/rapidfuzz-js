@@ -32,6 +32,8 @@ import {
   prepareChoices,
   scoreMatrix,
   type ExtractResult,
+  type PrepareOptions,
+  type PreparedChoiceIndex,
   type SearchOptions,
   type SearchScorer,
 } from '../src/search.js'
@@ -210,6 +212,22 @@ describe('an index refuses a call it was not prepared for', () => {
   it('leaves a plain collection alone at the same limits', () => {
     expect(extract('abc', ['abc'], { scorer: tokenSortRatio, limit: 0 })).toEqual([])
     expect(extract('abc', ['abc'], { processor: defaultProcess, limit: -1 })).toEqual([])
+  })
+})
+
+describe('the renamed types name the same thing', () => {
+  // `PrepareChoicesOptions` and `PreparedChoices` were the 0.4.0 names, renamed
+  // in 0.5.0 once a query and a single choice could be prepared too — neither
+  // old name describes what it holds any more. They were removed rather than
+  // aliased: `check-exports.mjs` can only assert runtime values, so a type-only
+  // alias has nothing but a test holding it, and this is that test for the names
+  // that replaced them.
+  it('are assignable from what prepareChoices returns', () => {
+    const options: PrepareOptions = { scorer: ratio }
+    const index: PreparedChoiceIndex<string, number> = prepareChoices(['abc'], options)
+
+    expect(index.scorer).toBe(ratio)
+    expect(extractOne('abc', index, {})).toEqual({ choice: 'abc', score: 100, key: 0 })
   })
 })
 

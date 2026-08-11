@@ -38,7 +38,7 @@
  * dependency, and `ratio`/`partialRatio` must stay usable without tokenising
  * anything.
  */
-import { convSequence, isSequence, type PrepareChoice } from '../_common.js'
+import { convSequence, isSequence, type ChoicePreparer } from '../_common.js'
 
 const SPACE = 32
 
@@ -659,7 +659,7 @@ const tokenChoices = new WeakSet<object>()
  * {@link PreparedTokenChoice}. `scoreMatrix` prepares every choice once per call,
  * so a form built here and never read is paid for on every choice in the list.
  */
-export function tokenChoicePreparer(): PrepareChoice {
+export function tokenChoicePreparer(): ChoicePreparer {
   return (choice) => {
     if (!isSequence(choice)) return choice
     const prepared: PreparedTokenChoice = { sequence: convSequence(choice) }

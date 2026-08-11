@@ -31,7 +31,7 @@ import {
   prepareScorerChoice,
   preparedScorerSequence,
   scorerSequence,
-  type PrepareChoice,
+  type ChoicePreparer,
   type PrepareScorer,
   type PreparedScore,
 } from '../_common.js'
@@ -155,12 +155,14 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
   const convertsChoice = usesTokens && kind !== 'wRatio'
   // One preparer per scorer rather than per query: `prepareFuzz` runs once, at
   // the point each scorer below is built.
-  const prepareChoice: PrepareChoice = usesTokens
+  const choicePreparer: ChoicePreparer = usesTokens
     ? tokenChoicePreparer()
     : prepareScorerChoice
 
   const prepare: PrepareScorer = (query) => {
-    const queryTokenChoice = usesTokens ? preparedTokenChoice(prepareChoice(query)) : null
+    const queryTokenChoice = usesTokens
+      ? preparedTokenChoice(choicePreparer(query))
+      : null
     const heldQuery = usesTokens
       ? queryTokenChoice === null
         ? null
@@ -420,5 +422,5 @@ export function prepareFuzz(kind: PreparedFuzzKind): PrepareScorer {
     }
     return score
   }
-  return withChoicePreparer(prepare, prepareChoice)
+  return withChoicePreparer(prepare, choicePreparer)
 }

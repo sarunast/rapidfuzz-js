@@ -127,16 +127,16 @@ The camelCase rule above holds for every scorer, and for the options they take.
 It does not hold for the handful of entry points whose Python shape did not
 survive the port. These are deliberate — do not "fix" them back:
 
-| Upstream           | Here                         | Why                                                                                                                                                                                                   |
-| ------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `process` (module) | `search`                     | `process` is a Node global, and shadowing it inside the module had already happened once.                                                                                                             |
-| `cdist`            | `scoreMatrix`                | Returns a `ScoreMatrix` over a typed array, not `cdist`'s array of arrays.                                                                                                                            |
-| `cpdist`           | `scorePairs`                 | Returns a typed array.                                                                                                                                                                                |
-| `dtype`            | `into`                       | Chooses the element type, where `dtype` only chose whether to round.                                                                                                                                  |
-| `scorer_kwargs`    | `configure(scorer, options)` | A bag of arguments passed alongside a scorer cannot be type-checked against it.                                                                                                                       |
-| —                  | `matchScore`, `isMatch`      | No counterpart: they exist because a missed `scoreCutoff` is otherwise reported as a sentinel, and for a similarity that sentinel is `0`.                                                             |
-| —                  | `prepareChoices`             | No counterpart: upstream caches the query side of a scorer, and a run of queries over one list pays for the choice side every time. Measured at 0.17-0.81x on a token scorer or the default `wRatio`. |
-| `Editops` (list)   | `Editops` (readonly result)  | The Python original is a mutable sequence of tuples. Reproducing it meant reimplementing `list`; the operations live in `ops.operations`, and JavaScript supplies the rest.                           |
+| Upstream           | Here                                              | Why                                                                                                                                                                                                                     |
+| ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `process` (module) | `search`                                          | `process` is a Node global, and shadowing it inside the module had already happened once.                                                                                                                               |
+| `cdist`            | `scoreMatrix`                                     | Returns a `ScoreMatrix` over a typed array, not `cdist`'s array of arrays.                                                                                                                                              |
+| `cpdist`           | `scorePairs`                                      | Returns a typed array.                                                                                                                                                                                                  |
+| `dtype`            | `into`                                            | Chooses the element type, where `dtype` only chose whether to round.                                                                                                                                                    |
+| `scorer_kwargs`    | `configure(scorer, options)`                      | A bag of arguments passed alongside a scorer cannot be type-checked against it.                                                                                                                                         |
+| —                  | `matchScore`, `isMatch`                           | No counterpart: they exist because a missed `scoreCutoff` is otherwise reported as a sentinel, and for a similarity that sentinel is `0`.                                                                               |
+| —                  | `prepareChoices`, `prepareQuery`, `prepareChoice` | No counterpart: upstream caches the query side of a scorer inside `process` and hands a caller neither half. `prepareChoices` measured 0.17-0.81x per query; the two singular handles 0.14-0.85x against a direct call. |
+| `Editops` (list)   | `Editops` (readonly result)                       | The Python original is a mutable sequence of tuples. Reproducing it meant reimplementing `list`; the operations live in `ops.operations`, and JavaScript supplies the rest.                                             |
 
 The last one is the largest. Upstream's `Editops`/`Opcodes` are indexable,
 sliceable with a step, `del`-able and full of tuples; here they hold readonly
@@ -155,6 +155,15 @@ Building either collection without validating is `editopsFromValidated` /
 that are deliberately absent from both barrels — a static on an exported class
 would be public API, and these skip every check. Both barrels list their
 editops exports explicitly for that reason; do not restore the `export *`.
+
+Three types were renamed in 0.5.0, once the singular handles arrived. Two are
+public and were renamed outright, with no alias: `PreparedChoices` →
+`PreparedChoiceIndex`, `PrepareChoicesOptions` → `PrepareOptions` (now shared by
+all three `prepare*` entry points). Neither old name describes what it holds any
+more, and a type-only alias is invisible to `check-exports.mjs`, which asserts
+runtime values — so an alias would have had nothing but a test holding it. The
+third is internal: `PrepareChoice` became `ChoicePreparer`, because the old name
+was one import away from shadowing the `prepareChoice` export.
 
 Two more shape changes with no name attached: `extract*` return
 `{ choice, score, key }` rather than the positional tuple, and `NaN` is treated

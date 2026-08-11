@@ -7,6 +7,7 @@
  * Keeping it out leaves the shared module the size it was.
  */
 import {
+  assertNotPreparedHandle,
   callScorer,
   configuredFlagsOf,
   configureOptionsOf,
@@ -62,6 +63,9 @@ export function configure<I, O extends ScorerOptions>(
   scorer: (s1: I, s2: I, options?: O) => number,
   options: ScorerConfig<O>,
 ): ConfiguredScorer<I, O> {
+  // Before anything wraps it: a configured handle would launder the brand, and
+  // the result would be a scorer-shaped thing that scores every pair wrongly.
+  assertNotPreparedHandle(scorer)
   const given = toRecord(options)
 
   // `ScorerConfig` omits these, so a TypeScript caller cannot get here — but
@@ -116,9 +120,9 @@ export function configure<I, O extends ScorerOptions>(
   if (inner !== null) {
     const wrapped: PrepareScorer = (query, options) =>
       inner(query, options === NO_OPTIONS ? baked : { ...baked, ...options })
-    const prepareChoice = inner[PREPARE_CHOICE]
+    const choicePreparer = inner[PREPARE_CHOICE]
     prepare =
-      prepareChoice === undefined ? wrapped : withChoicePreparer(wrapped, prepareChoice)
+      choicePreparer === undefined ? wrapped : withChoicePreparer(wrapped, choicePreparer)
   }
 
   return registerScorer(call, flags, {
