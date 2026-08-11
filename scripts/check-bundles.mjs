@@ -9,23 +9,29 @@ const root = resolve(import.meta.dirname, '..')
 const fixtures = resolve(import.meta.dirname, 'bundle-fixtures')
 const output = mkdtempSync(join(tmpdir(), 'rapidfuzz-bundles-'))
 
-/** Accepted deterministic gzip sizes plus 2% headroom. */
+/**
+ * Accepted deterministic gzip sizes plus 2% headroom.
+ *
+ * Re-record all of them together, never one: the headroom is what absorbs the
+ * few dozen bytes a different toolchain gzips differently, and topping up only
+ * the entry that failed leaves its siblings a byte from the same surprise.
+ */
 const budgets = {
-  'direct-fuzz.js': 5_987,
-  'direct-token-sort.js': 6_097,
-  'compiled-fuzz.js': 6_747,
-  'compiled-token-sort.js': 6_847,
-  'direct-normalized-edit.js': 9_880,
-  'compiled-normalized-edit.js': 10_613,
-  'direct-raw-distance.js': 9_892,
-  'compiled-raw-distance.js': 10_624,
-  'one-shot.js': 7_506,
-  'one-shot-iter.js': 7_584,
-  'matcher-token-sort.js': 8_347,
-  'score-matrix.js': 11_708,
-  'score-pairs.js': 11_283,
-  'full-fuzz.js': 10_138,
-  'all-subpaths.js': 26_371,
+  'direct-fuzz.js': 6_036,
+  'direct-token-sort.js': 6_080,
+  'compiled-fuzz.js': 6_831,
+  'compiled-token-sort.js': 6_867,
+  'direct-normalized-edit.js': 9_959,
+  'compiled-normalized-edit.js': 10_742,
+  'direct-raw-distance.js': 9_967,
+  'compiled-raw-distance.js': 10_749,
+  'one-shot.js': 7_657,
+  'one-shot-iter.js': 7_651,
+  'matcher-token-sort.js': 8_431,
+  'score-matrix.js': 11_792,
+  'score-pairs.js': 11_535,
+  'full-fuzz.js': 10_191,
+  'all-subpaths.js': 26_697,
 }
 
 try {
