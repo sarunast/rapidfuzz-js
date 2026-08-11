@@ -233,10 +233,31 @@ prepared query data, and symmetric matrices compute only one triangle.
 On the recorded M1 Max comparison, `rapidfuzz-js` was competitive with the
 fastest specialized JavaScript Levenshtein libraries and substantially faster
 than `fuzzball` for the measured workloads. Python RapidFuzz remains faster for
-most larger workloads that stay inside its C++ extension.
+most general distance and edit workloads that stay inside its C++ extension.
 
-See [Benchmarks](BENCHMARKS.md) for results, methodology, metrics, caveats, and
-reproduction instructions.
+### Prepared-input performance
+
+Preparation can change the result for repeated, token-heavy searches. For 20
+queries over 2,000 multiword titles, `prepareChoices` reduced the measured
+`tokenSortRatio` batch from 30.9 ms to 6.24 ms—**4.95× faster** than raw
+JavaScript search. The prepared path was also **2.74× faster than Python
+RapidFuzz** and **16.92× faster than `fuzzball`** on the equivalent measured
+workload.
+
+Key learnings:
+
+- Prepare stable collections that will be searched more than once.
+- Token scorers and processors benefit most because their setup can be reused.
+- Simple or one-off comparisons benefit less and may not recover preparation
+  cost.
+- Preparation removes repeated setup; it does not reduce the number of pair
+  scores.
+
+See the in-depth documentation for [why prepared inputs help](BENCHMARKS.md#prepared-inputs-why-they-matter),
+[comparisons with other libraries](BENCHMARKS.md#preparation-versus-other-libraries),
+and the full [Python RapidFuzz comparison](BENCHMARKS.md#python-rapidfuzz-comparison).
+The complete [benchmark documentation](BENCHMARKS.md) includes methodology,
+metrics, caveats, and reproduction instructions.
 
 ## Development
 
