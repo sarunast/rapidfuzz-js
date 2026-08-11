@@ -1,4 +1,8 @@
-const DIRECT_LOOKUP_LIMIT = 256
+/**
+ * Where the fixed Latin-1 mask region ends. `blockMasks.ts` is the canonical
+ * home of the partition invariant; this value must agree with it.
+ */
+export const DIRECT_LOOKUP_LIMIT = 256
 
 /** Whether a symbol directly indexes the fixed Latin-1 mask region. */
 export function isDirectSymbol(symbol: unknown): symbol is number {

@@ -28,6 +28,7 @@ import {
   rowVector,
   rowVectorN,
   wideSlots,
+  wordCount,
 } from '../../shared/bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../../shared/bitmask/pattern.js'
 
@@ -203,7 +204,7 @@ function levenshteinManyWords(
   textStart: number,
   textLength: number,
 ): number {
-  const words = (patternLength + WORD_BITS - 1) >>> WORD_SHIFT
+  const words = wordCount(patternLength)
   // Building the masks can widen the shared table, so every kernel below hoists
   // `directLimit` and the buffers after this call rather than before it.
   const stamp = blockMasksFor(pattern, patternStart, patternLength, words)
@@ -611,7 +612,7 @@ function levenshteinManyWordsBanded(
   textLength: number,
   budget: number,
 ): number {
-  const words = (patternLength + WORD_MASK) >>> WORD_SHIFT
+  const words = wordCount(patternLength)
   const stamp = blockMasksFor(pattern, patternStart, patternLength, words)
 
   const vp = rowVector(words)
@@ -1889,8 +1890,8 @@ export function levenshteinUniform(
   }
   if (cutoff < longest) return bounded(cutoff)
 
-  const words1 = (len1 + WORD_MASK) >>> WORD_SHIFT
-  const words2 = (len2 + WORD_MASK) >>> WORD_SHIFT
+  const words1 = wordCount(len1)
+  const words2 = wordCount(len2)
   const firstIsPattern = words1 * len2 <= words2 * len1
 
   const pattern = firstIsPattern ? s1 : s2

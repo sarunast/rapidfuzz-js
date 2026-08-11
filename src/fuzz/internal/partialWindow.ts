@@ -4,6 +4,7 @@ import {
   lcsSeqLengthRange,
   prepareLcsPattern,
 } from '../../algorithms/lcs/implementation.js'
+import { checkedStartGeneration } from '../../algorithms/shared/bitmask/blockMasks.js'
 import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
 /**
  * `ratio` and `partialRatio` — the two scorers that bottom out directly in
@@ -443,7 +444,7 @@ export function resetPartialRatioScratch(startGeneration = 0): void {
   bisectionStamps = null
   bisectionWindows = []
   bisectionNextWindows = []
-  bisectionGeneration = startGeneration
+  bisectionGeneration = checkedStartGeneration(startGeneration)
 }
 
 /**

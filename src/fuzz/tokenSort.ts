@@ -2,23 +2,22 @@ import { prepareLcsPattern } from '../algorithms/lcs/implementation.js'
 import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
 import { builtInMetric } from '../algorithms/shared/metricAdapter.js'
 import {
-  type PrepareScorer,
-  type PreparedScorerFactory,
-  type PreparedScore,
-  withChoicePreparer,
+  type PreparationFactory,
   FUZZ_FLAGS,
-  type NormalizedScorer,
+  type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
 import type { Metric } from '../core/metric.js'
+import type { PreparedKernel } from '../core/protocol.js'
+import type { Sequence } from '../core/types.js'
 import { preparedTokenChoice, sortedOf, tokenChoicePreparer } from './internal/tokens.js'
 import { tokenSortRatio_impl, tokenSortRatioConverted } from './internal/tokenSort.js'
 import type { FuzzConfiguration, FuzzOptions } from './types.js'
 
 /** Narrow prepared-query implementation for token-sort similarity. */
-export function prepareTokenSort(): PreparedScorerFactory {
+export function prepareTokenSort(): PreparationFactory {
   const choicePreparer = tokenChoicePreparer()
-  const prepare: PrepareScorer = (query) => {
+  const prepareQuery = (query: Sequence): PreparedKernel => {
     const queryChoice = preparedTokenChoice(choicePreparer(query))
     let pattern: PatternMask | null = null
     const patternOf = (): PatternMask => {
@@ -28,7 +27,7 @@ export function prepareTokenSort(): PreparedScorerFactory {
       }
       return pattern
     }
-    const score: PreparedScore = (rawChoice, rawCutoff) => {
+    const score: PreparedKernel = (rawChoice, rawCutoff) => {
       const choice = preparedTokenChoice(rawChoice)
       // `patternOf`, not `patternOf()`: the callee refuses an impossible cutoff
       // before it sorts anything, and an argument would have built the query's
@@ -44,12 +43,12 @@ export function prepareTokenSort(): PreparedScorerFactory {
     }
     return score
   }
-  return withChoicePreparer(prepare, choicePreparer)
+  return () => ({ prepareQuery, prepareChoice: choicePreparer })
 }
 
 const BOUNDS: readonly [number, number] = [0, 100]
 
-export const tokenSortRatio: NormalizedScorer<FuzzOptions> =
+export const tokenSortRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(tokenSortRatio_impl, FUZZ_FLAGS, prepareTokenSort())
 
 export const tokenSortSimilarity: Metric<'similarity', FuzzConfiguration> =

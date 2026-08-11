@@ -26,11 +26,7 @@ import {
 import { levenshteinEditops } from '../../src/algorithms/levenshtein/editops.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../../src/algorithms/osa/implementation.js'
-import {
-  type PreparedCapability,
-  type PrepareScorer,
-  type Sequence,
-} from '../../src/algorithms/shared/scorerSupport.js'
+import { type Sequence } from '../../src/algorithms/shared/scorerSupport.js'
 import { partialRatio } from '../../src/fuzz/partial.js'
 import { ratio } from '../../src/fuzz/similarity.js'
 import { prepareScorerOf } from '../support/preparation.js'
@@ -272,10 +268,6 @@ function text(palette: string, length: number, seed: number): string {
 
 const PAIRS = [...pairs()]
 
-function preparedOf(scorer: PreparedCapability): PrepareScorer {
-  return prepareScorerOf(scorer)
-}
-
 describe('every mask region, at every pattern width', () => {
   it('scores Levenshtein as the dynamic program does', () => {
     for (const { what, s1, s2 } of PAIRS) {
@@ -288,7 +280,7 @@ describe('every mask region, at every pattern width', () => {
   // The prepared kernels are a second set, split by width the same way and
   // reached only by holding the pattern across candidates.
   it('scores a held Levenshtein pattern the same', () => {
-    const prepare = preparedOf(levenshteinDistance)
+    const prepare = prepareScorerOf(levenshteinDistance)
     for (const { what, s1, s2 } of PAIRS) {
       const expected = levenshteinReference(s1, s2)
       expect(prepare(s1, {})(s2, null), what).toBe(expected)
@@ -307,7 +299,7 @@ describe('every mask region, at every pattern width', () => {
   })
 
   it('scores a held LCS pattern the same', () => {
-    const prepare = preparedOf(lcsSeqNormalizedSimilarity)
+    const prepare = prepareScorerOf(lcsSeqNormalizedSimilarity)
     for (const { what, s1, s2 } of PAIRS) {
       const expected = lcsReference(s1, s2)
       const normalized = normalizedLcs(expected, Math.max(s1.length, s2.length))
@@ -345,7 +337,7 @@ describe('every mask region, at every pattern width', () => {
   // Jaro's kernels split by width too, and its match window means the mask a
   // symbol reaches is read once per word the window spans rather than once.
   it('scores Jaro as the dynamic program does', () => {
-    const prepare = preparedOf(jaroSimilarity)
+    const prepare = prepareScorerOf(jaroSimilarity)
     for (const { what, s1, s2 } of PAIRS) {
       const expected = jaroReference(s1, s2)
       expect(jaroSimilarity(s1, s2), what).toBeCloseTo(expected, 12)
@@ -356,7 +348,7 @@ describe('every mask region, at every pattern width', () => {
   })
 
   it('scores Jaro-Winkler consistently with Jaro', () => {
-    const prepare = preparedOf(jaroWinklerSimilarity)
+    const prepare = prepareScorerOf(jaroWinklerSimilarity)
     for (const { what, s1, s2 } of PAIRS) {
       const scored = jaroWinklerSimilarity(s1, s2)
       expect(scored, what).toBeGreaterThanOrEqual(jaroReference(s1, s2) - 1e-12)
@@ -366,7 +358,7 @@ describe('every mask region, at every pattern width', () => {
   })
 
   it('scores a held OSA pattern the same', () => {
-    const prepare = preparedOf(osaDistance)
+    const prepare = prepareScorerOf(osaDistance)
     for (const { what, s1, s2 } of PAIRS) {
       const expected = osaReference(s1, s2)
       expect(prepare(s1, {})(s2, null), what).toBe(expected)
@@ -375,8 +367,8 @@ describe('every mask region, at every pattern width', () => {
   })
 
   it('scores a held ratio pattern the same', () => {
-    const prepare = preparedOf(ratio)
-    const preparePartial = preparedOf(partialRatio)
+    const prepare = prepareScorerOf(ratio)
+    const preparePartial = prepareScorerOf(partialRatio)
     for (const { what, s1, s2 } of PAIRS) {
       expect(prepare(s1, {})(s2, null), what).toBeCloseTo(ratio(s1, s2), 9)
       expect(preparePartial(s1, {})(s2, null), what).toBeCloseTo(partialRatio(s1, s2), 9)
@@ -452,7 +444,7 @@ describe('every mask region, under a cutoff', () => {
 // own copy of the classification.
 describe('every mask region, with a held pattern under a cutoff', () => {
   it('scores Levenshtein exactly inside the bound', () => {
-    const prepare = preparedOf(levenshteinDistance)
+    const prepare = prepareScorerOf(levenshteinDistance)
     for (const { what, s1, s2 } of PAIRS) {
       const exact = levenshteinReference(s1, s2)
       const score = prepare(s1, {})
@@ -465,8 +457,8 @@ describe('every mask region, with a held pattern under a cutoff', () => {
   })
 
   it('scores Indel and LCS exactly inside the bound', () => {
-    const prepareIndel = preparedOf(indelDistance)
-    const prepareLcs = preparedOf(lcsSeqNormalizedSimilarity)
+    const prepareIndel = prepareScorerOf(indelDistance)
+    const prepareLcs = prepareScorerOf(lcsSeqNormalizedSimilarity)
     for (const { what, s1, s2 } of PAIRS) {
       const lcs = lcsReference(s1, s2)
       const indel = s1.length + s2.length - 2 * lcs
@@ -497,7 +489,7 @@ describe('every mask region, with a held pattern under a cutoff', () => {
   // `ratio` takes the bounded held kernel only above a cutoff of 70 and a
   // combined length of 128, which no unbounded sweep reaches.
   it('scores a held ratio exactly inside the bound', () => {
-    const prepare = preparedOf(ratio)
+    const prepare = prepareScorerOf(ratio)
     for (const { what, s1, s2 } of PAIRS) {
       const exact = ratio(s1, s2)
       const score = prepare(s1, {})

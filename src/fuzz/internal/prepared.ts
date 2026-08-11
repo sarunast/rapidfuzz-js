@@ -6,7 +6,7 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * `process` scores one query against many choices, so anything derived from the
  * query alone is worth holding: its converted sequence, its LCS masks, its
  * tokenisation and the masks of its token-sorted form. {@link prepareFuzz} builds
- * that state once per query and returns a `PreparedScore` closure that consumes
+ * that state once per query and returns a `PreparedKernel` closure that consumes
  * it, which is what turns a `scoreMatrix` from `O(rows * cols)` tokenisations
  * into `O(rows + cols)`.
  *
@@ -27,14 +27,14 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
 import {
   alignRepresentation,
   convSequence,
-  withChoicePreparer,
-  prepareScorerChoice,
-  preparedScorerSequence,
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  scorerSequence,
   type ChoicePreparer,
-  type PrepareScorer,
-  type PreparedScorerFactory,
-  type PreparedScore,
+  type PreparationFactory,
 } from '../../algorithms/shared/scorerSupport.js'
+import type { PreparedKernel } from '../../core/protocol.js'
+import type { Sequence } from '../../core/types.js'
 import type { PreparedFuzzKind } from '../types.js'
 import {
   type CharSet,
@@ -63,7 +63,7 @@ import {
  *
  * The ones that do take {@link tokenChoicePreparer}, so a choice is converted
  * once and its derived forms are memoised on the record as branches ask for
- * them; the ones that do not take {@link prepareScorerChoice} and never
+ * them; the ones that do not take {@link prepareChoiceSequence} and never
  * tokenise at all.
  *
  * This used to be a table of *which* forms each scorer might read, so the
@@ -86,22 +86,20 @@ function tokenisesInput(kind: PreparedFuzzKind): boolean {
 }
 
 /** Build the internal query-caching hook shared by all fuzz scorers. */
-export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
+export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
   const usesTokens = tokenisesInput(kind)
   // One preparer per scorer rather than per query: `prepareFuzz` runs once, at
   // the point each scorer below is built.
   const choicePreparer: ChoicePreparer = usesTokens
     ? tokenChoicePreparer()
-    : prepareScorerChoice
+    : prepareChoiceSequence
 
-  const prepare: PrepareScorer = (query) => {
+  const prepareQuery = (query: Sequence): PreparedKernel => {
     const queryTokenChoice = usesTokens
       ? preparedTokenChoice(choicePreparer(query))
       : null
     const heldQuery =
-      queryTokenChoice === null
-        ? preparedScorerSequence(prepareScorerChoice(query))
-        : queryTokenChoice.sequence
+      queryTokenChoice === null ? scorerSequence(query) : queryTokenChoice.sequence
     const a = heldQuery
     // Built on first use rather than up front: `partialRatio` and `wRatio` are
     // the only kinds that score through the query's own LCS masks, and `wRatio`
@@ -169,12 +167,12 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
     // against the sequence preparer — and two branches then decoded the same
     // choice a second time to get a form the prelude had discarded the type of.
     // Six copies of one line buys every branch its own shape.
-    const score: PreparedScore = (rawChoice, rawCutoff) => {
+    const score: PreparedKernel = (rawChoice, rawCutoff) => {
       const cutoff = rawCutoff ?? 0
 
       switch (kind) {
         case 'partialRatio': {
-          const b = preparedScorerSequence(rawChoice)
+          const b = preparedChoiceSequence(rawChoice)
           // Unlike the mask kernels, the window scan prunes by comparing
           // elements with `===`, so a query held as a BMP string and a choice
           // expanded into code points have to be brought together first.
@@ -327,7 +325,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
           // sides have to be spelled alike — and here they already are:
           // `prepareTokenChoice` converts every choice, and the query took the
           // same route, so neither can still be the BMP string that would meet
-          // `97` as `'a'`. `partialRatio` prepares with `prepareScorerChoice`
+          // `97` as `'a'`. `partialRatio` prepares with `prepareChoiceSequence`
           // instead, which does not convert, which is why the test stays there.
           const partial =
             a.length <= b.length
@@ -363,5 +361,5 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
     }
     return score
   }
-  return withChoicePreparer(prepare, choicePreparer)
+  return () => ({ prepareQuery, prepareChoice: choicePreparer })
 }

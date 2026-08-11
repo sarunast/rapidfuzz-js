@@ -12,7 +12,6 @@
 // enough to make `extract` disagree with `ratio`.
 import { describe, expect, it } from 'vitest'
 
-import { PREPARE_CHOICE } from '../../src/algorithms/shared/scorerSupport.js'
 import { wRatio } from '../../src/fuzz/fuzzy.js'
 import { prepareFuzz } from '../../src/fuzz/internal/prepared.js'
 import { partialRatio } from '../../src/fuzz/partial.js'
@@ -25,7 +24,10 @@ const preparedScore = (
   query: string,
   choice: string,
   cutoff: number,
-): number => factory(query, {})(factory[PREPARE_CHOICE](choice), cutoff)
+): number => {
+  const preparation = factory({})
+  return preparation.prepareQuery(query)(preparation.prepareChoice(choice), cutoff)
+}
 
 describe('prepared scorers agree with raw ones', () => {
   it('accepts and rejects the same score at a cutoff of its own value', () => {

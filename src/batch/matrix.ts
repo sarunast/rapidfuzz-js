@@ -1,4 +1,5 @@
-import { scorerCompilation, type Scorer } from '../core/scorer.js'
+import type { MetricCompilation } from '../core/protocol.js'
+import { scorerCompilation } from '../core/scorer.js'
 import { validateSequence } from '../core/sequence.js'
 import { qualifies } from '../core/threshold.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
@@ -27,21 +28,20 @@ function normalizeInputs(
   })
 }
 
-function fill<D extends Direction>(
+function fill(
   queries: readonly Sequence[],
   choices: readonly Sequence[],
-  scorer: Scorer<D>,
+  compilation: MetricCompilation<Direction>,
   store: ScoreArray,
   integral: boolean,
   symmetric: boolean,
   threshold: number | null,
   multiplier: number,
 ): void {
-  const compilation = scorerCompilation(scorer)
-  const rejected =
-    compilation.trusted || threshold === null
-      ? 0
-      : rejectedScore(compilation.direction, compilation.bounds, multiplier, integral)
+  const rejected = rejectedScore(compilation, threshold, multiplier, integral)
+  // After the rejection check, so an unusable one is still reported, and before
+  // preparing the choices: with no rows there is no cell to score them for.
+  if (queries.length === 0) return
   const columns = choices.length
   // Written out rather than `choices.map(compilation.prepareChoice)`: the
   // protocol's preparer takes one argument, and `map` would hand it three.
@@ -62,7 +62,7 @@ function fill<D extends Direction>(
     for (let column = start; column < columns; column++) {
       const raw = prepared(preparedChoices[column], threshold)
       const score =
-        compilation.trusted ||
+        rejected === null ||
         threshold === null ||
         qualifies(compilation.direction, raw, threshold)
           ? raw
@@ -90,7 +90,12 @@ export function scoreMatrix<D extends Direction>(
   choices: readonly Sequence[],
   options: BatchOptions<D, ScoreArrayKind>,
 ): ScoreMatrix<ScoreArray> {
+  // Configuration first, data second — the order `scorePairs` uses. Reaching
+  // the scorer only inside `fill` meant a `normalize` with a side effect ran,
+  // and a whole matrix was allocated, before a scorer this package did not
+  // build was refused.
   const kind = options.into ?? 'f64'
+  const compilation = scorerCompilation(options.scorer)
   const { threshold, multiplier } = resolveBatchOptions(
     options.threshold,
     options.scoreMultiplier,
@@ -100,7 +105,7 @@ export function scoreMatrix<D extends Direction>(
   const normalizedQueries = sameInput
     ? normalizedChoices
     : normalizeInputs(queries, options.normalize)
-  const symmetric = sameInput && options.scorer.symmetric
+  const symmetric = sameInput && compilation.symmetric
   return buildScoreMatrix(
     kind,
     normalizedQueries.length,
@@ -110,7 +115,7 @@ export function scoreMatrix<D extends Direction>(
       fill(
         normalizedQueries,
         normalizedChoices,
-        options.scorer,
+        compilation,
         data,
         integral,
         symmetric,

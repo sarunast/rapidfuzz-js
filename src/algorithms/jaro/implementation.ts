@@ -1,3 +1,5 @@
+import type { PreparedKernel } from '../../core/protocol.js'
+import { wordCount } from '../shared/bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
@@ -6,16 +8,15 @@ import {
   normDistCutoff,
   normSimCutoff,
   type MaybeSequence,
-  type NormalizedScorer,
+  type Sequence,
+  type MaybeSequenceMetricImplementation,
   type ScorerOptions,
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
-  withChoicePreparer,
-  prepareScorerChoice,
-  preparedScorerSequence,
-  type PrepareScorer,
-  type PreparedScorerFactory,
-  type PreparedScore,
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  scorerSequence,
+  type PreparationFactory,
   withPreparedFlags,
 } from '../shared/scorerSupport.js'
 
@@ -106,8 +107,8 @@ function jaroSimilarityCore(
   const patternLength = patternEnd - origin
   const textLength = textEnd - origin
   const prepared = preparedPattern ?? preparePattern(pattern, prefix, patternLength)
-  const patternWords = Math.max((patternLength + 31) >>> 5, 1)
-  const textWords = Math.max((textLength + 31) >>> 5, 1)
+  const patternWords = Math.max(wordCount(patternLength), 1)
+  const textWords = Math.max(wordCount(textLength), 1)
   if (patternWords === 1 && textWords === 1) {
     return jaroOneWord(
       pattern,
@@ -229,7 +230,7 @@ function countTranspositionsWords(
   pFlag: Uint32Array,
   tFlag: Uint32Array,
 ): number {
-  const textWords = (textLength + 31) >>> 5
+  const textWords = wordCount(textLength)
   const firstWord = skip >>> 5
   // Both sides start past the prefix: those positions matched each other in
   // order and are equal by construction, so they contribute nothing and pairing
@@ -465,13 +466,13 @@ function jaroOneWord(
 
 type PreparedJaroKind = 'distance' | 'similarity'
 
-export function prepareJaro(kind: PreparedJaroKind): PreparedScorerFactory {
-  const prepare: PrepareScorer = (query) => {
-    const a = preparedScorerSequence(prepareScorerChoice(query))
+export function prepareJaro(kind: PreparedJaroKind): PreparationFactory {
+  const prepareQuery = (query: Sequence): PreparedKernel => {
+    const a = scorerSequence(query)
     const pattern = preparePattern(a, 0, a.length)
 
-    const score: PreparedScore = (rawChoice, rawCutoff) => {
-      const b = preparedScorerSequence(rawChoice)
+    const score: PreparedKernel = (rawChoice, rawCutoff) => {
+      const b = preparedChoiceSequence(rawChoice)
 
       // The transposition pass compares the two sequences elementwise, so they
       // have to agree on how a character is spelled.
@@ -489,7 +490,7 @@ export function prepareJaro(kind: PreparedJaroKind): PreparedScorerFactory {
     }
     return score
   }
-  return withChoicePreparer(prepare, prepareScorerChoice)
+  return () => ({ prepareQuery, prepareChoice: prepareChoiceSequence })
 }
 
 /**
@@ -531,13 +532,15 @@ function jaroDistance_impl(
   )
 }
 
-export const jaroSimilarity: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
-  jaroSimilarity_impl,
-  NORMALIZED_SIMILARITY_FLAGS,
-  prepareJaro('similarity'),
-)
-export const jaroDistance: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
-  jaroDistance_impl,
-  NORMALIZED_DISTANCE_FLAGS,
-  prepareJaro('distance'),
-)
+export const jaroSimilarity: MaybeSequenceMetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    jaroSimilarity_impl,
+    NORMALIZED_SIMILARITY_FLAGS,
+    prepareJaro('similarity'),
+  )
+export const jaroDistance: MaybeSequenceMetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    jaroDistance_impl,
+    NORMALIZED_DISTANCE_FLAGS,
+    prepareJaro('distance'),
+  )

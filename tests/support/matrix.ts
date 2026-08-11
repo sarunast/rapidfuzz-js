@@ -1,16 +1,16 @@
 import type {
-  ErasedScorer,
+  ErasedMetricImplementation,
   MaybeSequence,
 } from '../../src/algorithms/shared/scorerSupport.js'
 
 interface MatrixTestOptions {
-  readonly scorer: ErasedScorer
+  readonly scorer: ErasedMetricImplementation
   readonly scoreCutoff?: number | undefined
   readonly scoreHint?: number | undefined
 }
 
 function score(
-  scorer: ErasedScorer,
+  scorer: ErasedMetricImplementation,
   query: MaybeSequence,
   choice: MaybeSequence,
   options: MatrixTestOptions,

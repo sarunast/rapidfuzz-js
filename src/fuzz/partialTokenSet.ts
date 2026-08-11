@@ -1,7 +1,7 @@
 import { builtInMetric } from '../algorithms/shared/metricAdapter.js'
 import {
   FUZZ_FLAGS,
-  type NormalizedScorer,
+  type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
 import type { Metric } from '../core/metric.js'
@@ -11,7 +11,7 @@ import type { FuzzConfiguration, FuzzOptions } from './types.js'
 
 const BOUNDS: readonly [number, number] = [0, 100]
 
-export const partialTokenSetRatio: NormalizedScorer<FuzzOptions> =
+export const partialTokenSetRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(
     partialTokenSetRatio_impl,
     FUZZ_FLAGS,

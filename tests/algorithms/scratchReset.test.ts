@@ -37,7 +37,10 @@ import { resetWeightedScratch } from '../../src/algorithms/levenshtein/internal/
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../../src/algorithms/osa/implementation.js'
 import { resetOsaScratch } from '../../src/algorithms/osa/internal/kernel.js'
-import { resetBitVectorScratch } from '../../src/algorithms/shared/bitmask/blockMasks.js'
+import {
+  maskPoolOf,
+  resetBitVectorScratch,
+} from '../../src/algorithms/shared/bitmask/blockMasks.js'
 import { matrixScores } from '../support/matrix.js'
 
 function resetAll(): void {
@@ -134,6 +137,65 @@ describe('benchmark scratch resets', () => {
     resetAll()
 
     expect(workload()).toStrictEqual(cold)
+  })
+})
+
+// Every other buffer here is linear in the input or bounded by the symbol space.
+// The mask pool is neither: it holds a block of `words` per distinct element, so
+// a sequence that repeats nothing takes `length * words` — 48.8 MB for two
+// 20,000-element arrays of distinct objects, which the API accepts because an
+// element is whatever the caller's sequence holds. That much is unavoidable
+// during the comparison; keeping it afterwards is not.
+describe('the mask pool past its retention cap', () => {
+  const RETAINED_MASK_WORDS = 1 << 18
+
+  /** Distinct objects, so every element takes a block of its own. */
+  function unique(count: number, tag: string): ReadonlyArray<unknown> {
+    return Array.from({ length: count }, (_, index) => ({ tag, index }))
+  }
+
+  const wideA = unique(3200, 'a')
+  const wideB = unique(3200, 'b')
+
+  it('grows past the cap when the comparison needs it', () => {
+    resetAll()
+
+    expect(levenshteinDistance(wideA, wideB)).toBe(3200)
+    expect(maskPoolOf().length).toBeGreaterThan(RETAINED_MASK_WORDS)
+  })
+
+  it('holds it while the next build could fill it again', () => {
+    resetAll()
+    levenshteinDistance(wideA, wideB)
+    const grown = maskPoolOf().length
+
+    expect(levenshteinDistance(unique(3200, 'c'), unique(3200, 'd'))).toBe(3200)
+    expect(maskPoolOf().length).toBe(grown)
+  })
+
+  it('drops it for a single-word build, which can never use it', () => {
+    resetAll()
+    levenshteinDistance(wideA, wideB)
+
+    expect(levenshteinDistance('kitten', 'sitting')).toBe(3)
+    expect(maskPoolOf().length).toBeLessThanOrEqual(64)
+  })
+
+  it('drops it for a multi-word build too small to want it', () => {
+    resetAll()
+    levenshteinDistance(wideA, wideB)
+
+    const text = 'abcdefghij'.repeat(100)
+    expect(levenshteinDistance(text, 'z'.repeat(1000))).toBe(1000)
+    expect(maskPoolOf().length).toBeLessThan(RETAINED_MASK_WORDS)
+  })
+
+  it('answers the same either side of the cap', () => {
+    resetAll()
+    const cold = levenshteinDistance(wideA, wideB)
+
+    levenshteinDistance('kitten', 'sitting')
+    expect(levenshteinDistance(wideA, wideB)).toBe(cold)
   })
 })
 

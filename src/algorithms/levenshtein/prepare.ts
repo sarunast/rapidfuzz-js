@@ -1,17 +1,18 @@
+import type { PreparedKernel } from '../../core/protocol.js'
+import type { Sequence } from '../../core/types.js'
 import { sharesWideAffix } from '../shared/affix.js'
+import { wordCount } from '../shared/bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
-  normalize,
+  normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-  prepareScorerChoice,
-  preparedScorerSequence,
-  withChoicePreparer,
-  type PrepareScorer,
-  type PreparedScorerFactory,
-  type PreparedScore,
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  scorerSequence,
+  type PreparationFactory,
 } from '../shared/scorerSupport.js'
 import {
   distance_,
@@ -68,8 +69,8 @@ function preparedDistanceWorthwhile(
   const longest = Math.max(queryLength, choiceLength)
   if (Math.floor(scoreCutoff) < longest) return false
 
-  const queryWords = (queryLength + 31) >>> 5
-  const choiceWords = (choiceLength + 31) >>> 5
+  const queryWords = wordCount(queryLength)
+  const choiceWords = wordCount(choiceLength)
   return queryWords * choiceLength <= choiceWords * queryLength
 }
 
@@ -143,86 +144,96 @@ const AFFIX_TRIM_WORDS = 4
  * than {@link AFFIX_TRIM_WORDS} is not asked at all.
  */
 function worthTrimming(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
-  const words = (Math.min(a.length, b.length) + 31) >>> 5
+  const words = wordCount(Math.min(a.length, b.length))
   return words >= AFFIX_TRIM_WORDS && sharesWideAffix(a, b)
 }
 
-export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparedScorerFactory {
-  const prepare: PrepareScorer = (query, kwargs) => {
-    const weights = parseWeights(Reflect.get(kwargs, 'weights'))
-    const a = preparedScorerSequence(prepareScorerChoice(query))
-
+export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparationFactory {
+  return (options) => {
+    // Once per scorer, so a matcher preparing many queries never reparses them.
+    const weights = parseWeights(Reflect.get(options, 'weights'))
     const [insert, delete_, replace] = weights
     const uniform = insert === 1 && delete_ === 1 && replace === 1
     const integral = integralWeights(weights)
-    let pattern: PatternMask | null = null
 
-    const preparedDistance = (b: ArrayLike<unknown>, cutoff: number): number => {
-      // A scorer with no cutoff runs with `cutoff` at `MAX_SAFE_INTEGER`, which
-      // is what `scoreMatrix` does, and this comparison keeps it from paying for the
-      // rest of the band test. It is also the only place the band's width bound
-      // is applied, so `preparedBandWorthwhile` can take the budget as given.
-      if (cutoff < MAX_BAND_BUDGET + 1 && uniform && a.length > 0 && b.length > 0) {
-        const budget = Math.floor(cutoff)
-        if (preparedBandWorthwhile(a.length, b.length, budget)) {
+    const prepareQuery = (query: Sequence): PreparedKernel => {
+      const a = scorerSequence(query)
+      let pattern: PatternMask | null = null
+
+      const preparedDistance = (b: ArrayLike<unknown>, cutoff: number): number => {
+        // A scorer with no cutoff runs with `cutoff` at `MAX_SAFE_INTEGER`, which
+        // is what `scoreMatrix` does, and this comparison keeps it from paying for the
+        // rest of the band test. It is also the only place the band's width bound
+        // is applied, so `preparedBandWorthwhile` can take the budget as given.
+        if (cutoff < MAX_BAND_BUDGET + 1 && uniform && a.length > 0 && b.length > 0) {
+          const budget = Math.floor(cutoff)
+          if (preparedBandWorthwhile(a.length, b.length, budget)) {
+            pattern ??= preparePattern(a, 0, a.length)
+            return levenshteinSmallBand(pattern, a.length, b, 0, b.length, budget)
+          }
+        }
+        if (
+          preparedDistanceWorthwhile(uniform, a.length, b.length, cutoff) &&
+          !worthTrimming(a, b)
+        ) {
           pattern ??= preparePattern(a, 0, a.length)
-          return levenshteinSmallBand(pattern, a.length, b, 0, b.length, budget)
+          return levenshteinPrepared(pattern, b, 0, b.length)
+        }
+        // The unprepared kernel trims a common affix, which compares the two
+        // sequences elementwise, so they have to agree on how a character is
+        // spelled. The held pattern above reads either representation.
+        return distance_(
+          alignRepresentation(a, b),
+          alignRepresentation(b, a),
+          weights,
+          cutoff,
+          cutoff,
+        )
+      }
+
+      const score: PreparedKernel = (rawChoice, rawCutoff) => {
+        const b = preparedChoiceSequence(rawChoice)
+        // Lengths are all `maximum` reads, and aligning cannot change them, so it
+        // is left to the unprepared path in `preparedDistance` that needs it.
+        const max = maximum(a, b, weights)
+        switch (kind) {
+          case 'distance': {
+            const cutoff = levenshteinRawCutoff(rawCutoff, integral)
+            const bound = cutoff ?? Number.MAX_SAFE_INTEGER
+            const distance = preparedDistance(b, bound)
+            return cutoff === null || distance <= cutoff ? distance : cutoff + 1
+          }
+          case 'similarity': {
+            const cutoff = levenshteinSimilarityCutoff(rawCutoff, integral)
+            const bound =
+              cutoff === null ? Number.MAX_SAFE_INTEGER : rawBound(max - cutoff, integral)
+            return simCutoff(max - preparedDistance(b, bound), cutoff)
+          }
+          case 'normalizedDistance': {
+            const cutoff =
+              rawCutoff === null
+                ? Number.MAX_SAFE_INTEGER
+                : rawBound(rawCutoff * max, integral)
+            return normDistCutoff(
+              normalizeDistance(preparedDistance(b, cutoff), max),
+              rawCutoff,
+            )
+          }
+          case 'normalizedSimilarity': {
+            const cutoff =
+              rawCutoff === null
+                ? Number.MAX_SAFE_INTEGER
+                : rawBound((1 - rawCutoff) * max, integral)
+            return normSimCutoff(
+              1 - normalizeDistance(preparedDistance(b, cutoff), max),
+              rawCutoff,
+            )
+          }
         }
       }
-      if (
-        preparedDistanceWorthwhile(uniform, a.length, b.length, cutoff) &&
-        !worthTrimming(a, b)
-      ) {
-        pattern ??= preparePattern(a, 0, a.length)
-        return levenshteinPrepared(pattern, b, 0, b.length)
-      }
-      // The unprepared kernel trims a common affix, which compares the two
-      // sequences elementwise, so they have to agree on how a character is
-      // spelled. The held pattern above reads either representation.
-      return distance_(
-        alignRepresentation(a, b),
-        alignRepresentation(b, a),
-        weights,
-        cutoff,
-        cutoff,
-      )
+      return score
     }
 
-    const score: PreparedScore = (rawChoice, rawCutoff) => {
-      const b = preparedScorerSequence(rawChoice)
-      // Lengths are all `maximum` reads, and aligning cannot change them, so it
-      // is left to the unprepared path in `preparedDistance` that needs it.
-      const max = maximum(a, b, weights)
-      switch (kind) {
-        case 'distance': {
-          const cutoff = levenshteinRawCutoff(rawCutoff, integral)
-          const bound = cutoff ?? Number.MAX_SAFE_INTEGER
-          const distance = preparedDistance(b, bound)
-          return cutoff === null || distance <= cutoff ? distance : cutoff + 1
-        }
-        case 'similarity': {
-          const cutoff = levenshteinSimilarityCutoff(rawCutoff, integral)
-          const bound =
-            cutoff === null ? Number.MAX_SAFE_INTEGER : rawBound(max - cutoff, integral)
-          return simCutoff(max - preparedDistance(b, bound), cutoff)
-        }
-        case 'normalizedDistance': {
-          const cutoff =
-            rawCutoff === null
-              ? Number.MAX_SAFE_INTEGER
-              : rawBound(rawCutoff * max, integral)
-          return normDistCutoff(normalize(preparedDistance(b, cutoff), max), rawCutoff)
-        }
-        case 'normalizedSimilarity': {
-          const cutoff =
-            rawCutoff === null
-              ? Number.MAX_SAFE_INTEGER
-              : rawBound((1 - rawCutoff) * max, integral)
-          return normSimCutoff(1 - normalize(preparedDistance(b, cutoff), max), rawCutoff)
-        }
-      }
-    }
-    return score
+    return { prepareQuery, prepareChoice: prepareChoiceSequence }
   }
-  return withChoicePreparer(prepare, prepareScorerChoice)
 }

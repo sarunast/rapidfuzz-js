@@ -5,7 +5,7 @@ import {
   convPair,
   hasSurrogatePair,
   isSequence,
-  normalize,
+  normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
@@ -482,7 +482,7 @@ export function levenshteinNormalizedDistanceImpl(
   const hint =
     options.scoreHint == null ? cutoff : rawBound(options.scoreHint * max, integral)
   return normDistCutoff(
-    normalize(distance_(a, b, weights, cutoff, hint), max),
+    normalizeDistance(distance_(a, b, weights, cutoff, hint), max),
     options.scoreCutoff,
   )
 }
@@ -507,6 +507,6 @@ export function levenshteinNormalizedSimilarityImpl(
       : rawBound((1 - options.scoreCutoff) * max, integral)
   const hint =
     options.scoreHint == null ? cutoff : rawBound((1 - options.scoreHint) * max, integral)
-  const norm = normalize(distance_(a, b, weights, cutoff, hint), max)
+  const norm = normalizeDistance(distance_(a, b, weights, cutoff, hint), max)
   return normSimCutoff(1 - norm, options.scoreCutoff)
 }

@@ -49,16 +49,17 @@
  * masks start" below for why each kernel carries its own copy of the body.
  */
 
-import { isDirectSymbol, isHighSymbol } from './lookup.js'
+import { DIRECT_LOOKUP_LIMIT, isDirectSymbol, isHighSymbol } from './lookup.js'
 
-// Declared here rather than imported from `blockMasks.ts`. These are read once per
-// element of the pattern, and a cross-module binding does not fold the way a
-// module-local `const` does — measured at +3% on Latin-1 and +15% on Cyrillic
+// Declared here rather than imported from `blockMasks.ts`. These are read once
+// per element of the pattern, and a cross-module binding does not fold the way
+// a module-local `const` does — measured at +3% on Latin-1 and +15% on Cyrillic
 // for a loop of this shape. `blockMasks.ts` is the canonical home and
 // documents the invariant these have to keep; the values must agree with it.
+// `DIRECT_LOOKUP_LIMIT` is different: it sizes the Latin-1 block once per
+// preparation, so it is imported from the module that partitions by it.
 const WORD_SHIFT = 5
 const WORD_MASK = 31
-const DIRECT_LOOKUP_LIMIT = 256
 
 /**
  * Widest span of high elements a pattern will window, in code points.
@@ -200,7 +201,11 @@ export function preparePattern(
 ): PatternMask {
   if (length === 0) return EMPTY_PATTERN
 
-  const words = (length + WORD_MASK) >>> WORD_SHIFT
+  // `wordCount` in `blockMasks.ts`, minus the zero case the return above
+  // settles — spelled out so this module keeps importing no scratch sibling.
+  // `(length + 31) >>> 5` would wrap over the last 31 lengths a sequence may
+  // have.
+  const words = ((length - 1) >>> WORD_SHIFT) + 1
   const stringPattern = typeof pattern === 'string'
   const directCells = DIRECT_LOOKUP_LIMIT * words
 

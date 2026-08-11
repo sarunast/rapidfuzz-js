@@ -37,6 +37,19 @@ export const WORD_SHIFT = 5
 export const WORD_MASK = 31
 
 /**
+ * Words a range of `length` positions occupies.
+ *
+ * The subtraction precedes the shift because a bitwise operator converts to
+ * `uint32` first: `(length + 31) >>> 5` wraps to zero over the last 31 lengths
+ * a sequence may have, and `MAX_SEQUENCE_LENGTH` admits every one of them.
+ * Called once per kernel invocation, like the accessors below — never spell
+ * the expression inline.
+ */
+export function wordCount(length: number): number {
+  return length === 0 ? 0 : ((length - 1) >>> WORD_SHIFT) + 1
+}
+
+/**
  * Elements below this index a plain array instead of a `Map`. Latin-1 is
  * covered rather than just ASCII, which is what upstream's
  * `PatternMatchVector` does and costs nothing but table size.
@@ -146,6 +159,49 @@ export function wideSlots(): Map<unknown, number> {
  */
 export function maskPoolOf(): Int32Array {
   return (maskPool ??= new Int32Array(64))
+}
+
+/**
+ * Words of mask pool that stay retained between comparisons.
+ *
+ * A multi-word build gives every distinct element a block of `words`, so a range
+ * that repeats nothing takes `length * words` — quadratic in the input, where
+ * every other buffer here is linear or bounded. Measured 2026-08-12: comparing
+ * two 20,000-element arrays of distinct objects left 48.8 MB reachable for the
+ * life of the process, and the API accepts them, since an element is whatever
+ * the caller's sequence holds.
+ *
+ * Text never approaches this: 16,384 elements of Latin-1 fill 512 words per
+ * distinct element and at most 256 of them, so the pool tops out around a
+ * quarter of the cap on the longest pair the benchmark corpus has.
+ */
+const RETAINED_MASK_WORDS = 1 << 18
+
+/**
+ * The pool a build needing at most `needed` words starts from.
+ *
+ * One grown past the cap is kept only while the build in front of it could fill
+ * it again — scoring a long query against a list of long candidates rebuilds
+ * masks per candidate, and dropping the pool between them would trade the
+ * retention for a re-grow on every one. Anything smaller starts over.
+ */
+function maskPoolFor(needed: number): Int32Array {
+  const pool = maskPoolOf()
+  if (pool.length <= RETAINED_MASK_WORDS || needed > RETAINED_MASK_WORDS) return pool
+
+  return (maskPool = new Int32Array(64))
+}
+
+/**
+ * Drop an oversized pool from a path that cannot use it at all.
+ *
+ * A single-word build never touches the pool, so a process that scores one huge
+ * pair and then goes back to short ones would otherwise hold the whole of it
+ * until a multi-word build that may never come. Reading the binding rather than
+ * {@link maskPoolOf} keeps the drop from allocating the pool it is dropping.
+ */
+function dropOversizedMaskPool(): void {
+  if (maskPool !== null && maskPool.length > RETAINED_MASK_WORDS) maskPool = null
 }
 
 /**
@@ -268,10 +324,38 @@ function nextGeneration(): number {
   generation++
   if (generation >= GENERATION_LIMIT) {
     directStamps().fill(0)
+    // The counter restarts, so everything else keyed on it goes with the stamps
+    // this fill just cleared. A generation held anywhere else would come round
+    // again two billion builds later and read as current against an empty table.
+    invalidateMaskCache()
     generation = 1
   }
 
   return generation
+}
+
+/**
+ * A generation a reset hook may start the counter at.
+ *
+ * Anything below `1` puts the first build's stamp at `0`, which is what a slot
+ * no build has touched already holds — every element of a freshly dropped table
+ * then reads as one this build filed, and a multi-word pattern scores against
+ * block `0` for every symbol it contains. The value is compared against an
+ * `Int32Array` cell, so a fraction would never equal one and cannot be a
+ * generation either.
+ */
+export function checkedStartGeneration(startGeneration: number): number {
+  if (
+    !Number.isInteger(startGeneration) ||
+    startGeneration < 0 ||
+    startGeneration >= GENERATION_LIMIT
+  ) {
+    throw new RangeError(
+      `startGeneration has to be an integer in 0 - ${GENERATION_LIMIT - 1}`,
+    )
+  }
+
+  return startGeneration
 }
 
 /**
@@ -309,6 +393,7 @@ export function buildWordMasks(
   const wide = wideSlots()
 
   clearWide(wide)
+  dropOversizedMaskPool()
   let limit = directLimit
   const stringPattern = typeof pattern === 'string'
 
@@ -365,7 +450,7 @@ export function buildBlockMasks(
 
   clearWide(wide)
 
-  let pool = maskPoolOf()
+  let pool = maskPoolFor(length * words)
   let distinct = 0
   let limit = directLimit
   const stringPattern = typeof pattern === 'string'
@@ -459,7 +544,9 @@ export function buildBlockMasks(
  * kernels to read a `PatternMask` instead of the table.
  *
  * `maskGeneration` is what makes reuse safe: any other mask build bumps the
- * generation, and a stale table then fails the test rather than being read.
+ * generation, and a stale table then fails the test rather than being read. The
+ * counter is reused rather than exhausted, so {@link nextGeneration} drops this
+ * with the stamps at the wrap — a generation it outlived would match again.
  *
  * Only strings are remembered. Every other sequence is mutable, and a caller
  * that changes one between two calls would otherwise be scored against the
@@ -479,6 +566,15 @@ let maskStart = -1
 let maskLength = -1
 let maskWords = -1
 let maskGeneration = 0
+
+/** Forget the remembered pattern, whichever end of its lifetime this is. */
+function invalidateMaskCache(): void {
+  maskPattern = null
+  maskStart = -1
+  maskLength = -1
+  maskWords = -1
+  maskGeneration = 0
+}
 
 export function blockMasksFor(
   pattern: ArrayLike<unknown>,
@@ -638,6 +734,7 @@ export function bandVector(words: number): Int32Array {
  * lets that wrap be driven and its stale-stamp clearing checked.
  */
 export function resetBitVectorScratch(startGeneration = 0): void {
+  generation = checkedStartGeneration(startGeneration)
   maskPool = null
   vectorP = null
   vectorN = null
@@ -646,11 +743,5 @@ export function resetBitVectorScratch(startGeneration = 0): void {
   wideSlot = null
   bandScores = null
   directLimit = DIRECT_LOOKUP_LIMIT
-  generation = startGeneration
-
-  maskPattern = null
-  maskStart = -1
-  maskLength = -1
-  maskWords = -1
-  maskGeneration = 0
+  invalidateMaskCache()
 }

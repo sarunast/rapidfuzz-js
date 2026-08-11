@@ -1,27 +1,27 @@
+import type { PreparedKernel } from '../../core/protocol.js'
+import { checkedStartGeneration } from '../shared/bitmask/blockMasks.js'
 import {
   alignRepresentation,
   canonicalRawCutoff,
   canonicalSimilarityCutoff,
   convPair,
   distCutoff,
-  normalize,
+  normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
   type ScorerOptions,
   type Sequence,
-  withChoicePreparer,
-  prepareScorerChoice,
-  preparedScorerSequence,
-  type PrepareScorer,
-  type PreparedScorerFactory,
-  type PreparedScore,
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  scorerSequence,
+  type PreparationFactory,
   withPreparedFlags,
   DISTANCE_FLAGS,
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
-  type Scorer,
+  type MetricImplementation,
 } from '../shared/scorerSupport.js'
 
 let rowA: Int32Array | null = null
@@ -60,7 +60,7 @@ export function resetDamerauScratch(startGeneration = 0): void {
   shortTransposeRow = null
   bmpLastRow = null
   bmpLastStamp = null
-  bmpGeneration = startGeneration
+  bmpGeneration = checkedStartGeneration(startGeneration)
 }
 
 function grown(buffer: Int32Array | null, needed: number): Int32Array {
@@ -309,11 +309,11 @@ type PreparedDamerauKind =
   | 'normalizedDistance'
   | 'normalizedSimilarity'
 
-function prepareDamerau(kind: PreparedDamerauKind): PreparedScorerFactory {
-  const prepare: PrepareScorer = (query) => {
-    const a = preparedScorerSequence(prepareScorerChoice(query))
-    const score: PreparedScore = (rawChoice, rawCutoff) => {
-      let b = preparedScorerSequence(rawChoice)
+function prepareDamerau(kind: PreparedDamerauKind): PreparationFactory {
+  const prepareQuery = (query: Sequence): PreparedKernel => {
+    const a = scorerSequence(query)
+    const score: PreparedKernel = (rawChoice, rawCutoff) => {
+      let b = preparedChoiceSequence(rawChoice)
       // The kernel trims a common affix, which compares the two sequences
       // elementwise, so they have to agree on how a character is spelled.
       const s1 = alignRepresentation(a, b)
@@ -331,18 +331,24 @@ function prepareDamerau(kind: PreparedDamerauKind): PreparedScorerFactory {
         }
         case 'normalizedDistance': {
           const cutoff = rawCutoff === null ? Number.MAX_SAFE_INTEGER : rawCutoff * max
-          return normDistCutoff(normalize(distance_(s1, b, cutoff), max), rawCutoff)
+          return normDistCutoff(
+            normalizeDistance(distance_(s1, b, cutoff), max),
+            rawCutoff,
+          )
         }
         case 'normalizedSimilarity': {
           const cutoff =
             rawCutoff === null ? Number.MAX_SAFE_INTEGER : (1 - rawCutoff) * max
-          return normSimCutoff(1 - normalize(distance_(s1, b, cutoff), max), rawCutoff)
+          return normSimCutoff(
+            1 - normalizeDistance(distance_(s1, b, cutoff), max),
+            rawCutoff,
+          )
         }
       }
     }
     return score
   }
-  return withChoicePreparer(prepare, prepareScorerChoice)
+  return () => ({ prepareQuery, prepareChoice: prepareChoiceSequence })
 }
 
 function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
@@ -385,7 +391,10 @@ function damerauLevenshteinNormalizedDistance_impl(
   const max = maximum(a, b)
   const cutoff =
     options.scoreCutoff == null ? Number.MAX_SAFE_INTEGER : options.scoreCutoff * max
-  return normDistCutoff(normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
+  return normDistCutoff(
+    normalizeDistance(distance_(a, b, cutoff), max),
+    options.scoreCutoff,
+  )
 }
 
 /**
@@ -405,26 +414,31 @@ function damerauLevenshteinNormalizedSimilarity_impl(
     options.scoreCutoff == null
       ? Number.MAX_SAFE_INTEGER
       : (1 - options.scoreCutoff) * max
-  return normSimCutoff(1 - normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
+  return normSimCutoff(
+    1 - normalizeDistance(distance_(a, b, cutoff), max),
+    options.scoreCutoff,
+  )
 }
 
-export const damerauLevenshteinDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
-  damerauLevenshteinDistance_impl,
-  DISTANCE_FLAGS,
-  prepareDamerau('distance'),
-)
-export const damerauLevenshteinSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
-  damerauLevenshteinSimilarity_impl,
-  SIMILARITY_FLAGS,
-  prepareDamerau('similarity'),
-)
-export const damerauLevenshteinNormalizedDistance: Scorer =
+export const damerauLevenshteinDistance: MetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    damerauLevenshteinDistance_impl,
+    DISTANCE_FLAGS,
+    prepareDamerau('distance'),
+  )
+export const damerauLevenshteinSimilarity: MetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    damerauLevenshteinSimilarity_impl,
+    SIMILARITY_FLAGS,
+    prepareDamerau('similarity'),
+  )
+export const damerauLevenshteinNormalizedDistance: MetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     damerauLevenshteinNormalizedDistance_impl,
     NORMALIZED_DISTANCE_FLAGS,
     prepareDamerau('normalizedDistance'),
   )
-export const damerauLevenshteinNormalizedSimilarity: Scorer =
+export const damerauLevenshteinNormalizedSimilarity: MetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     damerauLevenshteinNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,

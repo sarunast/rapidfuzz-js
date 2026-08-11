@@ -9,12 +9,12 @@ import {
   convPair,
   distanceCutoffFor,
   distCutoff,
-  normalize,
+  normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
   type MaybeSequence,
-  type NormalizedScorer,
+  type MaybeSequenceMetricImplementation,
   type ScorerOptions,
   type Sequence,
   type ConfigurationCanonicalizer,
@@ -191,7 +191,7 @@ function hammingNormalizedDistance_impl(
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const max = maximum(a, b)
   const cutoff = distanceCutoffFor('normalizedDistance', options.scoreCutoff, max)
-  const norm = normalize(distance_(a, b, options.pad ?? true, cutoff), max)
+  const norm = normalizeDistance(distance_(a, b, options.pad ?? true, cutoff), max)
   return normDistCutoff(norm, options.scoreCutoff)
 }
 
@@ -209,7 +209,7 @@ function hammingNormalizedSimilarity_impl(
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const max = maximum(a, b)
   const cutoff = distanceCutoffFor('normalizedSimilarity', options.scoreCutoff, max)
-  const norm = normalize(distance_(a, b, options.pad ?? true, cutoff), max)
+  const norm = normalizeDistance(distance_(a, b, options.pad ?? true, cutoff), max)
   return normSimCutoff(1 - norm, options.scoreCutoff)
 }
 
@@ -267,28 +267,28 @@ const hammingConfigurationCanonicalizer: ConfigurationCanonicalizer = (options) 
   throw new TypeError('pad must be a boolean')
 }
 
-export const hammingDistance: NormalizedScorer<HammingOptions> =
+export const hammingDistance: MaybeSequenceMetricImplementation<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingDistance_impl,
     DISTANCE_FLAGS,
     prepareMetric('distance', preparedHammingDistance, maximum, parsedPad),
     { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )
-export const hammingSimilarity: NormalizedScorer<HammingOptions> =
+export const hammingSimilarity: MaybeSequenceMetricImplementation<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingSimilarity_impl,
     SIMILARITY_FLAGS,
     prepareMetric('similarity', preparedHammingDistance, maximum, parsedPad),
     { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )
-export const hammingNormalizedDistance: NormalizedScorer<HammingOptions> =
+export const hammingNormalizedDistance: MaybeSequenceMetricImplementation<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingNormalizedDistance_impl,
     NORMALIZED_DISTANCE_FLAGS,
     prepareMetric('normalizedDistance', preparedHammingDistance, maximum, parsedPad),
     { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )
-export const hammingNormalizedSimilarity: NormalizedScorer<HammingOptions> =
+export const hammingNormalizedSimilarity: MaybeSequenceMetricImplementation<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,

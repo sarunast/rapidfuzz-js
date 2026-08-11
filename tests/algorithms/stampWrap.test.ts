@@ -70,6 +70,25 @@ describe('the shared mask table across its stamp wrap', () => {
     resetBitVectorScratch()
   })
 
+  // The memo that lets one query serve a list of candidates remembers the
+  // generation its masks were built at, and the wrap hands that number back out.
+  // So it is dropped there too: a memo kept across it would answer from a table
+  // the wrap had just emptied.
+  it('keeps the multi-word mask memo exact across the wrap', () => {
+    resetBitVectorScratch(NEAR_LIMIT)
+
+    const query = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEF'
+    const candidates = [query, 'FEDCBA9876543210zyxwvutsrqponmlkjihgfedcba']
+    const cold = candidates.map((c) => levenshteinDistance(query, c))
+
+    for (let pass = 0; pass < 4; pass++) {
+      expect(candidates.map((c) => levenshteinDistance(query, c))).toEqual(cold)
+    }
+
+    resetBitVectorScratch()
+    expect(cold).toEqual(candidates.map((c) => levenshteinDistance(query, c)))
+  })
+
   // A stale stamp would report a match for an element the new pattern does not
   // hold, so the pair that catches it is one sharing nothing with the pattern
   // built just before the wrap.
@@ -130,6 +149,28 @@ describe('the window bisection across its stamp wrap', () => {
     expect(partialRatio(needle, huge)).toBe(100)
 
     resetPartialRatioScratch()
+  })
+})
+
+// The seam is only as safe as the value it is given. A generation below 1 puts
+// the first build's stamp at 0, which is what a slot no build has touched
+// already holds — the table then answers for every element at once, and
+// `levenshteinDistance` over two strings sharing nothing returns 0.
+describe('the starting generation the reset hooks accept', () => {
+  const hooks: ReadonlyArray<readonly [string, (start?: number) => void]> = [
+    ['resetBitVectorScratch', resetBitVectorScratch],
+    ['resetDamerauScratch', resetDamerauScratch],
+    ['resetPartialRatioScratch', resetPartialRatioScratch],
+  ]
+
+  it.each(hooks)('%s refuses a generation no stamp can hold', (_name, reset) => {
+    for (const bad of [-1, 1.5, NaN, Infinity, 0x7fff_ffff]) {
+      expect(() => reset(bad)).toThrow(RangeError)
+    }
+
+    expect(() => reset(0)).not.toThrow()
+    expect(() => reset(NEAR_LIMIT)).not.toThrow()
+    reset()
   })
 })
 

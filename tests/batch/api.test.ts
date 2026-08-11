@@ -10,7 +10,7 @@ import {
 } from '../../src/batch/scoreArray.js'
 import { scorerCompilation } from '../../src/core/scorer.js'
 import { createScorer, scoreMatrix, scorePairs } from '../../src/index.js'
-import type { MaybeSequence } from '../../src/index.js'
+import type { MaybeSequence, Sequence } from '../../src/index.js'
 
 describe('batch scoring', () => {
   test('matrix operations consume Scorer objects', () => {
@@ -265,6 +265,65 @@ describe('batch scoring', () => {
         )
       }
     }
+  })
+
+  test('a threshold nothing can meet rejects every pair', () => {
+    // A built-in kernel says "rejected" with `cutoff + 1`, which reads as a
+    // rejection only while the cutoff is inside the bounds. Below them it is a
+    // real score — `trunc(-0.5) + 1` is 0, a *perfect* distance — so batch used
+    // to store an identical pair as having met a threshold `Scorer.score`
+    // refuses outright. Out-of-bounds thresholds fall back to the declared
+    // bound, which is what a custom scorer's rejection already stored.
+    const distance = createScorer(levenshtein.distance)
+    for (const threshold of [-0.5, -1, -1e9]) {
+      expect(distance.score('abc', 'abc', { threshold })).toBeUndefined()
+      expect([...scorePairs(['abc'], ['abc'], { scorer: distance, threshold })]).toEqual([
+        Number.POSITIVE_INFINITY,
+      ])
+      expect(
+        scoreMatrix(['abc'], ['abc', 'zzz'], { scorer: distance, threshold }).toArray(),
+      ).toEqual([[Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY]])
+    }
+    // Inside the bounds the kernel's own sentinel still stands, and it is the
+    // one `process.cdist` stores: a rejected raw distance is `threshold + 1`.
+    expect([
+      ...scorePairs(['abc'], ['xyz1234'], { scorer: distance, threshold: 1 }),
+    ]).toEqual([2])
+    // A bounded similarity has a storable rejection either way, so an
+    // impossible threshold is answered rather than refused.
+    const bounded = createScorer(levenshtein.normalizedSimilarity)
+    expect([...scorePairs(['a'], ['a'], { scorer: bounded, threshold: 1.5 })]).toEqual([
+      0,
+    ])
+    expect(
+      scoreMatrix(['a'], ['a'], { scorer: bounded, threshold: 1.5, into: 'u8' }).at(0, 0),
+    ).toBe(0)
+  })
+
+  test('the scorer is settled before any query or choice is touched', () => {
+    // Configuration first, data second — the order `scorePairs` already used.
+    // Reaching the scorer only inside the fill meant a `normalize` with a side
+    // effect ran, and a whole matrix was allocated, before a scorer this
+    // package did not build was refused.
+    const normalize = vi.fn((value: Sequence) => value)
+    const foreign = { direction: 'similarity', bounds: [0, 100], symmetric: true }
+    expect(() =>
+      Reflect.apply(scoreMatrix, undefined, [
+        ['a'],
+        ['b'],
+        { scorer: foreign, normalize },
+      ]),
+    ).toThrow('scorer was not created by createScorer')
+    expect(normalize).not.toHaveBeenCalled()
+
+    // No rows means no cell, so the choices are never prepared — but an
+    // unusable rejected score is still reported rather than skipped with them.
+    const scorer = createScorer(levenshtein.distance)
+    const empty = scoreMatrix([], ['a', 'b'], { scorer })
+    expect([empty.rows, empty.cols, empty.data.length]).toEqual([0, 2, 0])
+    expect(() => scoreMatrix([], ['a'], { scorer, threshold: -1, into: 'u8' })).toThrow(
+      RangeError,
+    )
   })
 
   test('a rejected pair a custom scorer cannot express is refused, not stored', () => {

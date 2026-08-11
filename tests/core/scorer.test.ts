@@ -336,6 +336,16 @@ describe('Metric and Scorer contracts', () => {
         },
       ]),
     ).toThrow(TypeError)
+    // Not an object at all, the built-in mirror of the custom-metric case
+    // above. `Object.keys` answers `[]` for a number and a boolean alike, so
+    // each of these used to compile as if it were `{}`; a string instead
+    // reached `Reflect.get` and failed with a complaint about our internals.
+    for (const notAConfiguration of [null, 42, false, 'weights', () => 1]) {
+      expect(() =>
+        Reflect.apply(createScorer, undefined, [levenshtein.distance, notAConfiguration]),
+      ).toThrow('metric configuration must be an object')
+    }
+    expect(createScorer(levenshtein.distance, undefined).score('abc', 'abd')).toBe(1)
   })
 
   test('built-in configuration values are settled at compilation', () => {

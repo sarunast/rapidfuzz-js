@@ -19,6 +19,17 @@
  * In particular, raw strings would otherwise be indexed as UTF-16 code units.
  */
 
+/**
+ * Words a range of `length` positions occupies.
+ *
+ * The subtraction precedes the shift because a bitwise operator converts to
+ * `uint32` first: `length + 31` wraps to zero over the last 31 lengths a
+ * sequence may have, and `MAX_SEQUENCE_LENGTH` admits every one of them.
+ */
+function wordCount(length: number): number {
+  return length === 0 ? 0 : ((length - 1) >>> 5) + 1
+}
+
 function popcount32(word: number): number {
   let bits = word - ((word >>> 1) & 0x5555_5555)
   bits = (bits & 0x3333_3333) + ((bits >>> 2) & 0x3333_3333)
@@ -59,12 +70,24 @@ interface SymbolSpan {
   readonly maxSymbol: number
 }
 
-const EMPTY_SPAN: SymbolSpan = { minSymbol: 1, maxSymbol: 0 }
+interface SymbolCoverage extends SymbolSpan {
+  readonly spans: boolean
+}
 
-function symbolSpan(s1: ArrayLike<unknown>, start: number, length: number): SymbolSpan {
+const EMPTY_SPAN: SymbolCoverage = { minSymbol: 1, maxSymbol: 0, spans: false }
+
+function symbolSpan(
+  s1: ArrayLike<unknown>,
+  start: number,
+  length: number,
+): SymbolCoverage {
   const stringPattern = typeof s1 === 'string'
   let minSymbol = 1
   let maxSymbol = 0
+  // Whether the span accounts for every element, which is what lets its width
+  // bound the table. One element on the `Map` and the range's own length is all
+  // that bounds it again.
+  let spans = true
 
   for (let i = 0; i < length; i++) {
     const index = start + i
@@ -76,7 +99,10 @@ function symbolSpan(s1: ArrayLike<unknown>, start: number, length: number): Symb
     //
     // Negative elements need no test of their own — the table is indexed from
     // `minSymbol`, so a sequence of them indexes from its own least element.
-    if (typeof symbol !== 'number' || (symbol | 0) !== symbol) continue
+    if (typeof symbol !== 'number' || (symbol | 0) !== symbol) {
+      spans = false
+      continue
+    }
 
     if (minSymbol > maxSymbol) {
       minSymbol = symbol
@@ -87,7 +113,19 @@ function symbolSpan(s1: ArrayLike<unknown>, start: number, length: number): Symb
 
   return maxSymbol - minSymbol >= length + SPAN_SLACK
     ? EMPTY_SPAN
-    : { minSymbol, maxSymbol }
+    : { minSymbol, maxSymbol, spans }
+}
+
+/**
+ * Blocks {@link wordPositionMasks} can allocate. A span that accounts for every
+ * element bounds the table by its own width; otherwise the range's length is
+ * the only bound either table has.
+ */
+function maskBlockBound(span: SymbolCoverage, length: number): number {
+  const { minSymbol, maxSymbol, spans } = span
+  return spans && minSymbol <= maxSymbol
+    ? Math.min(maxSymbol - minSymbol + 1, length) + 1
+    : length + 1
 }
 
 /**
@@ -293,9 +331,16 @@ function wordPositionMasks(
   return { masks, bases, minSymbol, maxSymbol, wide }
 }
 
-/** The bits of a word that are positions of a range `length` elements long. */
+/**
+ * The bits of a word that are positions of a range `length` elements long.
+ *
+ * `~(-1 << bits)` rather than `(1 << bits) - 1`, which at 31 bits is
+ * `-2147483649` — the mask its callers want only once a bitwise operator has
+ * coerced it back into a word.
+ */
 function validBits(length: number): number {
-  return (length & 31) !== 0 ? (1 << (length & 31)) - 1 : -1
+  const bits = length & 31
+  return bits === 0 ? -1 : ~(-1 << bits)
 }
 
 export interface LcsSeqMatrix {
@@ -330,7 +375,7 @@ export function lcsSeqMatrix(
     return { sim: 0, rows: new Int32Array(0), words: 0 }
   }
 
-  const words = (s1Length + 31) >>> 5
+  const words = wordCount(s1Length)
   if (words === 1) {
     return oneWordLcsSeqMatrix(s1, s1Start, s1Length, s2, s2Start, s2Length)
   }
@@ -513,11 +558,13 @@ function bandedRows(s1Length: number, maximumDistance: number): boolean {
  * A band is `2 * maximumDistance + 1` positions wide and is stored from the
  * word boundary at or below its first one, so at worst it starts 31 bits into
  * the first stored word: `ceil((width + 31) / 32)` words hold any placement.
+ * Ordinary division rather than a shift, for the reason {@link wordCount} gives
+ * and because this is setup rather than a row loop.
  */
 function rowStride(s1Length: number, maximumDistance: number): number {
-  const words = (s1Length + 31) >>> 5
+  const words = wordCount(s1Length)
   return bandedRows(s1Length, maximumDistance)
-    ? Math.min(words, (2 * maximumDistance + 63) >>> 5)
+    ? Math.min(words, Math.floor((2 * maximumDistance + 63) / 32))
     : words
 }
 
@@ -532,13 +579,42 @@ function rowStride(s1Length: number, maximumDistance: number): number {
  * alignments to the divide-and-conquer path — and a different, though equally
  * short, edit script — over matrices that would have fitted comfortably.
  */
-export function levenshteinMatrixBytes(
+export function levenshteinRowBytes(
   s1Length: number,
   s2Length: number,
   maximumDistance: number,
 ): number {
   const banded = bandedRows(s1Length, maximumDistance)
   return s2Length * (2 * rowStride(s1Length, maximumDistance) * 4 + (banded ? 4 : 0))
+}
+
+/**
+ * Bytes {@link levenshteinMatrix} holds at once, rows and pattern tables both.
+ *
+ * The rows are the whole cost only while the pattern draws on a small alphabet.
+ * A range of distinct elements gives each one its own block of `words`, which
+ * on a narrow band measured (2026-08-11) 54x the rows it was budgeted against —
+ * so a caller with a memory limit has to count the tables or accept a matrix
+ * hundreds of times over it. Ordinary text lands within 1% either way.
+ */
+export function levenshteinMatrixBytes(
+  s1: ArrayLike<unknown>,
+  s1Start: number,
+  s1Length: number,
+  s2Length: number,
+  maximumDistance: number,
+): number {
+  const rows = levenshteinRowBytes(s1Length, s2Length, maximumDistance)
+  const words = wordCount(s1Length)
+  // An empty text builds no tables, and a one-word pattern tables its span
+  // alone — at most `SPAN_SLACK` entries past the 32 elements themselves.
+  if (s2Length === 0 || words < 2) return rows
+
+  const span = symbolSpan(s1, s1Start, s1Length)
+  const { minSymbol, maxSymbol } = span
+  const bases = minSymbol > maxSymbol ? 0 : maxSymbol - minSymbol + 1
+  // `vpState` and `vnState` are a word apiece beside the tables.
+  return rows + (maskBlockBound(span, s1Length) * words + bases + 2 * words) * 4
 }
 
 /**
@@ -566,7 +642,7 @@ export function levenshteinMatrix(
     }
   }
 
-  const words = (s1Length + 31) >>> 5
+  const words = wordCount(s1Length)
   // A band cannot narrow a row that is already one word wide, so the one-word
   // kernel ignores `maximumDistance` and stores every row whole.
   if (words === 1) {
@@ -713,47 +789,6 @@ function oneWordLevenshteinMatrix(
   }
 
   return { dist: currDist, vp, vn, stride: 1, offsets: null }
-}
-
-/** Length of the shared prefix and suffix, the suffix measured after the prefix. */
-export function commonAffix(
-  s1: ArrayLike<unknown>,
-  s2: ArrayLike<unknown>,
-): { prefixLen: number; suffixLen: number } {
-  const shorter = Math.min(s1.length, s2.length)
-  const end1 = s1.length - 1
-  const end2 = s2.length - 1
-
-  let prefixLen = 0
-  let suffixLen = 0
-
-  // Comparing two strings position by position allocates a one-character string
-  // per side per step; reading the code units compares integers instead. Both
-  // inputs share a representation by the time they arrive, so the branch is
-  // taken once rather than per position.
-  if (typeof s1 === 'string' && typeof s2 === 'string') {
-    while (prefixLen < shorter && s1.charCodeAt(prefixLen) === s2.charCodeAt(prefixLen)) {
-      prefixLen++
-    }
-    while (
-      suffixLen < shorter - prefixLen &&
-      s1.charCodeAt(end1 - suffixLen) === s2.charCodeAt(end2 - suffixLen)
-    ) {
-      suffixLen++
-    }
-
-    return { prefixLen, suffixLen }
-  }
-
-  while (prefixLen < shorter && s1[prefixLen] === s2[prefixLen]) prefixLen++
-  while (
-    suffixLen < shorter - prefixLen &&
-    s1[end1 - suffixLen] === s2[end2 - suffixLen]
-  ) {
-    suffixLen++
-  }
-
-  return { prefixLen, suffixLen }
 }
 
 /** @internal True when position `pos` of row `row` of a word matrix is set. */

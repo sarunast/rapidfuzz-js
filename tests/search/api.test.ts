@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, test } from 'vitest'
+import { describe, expect, expectTypeOf, test, vi } from 'vitest'
 
 import * as damerau from '../../src/algorithms/damerauLevenshtein/index.js'
 import * as hamming from '../../src/algorithms/hamming/index.js'
@@ -430,6 +430,29 @@ describe('one-shot search and Matcher', () => {
     expect(() =>
       search('query', ['alpha'], { scorer, limit: 0, threshold: Number.NaN }),
     ).toThrow(RangeError)
+    // The scorer and `missingItems` are read before the exit too: they are what
+    // every other limit refuses, and `limit: 0` is a result, not a dialect.
+    expect(() =>
+      Reflect.apply(search, undefined, [
+        'query',
+        ['alpha'],
+        {
+          scorer: { direction: 'similarity', bounds: [0, 100], symmetric: true },
+          limit: 0,
+        },
+      ]),
+    ).toThrow('scorer was not created by createScorer')
+    expect(() =>
+      Reflect.apply(search, undefined, [
+        'query',
+        ['alpha'],
+        { scorer, limit: 0, missingItems: 'ignore' },
+      ]),
+    ).toThrow("missingItems must be 'skip' or 'throw'")
+    // A normalizer is not run for it, though: the exit still costs no work.
+    const normalize = vi.fn((value: Sequence) => value)
+    expect(search('query', ['alpha'], { scorer, limit: 0, normalize })).toEqual([])
+    expect(normalize).not.toHaveBeenCalled()
     expect(() =>
       Reflect.apply(bestMatch, undefined, [
         'query',

@@ -1,5 +1,7 @@
 import type { Sequence } from '../../core/types.js'
 
+export { isSequence, validateSequence as asSequence } from '../../core/sequence.js'
+
 function toCodePoints(value: string): Uint32Array {
   const length = value.length
   const output = new Uint32Array(length)
@@ -49,13 +51,6 @@ export function convSequence(value: Sequence): ArrayLike<unknown> {
   return output
 }
 
-export function isSequence(value: unknown): value is Sequence {
-  if (typeof value === 'string') return true
-  if (typeof value !== 'object' || value === null || !('length' in value)) return false
-  const length = value.length
-  return typeof length === 'number' && Number.isSafeInteger(length) && length >= 0
-}
-
 export function convPair(
   left: Sequence,
   right: Sequence,
@@ -84,10 +79,4 @@ export function alignRepresentation(
 
 export function isMissing(value: unknown): value is null | undefined {
   return value == null
-}
-
-export function asSequence(value: unknown): Sequence {
-  if (!isSequence(value))
-    throw new TypeError('expected a string or an array-like sequence')
-  return value
 }

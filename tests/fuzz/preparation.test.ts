@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import { preparePattern } from '../../src/algorithms/shared/bitmask/pattern.js'
-import { PREPARE_CHOICE } from '../../src/algorithms/shared/scorerSupport.js'
 import {
   indelNormSimHeld,
   partialRatioAlignment,
@@ -20,25 +19,25 @@ import { prepareTokenSort } from '../../src/fuzz/tokenSort.js'
 
 describe('fuzz preparation invariants', () => {
   it('covers ratio preparation cutoffs and bounds', () => {
-    const factory = prepareSimilarity()
-    const empty = factory('', {})
-    expect(empty(factory[PREPARE_CHOICE](''), null)).toBe(100)
-    expect(empty(factory[PREPARE_CHOICE](''), 101)).toBe(0)
+    const preparation = prepareSimilarity()({})
+    const empty = preparation.prepareQuery('')
+    expect(empty(preparation.prepareChoice(''), null)).toBe(100)
+    expect(empty(preparation.prepareChoice(''), 101)).toBe(0)
 
-    const long = factory('a'.repeat(64), {})
-    expect(long(factory[PREPARE_CHOICE]('b'.repeat(64)), 100)).toBe(0)
-    expect(long(factory[PREPARE_CHOICE]('a'.repeat(64)), 70)).toBe(100)
-    const short = factory('abc', {})
-    expect(short(factory[PREPARE_CHOICE]('abd'), 0)).toBeGreaterThan(0)
-    expect(short(factory[PREPARE_CHOICE]('abc'), 70)).toBe(100)
-    expect(short(factory[PREPARE_CHOICE]('axc'), 70)).toBe(0)
+    const long = preparation.prepareQuery('a'.repeat(64))
+    expect(long(preparation.prepareChoice('b'.repeat(64)), 100)).toBe(0)
+    expect(long(preparation.prepareChoice('a'.repeat(64)), 70)).toBe(100)
+    const short = preparation.prepareQuery('abc')
+    expect(short(preparation.prepareChoice('abd'), 0)).toBeGreaterThan(0)
+    expect(short(preparation.prepareChoice('abc'), 70)).toBe(100)
+    expect(short(preparation.prepareChoice('axc'), 70)).toBe(0)
   })
 
   it('covers token-sort preparation', () => {
-    const factory = prepareTokenSort()
-    const score = factory('b a', {})
-    expect(score(factory[PREPARE_CHOICE]('a b'), null)).toBe(100)
-    expect(score(factory[PREPARE_CHOICE]('a c'), 0)).toBeGreaterThan(0)
+    const preparation = prepareTokenSort()({})
+    const score = preparation.prepareQuery('b a')
+    expect(score(preparation.prepareChoice('a b'), null)).toBe(100)
+    expect(score(preparation.prepareChoice('a c'), 0)).toBeGreaterThan(0)
   })
 
   it('covers each composite prepared scorer and mixed representations', () => {
@@ -53,31 +52,33 @@ describe('fuzz preparation invariants', () => {
     ] as const
 
     for (const [kind, query, choice] of cases) {
-      const factory = prepareFuzz(kind)
-      const score = factory(query, {})
-      expect(score(factory[PREPARE_CHOICE](choice), 0)).toBeGreaterThanOrEqual(0)
-      expect(score(factory[PREPARE_CHOICE](choice), 101)).toBe(0)
+      const preparation = prepareFuzz(kind)({})
+      const score = preparation.prepareQuery(query)
+      expect(score(preparation.prepareChoice(choice), 0)).toBeGreaterThanOrEqual(0)
+      expect(score(preparation.prepareChoice(choice), 101)).toBe(0)
     }
 
-    const wFactory = prepareFuzz('wRatio')
-    const close = wFactory('abc', {})
-    expect(close(wFactory[PREPARE_CHOICE]('abd'), 0)).toBeGreaterThan(0)
-    expect(close(wFactory[PREPARE_CHOICE]('abc'), 70)).toBe(100)
-    expect(close(wFactory[PREPARE_CHOICE]('axc'), 70)).toBe(0)
-    const bounded = wFactory('a'.repeat(64), {})
-    expect(bounded(wFactory[PREPARE_CHOICE]('b'.repeat(64)), 100)).toBe(0)
-    const tokens = wFactory('a b', {})
-    expect(tokens(wFactory[PREPARE_CHOICE]('a c'), 0)).toBeGreaterThan(0)
-    expect(tokens(wFactory[PREPARE_CHOICE]('x'.repeat(20)), 70)).toBeGreaterThanOrEqual(0)
-    const wideRatio = wFactory('a', {})
-    expect(wideRatio(wFactory[PREPARE_CHOICE]('x'.repeat(20)), 0)).toBeGreaterThanOrEqual(
+    const wPreparation = prepareFuzz('wRatio')({})
+    const close = wPreparation.prepareQuery('abc')
+    expect(close(wPreparation.prepareChoice('abd'), 0)).toBeGreaterThan(0)
+    expect(close(wPreparation.prepareChoice('abc'), 70)).toBe(100)
+    expect(close(wPreparation.prepareChoice('axc'), 70)).toBe(0)
+    const bounded = wPreparation.prepareQuery('a'.repeat(64))
+    expect(bounded(wPreparation.prepareChoice('b'.repeat(64)), 100)).toBe(0)
+    const tokens = wPreparation.prepareQuery('a b')
+    expect(tokens(wPreparation.prepareChoice('a c'), 0)).toBeGreaterThan(0)
+    expect(tokens(wPreparation.prepareChoice('x'.repeat(20)), 70)).toBeGreaterThanOrEqual(
       0,
     )
-    const longer = wFactory('alpha beta gamma delta', {})
-    expect(longer(wFactory[PREPARE_CHOICE]('alpha zeta'), 0)).toBeGreaterThanOrEqual(0)
-    const empty = wFactory('', {})
-    expect(empty(wFactory[PREPARE_CHOICE]('x'), 0)).toBe(0)
-    expect(close(wFactory[PREPARE_CHOICE](''), 0)).toBe(0)
+    const wideRatio = wPreparation.prepareQuery('a')
+    expect(
+      wideRatio(wPreparation.prepareChoice('x'.repeat(20)), 0),
+    ).toBeGreaterThanOrEqual(0)
+    const longer = wPreparation.prepareQuery('alpha beta gamma delta')
+    expect(longer(wPreparation.prepareChoice('alpha zeta'), 0)).toBeGreaterThanOrEqual(0)
+    const empty = wPreparation.prepareQuery('')
+    expect(empty(wPreparation.prepareChoice('x'), 0)).toBe(0)
+    expect(close(wPreparation.prepareChoice(''), 0)).toBe(0)
   })
 
   it('covers partial alignment and token-difference second passes', () => {

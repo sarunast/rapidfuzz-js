@@ -1,12 +1,13 @@
+import type { PreparedKernel } from '../../core/protocol.js'
+import { commonAffix } from '../shared/affix.js'
 import { WORD_LIMIT } from '../shared/bitmask/blockMasks.js'
 import { preparePattern } from '../shared/bitmask/pattern.js'
-import { commonAffix } from '../shared/bitParallel.js'
 import {
   alignRepresentation,
   convPair,
   distanceCutoffFor,
   distCutoff,
-  normalize,
+  normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
@@ -16,14 +17,12 @@ import {
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
-  withChoicePreparer,
-  prepareScorerChoice,
-  preparedScorerSequence,
-  type PrepareScorer,
-  type PreparedScorerFactory,
-  type PreparedScore,
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  scorerSequence,
+  type PreparationFactory,
   withPreparedFlags,
-  type Scorer,
+  type MetricImplementation,
 } from '../shared/scorerSupport.js'
 import { osaOneWordRange, osaOneWordPrepared, osaPrepared } from './internal/kernel.js'
 
@@ -125,7 +124,10 @@ function osaNormalizedDistance_impl(
   const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
   const cutoff = distanceCutoffFor('normalizedDistance', options.scoreCutoff, max)
-  return normDistCutoff(normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
+  return normDistCutoff(
+    normalizeDistance(distance_(a, b, cutoff), max),
+    options.scoreCutoff,
+  )
 }
 
 /**
@@ -141,7 +143,10 @@ function osaNormalizedSimilarity_impl(
   const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
   const cutoff = distanceCutoffFor('normalizedSimilarity', options.scoreCutoff, max)
-  return normSimCutoff(1 - normalize(distance_(a, b, cutoff), max), options.scoreCutoff)
+  return normSimCutoff(
+    1 - normalizeDistance(distance_(a, b, cutoff), max),
+    options.scoreCutoff,
+  )
 }
 
 type PreparedOsaKind =
@@ -150,13 +155,13 @@ type PreparedOsaKind =
   | 'normalizedDistance'
   | 'normalizedSimilarity'
 
-function prepareOsa(kind: PreparedOsaKind): PreparedScorerFactory {
-  const prepare: PrepareScorer = (query) => {
-    const a = preparedScorerSequence(prepareScorerChoice(query))
+function prepareOsa(kind: PreparedOsaKind): PreparationFactory {
+  const prepareQuery = (query: Sequence): PreparedKernel => {
+    const a = scorerSequence(query)
     const pattern = preparePattern(a, 0, a.length)
 
-    const score: PreparedScore = (rawChoice, rawCutoff) => {
-      const b = preparedScorerSequence(rawChoice)
+    const score: PreparedKernel = (rawChoice, rawCutoff) => {
+      const b = preparedChoiceSequence(rawChoice)
 
       const max = Math.max(a.length, b.length)
       const cutoff = distanceCutoffFor(kind, rawCutoff, max)
@@ -183,33 +188,35 @@ function prepareOsa(kind: PreparedOsaKind): PreparedScorerFactory {
         case 'similarity':
           return simCutoff(max - distance, rawCutoff)
         case 'normalizedDistance':
-          return normDistCutoff(normalize(distance, max), rawCutoff)
+          return normDistCutoff(normalizeDistance(distance, max), rawCutoff)
         case 'normalizedSimilarity':
-          return normSimCutoff(1 - normalize(distance, max), rawCutoff)
+          return normSimCutoff(1 - normalizeDistance(distance, max), rawCutoff)
       }
     }
     return score
   }
-  return withChoicePreparer(prepare, prepareScorerChoice)
+  return () => ({ prepareQuery, prepareChoice: prepareChoiceSequence })
 }
 
-export const osaDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
+export const osaDistance: MetricImplementation = /* @__PURE__ */ withPreparedFlags(
   osaDistance_impl,
   DISTANCE_FLAGS,
   prepareOsa('distance'),
 )
-export const osaSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
+export const osaSimilarity: MetricImplementation = /* @__PURE__ */ withPreparedFlags(
   osaSimilarity_impl,
   SIMILARITY_FLAGS,
   prepareOsa('similarity'),
 )
-export const osaNormalizedDistance: Scorer = /* @__PURE__ */ withPreparedFlags(
-  osaNormalizedDistance_impl,
-  NORMALIZED_DISTANCE_FLAGS,
-  prepareOsa('normalizedDistance'),
-)
-export const osaNormalizedSimilarity: Scorer = /* @__PURE__ */ withPreparedFlags(
-  osaNormalizedSimilarity_impl,
-  NORMALIZED_SIMILARITY_FLAGS,
-  prepareOsa('normalizedSimilarity'),
-)
+export const osaNormalizedDistance: MetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    osaNormalizedDistance_impl,
+    NORMALIZED_DISTANCE_FLAGS,
+    prepareOsa('normalizedDistance'),
+  )
+export const osaNormalizedSimilarity: MetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    osaNormalizedSimilarity_impl,
+    NORMALIZED_SIMILARITY_FLAGS,
+    prepareOsa('normalizedSimilarity'),
+  )

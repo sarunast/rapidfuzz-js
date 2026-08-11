@@ -19,7 +19,7 @@ import {
   hasSurrogatePair,
   isMissing,
   FUZZ_FLAGS,
-  type NormalizedScorer,
+  type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
 import type { Metric } from '../core/metric.js'
@@ -151,11 +151,8 @@ export function wRatio_impl(
 
 const BOUNDS: readonly [number, number] = [0, 100]
 
-export const wRatio: NormalizedScorer<FuzzOptions> = /* @__PURE__ */ withPreparedFlags(
-  wRatio_impl,
-  FUZZ_FLAGS,
-  prepareFuzz('wRatio'),
-)
+export const wRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
+  /* @__PURE__ */ withPreparedFlags(wRatio_impl, FUZZ_FLAGS, prepareFuzz('wRatio'))
 
 export const fuzzySimilarity: Metric<'similarity', FuzzConfiguration> =
   /* @__PURE__ */ builtInMetric({

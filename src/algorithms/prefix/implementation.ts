@@ -3,7 +3,7 @@ import {
   convPair,
   asSequence,
   distCutoff,
-  normalize,
+  normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
@@ -15,7 +15,7 @@ import {
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
-  type NormalizedScorer,
+  type MaybeSequenceMetricImplementation,
 } from '../shared/scorerSupport.js'
 
 function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
@@ -58,7 +58,10 @@ function prefixNormalizedDistance_impl(
 ): number {
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const max = maximum(a, b)
-  return normDistCutoff(normalize(max - commonPrefix(a, b), max), options.scoreCutoff)
+  return normDistCutoff(
+    normalizeDistance(max - commonPrefix(a, b), max),
+    options.scoreCutoff,
+  )
 }
 
 /**
@@ -74,26 +77,31 @@ function prefixNormalizedSimilarity_impl(
   if (s1 == null || s2 == null) return 0
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const max = maximum(a, b)
-  return normSimCutoff(1 - normalize(max - commonPrefix(a, b), max), options.scoreCutoff)
+  return normSimCutoff(
+    1 - normalizeDistance(max - commonPrefix(a, b), max),
+    options.scoreCutoff,
+  )
 }
 
-export const prefixDistance: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
-  prefixDistance_impl,
-  DISTANCE_FLAGS,
-  prepareMetric('distance', preparedPrefixDistance, maximum),
-)
-export const prefixSimilarity: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
-  prefixSimilarity_impl,
-  SIMILARITY_FLAGS,
-  prepareMetric('similarity', preparedPrefixDistance, maximum),
-)
-export const prefixNormalizedDistance: NormalizedScorer =
+export const prefixDistance: MaybeSequenceMetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    prefixDistance_impl,
+    DISTANCE_FLAGS,
+    prepareMetric('distance', preparedPrefixDistance, maximum),
+  )
+export const prefixSimilarity: MaybeSequenceMetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    prefixSimilarity_impl,
+    SIMILARITY_FLAGS,
+    prepareMetric('similarity', preparedPrefixDistance, maximum),
+  )
+export const prefixNormalizedDistance: MaybeSequenceMetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     prefixNormalizedDistance_impl,
     NORMALIZED_DISTANCE_FLAGS,
     prepareMetric('normalizedDistance', preparedPrefixDistance, maximum),
   )
-export const prefixNormalizedSimilarity: NormalizedScorer =
+export const prefixNormalizedSimilarity: MaybeSequenceMetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     prefixNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,

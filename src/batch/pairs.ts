@@ -54,10 +54,7 @@ export function scorePairs<D extends Direction>(
   )
   const scores = allocateScores(kind, queries.length, 'scorePairs')
   const integral = kind !== 'f64' && kind !== 'f32'
-  const rejected =
-    compilation.trusted || threshold === null
-      ? 0
-      : rejectedScore(compilation.direction, compilation.bounds, multiplier, integral)
+  const rejected = rejectedScore(compilation, threshold, multiplier, integral)
   // One closure, with the invariant tests inside it. Choosing between two
   // closures — one that qualifies and one that cannot — measured 1.02-1.18x
   // *slower* over six pair workloads, worst on the custom-scorer case it was
@@ -65,7 +62,7 @@ export function scorePairs<D extends Direction>(
   // being inlined, and that costs more than the branches it removes.
   const store = (score: number): number => {
     const thresholded =
-      compilation.trusted ||
+      rejected === null ||
       threshold === null ||
       qualifies(compilation.direction, score, threshold)
         ? score

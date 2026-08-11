@@ -95,6 +95,7 @@
     "bench": "node bench/tooling/runner.ts",
     "bench:quick": "node bench/tooling/runner.ts --quick",
     "bench:memory": "npm run build --silent && node --expose-gc bench/tooling/matcher-memory.ts",
+    "bench:memory:scratch": "npm run build --silent && node --expose-gc bench/tooling/scratch-memory.ts",
     "bench:compare": "node bench/tooling/compare.ts",
     "bench:compare:quick": "node bench/tooling/compare.ts --quick",
     "bench:confirm": "node bench/tooling/compare.ts --confirm",

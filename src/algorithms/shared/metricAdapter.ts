@@ -1,9 +1,5 @@
 import { type Metric } from '../../core/metric.js'
-import {
-  COMPILE,
-  type MetricCompilation,
-  type PreparedKernel,
-} from '../../core/protocol.js'
+import { COMPILE, type MetricCompilation } from '../../core/protocol.js'
 import { validatePair, validateSequence } from '../../core/sequence.js'
 import type {
   Direction,
@@ -12,22 +8,35 @@ import type {
   Sequence,
 } from '../../core/types.js'
 import {
-  configurationFlagsOf,
+  configurationSymmetryOf,
   configurationCanonicalizerOf,
-  PREPARE_CHOICE,
   PREPARE_SCORER,
-  type PreparedErasedScorer,
+  type ErasedMetricImplementation,
+  type PreparedCapability,
   type ScorerOptions,
 } from './scorerSupport.js'
 
 interface BuiltInMetricOptions<D extends Direction> {
-  readonly implementation: PreparedErasedScorer
+  readonly implementation: ErasedMetricImplementation & PreparedCapability
   readonly directImplementation?:
     | ((a: MaybeSequence, b: MaybeSequence) => number)
     | undefined
   readonly direction: D
   readonly bounds: readonly [number, number]
   readonly configurationKeys?: readonly string[] | undefined
+}
+
+// Reads `unknown` because `createScorer(levenshtein.distance, null)` reaches
+// here from JavaScript, where the hook's `Config | undefined` proves nothing.
+// `Object.keys` answers `[]` for a number and a boolean alike, so a primitive
+// would otherwise pass for "no configuration" — and a string reached
+// `Reflect.get` and failed with an error about our own internals.
+function configurationObject(given: unknown): object {
+  if (given === undefined) return {}
+  if (typeof given !== 'object' || given === null) {
+    throw new TypeError('metric configuration must be an object')
+  }
+  return given
 }
 
 function configurationRecord<D extends Direction>(
@@ -80,18 +89,17 @@ export function builtInMetric<D extends Direction, Config extends object>(
       return implementation(a, b)
     })
   const compile = (given: Config | undefined): MetricCompilation<D> => {
-    const canonical: object = given ?? {}
     const { record: initial, missing } = configurationRecord(
-      canonical,
+      configurationObject(given),
       options.direction,
       options.configurationKeys ?? [],
     )
     const canonicalizer = configurationCanonicalizerOf(options.implementation)
     const record = canonicalizer === null ? initial : canonicalizer(initial)
     const configured = Object.keys(record).length !== 0
-    const flags = configurationFlagsOf(options.implementation)
-    const symmetric = flags?.(record).symmetric ?? true
-    const prepare = options.implementation[PREPARE_SCORER]
+    const symmetry = configurationSymmetryOf(options.implementation)
+    const symmetric = symmetry?.(record) ?? true
+    const preparation = options.implementation[PREPARE_SCORER](record)
     // Batch and driver loops call rawScore thousands of times with one fixed
     // threshold; a one-entry cache keeps the cutoff-bearing options from being
     // rebuilt per pair. The threshold changes between loops, not inside them.
@@ -115,8 +123,6 @@ export function builtInMetric<D extends Direction, Config extends object>(
       const pair = validatePair(a, b, options.direction, missing)
       return pair === null ? 0 : rawScore(pair[0], pair[1], threshold)
     }
-    const prepareQuery = (query: Sequence): PreparedKernel => prepare(query, record)
-    const choicePreparer = prepare[PREPARE_CHOICE]
     return {
       direction: options.direction,
       bounds: options.bounds,
@@ -127,8 +133,8 @@ export function builtInMetric<D extends Direction, Config extends object>(
       },
       score,
       rawScore,
-      prepareQuery,
-      prepareChoice: (choice) => choicePreparer(choice),
+      prepareQuery: preparation.prepareQuery,
+      prepareChoice: preparation.prepareChoice,
     }
   }
   return Object.assign(direct, {

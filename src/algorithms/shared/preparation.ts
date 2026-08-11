@@ -1,59 +1,50 @@
+import type { PreparedKernel } from '../../core/protocol.js'
 import type { Sequence } from '../../core/types.js'
 import {
   distanceCutoffFor,
   distCutoff,
-  normalize,
+  normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-  type PreparedMetricKind,
+  type MetricScoreKind,
 } from './cutoff.js'
-import { alignRepresentation, scorerSequence } from './sequence.js'
+import { alignRepresentation, convSequence, scorerSequence } from './sequence.js'
 
-export const PREPARE_CHOICE: unique symbol = Symbol('rapidfuzz.prepareChoice')
 export const PREPARE_SCORER: unique symbol = Symbol('rapidfuzz.prepareScorer')
-
-class PreparedSequence {
-  constructor(readonly value: ArrayLike<unknown>) {}
-}
 
 export type ChoicePreparer = (choice: Sequence) => unknown
 
-export interface PreparedScore {
-  (choice: unknown, scoreCutoff: number | null): number
+export interface MetricPreparation {
+  readonly prepareQuery: (query: Sequence) => PreparedKernel
+  readonly prepareChoice: ChoicePreparer
 }
 
-export interface PrepareScorer {
-  (query: Sequence, options: Readonly<Record<string, unknown>>): PreparedScore
-  [PREPARE_CHOICE]?: ChoicePreparer
+export type PreparationFactory = (
+  options: Readonly<Record<string, unknown>>,
+) => MetricPreparation
+
+function isPreparedRepresentation(value: unknown): value is ArrayLike<unknown> {
+  return (
+    typeof value === 'string' ||
+    (typeof value === 'object' && value !== null && 'length' in value)
+  )
 }
 
-export interface PreparedScorerFactory extends PrepareScorer {
-  [PREPARE_CHOICE]: ChoicePreparer
+export function prepareChoiceSequence(choice: Sequence): ArrayLike<unknown> {
+  return scorerSequence(choice)
 }
 
-export function withChoicePreparer(
-  prepare: PrepareScorer,
-  choicePreparer: ChoicePreparer,
-): PreparedScorerFactory {
-  prepare[PREPARE_CHOICE] = choicePreparer
-  return Object.assign(prepare, { [PREPARE_CHOICE]: choicePreparer })
-}
-
-export function prepareScorerChoice(choice: Sequence): PreparedSequence {
-  return new PreparedSequence(scorerSequence(choice))
-}
-
-export function preparedScorerSequence(value: unknown): ArrayLike<unknown> {
-  if (!(value instanceof PreparedSequence)) {
+export function preparedChoiceSequence(value: unknown): ArrayLike<unknown> {
+  if (!isPreparedRepresentation(value)) {
     throw new TypeError('invalid prepared sequence')
   }
 
-  return value.value
+  return value
 }
 
 export function prepareMetric(
-  kind: PreparedMetricKind,
+  kind: MetricScoreKind,
   distance: (
     query: ArrayLike<unknown>,
     choice: ArrayLike<unknown>,
@@ -62,34 +53,47 @@ export function prepareMetric(
   ) => number,
   maximum: (query: ArrayLike<unknown>, choice: ArrayLike<unknown>) => number,
   parseOptions: (options: Readonly<Record<string, unknown>>) => unknown = () => null,
-): PreparedScorerFactory {
-  const prepare: PrepareScorer = (query, options) => {
-    const preparedQuery = preparedScorerSequence(prepareScorerChoice(query))
+): PreparationFactory {
+  return (options) => {
+    // Once per scorer: configuration belongs to the scorer lifetime, so a
+    // matcher preparing many queries never reparses it.
     const parsedOptions = parseOptions(options)
-    return (rawChoice, rawCutoff) => {
-      const choice = preparedScorerSequence(rawChoice)
-      const alignedQuery = alignRepresentation(preparedQuery, choice)
-      const alignedChoice = alignRepresentation(choice, preparedQuery)
-      const max = maximum(alignedQuery, alignedChoice)
-      const score = distance(
-        alignedQuery,
-        alignedChoice,
-        parsedOptions,
-        distanceCutoffFor(kind, rawCutoff, max),
-      )
-      switch (kind) {
-        case 'distance':
-          return distCutoff(score, rawCutoff)
-        case 'similarity':
-          return simCutoff(max - score, rawCutoff)
-        case 'normalizedDistance':
-          return normDistCutoff(normalize(score, max), rawCutoff)
-        case 'normalizedSimilarity':
-          return normSimCutoff(1 - normalize(score, max), rawCutoff)
-      }
+    return {
+      prepareQuery: (query) => {
+        const preparedQuery = scorerSequence(query)
+        // A string query scored against array choices would otherwise be
+        // converted to code points once per candidate; the converted form
+        // never changes.
+        let convertedQuery: ArrayLike<unknown> | null = null
+        return (rawChoice, rawCutoff) => {
+          const choice = preparedChoiceSequence(rawChoice)
+          const alignedQuery =
+            typeof preparedQuery === 'string' && typeof choice !== 'string'
+              ? (convertedQuery ??= convSequence(preparedQuery))
+              : preparedQuery
+          const alignedChoice = alignRepresentation(choice, preparedQuery)
+          const max = maximum(alignedQuery, alignedChoice)
+          const score = distance(
+            alignedQuery,
+            alignedChoice,
+            parsedOptions,
+            distanceCutoffFor(kind, rawCutoff, max),
+          )
+          switch (kind) {
+            case 'distance':
+              return distCutoff(score, rawCutoff)
+            case 'similarity':
+              return simCutoff(max - score, rawCutoff)
+            case 'normalizedDistance':
+              return normDistCutoff(normalizeDistance(score, max), rawCutoff)
+            case 'normalizedSimilarity':
+              return normSimCutoff(1 - normalizeDistance(score, max), rawCutoff)
+          }
+        }
+      },
+      prepareChoice: prepareChoiceSequence,
     }
   }
-  return withChoicePreparer(prepare, prepareScorerChoice)
 }
 
-export type { PreparedMetricKind } from './cutoff.js'
+export type { MetricScoreKind } from './cutoff.js'

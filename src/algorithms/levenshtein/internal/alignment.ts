@@ -141,6 +141,8 @@ export function alignHirschberg(
   maximumDistance = Math.min(maximumDistance, Math.max(sourceLength, destinationLength))
 
   const matrixBytes = levenshteinMatrixBytes(
+    source,
+    sourceStart,
     sourceLength,
     destinationLength,
     maximumDistance,

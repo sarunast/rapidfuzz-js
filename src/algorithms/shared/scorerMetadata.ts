@@ -1,5 +1,5 @@
 import type { MaybeSequence, Sequence } from '../../core/types.js'
-import { PREPARE_SCORER, type PreparedScorerFactory } from './preparation.js'
+import { PREPARE_SCORER, type PreparationFactory } from './preparation.js'
 import type { ScorerOptions } from './types.js'
 
 export interface ScorerFlags {
@@ -13,100 +13,96 @@ export interface Flagged {
 }
 
 export interface PreparedCapability {
-  readonly [PREPARE_SCORER]: PreparedScorerFactory
+  readonly [PREPARE_SCORER]: PreparationFactory
 }
 
-export interface Scorer<O extends ScorerOptions = ScorerOptions>
+export interface MetricImplementation<O extends ScorerOptions = ScorerOptions>
   extends Flagged, PreparedCapability {
   (left: Sequence, right: Sequence, options?: O): number
 }
 
-export interface NormalizedScorer<O extends ScorerOptions = ScorerOptions>
+export interface MaybeSequenceMetricImplementation<
+  O extends ScorerOptions = ScorerOptions,
+>
   extends Flagged, PreparedCapability {
   (left: MaybeSequence, right: MaybeSequence, options?: O): number
 }
 
-export type ConfigurationFlagsResolver = (
+export type ConfigurationSymmetryResolver = (
   options: Readonly<Record<string, unknown>>,
-) => ScorerFlags
+) => boolean
 
 export type ConfigurationCanonicalizer = (
   options: Readonly<Record<string, unknown>>,
 ) => Readonly<Record<string, unknown>>
 
 export interface ScorerRegistration {
-  readonly configurationFlags?: ConfigurationFlagsResolver | undefined
+  readonly configurationSymmetry?: ConfigurationSymmetryResolver | undefined
   readonly configurationCanonicalizer?: ConfigurationCanonicalizer | undefined
 }
 
-const configurationFlagResolvers = new WeakMap<object, ConfigurationFlagsResolver>()
-const optionCanonicalizers = new WeakMap<object, ConfigurationCanonicalizer>()
+const registrations = new WeakMap<object, ScorerRegistration>()
 
-export function configurationFlagsOf(scorer: object): ConfigurationFlagsResolver | null {
-  return configurationFlagResolvers.get(scorer) ?? null
+export function configurationSymmetryOf(
+  scorer: object,
+): ConfigurationSymmetryResolver | null {
+  return registrations.get(scorer)?.configurationSymmetry ?? null
 }
 
 export function configurationCanonicalizerOf(
   scorer: object,
 ): ConfigurationCanonicalizer | null {
-  return optionCanonicalizers.get(scorer) ?? null
+  return registrations.get(scorer)?.configurationCanonicalizer ?? null
 }
 
-export const DISTANCE_FLAGS: ScorerFlags = {
+export const DISTANCE_FLAGS: ScorerFlags = /* @__PURE__ */ Object.freeze({
   optimalScore: 0,
   worstScore: Number.POSITIVE_INFINITY,
   symmetric: true,
-}
+})
 
-export const SIMILARITY_FLAGS: ScorerFlags = {
+export const SIMILARITY_FLAGS: ScorerFlags = /* @__PURE__ */ Object.freeze({
   optimalScore: Number.POSITIVE_INFINITY,
   worstScore: 0,
   symmetric: true,
-}
+})
 
-export const NORMALIZED_DISTANCE_FLAGS: ScorerFlags = {
+export const NORMALIZED_DISTANCE_FLAGS: ScorerFlags = /* @__PURE__ */ Object.freeze({
   optimalScore: 0,
   worstScore: 1,
   symmetric: true,
-}
+})
 
-export const NORMALIZED_SIMILARITY_FLAGS: ScorerFlags = {
+export const NORMALIZED_SIMILARITY_FLAGS: ScorerFlags = /* @__PURE__ */ Object.freeze({
   optimalScore: 1,
   worstScore: 0,
   symmetric: true,
-}
+})
 
-export const FUZZ_FLAGS: ScorerFlags = {
+export const FUZZ_FLAGS: ScorerFlags = /* @__PURE__ */ Object.freeze({
   optimalScore: 100,
   worstScore: 0,
   symmetric: true,
-}
+})
 
-export type ErasedScorer = (
+export type ErasedMetricImplementation = (
   left: Sequence,
   right: Sequence,
   options?: ScorerOptions,
 ) => number
 
-export interface PreparedErasedScorer extends ErasedScorer {
-  readonly [PREPARE_SCORER]: PreparedScorerFactory
-}
-
-export function withPreparedFlags<F extends ErasedScorer>(
+export function withPreparedFlags<F extends ErasedMetricImplementation>(
   implementation: F,
   flags: ScorerFlags,
-  prepare: PreparedScorerFactory,
+  prepare: PreparationFactory,
   registration: ScorerRegistration = {},
-): F & Flagged & PreparedErasedScorer {
+): F & Flagged & PreparedCapability {
+  // Decorates the implementation instead of wrapping it, so scoring pays no
+  // extra call. Registering unconditionally replaces any earlier registration.
   const scorer = Object.assign(implementation, {
     rfScorerFlags: Object.freeze({ ...flags }),
     [PREPARE_SCORER]: prepare,
   })
-  if (registration.configurationFlags !== undefined) {
-    configurationFlagResolvers.set(scorer, registration.configurationFlags)
-  }
-  if (registration.configurationCanonicalizer !== undefined) {
-    optionCanonicalizers.set(scorer, registration.configurationCanonicalizer)
-  }
+  registrations.set(scorer, registration)
   return scorer
 }

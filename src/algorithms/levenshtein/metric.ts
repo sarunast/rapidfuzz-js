@@ -5,9 +5,8 @@ import {
   SIMILARITY_FLAGS,
   withPreparedFlags,
   type ConfigurationCanonicalizer,
-  type ConfigurationFlagsResolver,
-  type Scorer,
-  type ScorerFlags,
+  type ConfigurationSymmetryResolver,
+  type MetricImplementation,
 } from '../shared/scorerSupport.js'
 import {
   levenshteinCosts,
@@ -32,17 +31,13 @@ export { levenshteinCosts } from './internal/engine.js'
  * same, because swapping the arguments swaps those two operations.
  *
  * Scorer compilation calls this when weights are retained, which is the only
- * way they can reach a matrix. Reporting it through the flags is what lets
- * `scoreMatrix` decide whether it may mirror the lower triangle without knowing
- * that the option in question is spelled `weights`.
+ * way they can reach a matrix. Reporting it through the registration is what
+ * lets `scoreMatrix` decide whether it may mirror the lower triangle without
+ * knowing that the option in question is spelled `weights`.
  */
-function levenshteinConfigurationFlagsResolver(
-  base: ScorerFlags,
-): ConfigurationFlagsResolver {
-  return (options) => {
-    const { insertion, deletion } = levenshteinCosts(Reflect.get(options, 'weights'))
-    return insertion === deletion ? base : { ...base, symmetric: false }
-  }
+const levenshteinConfigurationSymmetry: ConfigurationSymmetryResolver = (options) => {
+  const { insertion, deletion } = levenshteinCosts(Reflect.get(options, 'weights'))
+  return insertion === deletion
 }
 
 /**
@@ -65,49 +60,43 @@ const levenshteinConfigurationCanonicalizer: ConfigurationCanonicalizer = (optio
 }
 
 // Scorer flags let generic batch and search code specialize by direction.
-export const levenshteinDistance: Scorer<LevenshteinOptions> =
+export const levenshteinDistance: MetricImplementation<LevenshteinOptions> =
   /* @__PURE__ */ withPreparedFlags(
     levenshteinDistanceImpl,
     DISTANCE_FLAGS,
     prepareLevenshtein('distance'),
     {
-      configurationFlags:
-        /* @__PURE__ */ levenshteinConfigurationFlagsResolver(DISTANCE_FLAGS),
+      configurationSymmetry: levenshteinConfigurationSymmetry,
       configurationCanonicalizer: levenshteinConfigurationCanonicalizer,
     },
   )
-export const levenshteinSimilarity: Scorer<LevenshteinOptions> =
+export const levenshteinSimilarity: MetricImplementation<LevenshteinOptions> =
   /* @__PURE__ */ withPreparedFlags(
     levenshteinSimilarityImpl,
     SIMILARITY_FLAGS,
     prepareLevenshtein('similarity'),
     {
-      configurationFlags:
-        /* @__PURE__ */ levenshteinConfigurationFlagsResolver(SIMILARITY_FLAGS),
+      configurationSymmetry: levenshteinConfigurationSymmetry,
       configurationCanonicalizer: levenshteinConfigurationCanonicalizer,
     },
   )
-export const levenshteinNormalizedDistance: Scorer<LevenshteinOptions> =
+export const levenshteinNormalizedDistance: MetricImplementation<LevenshteinOptions> =
   /* @__PURE__ */ withPreparedFlags(
     levenshteinNormalizedDistanceImpl,
     NORMALIZED_DISTANCE_FLAGS,
     prepareLevenshtein('normalizedDistance'),
     {
-      configurationFlags: /* @__PURE__ */ levenshteinConfigurationFlagsResolver(
-        NORMALIZED_DISTANCE_FLAGS,
-      ),
+      configurationSymmetry: levenshteinConfigurationSymmetry,
       configurationCanonicalizer: levenshteinConfigurationCanonicalizer,
     },
   )
-export const levenshteinNormalizedSimilarity: Scorer<LevenshteinOptions> =
+export const levenshteinNormalizedSimilarity: MetricImplementation<LevenshteinOptions> =
   /* @__PURE__ */ withPreparedFlags(
     levenshteinNormalizedSimilarityImpl,
     NORMALIZED_SIMILARITY_FLAGS,
     prepareLevenshtein('normalizedSimilarity'),
     {
-      configurationFlags: /* @__PURE__ */ levenshteinConfigurationFlagsResolver(
-        NORMALIZED_SIMILARITY_FLAGS,
-      ),
+      configurationSymmetry: levenshteinConfigurationSymmetry,
       configurationCanonicalizer: levenshteinConfigurationCanonicalizer,
     },
   )

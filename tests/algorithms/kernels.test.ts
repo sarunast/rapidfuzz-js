@@ -47,12 +47,13 @@ import {
   osaOneWordRange,
   osaPrepared,
 } from '../../src/algorithms/osa/internal/kernel.js'
+import { commonAffix } from '../../src/algorithms/shared/affix.js'
 import { preparePattern } from '../../src/algorithms/shared/bitmask/pattern.js'
 import {
-  commonAffix,
   lcsSeqMatrix,
   levenshteinMatrix,
   levenshteinMatrixBytes,
+  levenshteinRowBytes,
   rowBitSet,
   shiftedRowBitSet,
 } from '../../src/algorithms/shared/bitParallel.js'
@@ -570,10 +571,55 @@ describe('alignment matrices agree with strict sequence equality', () => {
     const s2 = Array.from({ length: len2 }, (_, i) => 97 + ((i * 3) % 5))
     const { vp, vn, offsets } = levenshteinMatrix(s1, 0, len1, s2, 0, len2, budget)
 
-    expect(levenshteinMatrixBytes(len1, len2, budget)).toBe(
+    expect(levenshteinRowBytes(len1, len2, budget)).toBe(
       vp.byteLength + vn.byteLength + (offsets === null ? 0 : offsets.byteLength),
     )
   })
+
+  // The rows are what the budget used to count, and they are the whole cost
+  // only while the pattern draws on a small alphabet. On a narrow band over a
+  // range of distinct elements the tables outweigh them 54x, and the same 1 MiB
+  // gate accepted a matrix that went on to allocate 436 MB. What separates the
+  // two is the alphabet, so that is what the estimate has to read.
+  it('counts the pattern tables, and only text can ignore them', () => {
+    const len = 4096
+    const size = (element: (i: number) => unknown): number =>
+      levenshteinMatrixBytes(
+        Array.from({ length: len }, (_, i) => element(i)),
+        0,
+        len,
+        len,
+        4,
+      )
+    const rows = levenshteinRowBytes(len, len, 4)
+
+    expect(size((i) => 97 + (i % 26))).toBeLessThan(rows * 1.25)
+    expect(size((i) => i)).toBeGreaterThan(rows * 20)
+    expect(size((i) => ({ at: i }))).toBeGreaterThan(rows * 20)
+  })
+
+  // A range with nothing to align against builds no tables to charge for.
+  it.each([
+    ['an empty text', 64, 0],
+    ['an empty pattern', 0, 64],
+    ['a one-word pattern', 32, 64],
+  ])('charges %s for its rows alone', (_label, len1, len2) => {
+    const s1 = Array.from({ length: len1 }, (_, i) => i)
+
+    expect(levenshteinMatrixBytes(s1, 0, len1, len2, -1)).toBe(
+      levenshteinRowBytes(len1, len2, -1),
+    )
+  })
+
+  // `(length + 31) >>> 5` converts to uint32 before it adds, so it wraps to
+  // zero over the last 31 lengths `MAX_SEQUENCE_LENGTH` admits — and a matrix
+  // sized at zero bytes is one the Hirschberg gate always accepts.
+  it.each([0xffff_ffe1, 0xffff_fffe, 0xffff_ffff])(
+    'sizes a %i-element row without wrapping',
+    (len) => {
+      expect(levenshteinRowBytes(len, 1, -1)).toBe(Math.ceil(len / 32) * 8)
+    },
+  )
 
   it('counts long final vectors without losing high bits', () => {
     const s1 = Array.from({ length: 257 }, (_, i) => i % 11)
@@ -1562,6 +1608,62 @@ describe('the prepared LCS kernels agree with the dynamic program', () => {
         else expect(actual < 0 || actual === expected).toBe(true)
       }
     }
+  })
+})
+
+// The window decision in `preparePattern` has two bounds, each with an exact
+// edge: a span of `WINDOW_SPAN_LIMIT` (2048) code points is windowed while one
+// more is not, and `WINDOW_CELL_LIMIT` (16384) cells is allocated while one
+// more word behind the same span is not. Which side of an edge a pattern lands
+// on only changes the representation, so each edge is pinned both by the shape
+// the mask takes and by the score staying exact across it.
+describe('the prepared window decision at its exact edges', () => {
+  const low = 0x400
+  const spanTop = (span: number) => low + span - 1
+
+  function expectExactScore(pattern: readonly unknown[]): void {
+    const text = [...pattern].reverse().slice(0, Math.min(pattern.length, 40))
+    const prepared = preparePattern(pattern, 0, pattern.length)
+    expect(lcsLengthPrepared(prepared, text, 0, text.length)).toBe(
+      lcsReference(pattern, text),
+    )
+  }
+
+  it('windows a span of exactly 2048 code points, and not one more', () => {
+    const windowed = preparePattern([low, spanTop(2048)], 0, 2)
+    expect(windowed.highCount).toBe(2048)
+    expect(windowed.highBase).toBe(low)
+    expect(windowed.wideOffsets.size).toBe(0)
+
+    const strayed = preparePattern([low, spanTop(2049)], 0, 2)
+    expect(strayed.highCount).toBe(0)
+    expect(strayed.wideOffsets.size).toBe(2)
+
+    expectExactScore([low, spanTop(2048)])
+    expectExactScore([low, spanTop(2049)])
+  })
+
+  it('windows exactly 16384 cells, and not one word more', () => {
+    // The same 2048-code-point span behind eight words is 16384 cells — the
+    // limit itself — and behind nine words is past it. Only the pattern length
+    // moves between the two, so this edge is the cell bound alone.
+    const span = 2048
+    const atLimit = Array.from({ length: 256 }, (_unused, i) =>
+      i % 2 === 0 ? low : spanTop(span),
+    )
+    const windowed = preparePattern(atLimit, 0, atLimit.length)
+    expect(windowed.words).toBe(8)
+    expect(windowed.highCount).toBe(span)
+    expect(windowed.wideOffsets.size).toBe(0)
+
+    const pastLimit = [...atLimit, low]
+    const strayed = preparePattern(pastLimit, 0, pastLimit.length)
+    expect(strayed.words).toBe(9)
+    expect(strayed.highCount).toBe(0)
+    expect(strayed.wideOffsets.size).toBe(2)
+
+    expectExactScore(atLimit)
+    expectExactScore(pastLimit)
   })
 })
 

@@ -3,12 +3,12 @@ import {
   asSequence,
   convPair,
   distCutoff,
-  normalize,
+  normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
   type MaybeSequence,
-  type NormalizedScorer,
+  type MaybeSequenceMetricImplementation,
   type ScorerOptions,
   prepareMetric,
   withPreparedFlags,
@@ -58,7 +58,10 @@ function postfixNormalizedDistance_impl(
 ): number {
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const max = maximum(a, b)
-  return normDistCutoff(normalize(max - commonSuffix(a, b), max), options.scoreCutoff)
+  return normDistCutoff(
+    normalizeDistance(max - commonSuffix(a, b), max),
+    options.scoreCutoff,
+  )
 }
 
 /**
@@ -74,26 +77,31 @@ function postfixNormalizedSimilarity_impl(
   if (s1 == null || s2 == null) return 0
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const max = maximum(a, b)
-  return normSimCutoff(1 - normalize(max - commonSuffix(a, b), max), options.scoreCutoff)
+  return normSimCutoff(
+    1 - normalizeDistance(max - commonSuffix(a, b), max),
+    options.scoreCutoff,
+  )
 }
 
-export const postfixDistance: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
-  postfixDistance_impl,
-  DISTANCE_FLAGS,
-  prepareMetric('distance', preparedPostfixDistance, maximum),
-)
-export const postfixSimilarity: NormalizedScorer = /* @__PURE__ */ withPreparedFlags(
-  postfixSimilarity_impl,
-  SIMILARITY_FLAGS,
-  prepareMetric('similarity', preparedPostfixDistance, maximum),
-)
-export const postfixNormalizedDistance: NormalizedScorer =
+export const postfixDistance: MaybeSequenceMetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    postfixDistance_impl,
+    DISTANCE_FLAGS,
+    prepareMetric('distance', preparedPostfixDistance, maximum),
+  )
+export const postfixSimilarity: MaybeSequenceMetricImplementation =
+  /* @__PURE__ */ withPreparedFlags(
+    postfixSimilarity_impl,
+    SIMILARITY_FLAGS,
+    prepareMetric('similarity', preparedPostfixDistance, maximum),
+  )
+export const postfixNormalizedDistance: MaybeSequenceMetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     postfixNormalizedDistance_impl,
     NORMALIZED_DISTANCE_FLAGS,
     prepareMetric('normalizedDistance', preparedPostfixDistance, maximum),
   )
-export const postfixNormalizedSimilarity: NormalizedScorer =
+export const postfixNormalizedSimilarity: MaybeSequenceMetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     postfixNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,

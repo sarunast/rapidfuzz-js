@@ -102,10 +102,12 @@ export function bestMatch<T, D extends Direction>(
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
   const compilation = scorerCompilation(options.scorer)
-  const normalized = normalizeQuery(query, options.normalize)
   const stableOptions: MatcherOptions<T, Direction> = options
-  const arrayItems = arrayItemsOf(items)
+  // Before the query is normalized, so `search` at any limit refuses a wrong
+  // option in the same order — `limit: 1` delegates here.
   const readSequence = sequenceReader(stableOptions, false)
+  const normalized = normalizeQuery(query, options.normalize)
+  const arrayItems = arrayItemsOf(items)
 
   if (normalized === null) {
     const score = compilation.score(query, '', threshold)
@@ -206,16 +208,19 @@ export function search<T, D extends Direction>(
   const limit = resultLimit(options.limit)
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
-  if (limit === 0) return []
   if (limit === 1) {
     const match = bestMatch(query, items, options)
     return match === undefined ? [] : [match]
   }
   const compilation = scorerCompilation(options.scorer)
-  const normalized = normalizeQuery(query, options.normalize)
   const stableOptions: MatcherOptions<T, Direction> = options
-  const arrayItems = arrayItemsOf(items)
   const readSequence = sequenceReader(stableOptions, false)
+  // Every option is read before the exit, so `limit: 0` refuses a foreign
+  // scorer and an unknown `missingItems` the way every other limit does. What
+  // it still skips is the work: no query normalization, no traversal.
+  if (limit === 0) return []
+  const normalized = normalizeQuery(query, options.normalize)
+  const arrayItems = arrayItemsOf(items)
 
   if (normalized === null) {
     const score = compilation.score(query, '', threshold)

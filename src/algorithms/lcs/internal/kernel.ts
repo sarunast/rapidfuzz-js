@@ -24,6 +24,7 @@ import {
   measureAffix,
   rowVector,
   wideSlots,
+  wordCount,
 } from '../../shared/bitmask/blockMasks.js'
 import type { PatternMask } from '../../shared/bitmask/pattern.js'
 
@@ -32,7 +33,6 @@ import type { PatternMask } from '../../shared/bitmask/pattern.js'
 // binding does not fold the way a module-local `const` does.
 const WORD_BITS = 32
 const WORD_SHIFT = 5
-const WORD_MASK = 31
 const DIRECT_LOOKUP_LIMIT = 256
 
 /** Duplicated for the same reason as the constants: called once per word. */
@@ -154,7 +154,7 @@ function lcsManyWords(
   textStart: number,
   textLength: number,
 ): number {
-  const words = (patternLength + WORD_BITS - 1) >>> WORD_SHIFT
+  const words = wordCount(patternLength)
   const stamp = blockMasksFor(pattern, patternStart, patternLength, words)
 
   if (words === 4) return lcsFourWordsStamped(stamp, text, textStart, textLength)
@@ -385,7 +385,7 @@ function lcsManyWordsBanded(
   textLength: number,
   required: number,
 ): number {
-  const words = (patternLength + WORD_MASK) >>> WORD_SHIFT
+  const words = wordCount(patternLength)
   const stamp = blockMasksFor(pattern, patternStart, patternLength, words)
   const row = rowVector(words)
   clearRange(row, -1, 0, words)
@@ -620,8 +620,7 @@ export function lcsLengthRange(
   const firstIsPattern =
     middle1 <= WORD_BITS && middle2 <= WORD_BITS
       ? middle2 <= middle1
-      : ((middle1 + WORD_MASK) >>> WORD_SHIFT) * middle2 <=
-        ((middle2 + WORD_MASK) >>> WORD_SHIFT) * middle1
+      : wordCount(middle1) * middle2 <= wordCount(middle2) * middle1
 
   const pattern = firstIsPattern ? s1 : s2
   const patternStart = (firstIsPattern ? start1 : start2) + prefix
@@ -637,14 +636,14 @@ export function lcsLengthRange(
   const requiredMiddle = Math.max(0, requiredTotal - common)
   const fullBand = patternLength + textLength - 2 * requiredMiddle + 1
   const bandWords = Math.min(
-    (patternLength + WORD_MASK) >>> WORD_SHIFT,
+    wordCount(patternLength),
     Math.floor(fullBand / WORD_BITS) + 2,
   )
 
   const middle =
     patternLength <= WORD_BITS
       ? lcsOneWord(pattern, patternStart, patternLength, text, textStart, textLength)
-      : requiredMiddle > 0 && bandWords < (patternLength + WORD_MASK) >>> WORD_SHIFT
+      : requiredMiddle > 0 && bandWords < wordCount(patternLength)
         ? lcsManyWordsBanded(
             pattern,
             patternStart,

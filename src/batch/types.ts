@@ -14,8 +14,12 @@ export interface BatchOptions<D extends Direction, K extends ScoreArrayKind = 'f
   /**
    * The score a pair has to reach, on the scorer's own scale — `0..100` for a
    * fuzz scorer, `0..1` for a normalized one, a count for a raw edit distance.
-   * A pair that misses it is stored as the far end of the scorer's bounds:
-   * the worst similarity, or the worst distance.
+   *
+   * A pair that misses it is stored as its scorer's own rejection, which is
+   * what `process.cdist` stores upstream: `threshold + 1` for a raw distance,
+   * `0` for a similarity. A custom metric never sees the threshold, so a pair
+   * it rejects is stored as the far end of its declared bounds instead — as is
+   * every pair under a threshold outside those bounds, which nothing can meet.
    *
    * Read before {@link scoreMultiplier}, so the threshold means the same thing
    * whatever the multiplier is.
