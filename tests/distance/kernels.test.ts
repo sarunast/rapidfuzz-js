@@ -58,7 +58,7 @@ import {
   type LevenshteinWeights,
 } from '../../src/distance/levenshtein.js'
 import { osaDistance } from '../../src/distance/osa.js'
-import { partialRatio, partialRatioAlignment, ratio } from '../../src/fuzz.js'
+import { partialRatio, partialRatioAlignment, ratio } from '../../src/_fuzz/legacy.js'
 import { editopTuples } from '../common.js'
 
 /** Textbook LCS, O(n*m). Slow and obviously right. */

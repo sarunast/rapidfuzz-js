@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { levenshteinDistance } from '../src/distance/levenshtein.js'
-import { ratio } from '../src/fuzz.js'
+import { ratio } from '../src/_fuzz/legacy.js'
 import { scoreMatrix, scorePairs } from '../src/search.js'
 import { callUntyped } from './common.js'
 

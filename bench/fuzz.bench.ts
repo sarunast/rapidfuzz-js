@@ -8,7 +8,7 @@ import {
   tokenSetRatio,
   tokenSortRatio,
   wRatio,
-} from '../src/fuzz.js'
+} from '../src/_fuzz/legacy.js'
 import { pairs, sentences, similarPairs } from './_corpus.js'
 import { measure } from './_harness.js'
 

@@ -43,7 +43,7 @@ import {
   wRatio,
   type FuzzInput,
   type FuzzOptions,
-} from '../src/fuzz.js'
+} from '../src/_fuzz/legacy.js'
 import {
   extract,
   extractIter,

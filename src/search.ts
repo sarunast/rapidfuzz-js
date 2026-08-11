@@ -37,7 +37,7 @@ import {
   type ScoreArrayOf,
   type ScoreMatrix,
 } from './_scoreArray.js'
-import { ratio, wRatio } from './fuzz.js'
+import { ratio, wRatio } from './_fuzz/legacy.js'
 
 /** What `into` defaults to: a double, which loses no score to its store. */
 const DEFAULT_SCORE_KIND: ScoreArrayKind = 'f64'

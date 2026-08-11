@@ -24,7 +24,7 @@ import {
   prefixNormalizedDistance,
   prefixNormalizedSimilarity,
 } from '../src/distance/prefix.js'
-import { partialRatio, ratio, tokenSortRatio, wRatio } from '../src/fuzz.js'
+import { partialRatio, ratio, tokenSortRatio, wRatio } from '../src/_fuzz/legacy.js'
 import {
   extract,
   extractIter,

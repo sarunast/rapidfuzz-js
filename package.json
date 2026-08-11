@@ -1,6 +1,6 @@
 {
   "name": "rapidfuzz-js",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Fast fuzzy string matching for Node.js and the browser",
   "keywords": [
     "damerau-levenshtein",
@@ -28,7 +28,6 @@
   },
   "files": [
     "dist",
-    "src",
     "!dist/**/*-stats.json"
   ],
   "type": "module",
@@ -45,61 +44,45 @@
       "types": "./dist/fuzz.d.ts",
       "import": "./dist/fuzz.js"
     },
-    "./search": {
-      "types": "./dist/search.d.ts",
-      "import": "./dist/search.js"
+    "./levenshtein": {
+      "types": "./dist/levenshtein.d.ts",
+      "import": "./dist/levenshtein.js"
     },
-    "./match": {
-      "types": "./dist/match.d.ts",
-      "import": "./dist/match.js"
+    "./indel": {
+      "types": "./dist/indel.d.ts",
+      "import": "./dist/indel.js"
     },
-    "./utils": {
-      "types": "./dist/utils.d.ts",
-      "import": "./dist/utils.js"
+    "./lcs": {
+      "types": "./dist/lcs.d.ts",
+      "import": "./dist/lcs.js"
     },
-    "./distance": {
-      "types": "./dist/distance/index.d.ts",
-      "import": "./dist/distance/index.js"
+    "./osa": {
+      "types": "./dist/osa.d.ts",
+      "import": "./dist/osa.js"
     },
-    "./distance/Indel": {
-      "types": "./dist/distance/namespaces/Indel.d.ts",
-      "import": "./dist/distance/namespaces/Indel.js"
+    "./damerau-levenshtein": {
+      "types": "./dist/damerau-levenshtein.d.ts",
+      "import": "./dist/damerau-levenshtein.js"
     },
-    "./distance/LCSseq": {
-      "types": "./dist/distance/namespaces/LCSseq.d.ts",
-      "import": "./dist/distance/namespaces/LCSseq.js"
+    "./hamming": {
+      "types": "./dist/hamming.d.ts",
+      "import": "./dist/hamming.js"
     },
-    "./distance/Levenshtein": {
-      "types": "./dist/distance/namespaces/Levenshtein.d.ts",
-      "import": "./dist/distance/namespaces/Levenshtein.js"
+    "./jaro": {
+      "types": "./dist/jaro.d.ts",
+      "import": "./dist/jaro.js"
     },
-    "./distance/DamerauLevenshtein": {
-      "types": "./dist/distance/namespaces/DamerauLevenshtein.d.ts",
-      "import": "./dist/distance/namespaces/DamerauLevenshtein.js"
+    "./jaro-winkler": {
+      "types": "./dist/jaro-winkler.d.ts",
+      "import": "./dist/jaro-winkler.js"
     },
-    "./distance/OSA": {
-      "types": "./dist/distance/namespaces/OSA.d.ts",
-      "import": "./dist/distance/namespaces/OSA.js"
+    "./prefix": {
+      "types": "./dist/prefix.d.ts",
+      "import": "./dist/prefix.js"
     },
-    "./distance/Hamming": {
-      "types": "./dist/distance/namespaces/Hamming.d.ts",
-      "import": "./dist/distance/namespaces/Hamming.js"
-    },
-    "./distance/Jaro": {
-      "types": "./dist/distance/namespaces/Jaro.d.ts",
-      "import": "./dist/distance/namespaces/Jaro.js"
-    },
-    "./distance/JaroWinkler": {
-      "types": "./dist/distance/namespaces/JaroWinkler.d.ts",
-      "import": "./dist/distance/namespaces/JaroWinkler.js"
-    },
-    "./distance/Prefix": {
-      "types": "./dist/distance/namespaces/Prefix.d.ts",
-      "import": "./dist/distance/namespaces/Prefix.js"
-    },
-    "./distance/Postfix": {
-      "types": "./dist/distance/namespaces/Postfix.d.ts",
-      "import": "./dist/distance/namespaces/Postfix.js"
+    "./postfix": {
+      "types": "./dist/postfix.d.ts",
+      "import": "./dist/postfix.js"
     },
     "./package.json": "./package.json"
   },

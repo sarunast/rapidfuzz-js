@@ -34,7 +34,7 @@ import {
   tokenSetRatio,
   tokenSortRatio,
   wRatio,
-} from '../src/fuzz.js'
+} from '../src/_fuzz/legacy.js'
 import { isMatch, matchScore } from '../src/match.js'
 import {
   extract,

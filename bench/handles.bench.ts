@@ -14,7 +14,7 @@
 import { describe } from 'vitest'
 
 import { levenshteinDistance } from '../src/distance/levenshtein.js'
-import { ratio, tokenSortRatio, wRatio } from '../src/fuzz.js'
+import { ratio, tokenSortRatio, wRatio } from '../src/_fuzz/legacy.js'
 import { prepareChoice, prepareQuery } from '../src/search.js'
 import { defaultProcess } from '../src/utils.js'
 import { sentences, words } from './_corpus.js'

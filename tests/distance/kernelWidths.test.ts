@@ -26,7 +26,7 @@ import {
   levenshteinEditops,
 } from '../../src/distance/levenshtein.js'
 import { osaDistance } from '../../src/distance/osa.js'
-import { partialRatio, ratio } from '../../src/fuzz.js'
+import { partialRatio, ratio } from '../../src/_fuzz/legacy.js'
 
 /** Textbook Levenshtein, O(n*m). */
 function levenshteinReference(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {

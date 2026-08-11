@@ -19,7 +19,7 @@ import {
   levenshteinNormalizedDistance,
   type LevenshteinWeights,
 } from '../src/distance/levenshtein.js'
-import { ratio } from '../src/fuzz.js'
+import { ratio } from '../src/_fuzz/legacy.js'
 import { extractOne } from '../src/search.js'
 import { defaultProcess } from '../src/utils.js'
 import { matrixScores } from './matrix.js'

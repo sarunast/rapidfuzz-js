@@ -23,7 +23,7 @@ import {
   uniqueOf,
   type UniqueTokenSet,
 } from '../src/_fuzz/tokens.js'
-import { tokenRatio, tokenSetRatio, tokenSortRatio } from '../src/fuzz.js'
+import { tokenRatio, tokenSetRatio, tokenSortRatio } from '../src/_fuzz/legacy.js'
 
 /** Everything observable about a token set, in an order-free form. */
 function snapshot(set: UniqueTokenSet): { size: number; tokens: string[] } {

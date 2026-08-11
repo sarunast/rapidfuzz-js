@@ -1,16 +1,4 @@
 // @ts-check
-/**
- * Assert every declared subpath resolves and carries the names it should.
- *
- * Deliberately a script run after `build` rather than a Vitest file. `test`
- * runs before `build`, so a test importing `../src/search.js` would not
- * exercise the export map at all, and one importing `rapidfuzz-js/search`
- * would resolve against whatever stale `dist/` happened to be on disk. Nothing
- * else covers the barrels or the namespace modules at run time.
- *
- * The imports are self-references: Node resolves them through this package's
- * own `exports` field, which is the thing under test.
- */
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
@@ -18,71 +6,64 @@ const pkg = JSON.parse(
   await readFile(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
 )
 
-/** Subpath -> names that must be present and callable. */
 /** @type {Record<string, string[]>} */
 const EXPECTED = {
   '.': [
-    'configure',
-    'matchScore',
+    'createScorer',
+    'createMatcher',
+    'bestMatch',
+    'search',
+    'scoreMatrix',
+    'scorePairs',
     'isMatch',
-    'extract',
-    'extractOne',
-    'extractIter',
-    'scoreMatrix',
-    'scorePairs',
-    'prepareChoices',
-    'prepareQuery',
-    'prepareChoice',
-    'ratio',
-    'wRatio',
-    'levenshteinDistance',
-    'defaultProcess',
-    'Editops',
-    'Opcodes',
+    'scoreIfMatch',
+    'normalizeText',
   ],
-  './fuzz': ['ratio', 'partialRatio', 'wRatio', 'qRatio', 'tokenSortRatio'],
-  './search': [
-    'extract',
-    'extractOne',
-    'extractIter',
-    'scoreMatrix',
-    'scorePairs',
-    'prepareChoices',
-    'prepareQuery',
-    'prepareChoice',
+  './fuzz': [
+    'similarity',
+    'partialSimilarity',
+    'partialSimilarityAlignment',
+    'tokenSortSimilarity',
+    'tokenSetSimilarity',
+    'tokenSimilarity',
+    'partialTokenSortSimilarity',
+    'partialTokenSetSimilarity',
+    'partialTokenSimilarity',
+    'fuzzySimilarity',
   ],
-  './match': ['matchScore', 'isMatch'],
-  './utils': ['defaultProcess'],
-  // The namespace barrel mirroring Python's `rapidfuzz.distance` package, so
-  // these are the module objects rather than flat scorer names.
-  './distance': [
-    'Indel',
-    'LCSseq',
-    'Levenshtein',
-    'DamerauLevenshtein',
-    'OSA',
-    'Hamming',
-    'Jaro',
-    'JaroWinkler',
-    'Prefix',
-    'Postfix',
-    'Editops',
-    'Opcodes',
-  ],
+  './levenshtein': ['distance', 'similarity', 'editops', 'opcodes'],
+  './indel': ['distance', 'similarity', 'editops', 'opcodes'],
+  './lcs': ['distance', 'similarity', 'editops', 'opcodes'],
+  './hamming': ['distance', 'similarity', 'editops', 'opcodes'],
+  './osa': ['distance', 'similarity'],
+  './damerau-levenshtein': ['distance', 'similarity'],
+  './jaro': ['similarity'],
+  './jaro-winkler': ['similarity'],
+  './prefix': ['distance', 'similarity'],
+  './postfix': ['distance', 'similarity'],
 }
 
-/** Every `./distance/<Name>` module exposes the same four entry points. */
-const METRIC = ['distance', 'similarity', 'normalizedDistance', 'normalizedSimilarity']
-for (const subpath of Object.keys(pkg.exports)) {
-  if (subpath.startsWith('./distance/')) EXPECTED[subpath] = METRIC
-}
+const REMOVED = [
+  'configure',
+  'extract',
+  'extractOne',
+  'extractIter',
+  'prepareChoices',
+  'prepareQuery',
+  'prepareChoice',
+  'matchScore',
+  'defaultProcess',
+  'ratio',
+  'wRatio',
+  'qRatio',
+  'normalizedDistance',
+  'normalizedSimilarity',
+]
 
-const declared = Object.keys(pkg.exports).filter((s) => s !== './package.json')
-const missing = declared.filter((s) => !(s in EXPECTED))
-if (missing.length > 0) {
-  throw new Error(
-    `package.json declares ${missing.join(', ')} but check-exports.mjs does not check them`,
-  )
+const declared = Object.keys(pkg.exports).filter((subpath) => subpath !== './package.json')
+const missingChecks = declared.filter((subpath) => !(subpath in EXPECTED))
+if (missingChecks.length > 0) {
+  throw new Error(`missing export checks for ${missingChecks.join(', ')}`)
 }
 
 let failures = 0
@@ -93,46 +74,21 @@ for (const [subpath, names] of Object.entries(EXPECTED)) {
     module = await import(specifier)
   } catch (error) {
     console.error(
-      `✗ ${specifier} failed to import: ` +
-        `${error instanceof Error ? error.message : error}`,
+      `✗ ${specifier} failed to import: ${error instanceof Error ? error.message : error}`,
     )
     failures++
     continue
   }
-
-  const absent = names.filter((name) => module[name] === undefined)
-  if (absent.length > 0) {
-    console.error(`✗ ${specifier} is missing ${absent.join(', ')}`)
+  const absent = names.filter((name) => typeof module[name] !== 'function')
+  const present = REMOVED.filter((name) => module[name] !== undefined)
+  if (absent.length > 0 || present.length > 0) {
+    if (absent.length > 0) console.error(`✗ ${specifier} missing ${absent.join(', ')}`)
+    if (present.length > 0) console.error(`✗ ${specifier} exposes ${present.join(', ')}`)
     failures++
-    continue
+  } else {
+    console.log(`✓ ${specifier} (${names.length} names)`)
   }
-
-  // `cdist` and `cpdist` were renamed; leaving a stale one behind would mean
-  // the barrel and the module had drifted apart.
-  //
-  // The two `fromValidated` functions are a different question: they are not
-  // stale, they are the door past every check `fromOperations` makes, and a
-  // barrel that widened to `export *` would publish them. Reaching them has to
-  // stay a matter of importing `src/distance/editops.js` directly, which the
-  // export map does not offer.
-  const removed = [
-    'cdist',
-    'cpdist',
-    'scorerKwargs',
-    'editopsFromValidated',
-    'opcodesFromValidated',
-  ].filter((name) => module[name] !== undefined)
-  if (removed.length > 0) {
-    console.error(`✗ ${specifier} still exports ${removed.join(', ')}`)
-    failures++
-    continue
-  }
-
-  console.log(`✓ ${specifier} (${names.length} names)`)
 }
 
-if (failures > 0) {
-  console.error(`\n${failures} subpath(s) failed`)
-  process.exit(1)
-}
+if (failures > 0) process.exit(1)
 console.log(`\nall ${declared.length} declared subpaths resolve`)

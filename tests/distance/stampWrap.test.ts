@@ -23,7 +23,7 @@ import {
 import { indelDistance } from '../../src/distance/indel.js'
 import { lcsSeqSimilarity } from '../../src/distance/lcsSeq.js'
 import { levenshteinDistance } from '../../src/distance/levenshtein.js'
-import { partialRatio, partialRatioAlignment } from '../../src/fuzz.js'
+import { partialRatio, partialRatioAlignment } from '../../src/_fuzz/legacy.js'
 
 /** One before the counter's ceiling, so the next build but one wraps it. */
 const NEAR_LIMIT = 0x7fff_fffd

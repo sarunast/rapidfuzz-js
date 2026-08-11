@@ -15,7 +15,7 @@ import {
   wRatio,
   type FuzzInput,
   type FuzzOptions,
-} from '../src/fuzz.js'
+} from '../src/_fuzz/legacy.js'
 import { defaultProcess } from '../src/utils.js'
 import { callUntyped } from './common.js'
 

@@ -24,7 +24,7 @@ import {
   tokenSetRatio,
   tokenSortRatio,
   wRatio,
-} from '../src/fuzz.js'
+} from '../src/_fuzz/legacy.js'
 import {
   extract,
   extractIter,

@@ -3,16 +3,15 @@
 [![CI](https://github.com/sarunast/rapidfuzz-js/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sarunast/rapidfuzz-js/actions/workflows/ci.yml)
 [![coverage](https://codecov.io/gh/sarunast/rapidfuzz-js/branch/main/graph/badge.svg)](https://codecov.io/gh/sarunast/rapidfuzz-js)
 [![npm](https://img.shields.io/npm/v/rapidfuzz-js)](https://www.npmjs.com/package/rapidfuzz-js)
-[![bundle size](https://img.shields.io/bundlejs/size/rapidfuzz-js@latest)](https://bundlejs.com/?q=rapidfuzz-js)
 [![license](https://img.shields.io/npm/l/rapidfuzz-js)](./LICENSE)
 
-Fast fuzzy string matching for JavaScript and TypeScript, based on
+Fast fuzzy matching for JavaScript and TypeScript, powered by the algorithms of
 [RapidFuzz](https://github.com/rapidfuzz/RapidFuzz).
 
-- Works in Node.js 22+, browsers, and edge runtimes
-- ESM with TypeScript declarations
+- Node.js 22+, browsers, and edge runtimes
+- ESM with strict TypeScript declarations
 - No runtime dependencies
-- Tree-shakeable
+- Tree-shakeable algorithm subpaths
 
 ## Install
 
@@ -20,266 +19,215 @@ Fast fuzzy string matching for JavaScript and TypeScript, based on
 npm install rapidfuzz-js
 ```
 
-## Quick start
+## The API in one minute
+
+Version 0.6 follows one composition model:
+
+```text
+Metric → Scorer object → Matcher
+```
+
+Import metrics from algorithm subpaths and orchestration from the package root:
 
 ```ts
-import { extractOne, levenshteinDistance, ratio } from 'rapidfuzz-js'
+import { createMatcher, createScorer, normalizeText } from 'rapidfuzz-js'
+import { tokenSortSimilarity } from 'rapidfuzz-js/fuzz'
 
-ratio('this is a test', 'this is a test!')
-// 96.55172413793103
+const scorer = createScorer(tokenSortSimilarity)
+
+const products = [
+  { title: 'Wireless mechanical keyboard' },
+  { title: 'Compact wireless mouse' },
+]
+
+const matcher = createMatcher(products, {
+  scorer,
+  getText: (product) => product.title,
+  normalize: normalizeText,
+})
+
+matcher.best('mechanical keybord', { threshold: 70 })
+// { item: products[0], key: 0, score: ... }
+```
+
+Use `bestMatch` or `search` for one query. Build a `Matcher` when the same
+collection will receive many queries.
+
+## Metrics and score scales
+
+Metrics are directly callable:
+
+```ts
+import { similarity as fuzzySimilarity } from 'rapidfuzz-js/fuzz'
+import {
+  distance as levenshteinDistance,
+  similarity as levenshteinSimilarity,
+} from 'rapidfuzz-js/levenshtein'
+
+fuzzySimilarity('this is a test', 'this is a test!')
+// 96.55172413793103 (0–100)
 
 levenshteinDistance('lewenstein', 'levenshtein')
-// 2
+// 2 (native edit count)
 
-extractOne('new york mets', ['new york mets', 'atlanta braves'])
-// { choice: 'new york mets', score: 100, key: 0 }
+levenshteinSimilarity('abc', 'axc')
+// 0.6666666666666667 (normalized 0–1)
 ```
 
-## Usage
+The library never rescales between families:
 
-### Find the best matches
+| Family | Scale |
+| --- | --- |
+| Fuzz similarities | `0–100` |
+| Normalized edit similarities | `0–1` |
+| Jaro and Jaro-Winkler | `0–1` |
+| Distances | Native algorithm units |
 
-```ts
-import { extract, extractOne } from 'rapidfuzz-js'
+Available subpaths:
 
-const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
-
-extractOne('new york jet', teams)
-// Best match, or undefined when no result meets scoreCutoff
-
-extract('new york', teams, { limit: 2, scoreCutoff: 60 })
-// Up to two matches with a score of at least 60
+```text
+rapidfuzz-js/fuzz
+rapidfuzz-js/levenshtein
+rapidfuzz-js/indel
+rapidfuzz-js/lcs
+rapidfuzz-js/osa
+rapidfuzz-js/damerau-levenshtein
+rapidfuzz-js/hamming
+rapidfuzz-js/jaro
+rapidfuzz-js/jaro-winkler
+rapidfuzz-js/prefix
+rapidfuzz-js/postfix
 ```
 
-Search results have the following shape:
+Levenshtein, Indel, LCS, and Hamming also export `editops` and `opcodes`.
+
+## Scorer objects
+
+`createScorer` freezes direction, bounds, symmetry, algorithm configuration,
+and private preparation hooks into a reusable object:
 
 ```ts
-type ExtractResult<T, K> = {
-  choice: T
-  score: number
-  key: K
-}
-```
+import { createScorer } from 'rapidfuzz-js'
+import { distance } from 'rapidfuzz-js/levenshtein'
 
-`extract`, `extractOne`, and `extractIter` accept arrays, maps, plain objects,
-sets, generators, and other iterables. The result key is the item index, map
-key, or object property name.
-
-### Build a score matrix
-
-```ts
-import { ratio, scoreMatrix } from 'rapidfuzz-js'
-
-const matrix = scoreMatrix(['cat', 'dog'], ['cats', 'dogs'], {
-  scorer: ratio,
-})
-
-matrix.rows // 2
-matrix.cols // 2
-matrix.at(0, 0) // Score for "cat" and "cats"
-matrix.data // Row-major Float64Array
-matrix.toArray() // Nested JavaScript arrays
-```
-
-Use `into` to select another typed-array format: `f64`, `f32`, `i32`, `i16`,
-`i8`, `u32`, `u16`, `u8`, or `u8c`. `scorePairs` compares items at matching
-positions and returns a typed array directly.
-
-All search functions are synchronous.
-
-### Reuse prepared inputs
-
-Prepare a collection once when running multiple queries against it:
-
-```ts
-import { defaultProcess, extractOne, prepareChoices, tokenSortRatio } from 'rapidfuzz-js'
-
-const index = prepareChoices(titles, {
-  scorer: tokenSortRatio,
-  processor: defaultProcess,
-})
-
-for (const query of queries) {
-  extractOne(query, index)
-}
-```
-
-For custom scoring loops, use `prepareQuery` or `prepareChoice`:
-
-```ts
-import { prepareQuery, tokenSortRatio } from 'rapidfuzz-js'
-
-const score = prepareQuery('new york mets', { scorer: tokenSortRatio })
-const scores = titles.map((title) => score(title))
-```
-
-A prepared value is a snapshot. Do not mutate its inputs after preparation, and
-use deterministic processors. Rebuild it when the source data changes.
-
-### Configure a scorer
-
-Use `configure` to bind scorer-specific options before passing a scorer to a
-search function:
-
-```ts
-import { configure, levenshteinDistance, scoreMatrix } from 'rapidfuzz-js'
-
-const weightedDistance = configure(levenshteinDistance, {
+const weighted = createScorer(distance, {
   weights: { insertion: 1, deletion: 1, substitution: 2 },
 })
 
-scoreMatrix(['kitten'], ['sitting'], { scorer: weightedDistance })
+weighted.direction // 'distance'
+weighted.bounds // [0, Infinity]
+weighted.symmetric // true
+weighted.score('kitten', 'sitting') // 5
+weighted.score('kitten', 'sitting', { threshold: 3 }) // undefined
 ```
 
-### Test a threshold
+Similarity thresholds are minimums. Distance thresholds are maximums. A
+threshold uses the scorer's own scale and must be finite.
+
+`scoreIfMatch` provides the thresholded result as a standalone operation;
+`isMatch` returns only the boolean.
+
+## One query or many
+
+One-shot search streams its input and does not retain the collection:
 
 ```ts
-import { isMatch, levenshteinDistance, matchScore, ratio } from 'rapidfuzz-js'
+import { bestMatch, createScorer, search } from 'rapidfuzz-js'
+import { fuzzySimilarity } from 'rapidfuzz-js/fuzz'
 
-matchScore(ratio, 'martha', 'marhta', { threshold: 80 })
-// Score or undefined
+const scorer = createScorer(fuzzySimilarity)
+const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
-isMatch(levenshteinDistance, 'kitten', 'sitting', { threshold: 3 })
-// true
+bestMatch('new york jet', teams, { scorer })
+search('new york', teams, { scorer, threshold: 60, limit: 2 })
 ```
 
-A threshold is a minimum for similarity scorers and a maximum for distance
-scorers.
-
-### Work with edit operations
+A Matcher snapshots searchable sequences and prepares them once:
 
 ```ts
-import { levenshteinEditops } from 'rapidfuzz-js'
+import { createMatcher } from 'rapidfuzz-js'
 
-const edits = levenshteinEditops('kitten', 'sitting')
+const matcher = createMatcher(teams, { scorer })
 
-edits.apply('kitten', 'sitting') // 'sitting'
-edits.toOpcodes()
-edits.toMatchingBlocks()
-edits.inverse()
+matcher.size // 3
+matcher.best('new york jet')
+matcher.search('new york', { limit: null }) // every result, best first
 ```
 
-`Editops` and `Opcodes` are readonly and use named records instead of tuples.
+Arrays and iterables use source positions as keys. Maps retain map keys. Plain
+objects retain property names. Missing source items and missing `getText`
+results are skipped by default without compacting those keys; use
+`missingItems: 'throw'` to reject them instead.
 
-## Imports
+Strings are retained. Non-string array-like sequences are shallow-copied into
+Matcher-owned storage, so later top-level mutations do not change search
+scores. Returned items and nested element objects remain live references.
 
-Functions can be imported from the package root. Python-style namespaces are
-also available:
+## Matrices and paired scoring
 
 ```ts
-import * as Indel from 'rapidfuzz-js/distance/Indel'
-import * as fuzz from 'rapidfuzz-js/fuzz'
-import * as search from 'rapidfuzz-js/search'
+import { scoreMatrix, scorePairs } from 'rapidfuzz-js'
 
-Indel.distance('kitten', 'sitting')
-fuzz.tokenSortRatio('red green blue', 'blue red green')
-search.scoreMatrix(['alpha'], ['alfa'])
+const matrix = scoreMatrix(['cat', 'dog'], ['cats', 'dogs'], { scorer })
+matrix.rows
+matrix.cols
+matrix.at(0, 0)
+matrix.data // row-major Float64Array
+
+scorePairs(['cat', 'dog'], ['cats', 'dogs'], { scorer })
 ```
 
-This package is ESM-only. CommonJS code must use asynchronous dynamic import:
+Set `into` to `f64`, `f32`, `i32`, `i16`, `i8`, `u32`, `u16`, `u8`, or `u8c`
+to select the typed-array storage.
 
-```js
-async function main() {
-  const { ratio } = await import('rapidfuzz-js')
-  return ratio('this is a test', 'this is a test!')
-}
+## Missing and invalid values
+
+Only `null` and `undefined` are missing. Similarity scorers return `0` for a
+missing operand by default:
+
+```ts
+const strict = createScorer(fuzzySimilarity, { missing: 'throw' })
+strict.score(null, 'text') // throws TypeError
 ```
 
-## API overview
+Distance scorers always throw on missing operands. Empty sequences are valid.
+Numbers (including `NaN`), booleans, and objects without a valid array-like
+`length` are invalid.
 
-| Area             | Exports                                                                                                              |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Distance metrics | `Indel`, `LCSseq`, `Levenshtein`, `DamerauLevenshtein`, `OSA`, `Hamming`, `Jaro`, `JaroWinkler`, `Prefix`, `Postfix` |
-| Fuzzy scorers    | `ratio`, `partialRatio`, `tokenSortRatio`, `tokenSetRatio`, `tokenRatio`, their partial variants, `wRatio`, `qRatio` |
-| Search           | `extract`, `extractOne`, `extractIter`, `scoreMatrix`, `scorePairs`                                                  |
-| Preparation      | `prepareChoices`, `prepareQuery`, `prepareChoice`                                                                    |
-| Utilities        | `configure`, `matchScore`, `isMatch`, `defaultProcess`, `Editops`, `Opcodes`                                         |
+## Custom metrics
 
-Each distance metric provides `distance`, `similarity`, `normalizedDistance`,
-and `normalizedSimilarity`. Root exports include the metric name, such as
-`levenshteinDistance` and `jaroSimilarity`. `Levenshtein`, `Indel`, `LCSseq`,
-and `Hamming` also provide edit operations and opcodes.
+Custom metrics must declare enough metadata for safe ordering and validation:
 
-## Moving from Python RapidFuzz
-
-JavaScript names use camelCase, and keyword arguments become an options object.
-
-| Python RapidFuzz                 | rapidfuzz-js                                              |
-| -------------------------------- | --------------------------------------------------------- |
-| `rapidfuzz.process`              | `rapidfuzz-js/search`                                     |
-| `cdist()`                        | `scoreMatrix()`                                           |
-| `cpdist()`                       | `scorePairs()`                                            |
-| `dtype='int'`                    | `into: 'i32'`                                             |
-| `(choice, score, key)`           | `{ choice, score, key }`                                  |
-| `extract_one()` returning `None` | `extractOne()` returning `undefined`                      |
-| `scorer_kwargs={...}`            | `scorer: configure(scorer, {...})`                        |
-| `weights=(1, 1, 2)`              | `weights: { insertion: 1, deletion: 1, substitution: 2 }` |
-
-Other differences:
-
-- `scoreMatrix` returns a `ScoreMatrix` backed by a typed array, not NumPy.
-- Sequence elements are compared with JavaScript's `===`.
-- `null`, `undefined`, and `NaN` are treated as missing values.
-- Prepared inputs are an extension provided by this package.
-
-The implementation is tested against RapidFuzz 3.14.5 and follows its public
-C++ behavior where the C++ and pure-Python implementations differ.
-
-## Performance
-
-Distance algorithms use bit-parallel kernels. Repeated-query search caches
-prepared query data, and symmetric matrices compute only one triangle.
-
-On the recorded M1 Max comparison, `rapidfuzz-js` was competitive with the
-fastest specialized JavaScript Levenshtein libraries and substantially faster
-than `fuzzball` for the measured workloads. Python RapidFuzz remains faster for
-most general distance and edit workloads that stay inside its C++ extension.
-
-### Prepared-input performance
-
-Preparation can change the result for repeated, token-heavy searches. For 20
-queries over 2,000 multiword titles, `prepareChoices` reduced the measured
-`tokenSortRatio` batch from 30.9 ms to 6.24 ms—**4.95× faster** than raw
-JavaScript search. The prepared path was also **2.74× faster than Python
-RapidFuzz** and **16.92× faster than `fuzzball`** on the equivalent measured
-workload.
-
-Key learnings:
-
-- Prepare stable collections that will be searched more than once.
-- Token scorers and processors benefit most because their setup can be reused.
-- Simple or one-off comparisons benefit less and may not recover preparation
-  cost.
-- Preparation removes repeated setup; it does not reduce the number of pair
-  scores.
-
-See the in-depth documentation for [why prepared inputs help](BENCHMARKS.md#prepared-inputs-why-they-matter),
-[comparisons with other libraries](BENCHMARKS.md#preparation-versus-other-libraries),
-and the full [Python RapidFuzz comparison](BENCHMARKS.md#python-rapidfuzz-comparison).
-The complete [benchmark documentation](BENCHMARKS.md) includes methodology,
-metrics, caveats, and reproduction instructions.
-
-## Development
-
-Requires Node.js 22+ and pnpm.
-
-```sh
-pnpm install
-pnpm test
-pnpm build
-pnpm lint
-pnpm check
+```ts
+const custom = createScorer(
+  (a, b) => (a === b ? 1 : 0),
+  {
+    direction: 'similarity',
+    bounds: [0, 1],
+    symmetric: true,
+  },
+)
 ```
 
-Keep source modules free of import-time work and runtime dependencies. The
-package relies on per-module output and `"sideEffects": false` for
-tree-shaking. See [CLAUDE.md](CLAUDE.md) for implementation and parity rules.
+Every custom result must be finite and inside its declared bounds. The result
+is validated before thresholding, ordering, or pruning.
+
+## Performance and package validation
+
+The benchmark vocabulary maps directly to the public API:
+
+| Workload | API |
+| --- | --- |
+| One best result | `bestMatch` |
+| Top N results | `search` with `limit: N` |
+| Prepare a reusable collection | `createMatcher` construction |
+| Repeated prepared query | `matcher.best` / `matcher.search` |
+
+The release check runs type checking, linting, formatting, all functional
+tests, the build, export-map validation, package validation, and tarball
+inspection. Source maps are shipped with embedded source content; TypeScript
+source files are not included in the package.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
-
-This project is derived from
-[RapidFuzz](https://github.com/rapidfuzz/RapidFuzz) and
-[rapidfuzz-cpp](https://github.com/rapidfuzz/rapidfuzz-cpp). Their notices are
-included in the license file.
+[MIT](./LICENSE)

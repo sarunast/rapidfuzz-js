@@ -16,7 +16,7 @@ import {
   levenshteinNormalizedDistance,
   levenshteinNormalizedSimilarity,
 } from '../src/distance/levenshtein.js'
-import { ratio } from '../src/fuzz.js'
+import { ratio } from '../src/_fuzz/legacy.js'
 import { isMatch, matchScore } from '../src/match.js'
 import { defaultProcess } from '../src/utils.js'
 

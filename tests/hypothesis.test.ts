@@ -26,7 +26,7 @@ import {
   tokenSetRatio,
   tokenSortRatio,
   wRatio,
-} from '../src/fuzz.js'
+} from '../src/_fuzz/legacy.js'
 import { extract } from '../src/search.js'
 import { defaultProcess } from '../src/utils.js'
 import { matrixScores } from './matrix.js'

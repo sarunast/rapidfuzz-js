@@ -17,7 +17,7 @@ import {
   prefixNormalizedSimilarity,
   prefixSimilarity,
 } from '../src/distance/prefix.js'
-import { ratio } from '../src/fuzz.js'
+import { ratio } from '../src/_fuzz/legacy.js'
 import { defaultProcess } from '../src/utils.js'
 import { editopTuples, maxLen } from './common.js'
 

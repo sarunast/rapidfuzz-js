@@ -24,3 +24,6 @@ export function defaultProcess(sentence: Sequence): string {
 
   return sentence.replace(NON_ALNUM, ' ').trim().toLowerCase()
 }
+
+/** Canonical text normalizer used by Matcher and one-shot search. */
+export const normalizeText: typeof defaultProcess = defaultProcess
