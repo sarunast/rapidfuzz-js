@@ -1,10 +1,26 @@
 import type { Direction, MaybeSequence, MissingPolicy, Sequence } from './types.js'
 
+/**
+ * The longest array JavaScript can hold. Without it `{ length: 2 ** 53 - 1 }`
+ * passes here and fails in {@link snapshotSequence} instead, as a `RangeError`
+ * about our own array. A representability bound, not a resource one.
+ */
+const MAX_SEQUENCE_LENGTH = 0xffff_ffff
+
+/**
+ * A callable is not a sequence, though every function has a `length`: accepting
+ * one would score a misplaced argument instead of reporting it.
+ */
 export function isSequence(value: unknown): value is Sequence {
   if (typeof value === 'string') return true
   if (typeof value !== 'object' || value === null || !('length' in value)) return false
   const length = value.length
-  return typeof length === 'number' && Number.isSafeInteger(length) && length >= 0
+  return (
+    typeof length === 'number' &&
+    Number.isSafeInteger(length) &&
+    length >= 0 &&
+    length <= MAX_SEQUENCE_LENGTH
+  )
 }
 
 export function validateSequence(value: unknown): Sequence {

@@ -35,30 +35,35 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { distance as damerauLevenshteinDistance } from '../../dist/algorithms/damerauLevenshtein/index.js'
+import { distance as hammingDistance } from '../../dist/algorithms/hamming/index.js'
+import { distance as indelDistance } from '../../dist/algorithms/indel/index.js'
+import { similarity as jaroSimilarity } from '../../dist/algorithms/jaro/index.js'
+import { similarity as jaroWinklerSimilarity } from '../../dist/algorithms/jaroWinkler/index.js'
 import {
-  damerauLevenshteinDistance,
-  extractOne,
-  hammingDistance,
-  indelDistance,
-  jaroSimilarity,
-  jaroWinklerSimilarity,
-  lcsSeqEditops,
-  lcsSeqSimilarity,
-  levenshteinDistance,
-  levenshteinEditops,
-  osaDistance,
-  partialRatio,
-  postfixDistance,
-  prefixDistance,
-  prepareChoices,
-  prepareQuery,
-  qRatio,
-  ratio,
+  editops as lcsEditops,
+  similarity as lcsSimilarity,
+} from '../../dist/algorithms/lcs/index.js'
+import {
+  distance as levenshteinDistance,
+  editops as levenshteinEditops,
+} from '../../dist/algorithms/levenshtein/index.js'
+import { distance as osaDistance } from '../../dist/algorithms/osa/index.js'
+import { distance as postfixDistance } from '../../dist/algorithms/postfix/index.js'
+import { distance as prefixDistance } from '../../dist/algorithms/prefix/index.js'
+import {
+  fuzzySimilarity,
+  partialSimilarity,
+  similarity as fuzzSimilarity,
+  tokenSetSimilarity,
+  tokenSortSimilarity,
+} from '../../dist/fuzz/index.js'
+import {
+  bestMatch,
+  createMatcher,
+  createScorer,
   scoreMatrix,
   scorePairs,
-  tokenSetRatio,
-  tokenSortRatio,
-  wRatio,
 } from '../../dist/index.js'
 
 // The contenders are dependencies of `bench/comparison/package.json`, not of
@@ -106,12 +111,15 @@ for (const argument of process.argv.slice(2)) {
 const corpus = buildCorpus()
 const fixedLevenshteinQuery = corpus.pairs['128'][0][0]
 const fixedLevenshteinChoices = corpus.pairs['128'].map(([, choice]) => choice)
-const preparedLevenshteinQuery = prepareQuery(fixedLevenshteinQuery, {
-  scorer: levenshteinDistance,
-})
-const preparedTokenTitles = prepareChoices(corpus.titles, {
-  scorer: tokenSortRatio,
-})
+
+// 0.6 has no public prepared handle. A query is held for the length of one
+// call — `scoreMatrix` prepares each row once and each column once — and a
+// collection is held by a `Matcher`, which prepares every choice at
+// construction and reuses them for every later query.
+const levenshteinScorer = createScorer(levenshteinDistance)
+const fuzzScorer = createScorer(fuzzSimilarity)
+const tokenSortScorer = createScorer(tokenSortSimilarity)
+const titleMatcher = createMatcher(corpus.titles, { scorer: tokenSortScorer })
 
 /**
  * Before timing anything, check the contenders answer the same question.
@@ -150,7 +158,7 @@ function checkAgreement() {
   }
 
   for (const [first, second] of corpus.sentences) {
-    const rounded = Math.round(ratio(first, second))
+    const rounded = Math.round(fuzzSimilarity(first, second))
     const theirs = fuzzball.ratio(first, second, RAW)
     if (theirs !== rounded) {
       problems.push(`fuzzball ratio: ${theirs} vs ${rounded} on "${first}"`)
@@ -250,59 +258,61 @@ const runFixedLevenshteinDirect = () => {
     levenshteinDistance(fixedLevenshteinQuery, choice)
   }
 }
-const runFixedLevenshteinPrepared = () => {
-  for (const choice of fixedLevenshteinChoices) preparedLevenshteinQuery(choice)
+const runFixedLevenshteinHeld = () => {
+  scoreMatrix([fixedLevenshteinQuery], fixedLevenshteinChoices, {
+    scorer: levenshteinScorer,
+  })
 }
 
-console.log('\nPrepared fixed-query Levenshtein — 1 query, 200 choices at 128 chars')
+console.log('\nHeld-query Levenshtein — 1 query, 200 choices at 128 chars')
 contest(
-  'prepared query',
+  'held query',
   'rapidfuzz-js direct',
-  runFixedLevenshteinPrepared,
+  runFixedLevenshteinHeld,
   runFixedLevenshteinDirect,
-  'same scorer; prepared query reused across every choice',
+  'same scorer and numbers; the query is prepared once per call, not per pair',
 )
 contest(
-  'prepared query',
+  'held query',
   'fastest-levenshtein',
-  runFixedLevenshteinPrepared,
+  runFixedLevenshteinHeld,
   () => {
     for (const choice of fixedLevenshteinChoices) {
       fastestLevenshtein(fixedLevenshteinQuery, choice)
     }
   },
-  'same distance; contender has no prepared-query API',
+  'same distance; contender scores every pair from scratch',
 )
 contest(
-  'prepared query',
+  'held query',
   'leven',
-  runFixedLevenshteinPrepared,
+  runFixedLevenshteinHeld,
   () => {
     for (const choice of fixedLevenshteinChoices) leven(fixedLevenshteinQuery, choice)
   },
-  'same distance; contender has no prepared-query API',
+  'same distance; contender scores every pair from scratch',
 )
 contest(
-  'prepared query',
+  'held query',
   'js-levenshtein',
-  runFixedLevenshteinPrepared,
+  runFixedLevenshteinHeld,
   () => {
     for (const choice of fixedLevenshteinChoices) {
       jsLevenshtein(fixedLevenshteinQuery, choice)
     }
   },
-  'same distance; contender has no prepared-query API',
+  'same distance; contender scores every pair from scratch',
 )
 contest(
-  'prepared query',
+  'held query',
   'fuzzball',
-  runFixedLevenshteinPrepared,
+  runFixedLevenshteinHeld,
   () => {
     for (const choice of fixedLevenshteinChoices) {
       fuzzball.distance(fixedLevenshteinQuery, choice, RAW)
     }
   },
-  'same distance; contender has no prepared-query API',
+  'same distance; contender scores every pair from scratch',
 )
 
 console.log('\nNormalised similarity')
@@ -310,7 +320,7 @@ contest(
   `sentences, ${corpus.sentences.length} pairs`,
   'fuzzball',
   () => {
-    for (const [a, b] of corpus.sentences) ratio(a, b)
+    for (const [a, b] of corpus.sentences) fuzzSimilarity(a, b)
   },
   () => {
     for (const [a, b] of corpus.sentences) fuzzball.ratio(a, b, RAW)
@@ -321,7 +331,7 @@ contest(
   `sentences, ${corpus.sentences.length} pairs`,
   'string-similarity',
   () => {
-    for (const [a, b] of corpus.sentences) ratio(a, b)
+    for (const [a, b] of corpus.sentences) fuzzSimilarity(a, b)
   },
   () => {
     for (const [a, b] of corpus.sentences) compareTwoStrings(a, b)
@@ -335,7 +345,7 @@ contest(
   'fuzzball',
   () => {
     for (const query of corpus.queries) {
-      extractOne(query, corpus.choices, { scorer: ratio })
+      bestMatch(query, corpus.choices, { scorer: fuzzScorer })
     }
   },
   () => {
@@ -355,7 +365,7 @@ contest(
   'string-similarity',
   () => {
     for (const query of corpus.queries) {
-      extractOne(query, corpus.choices, { scorer: ratio })
+      bestMatch(query, corpus.choices, { scorer: fuzzScorer })
     }
   },
   () => {
@@ -373,7 +383,7 @@ contest(
   'fuse.js (prebuilt index)',
   () => {
     for (const query of corpus.queries) {
-      extractOne(query, corpus.choices, { scorer: ratio })
+      bestMatch(query, corpus.choices, { scorer: fuzzScorer })
     }
   },
   () => {
@@ -384,11 +394,11 @@ contest(
 
 const runRawTokenSearch = () => {
   for (const query of corpus.titleQueries) {
-    extractOne(query, corpus.titles, { scorer: tokenSortRatio })
+    bestMatch(query, corpus.titles, { scorer: tokenSortScorer })
   }
 }
-const runPreparedTokenSearch = () => {
-  for (const query of corpus.titleQueries) extractOne(query, preparedTokenTitles)
+const runMatcherTokenSearch = () => {
+  for (const query of corpus.titleQueries) titleMatcher.best(query)
 }
 const runFuzzballTokenSearch = () => {
   for (const query of corpus.titleQueries) {
@@ -401,7 +411,7 @@ const runFuzzballTokenSearch = () => {
   }
 }
 
-console.log('\nPrepared token-sort search — 20 queries, 2,000 multiword titles')
+console.log('\nMatcher token-sort search — 20 queries, 2,000 multiword titles')
 contest(
   'raw choices',
   'fuzzball',
@@ -410,18 +420,18 @@ contest(
   'same token-sort scorer; fuzzball rounds scores',
 )
 contest(
-  'prepared choices',
-  'rapidfuzz-js raw',
-  runPreparedTokenSearch,
+  'Matcher',
+  'rapidfuzz-js one-shot',
+  runMatcherTokenSearch,
   runRawTokenSearch,
-  'same scorer and results; preparation is the only difference',
+  'same scorer and results; holding the collection is the only difference',
 )
 contest(
-  'prepared choices',
+  'Matcher',
   'fuzzball',
-  runPreparedTokenSearch,
+  runMatcherTokenSearch,
   runFuzzballTokenSearch,
-  'same token-sort scorer; fuzzball has no prepared-choice API',
+  'same token-sort scorer; fuzzball re-reads the collection every query',
 )
 
 /**
@@ -475,9 +485,9 @@ if (pythonPath !== null) {
   }
   againstPython.push([
     'ratio-sentences',
-    'fuzz.ratio, sentences',
+    'fuzz.similarity, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) ratio(a, b)
+      for (const [a, b] of corpus.sentences) fuzzSimilarity(a, b)
     },
   ])
   againstPython.push([
@@ -487,8 +497,8 @@ if (pythonPath !== null) {
   ])
   againstPython.push([
     'fixed-query-levenshtein-128',
-    'fixed-query Levenshtein, prepared',
-    runFixedLevenshteinPrepared,
+    'fixed-query Levenshtein, held',
+    runFixedLevenshteinHeld,
   ])
   againstPython.push([
     'indel-distance-128',
@@ -499,9 +509,9 @@ if (pythonPath !== null) {
   ])
   againstPython.push([
     'lcs-similarity-128',
-    'LCSseq.similarity, 128 chars',
+    'lcs.similarity, 128 chars',
     () => {
-      for (const [a, b] of pairs128) lcsSeqSimilarity(a, b)
+      for (const [a, b] of pairs128) lcsSimilarity(a, b)
     },
   ])
   againstPython.push([
@@ -555,83 +565,72 @@ if (pythonPath !== null) {
   ])
   againstPython.push([
     'partial-ratio-sentences',
-    'fuzz.partialRatio, sentences',
+    'fuzz.partialSimilarity, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) partialRatio(a, b)
+      for (const [a, b] of corpus.sentences) partialSimilarity(a, b)
     },
   ])
   againstPython.push([
     'token-sort-ratio-sentences',
-    'fuzz.tokenSortRatio, sentences',
+    'fuzz.tokenSortSimilarity, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) tokenSortRatio(a, b)
+      for (const [a, b] of corpus.sentences) tokenSortSimilarity(a, b)
     },
   ])
   againstPython.push([
     'token-set-ratio-sentences',
-    'fuzz.tokenSetRatio, sentences',
+    'fuzz.tokenSetSimilarity, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) tokenSetRatio(a, b)
+      for (const [a, b] of corpus.sentences) tokenSetSimilarity(a, b)
     },
   ])
   againstPython.push([
     'w-ratio-sentences',
-    'fuzz.WRatio, sentences',
+    'fuzz.fuzzySimilarity, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) wRatio(a, b)
-    },
-  ])
-  againstPython.push([
-    'q-ratio-sentences',
-    'fuzz.QRatio, sentences',
-    () => {
-      for (const [a, b] of corpus.sentences) qRatio(a, b)
+      for (const [a, b] of corpus.sentences) fuzzySimilarity(a, b)
     },
   ])
   againstPython.push([
     'extract-one',
-    'process.extractOne, 2,000 choices',
+    'bestMatch, 2,000 choices',
     () => {
       for (const query of corpus.queries) {
-        extractOne(query, corpus.choices, { scorer: ratio })
+        bestMatch(query, corpus.choices, { scorer: fuzzScorer })
       }
     },
   ])
   againstPython.push([
     'extract-one-token-sort',
-    'extractOne tokenSort, 2,000 titles',
-    () => {
-      for (const query of corpus.titleQueries) {
-        extractOne(query, corpus.titles, { scorer: tokenSortRatio })
-      }
-    },
+    'bestMatch tokenSort, 2,000 titles',
+    runRawTokenSearch,
   ])
   againstPython.push([
     'extract-one-token-sort',
-    'extractOne tokenSort, prepared titles',
-    runPreparedTokenSearch,
+    'Matcher tokenSort, 2,000 titles',
+    runMatcherTokenSearch,
   ])
   againstPython.push([
     'score-matrix',
-    'process.cdist, 50 x 200',
+    'scoreMatrix, 50 x 200',
     () => {
-      scoreMatrix(corpus.matrixRows, corpus.matrixCols, { scorer: ratio })
+      scoreMatrix(corpus.matrixRows, corpus.matrixCols, { scorer: fuzzScorer })
     },
   ])
   againstPython.push([
     'score-matrix-token-sort',
-    'process.cdist tokenSort, 50 x 200',
+    'scoreMatrix tokenSort, 50 x 200',
     () => {
       scoreMatrix(corpus.titles.slice(0, 50), corpus.titles.slice(50, 250), {
-        scorer: tokenSortRatio,
+        scorer: tokenSortScorer,
       })
     },
   ])
   againstPython.push([
     'score-pairs-ratio',
-    'process.cpdist ratio, 200 pairs',
+    'scorePairs, 200 pairs',
     () => {
-      scorePairs(sentenceLeft, sentenceRight, { scorer: ratio })
+      scorePairs(sentenceLeft, sentenceRight, { scorer: fuzzScorer })
     },
   ])
   againstPython.push([
@@ -643,9 +642,9 @@ if (pythonPath !== null) {
   ])
   againstPython.push([
     'lcs-editops-128',
-    'LCSseq.editops, 128 chars',
+    'lcs.editops, 128 chars',
     () => {
-      for (const [a, b] of pairs128) lcsSeqEditops(a, b)
+      for (const [a, b] of pairs128) lcsEditops(a, b)
     },
   ])
 

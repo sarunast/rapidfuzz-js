@@ -6,17 +6,28 @@ export function bestSimilarity<T, K>(
   threshold: number | null,
   optimal: number | null,
 ): DriverMatch<T, K> | undefined {
-  let found: DriverMatch<T, K> | undefined
+  // The winner is carried as the stored entry it already is, so a run of
+  // improvements allocates one result rather than one per improvement.
+  //
+  // What makes the first candidate a winner is `best`, not the sentinel: a
+  // custom metric may return the sentinel as a real score, and a bare
+  // `value > bestScore` would then select nothing. The sentinel is only here
+  // to mirror `bestDistance`.
+  let best: StoredItem<T, K> | undefined
+  let bestScore = Number.NEGATIVE_INFINITY
   let cutoff = threshold
   for (let index = 0; index < items.length; index++) {
     const entry = items[index]
     const value = score(entry.prepared, cutoff)
     if (threshold !== null && value < threshold) continue
-    if (found === undefined || value > found.score) {
-      found = { item: entry.item, key: entry.key, score: value }
+    if (best === undefined || value > bestScore) {
+      best = entry
+      bestScore = value
       cutoff = value
       if (optimal !== null && value === optimal) break
     }
   }
-  return found
+  return best === undefined
+    ? undefined
+    : { item: best.item, key: best.key, score: bestScore }
 }

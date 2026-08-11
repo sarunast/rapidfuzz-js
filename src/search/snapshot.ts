@@ -1,16 +1,20 @@
 import { snapshotSequence, validateSequence } from '../core/sequence.js'
-import type { MaybeSequence, Sequence } from '../core/types.js'
+import type { Direction, MaybeSequence, Sequence } from '../core/types.js'
 import type { MatcherOptions, Normalizer } from './types.js'
 
-export interface SequenceReader<T> {
-  (item: T): Sequence | null
-}
+export type SequenceReader<T> = (item: T) => Sequence | null
 
 export function sequenceReader<T>(
-  options: MatcherOptions<T, import('../core/types.js').Direction>,
+  options: MatcherOptions<T, Direction>,
   own: boolean,
 ): SequenceReader<T> {
   const policy = options.missingItems ?? 'skip'
+  // Checked once, before the specialized reader exists: an unknown policy is a
+  // typo, and reading it as 'throw' by falling through the 'skip' test would
+  // answer one wrong argument with a different wrong behaviour.
+  if (policy !== 'skip' && policy !== 'throw') {
+    throw new TypeError("missingItems must be 'skip' or 'throw'")
+  }
   const retain = own ? snapshotSequence : (value: Sequence): Sequence => value
   const normalize = options.normalize
 
@@ -88,7 +92,7 @@ export function resultLimit(value: number | null | undefined): number | null {
   if (value === null) return null
   const limit = value ?? 5
   if (!Number.isSafeInteger(limit) || limit < 0) {
-    throw new RangeError('limit must be null or a non-negative integer')
+    throw new RangeError('limit must be null or a non-negative safe integer')
   }
   return limit
 }

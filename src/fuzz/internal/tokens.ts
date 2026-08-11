@@ -12,10 +12,14 @@
  * performance unit and one set of semantics. `tokenSetRatioConverted` walks a
  * set's two maps directly rather than through an interface, and every piece here
  * has to agree about what a generic JavaScript element *is* — how it splits, how
- * it orders, how it hashes, and now how its identity is spelled, since
- * {@link mixedTokenKey} and the sort order read the same {@link identityOrdinal}.
- * A boundary between any two of them would run through the middle of that
- * agreement.
+ * it orders, how it hashes, and now how its identity is spelled: for an object
+ * or a function, {@link mixedTokenKey} and the sort order read the same
+ * {@link identityOrdinal}. A symbol is the exception on both counts — it hashes
+ * through `String(x)`, which two symbols of one description share, and it orders
+ * through {@link symbolIdentityOrder}'s own table, because a `WeakMap` cannot key
+ * one under this target's lib. Sharing a hash costs nothing there: a mixed key is
+ * a bucket, and {@link equalTokens} separates its occupants. A boundary between
+ * any two of these pieces would run through the middle of that agreement.
  *
  * `nextIdentityOrdinal` is shared between the object and symbol tiebreaks, but
  * that is convenience rather than necessity: {@link typeOrder} separates the two
@@ -169,6 +173,28 @@ export function stringContainsWhitespace(s: string): boolean {
  */
 export function tokenForm(s: ArrayLike<unknown>): ArrayLike<unknown> {
   return typeof s === 'string' ? convSequence(s) : s
+}
+
+/**
+ * The pair a token scorer scores, in the one form its engine reads.
+ *
+ * `convPair` hands back two BMP strings unchanged, which is right for the edit
+ * kernels — they read a string as fast as a typed array — and wrong here.
+ * Tokenising a string costs 1.5-2x tokenising the same content as code points,
+ * measured over the benchmark corpus at 585us against 390us for `tokenSort` and
+ * 1113us against 564us for `tokenSet`. The prepared path never had the problem:
+ * {@link prepareTokenChoice} has always converted, which is why only the
+ * unprepared scorers were affected.
+ *
+ * Both sides convert unconditionally, so the pair stays in one representation.
+ * That is the invariant token comparison depends on — a token of characters and
+ * a token of code points never compare equal.
+ */
+export function tokenPair(
+  left: Sequence,
+  right: Sequence,
+): [ArrayLike<unknown>, ArrayLike<unknown>] {
+  return [convSequence(left), convSequence(right)]
 }
 
 export function containsWhitespace(s: ArrayLike<unknown>): boolean {
@@ -386,6 +412,13 @@ const MAX_CODE_POINT = 0x10ffff
 const BMP_KEY_PREFIX = '\u0011'
 
 /**
+ * The same prefix as a code unit, written out rather than read back off the
+ * string: {@link isMixedTokenKey} asks for it once per `add` and once per `has`,
+ * which is twice per token of every token-set comparison.
+ */
+const BMP_KEY_PREFIX_CODE = 0x11
+
+/**
  * Every element is an integer inside the BMP, so the whole token spreads into
  * `String.fromCharCode` unchanged.
  *
@@ -484,12 +517,18 @@ function equalTokens(a: readonly unknown[], b: readonly unknown[]): boolean {
 
 /** Whether `key` belongs to the collision-checked mixed-token key space. */
 function isMixedTokenKey(key: string): boolean {
-  return key.length > 0 && key.charCodeAt(0) > BMP_KEY_PREFIX.charCodeAt(0)
+  return key.length > 0 && key.charCodeAt(0) > BMP_KEY_PREFIX_CODE
 }
 
 /**
- * Set-like token storage with an allocation-free fast path for code-point
- * tokens and collision buckets for arbitrary mixed tokens.
+ * Set-like token storage: a direct-keyed fast path for code-point tokens, and
+ * collision buckets for arbitrary mixed ones.
+ *
+ * Not an allocation-free path — {@link tokenKey} builds a string for either kind
+ * of token. What the fast path skips is everything after the key: no bucket
+ * array, no elementwise {@link equalTokens}, and a `Map` probe that decides
+ * membership on its own, because a packed key *is* the token's identity where a
+ * mixed key is only its hash.
  */
 export class UniqueTokenSet {
   readonly packed: Map<string, unknown[]> = new Map<string, unknown[]>()
@@ -540,9 +579,13 @@ export class UniqueTokenSet {
 export function uniqueTokens(tokens: readonly unknown[][]): UniqueTokenSet {
   const out = new UniqueTokenSet()
 
-  for (const token of tokens) {
-    const key = tokenKey(token)
-    out.add(key, token)
+  // Indexed, like every other loop over a token array here. `tokens` is always
+  // the array `splitSequence` built, and the difference against `for…of` is
+  // below what this machine can measure — this is for one reading convention
+  // rather than for a number.
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]
+    out.add(tokenKey(token), token)
   }
 
   return out

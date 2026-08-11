@@ -1,19 +1,22 @@
 import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
-import { asSequence, convPair, isMissing } from '../../algorithms/shared/scorerSupport.js'
+import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
 import { indelNormSimHeld, ratioConverted } from './partialWindow.js'
-import { sortedOf, tokenViewOf, type PreparedTokenChoice } from './tokens.js'
+import { sortedOf, tokenPair, tokenViewOf, type PreparedTokenChoice } from './tokens.js'
 
 /**
- * `sortedPatternA` must be the masks of `sortedA` — the caller holding one is
- * the only way to know that, since a mask cannot be checked against the
- * sequence it came from.
+ * `sortedPatternA` must build the masks of `sortedA` — the caller holding one
+ * is the only way to know that, since a mask cannot be checked against the
+ * sequence it came from. It is a thunk for the same reason
+ * {@link import('./tokenSet.js').tokenRatioConverted} takes one: arguments are
+ * evaluated before the callee runs, so a caller passing the built masks would
+ * build them behind the cutoff guard below rather than in front of it.
  *
- * It is scored through {@link indelNormSimHeld} rather than `ratioPrepared` on
- * purpose: the two differ in where they scale by 100, and a prepared query must
- * not disagree with an unprepared one in the last ULP. `indelNormSimHeld` is
- * `indelNormSimRange` with the LCS kernel swapped, so the arithmetic is the same
- * expression either way.
+ * It is scored through {@link indelNormSimHeld} rather than
+ * {@link import('./partialWindow.js').ratioHeld} because the sorted forms are
+ * built here and their lengths are already in hand; either way the arithmetic is
+ * `indelNormSimRange`'s with the LCS kernel swapped, which is what keeps a
+ * prepared query from disagreeing with an unprepared one in the last ULP.
  */
 export function tokenSortRatioConverted(
   a: ArrayLike<unknown>,
@@ -21,7 +24,7 @@ export function tokenSortRatioConverted(
   scoreCutoff: number,
   viewA?: PreparedTokenChoice,
   viewB?: PreparedTokenChoice,
-  sortedPatternA?: PatternMask,
+  sortedPatternA?: () => PatternMask,
 ): number {
   // Before the sorted forms are built, not after. These used to be default
   // parameter values, which JavaScript evaluates ahead of the body — so the
@@ -36,7 +39,7 @@ export function tokenSortRatioConverted(
   if (sortedPatternA !== undefined) {
     return (
       indelNormSimHeld(
-        sortedPatternA,
+        sortedPatternA(),
         sortedA.length,
         sortedB,
         0,
@@ -57,7 +60,7 @@ export function tokenSortRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
 
   // Through the core rather than straight to `ratioConverted`, so an impossible
   // cutoff is refused before either input is sorted.

@@ -182,6 +182,45 @@ describe('Metric and Scorer contracts', () => {
       Reflect.apply(createScorer, undefined, [() => 1, { direction: 'similarity' }]),
     ).toThrow(TypeError)
     expect(() => Reflect.apply(createScorer, undefined, [() => 1])).toThrow(TypeError)
+    // Not an object at all: these must reach the intended refusal rather than
+    // a `Reflect.get` complaint about a non-object target.
+    for (const notAConfiguration of [null, 42, 'similarity', () => 1]) {
+      expect(() =>
+        Reflect.apply(createScorer, undefined, [() => 1, notAConfiguration]),
+      ).toThrow('custom metrics require direction, bounds, and symmetric configuration')
+    }
+    // A custom distance scorer refuses `missing` as a built-in one does, rather
+    // than accepting a word it would then ignore.
+    for (const missing of ['compatible', 'throw']) {
+      expect(() =>
+        Reflect.apply(createScorer, undefined, [
+          () => 1,
+          { direction: 'distance', bounds: [0, 1], symmetric: true, missing },
+        ]),
+      ).toThrow("unknown custom scorer configuration key 'missing'")
+    }
+    const customDistance = createScorer(() => 1, {
+      direction: 'distance',
+      bounds: [0, 1],
+      symmetric: true,
+    })
+    expect(() => customDistance.score(null, 'a')).toThrow(TypeError)
+    // What a JavaScript caller can reach that a TypeScript one cannot. The
+    // built-in test answers `false` for these rather than throwing on a symbol
+    // lookup, so the refusal has to be made here, before a scorer exists.
+    for (const notAMetric of [null, undefined, 42, 'levenshtein', {}]) {
+      expect(() =>
+        Reflect.apply(createScorer, undefined, [
+          notAMetric,
+          { direction: 'similarity', bounds: [0, 1], symmetric: true },
+        ]),
+      ).toThrow(TypeError)
+    }
+    // An inherited compile hook is not this package's metric: `builtInMetric`
+    // installs it on the function itself, and a borrowed prototype should take
+    // the custom path — which then refuses it for want of a configuration.
+    const borrowed = Object.setPrototypeOf(() => 1, levenshtein.distance)
+    expect(() => Reflect.apply(createScorer, undefined, [borrowed])).toThrow(TypeError)
     expect(() =>
       Reflect.apply(createScorer, undefined, [
         () => 1,
@@ -354,6 +393,12 @@ describe('Metric and Scorer contracts', () => {
     expect(isMatch(custom, 'a', 'b', { threshold: 0 })).toBe(true)
     const distance = createScorer(levenshtein.distance)
     expect(distance.score('a', 'a', { threshold: -1 })).toBeUndefined()
+    // The distance half of the always-matches shortcut: a normalized distance
+    // cannot exceed 1, so a threshold of 1 accepts every pair — including one
+    // with nothing in common — while an invalid input still throws.
+    const normalized = createScorer(levenshtein.normalizedDistance)
+    expect(isMatch(normalized, 'abc', 'xyz', { threshold: 1 })).toBe(true)
+    expect(isMatch(normalized, 'abc', 'xyz', { threshold: 0.5 })).toBe(false)
     expect(() => Reflect.apply(scorerCompilation, undefined, [{}])).toThrow(TypeError)
   })
 })

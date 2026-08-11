@@ -22,7 +22,7 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * `normDistance` and `indelDist` are here rather than anywhere shared because
  * `tokenSetRatioConverted` is their only caller.
  */
-import { asSequence, convPair, isMissing } from '../../algorithms/shared/scorerSupport.js'
+import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
 import {
   type CharSet,
@@ -34,6 +34,7 @@ import {
   intersects,
   joinTokens,
   sortedOf,
+  tokenPair,
   sortTokens,
   splitOf,
   tokenViewOf,
@@ -68,7 +69,7 @@ export function tokenSetRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
 
   return tokenSetRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -215,7 +216,7 @@ export function tokenRatioConverted(
       // The masks describe the *caller's* sorted query. A view built here has a
       // sorted form of its own, and scoring it against the caller's masks would
       // compare against the wrong sequence.
-      viewA === undefined ? undefined : preparedSortedPatternA?.(),
+      viewA === undefined ? undefined : preparedSortedPatternA,
     ),
   )
 }
@@ -228,7 +229,7 @@ export function tokenRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
 
   return tokenRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -241,7 +242,7 @@ export function partialTokenSortRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
 
   // Refused before either input is sorted, for the same reason as
   // `tokenSortRatio_impl`. `partialRatioConverted` would answer 0 anyway, but
@@ -264,7 +265,7 @@ export function partialTokenSetRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
 
   return partialTokenSetRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -304,7 +305,7 @@ export function partialTokenRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
 
   return partialTokenRatioConverted(a, b, options.scoreCutoff ?? 0)
 }

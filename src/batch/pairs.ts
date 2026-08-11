@@ -2,7 +2,7 @@ import { scorerCompilation } from '../core/scorer.js'
 import { validateSequence } from '../core/sequence.js'
 import { qualifies } from '../core/threshold.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
-import { resolveBatchOptions } from './options.js'
+import { rejectedScore, resolveBatchOptions } from './options.js'
 import {
   allocateScores,
   roundHalfAwayFromZero,
@@ -42,23 +42,34 @@ export function scorePairs<D extends Direction>(
   if (queries.length !== choices.length) {
     throw new RangeError('queries and choices must have the same length')
   }
+  // Configuration first, allocation second, data third. Every check below is a
+  // few comparisons, and reaching them after the allocation meant a bad
+  // threshold or an unusable multiplier was reported only once a typed array
+  // the length of the input had been handed out.
   const kind = options.into ?? 'f64'
-  const scores = allocateScores(kind, queries.length, 'scorePairs')
-  const integral = kind !== 'f64' && kind !== 'f32'
   const compilation = scorerCompilation(options.scorer)
   const { threshold, multiplier } = resolveBatchOptions(
     options.threshold,
     options.scoreMultiplier,
   )
+  const scores = allocateScores(kind, queries.length, 'scorePairs')
+  const integral = kind !== 'f64' && kind !== 'f32'
+  const rejected =
+    compilation.trusted || threshold === null
+      ? 0
+      : rejectedScore(compilation.direction, compilation.bounds, multiplier, integral)
+  // One closure, with the invariant tests inside it. Choosing between two
+  // closures — one that qualifies and one that cannot — measured 1.02-1.18x
+  // *slower* over six pair workloads, worst on the custom-scorer case it was
+  // meant to help: two shapes reaching one call site is what stops the call
+  // being inlined, and that costs more than the branches it removes.
   const store = (score: number): number => {
     const thresholded =
       compilation.trusted ||
       threshold === null ||
       qualifies(compilation.direction, score, threshold)
         ? score
-        : compilation.direction === 'similarity'
-          ? compilation.bounds[0]
-          : compilation.bounds[1]
+        : rejected
     const scaled = thresholded * multiplier
     return integral ? roundHalfAwayFromZero(scaled) : scaled
   }

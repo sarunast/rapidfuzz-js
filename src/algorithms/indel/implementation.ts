@@ -11,6 +11,7 @@ import type { Editops, Opcodes } from '../shared/editops/index.js'
 import {
   alignRepresentation,
   canonicalRawCutoff,
+  canonicalSimilarityCutoff,
   convPair,
   distCutoff,
   normalize,
@@ -119,7 +120,7 @@ function indelSimilarity_impl(
 ): number {
   const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
-  const cutoff = canonicalRawCutoff(options.scoreCutoff)
+  const cutoff = canonicalSimilarityCutoff(options.scoreCutoff)
   const misses = cutoff == null ? UNBOUNDED_MISSES : max - cutoff
   return simCutoff(max - distance_(a, b, misses), cutoff)
 }
@@ -198,7 +199,7 @@ function prepareIndel(kind: PreparedIndelKind): PreparedScorerFactory {
           return distCutoff(preparedDistance(b, cutoff ?? UNBOUNDED_MISSES), cutoff)
         }
         case 'similarity': {
-          const cutoff = canonicalRawCutoff(rawCutoff)
+          const cutoff = canonicalSimilarityCutoff(rawCutoff)
           const misses = cutoff === null ? UNBOUNDED_MISSES : max - cutoff
           return simCutoff(max - preparedDistance(b, misses), cutoff)
         }

@@ -31,9 +31,16 @@ export function replaceHeapRoot<T>(
     if (left >= length) break
     const right = left + 1
     let child = left
-    if (right < length && higherPriority(heap[right], heap[left])) child = right
-    if (!higherPriority(heap[child], value)) break
-    heap[parent] = heap[child]
+    let childValue = heap[left]
+    if (right < length) {
+      const rightValue = heap[right]
+      if (higherPriority(rightValue, childValue)) {
+        child = right
+        childValue = rightValue
+      }
+    }
+    if (!higherPriority(childValue, value)) break
+    heap[parent] = childValue
     parent = child
   }
   heap[parent] = value

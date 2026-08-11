@@ -1,6 +1,7 @@
 import {
   alignRepresentation,
   canonicalRawCutoff,
+  canonicalSimilarityCutoff,
   convPair,
   distCutoff,
   normalize,
@@ -324,7 +325,7 @@ function prepareDamerau(kind: PreparedDamerauKind): PreparedScorerFactory {
           return distCutoff(distance_(s1, b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
         }
         case 'similarity': {
-          const cutoff = canonicalRawCutoff(rawCutoff)
+          const cutoff = canonicalSimilarityCutoff(rawCutoff)
           const bound = cutoff === null ? Number.MAX_SAFE_INTEGER : max - cutoff
           return simCutoff(max - distance_(s1, b, bound), cutoff)
         }
@@ -370,7 +371,7 @@ function damerauLevenshteinSimilarity_impl(
 ): number {
   const [a, b] = convPair(s1, s2)
   const max = maximum(a, b)
-  const cutoff = canonicalRawCutoff(options.scoreCutoff)
+  const cutoff = canonicalSimilarityCutoff(options.scoreCutoff)
   const bound = cutoff == null ? Number.MAX_SAFE_INTEGER : max - cutoff
   return simCutoff(max - distance_(a, b, bound), cutoff)
 }

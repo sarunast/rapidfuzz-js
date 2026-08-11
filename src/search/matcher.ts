@@ -1,7 +1,7 @@
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
-import { collectionEntries } from './collection.js'
+import { assertCollection, collectionEntries } from './collection.js'
 import { bestDistance } from './internal/bestDistance.js'
 import { bestSimilarity } from './internal/bestSimilarity.js'
 import { topDistance } from './internal/topDistance.js'
@@ -23,7 +23,11 @@ import type {
   SearchOptions,
 } from './types.js'
 
-function missingBest<T, K>(
+// Both helpers answer a missing query, which only a similarity scorer accepts:
+// a distance metric refuses the pair in `validatePair` before a score exists.
+// That is why they qualify with `score < threshold` rather than reading the
+// direction — under distance the call has already thrown.
+function missingSimilarityBest<T, K>(
   items: readonly StoredItem<T, K>[],
   score: number,
   threshold: number | null,
@@ -33,15 +37,20 @@ function missingBest<T, K>(
   return first === undefined ? undefined : { item: first.item, key: first.key, score }
 }
 
-function missingTop<T, K>(
+function missingSimilarityTop<T, K>(
   items: readonly StoredItem<T, K>[],
   score: number,
   threshold: number | null,
   limit: number | null,
 ): readonly Match<T, K>[] {
   if (threshold !== null && score < threshold) return []
-  const selected = limit === null ? items : items.slice(0, limit)
-  return selected.map(({ item, key }) => ({ item, key, score }))
+  const length = limit === null ? items.length : Math.min(items.length, limit)
+  const matches: Match<T, K>[] = new Array(length)
+  for (let index = 0; index < length; index++) {
+    const entry = items[index]
+    matches[index] = { item: entry.item, key: entry.key, score }
+  }
+  return matches
 }
 
 export function createMatcher<T, D extends Direction>(
@@ -66,12 +75,27 @@ export function createMatcher<T, D extends Direction>(
 ): Matcher<T, unknown, D> {
   const scorer = options.scorer
   const normalize = options.normalize
+  // Same order as the one-shot entry points: the collection is checked before
+  // anything semantic, so a wrong argument is refused the same way whichever
+  // API the caller reached for.
+  assertCollection(items)
   const compilation = scorerCompilation(scorer)
+  // Fixed for the matcher's lifetime: direction and bounds belong to the
+  // scorer, and only the threshold changes from one call to the next.
+  const direction = compilation.direction
+  const optimal = compilation.trusted
+    ? direction === 'similarity'
+      ? compilation.bounds[1]
+      : compilation.bounds[0]
+    : null
+  // A copy, so a caller who mutates their options object afterwards cannot
+  // change a matcher that has already read them. The properties are declared
+  // as `| undefined`, so naming an absent one costs nothing.
   const stableOptions: MatcherOptions<T, Direction> = {
     scorer: options.scorer,
-    ...(options.getText === undefined ? {} : { getText: options.getText }),
-    ...(options.normalize === undefined ? {} : { normalize: options.normalize }),
-    ...(options.missingItems === undefined ? {} : { missingItems: options.missingItems }),
+    getText: options.getText,
+    normalize: options.normalize,
+    missingItems: options.missingItems,
   }
   const stored: StoredItem<T, unknown>[] = []
   const readSequence = sequenceReader(stableOptions, true)
@@ -104,24 +128,19 @@ export function createMatcher<T, D extends Direction>(
     const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
       const missingScore = compilation.score(query, '', threshold)
-      return missingBest(stored, missingScore, threshold)
+      return missingSimilarityBest(stored, missingScore, threshold)
     }
     if (
       compilation.trusted &&
-      impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
+      impossibleTrustedThreshold(direction, compilation.bounds, threshold)
     ) {
       return undefined
     }
     const activeThreshold = compilation.trusted
-      ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
+      ? trustedKernelThreshold(direction, compilation.bounds, threshold)
       : threshold
     const score = compilation.prepareQuery(normalized)
-    const optimal = compilation.trusted
-      ? compilation.direction === 'similarity'
-        ? compilation.bounds[1]
-        : compilation.bounds[0]
-      : null
-    return compilation.direction === 'similarity'
+    return direction === 'similarity'
       ? bestSimilarity(stored, score, activeThreshold, optimal)
       : bestDistance(stored, score, activeThreshold, optimal)
   }
@@ -135,24 +154,19 @@ export function createMatcher<T, D extends Direction>(
     const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
       const missingScore = compilation.score(query, '', threshold)
-      return missingTop(stored, missingScore, threshold, limit)
+      return missingSimilarityTop(stored, missingScore, threshold, limit)
     }
     if (
       compilation.trusted &&
-      impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
+      impossibleTrustedThreshold(direction, compilation.bounds, threshold)
     ) {
       return []
     }
     const activeThreshold = compilation.trusted
-      ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
+      ? trustedKernelThreshold(direction, compilation.bounds, threshold)
       : threshold
     const score = compilation.prepareQuery(normalized)
-    const optimal = compilation.trusted
-      ? compilation.direction === 'similarity'
-        ? compilation.bounds[1]
-        : compilation.bounds[0]
-      : null
-    return compilation.direction === 'similarity'
+    return direction === 'similarity'
       ? topSimilarity(stored, score, activeThreshold, limit, optimal)
       : topDistance(stored, score, activeThreshold, limit, optimal)
   }
@@ -160,8 +174,11 @@ export function createMatcher<T, D extends Direction>(
     query: MaybeSequence,
     call?: SearchIterOptions,
   ): IterableIterator<Match<T, unknown>> => {
+    // Read where the call is made, not where iteration starts: a caller who
+    // mutates their options object between the two would otherwise change a
+    // search already asked for. Scoring stays lazy; only the number is taken.
+    const threshold = optionalThreshold(call?.threshold)
     function* iterate(): Generator<Match<T, unknown>> {
-      const threshold = optionalThreshold(call?.threshold)
       const normalized = normalizeQuery(query, normalize)
       if (normalized === null) {
         const missingScore = compilation.score(query, '', threshold)
@@ -174,22 +191,21 @@ export function createMatcher<T, D extends Direction>(
       }
       if (
         compilation.trusted &&
-        impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
+        impossibleTrustedThreshold(direction, compilation.bounds, threshold)
       ) {
         return
       }
       const activeThreshold = compilation.trusted
-        ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
+        ? trustedKernelThreshold(direction, compilation.bounds, threshold)
         : threshold
       const score = compilation.prepareQuery(normalized)
+      const similarity = direction === 'similarity'
       for (let index = 0; index < stored.length; index++) {
         const entry = stored[index]
         const value = score(entry.prepared, activeThreshold)
         if (
           threshold === null ||
-          (compilation.direction === 'similarity'
-            ? value >= threshold
-            : value <= threshold)
+          (similarity ? value >= threshold : value <= threshold)
         ) {
           yield { item: entry.item, key: entry.key, score: value }
         }

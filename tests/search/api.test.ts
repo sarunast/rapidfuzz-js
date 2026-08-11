@@ -445,6 +445,21 @@ describe('one-shot search and Matcher', () => {
     )
   })
 
+  test('searchIter reads its call options where the call is made', () => {
+    // Lazy scoring, eager arguments: a caller who reuses and mutates an options
+    // object must not change a search they already asked for.
+    const items = ['alpha', 'alpine', 'beta']
+    const options = { scorer, threshold: 90 }
+    const iterator = searchIter('alpha', items, options)
+    options.threshold = 0
+    expect([...iterator].map((match) => match.item)).toEqual(['alpha'])
+
+    const call = { threshold: 90 }
+    const fromMatcher = createMatcher(items, { scorer }).searchIter('alpha', call)
+    call.threshold = 0
+    expect([...fromMatcher].map((match) => match.item)).toEqual(['alpha'])
+  })
+
   test('a finite one-shot heap stops once it holds only optimal scores', () => {
     // What the specialized Matcher drivers already do: ties lose on source
     // order, so a full heap of optimal scores cannot be displaced by anything
@@ -645,6 +660,22 @@ describe('one-shot search and Matcher', () => {
     expect(() => Reflect.apply(createMatcher, undefined, [null, { scorer }])).toThrow(
       TypeError,
     )
+    // A record collection is read with Object.keys, so an object that holds its
+    // items anywhere else is a wrong argument rather than an empty collection.
+    expect(() =>
+      Reflect.apply(createMatcher, undefined, [new Date(), { scorer }]),
+    ).toThrow(TypeError)
+    const bare: Record<string, string> = Object.create(null)
+    bare['only'] = 'alpha'
+    expect(createMatcher(bare, { scorer }).best('alpha')?.key).toBe('only')
+    // A misspelled policy is refused rather than read as 'throw' by failing
+    // the 'skip' test, which is what an untyped caller would otherwise get.
+    expect(() =>
+      Reflect.apply(createMatcher, undefined, [['a'], { scorer, missingItems: 'none' }]),
+    ).toThrow(TypeError)
+    expect(() =>
+      Reflect.apply(bestMatch, undefined, ['a', ['a'], { scorer, missingItems: 'none' }]),
+    ).toThrow(TypeError)
     const distance = createScorer(levenshtein.distance)
     expect(() => createMatcher([], { scorer: distance }).best(null)).toThrow(TypeError)
     expect(() => bestMatch(null, [], { scorer: distance })).toThrow(TypeError)

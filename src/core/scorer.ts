@@ -53,7 +53,9 @@ function customCompilation<D extends Direction>(
     bounds,
     symmetric,
     trusted: false,
-    score: (a, b) => score(a, b),
+    // Passed rather than wrapped: a two-parameter function satisfies the
+    // three-parameter shape, and a custom metric has no cutoff to take.
+    score,
     rawScore,
     prepareQuery: (query) => (choice) => rawScore(query, validatePreparedChoice(choice)),
     prepareChoice: (choice) => choice,
@@ -117,26 +119,42 @@ export function createScorer<D extends Direction>(
   metric: (a: MaybeSequence, b: MaybeSequence) => number,
   configuration: CustomScorerConfiguration<D>,
 ): Scorer<D>
+// `Metric<D, never>` is "whatever its configuration", not "it takes none": the
+// compile hook is contravariant, so `object` would demand a hook accepting any
+// object and no built-in would be assignable. The overloads keep the real
+// `Config`; this line only has to admit them all.
 export function createScorer<D extends Direction>(
-  metric: Metric<D, object> | ((a: MaybeSequence, b: MaybeSequence) => number),
+  metric: Metric<D, never> | ((a: MaybeSequence, b: MaybeSequence) => number),
   configuration?: object,
 ): Scorer<D> {
-  if (isBuiltInMetric(metric)) {
+  // The direction is named rather than inferred: the guard reads `unknown`, so
+  // there is no argument left to infer `D` from, and a bare call would widen the
+  // result to `Scorer<Direction>`.
+  if (isBuiltInMetric<D, object>(metric)) {
     return fromCompilation(metric[COMPILE](configuration))
+  }
+  // The guard above answers `false` for a non-callable rather than throwing, so
+  // refuse it here — otherwise the scorer builds and fails at first use.
+  if (typeof metric !== 'function') {
+    throw new TypeError('metric must be a function')
   }
   if (!isCustomConfiguration<D>(configuration)) {
     throw new TypeError(
       'custom metrics require direction, bounds, and symmetric configuration',
     )
   }
-  validateCustomConfigurationKeys(configuration)
+  validateCustomConfigurationKeys(configuration, configuration.direction)
   validateBounds(configuration.bounds)
-  const missing = configuration.missing ?? 'compatible'
+  // Only similarity has a policy to choose: `validatePair` throws for a missing
+  // side of a distance pair whatever it is told.
+  const missing: MissingPolicy =
+    configuration.direction === 'similarity'
+      ? (configuration.missing ?? 'compatible')
+      : 'throw'
   if (missing !== 'compatible' && missing !== 'throw') {
     throw new TypeError("missing must be 'compatible' or 'throw'")
   }
   if (
-    configuration.direction === 'similarity' &&
     missing === 'compatible' &&
     (configuration.bounds[0] > 0 || configuration.bounds[1] < 0)
   ) {
@@ -159,23 +177,30 @@ export function createScorer<D extends Direction>(
   )
 }
 
-function validateCustomConfigurationKeys(configuration: object): void {
+function validateCustomConfigurationKeys(
+  configuration: object,
+  direction: Direction,
+): void {
   for (const key of Object.keys(configuration)) {
-    if (
-      key !== 'direction' &&
-      key !== 'bounds' &&
-      key !== 'symmetric' &&
-      key !== 'missing'
-    ) {
+    // `missing` is similarity-only, as it is for a built-in metric — see
+    // `configurationRecord` in `algorithms/shared/metricAdapter`.
+    const known =
+      key === 'direction' ||
+      key === 'bounds' ||
+      key === 'symmetric' ||
+      (key === 'missing' && direction === 'similarity')
+    if (!known) {
       throw new TypeError(`unknown custom scorer configuration key '${key}'`)
     }
   }
 }
 
+// Reads `unknown` because a JavaScript caller's `null` or `123` gets here, and
+// `Reflect.get` on a non-object throws an error about our internals.
 function isCustomConfiguration<D extends Direction>(
-  value: object | undefined,
+  value: unknown,
 ): value is CustomScorerConfiguration<D> {
-  if (value === undefined) return false
+  if (typeof value !== 'object' || value === null) return false
   const direction = Reflect.get(value, 'direction')
   return (
     (direction === 'similarity' || direction === 'distance') &&

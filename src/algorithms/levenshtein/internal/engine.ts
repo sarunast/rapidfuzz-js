@@ -1,6 +1,7 @@
 import { lcsLengthRange } from '../../lcs/internal/kernel.js'
 import {
   canonicalRawCutoff,
+  canonicalSimilarityCutoff,
   convPair,
   hasSurrogatePair,
   isSequence,
@@ -107,6 +108,18 @@ export function levenshteinRawCutoff(
     throw new RangeError('scoreCutoff has to be a finite count of at least 0')
   }
   return cutoff
+}
+
+/**
+ * {@link levenshteinRawCutoff} for the similarity direction, where a count
+ * clears a fractional cutoff only by reaching the next whole one.
+ */
+export function levenshteinSimilarityCutoff(
+  cutoff: number | null | undefined,
+  integral: boolean,
+): number | null {
+  if (integral) return canonicalSimilarityCutoff(cutoff)
+  return levenshteinRawCutoff(cutoff, false)
 }
 
 export function rawBound(bound: number, integral: boolean): number {
@@ -444,7 +457,7 @@ export function levenshteinSimilarityImpl(
   const integral = integralWeights(weights)
   const [a, b] = convPair(s1, s2)
   const max = maximum(a, b, weights)
-  const cutoff = levenshteinRawCutoff(options.scoreCutoff, integral)
+  const cutoff = levenshteinSimilarityCutoff(options.scoreCutoff, integral)
   const bound =
     cutoff === null ? Number.MAX_SAFE_INTEGER : rawBound(max - cutoff, integral)
   const hint =

@@ -1,5 +1,6 @@
 import {
   lcsSeqLengthPrepared,
+  lcsSeqLengthPreparedBounded,
   lcsSeqLengthRange,
   prepareLcsPattern,
 } from '../../algorithms/lcs/implementation.js'
@@ -16,9 +17,10 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * what makes the dependency graph readable. Token families and adaptive fuzzy
  * similarity sit above both, and a cycle would show up here first.
  *
- * The two helpers exported for those upper layers — {@link indelNormSimHeld}
- * and {@link ratioConverted} — live here rather than in a shared `common` module
- * precisely because this one is already upstream of everything that wants them.
+ * The helpers exported for those upper layers — {@link indelNormSimHeld},
+ * {@link ratioConverted} and {@link ratioHeld} — live here rather than in a
+ * shared `common` module precisely because this one is already upstream of
+ * everything that wants them.
  */
 import { asSequence, convPair, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import type { FuzzInput, FuzzOptions, ScoreAlignment } from '../types.js'
@@ -91,10 +93,11 @@ export function indelNormSimHeld(
 ): number {
   const maximum = patternLength + textLength
   // Two empty inputs are identical, and the division below would answer `NaN`.
-  // Not weighed against the cutoff: every caller scales a percentage into
-  // `[0, 1]` and answers 0 above 100 before reaching this, so no cutoff that
-  // gets here is above the 1 it would be compared against.
-  if (maximum === 0) return 1
+  // Weighed against the cutoff all the same, exactly as {@link indelNormSimRange}
+  // does: every caller today scales a percentage into `[0, 1]` and answers 0
+  // above 100 before reaching this, but that is the caller's invariant rather
+  // than this function's, and it costs nothing here to owe them nothing.
+  if (maximum === 0) return 1 >= scoreCutoff ? 1 : 0
 
   const ceiling = 1 - Math.abs(patternLength - textLength) / maximum
   if (ceiling < scoreCutoff) return 0
@@ -112,6 +115,80 @@ export function ratioConverted(
   scoreCutoff: number,
 ): number {
   return indelNormSim(a, b, scoreCutoff / 100) * 100
+}
+
+/**
+ * {@link ratioConverted} against masks the caller holds, which is what a
+ * prepared query scores every candidate through.
+ *
+ * `pattern` must build the masks of a sequence `patternLength` long — a caller
+ * holding one is the only way to know that, since a mask cannot be checked
+ * against the sequence it came from.
+ *
+ * The scaling order is {@link ratioConverted}'s, not a rearrangement of it: the
+ * cutoff is divided by 100 on the way in and the score multiplied by 100 on the
+ * way out, so the comparison happens on the same two numbers either way.
+ * Comparing percentages instead — `sim * 100 >= scoreCutoff` — is algebraically
+ * the same test and a different one in floating point, and the two prepared
+ * ratio paths did exactly that. `'ceaece'` against `'caecec'` scores
+ * 83.33333333333334; feeding that back as a cutoff divides to
+ * 0.8333333333333335, one ULP *above* the 0.8333333333333334 the score
+ * normalises to, so the unprepared path rejected a score the prepared one
+ * returned. Best-match search raises its cutoff to the running best, which is
+ * precisely that comparison — so the disagreement was reachable from `extract`
+ * on six-character inputs, not only in principle.
+ *
+ * Deliberately ignores `scoreHint`, which the prepared callers receive and drop.
+ * The only lever a hint could pull here is the bounded kernel's early exit, and a
+ * hint is an estimate rather than a bound: budgeting the scan at an optimistic
+ * hint means every candidate scoring between the cutoff and the hint is pruned
+ * and then rescanned in full. Measured over an `extract` of 2000 choices where
+ * the bounded path is reachable, that cost **1.49x** the kernel iterations at
+ * `scoreHint: 90` and **1.71x** at `70`; with a cutoff already set it ran the
+ * bounded kernel 1602 times where 806 sufficed. The same shape was already found
+ * slower in Levenshtein, which sizes a *band* with its hint — a lever the
+ * bit-parallel LCS does not have.
+ */
+export function ratioHeld(
+  pattern: PatternMask,
+  patternLength: number,
+  text: ArrayLike<unknown>,
+  scoreCutoff: number,
+): number {
+  // No pair scores above 100, so a cutoff past it rejects everything — including
+  // the empty pair, whose perfect score is awarded below without a comparison.
+  // `wRatio` divides its cutoff by a scale factor and so does ask for more.
+  if (scoreCutoff > 100) return 0
+
+  const cutoff = scoreCutoff / 100
+  const textLength = text.length
+  const maximum = patternLength + textLength
+  // Two empty inputs are identical, and the division below would answer `NaN`.
+  // Not weighed against the cutoff: the guard above leaves nothing above the 1
+  // this scores.
+  if (maximum === 0) return 100
+
+  const ceiling = 1 - Math.abs(patternLength - textLength) / maximum
+  if (ceiling < cutoff) return 0
+
+  // Smallest common subsequence that could still score at the cutoff, since
+  // `sim` below is `2 * lcs / maximum`. Deliberately rounded down: this is only
+  // a pruning bound, and the comparison at the end is what qualifies a score.
+  // One element too permissive costs the kernel its early exit; rounding upward
+  // could reject a pair that meets the cutoff exactly.
+  const required = Math.max(0, Math.floor((cutoff * maximum) / 2))
+  // The bounded kernel answers a negative sentinel rather than a length when the
+  // target is out of reach, and every non-negative answer is the exact length —
+  // so nothing approximate reaches the score. Below these thresholds the exit it
+  // buys does not pay for the extra bookkeeping.
+  const lcs =
+    cutoff >= 0.7 && maximum >= 128
+      ? lcsSeqLengthPreparedBounded(pattern, text, 0, textLength, required)
+      : lcsSeqLengthPrepared(pattern, text, 0, textLength)
+  if (lcs < 0) return 0
+
+  const sim = 1 - (maximum - 2 * lcs) / maximum
+  return sim >= cutoff ? sim * 100 : 0
 }
 
 /**
@@ -169,11 +246,12 @@ export interface CharSet {
 /**
  * Highest code unit a string needle's direct table will stretch to cover.
  *
- * Every non-ideographic script sits in one contiguous block of the low BMP:
- * Cyrillic ends at U+04FF, Greek at U+03FF, Hebrew at U+05F4, and a needle
- * written in any of them is answered by a table of a couple of kilobytes
- * however long it is. The ideographs start at U+4E00 and would want eighty, so
- * they keep the `Set` — and keep it *inline* at the probe, which is why the
+ * The scripts packed into the first two kilobytes of the BMP end here: Greek at
+ * U+03FF, Cyrillic at U+04FF, Hebrew at U+05F4, Arabic at U+06FF. A needle
+ * written in any of them is answered by a table of a couple of kilobytes however
+ * long it is. Everything above — Devanagari, Thai and the rest of the higher
+ * blocks as much as the ideographs, which start at U+4E00 and would want eighty
+ * kilobytes — keeps the `Set`, and keeps it *inline* at the probe, which is why the
  * table's size is what varies here rather than a second table being added
  * beside it. A widened table costs one comparison against a local instead of
  * against the constant 256; a second table cost a null test on every probe and
@@ -258,9 +336,12 @@ export function charSetOf(s: ArrayLike<unknown>): CharSet {
  * The all-zero table a needle with nothing to put in one shares.
  *
  * Retained rather than allocated per call, and built on demand rather than at
- * module scope: `sideEffects: false` promises that importing this module does
- * no work. Never written — {@link charSetOf} allocates its own the moment it
- * has a narrow element to record.
+ * module scope. `"sideEffects": false` is a claim to the bundler about dropping
+ * an unused module, not about what a used one does at import — the rule that
+ * this allocation answers to is the package's own, that importing a module does
+ * no work, so a consumer who never scores a sequence of objects never pays for
+ * the table only that shape needs. Never written — {@link charSetOf} allocates
+ * its own the moment it has a narrow element to record.
  */
 let shared: Uint8Array | null = null
 function emptyTable(): Uint8Array {

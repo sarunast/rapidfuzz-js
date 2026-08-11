@@ -20,10 +20,10 @@ import { bestMatch, createMatcher, search, searchIter } from '../../src/search/i
 import fixture from '../fixtures/rapidfuzz-3.14.5.json' with { type: 'json' }
 
 interface MetricSuite {
-  readonly distance: Metric<'distance', object>
-  readonly similarity: Metric<'similarity', object>
-  readonly normalizedDistance: Metric<'distance', object>
-  readonly normalizedSimilarity: Metric<'similarity', object>
+  readonly distance: Metric<'distance', never>
+  readonly similarity: Metric<'similarity', never>
+  readonly normalizedDistance: Metric<'distance', never>
+  readonly normalizedSimilarity: Metric<'similarity', never>
 }
 
 interface Scores {

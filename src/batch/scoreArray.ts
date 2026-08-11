@@ -42,7 +42,7 @@ export type ScoreArray = ScoreArrayOf[ScoreArrayKind]
  * let a `Float64Array` factory sit in the `u8` slot of the table below.
  */
 interface ScoreArrayFactory<A extends ScoreArray> {
-  /** Whether the store truncates, so a score has to be rounded before it. */
+  /** Whether the store holds integers, so a score has to be rounded before it. */
   readonly integral: boolean
   readonly allocate: (length: number) => A
   /** A row, sharing the buffer rather than copying it. */
@@ -59,7 +59,8 @@ interface ScoreArrayFactory<A extends ScoreArray> {
  * type by the generic key propagates the instantiation instead, and each entry
  * here is concrete so `subarray` has a single unambiguous signature.
  *
- * A plain object literal over globals: no work at import time, no bundle cost.
+ * A static table over the built-in typed arrays: nothing registers a kind at
+ * runtime, and no constructor has to be abstracted over.
  */
 const SCORE_ARRAYS: {
   readonly [K in ScoreArrayKind]: ScoreArrayFactory<ScoreArrayOf[K]>
@@ -161,8 +162,10 @@ export function allocateScores<K extends ScoreArrayKind>(
  * `Math.round` breaks a tie towards positive infinity, so it agrees on every
  * non-negative score and disagrees on `-0.5`, `-1.5`, `-2.5` — reachable
  * through a negative `scoreMultiplier`, since no scorer returns a negative
- * score itself. A typed-array store truncates, so leaving the rounding to it
- * would silently replace this rule with `Math.trunc`.
+ * score itself. An integer typed array applies its own conversion on assignment
+ * — truncating for most of them, clamping and rounding to even for
+ * `Uint8ClampedArray` — and none of those is this rule, so leaving the rounding
+ * to the store would silently replace it.
  *
  * The zero is normalised because an integer array upstream holds `0` where
  * rounding a small negative score here would otherwise leave JavaScript's `-0`.
@@ -197,6 +200,22 @@ export interface ScoreMatrix<A extends ScoreArray = Float64Array> {
 }
 
 /**
+ * Check a dimension on its own, because the allocation only ever sees their
+ * product: `-1 × -1` is a length of one, and so is `0.5 × 2`. Either would
+ * build a matrix whose `at`, `toArray` and row iterator all disagree with the
+ * data behind them, and `allocateScores` would accept both.
+ *
+ * `scoreMatrix` cannot reach this — its dimensions are array lengths — so what
+ * it guards is this module's own contract: nothing here should be able to
+ * return an internally inconsistent {@link ScoreMatrix}.
+ */
+function validateDimension(value: number, name: string, what: string): void {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(`${what} needs a ${name} count, not ${value}`)
+  }
+}
+
+/**
  * Allocate a matrix of `kind`, fill it, and wrap it.
  *
  * `kind` has to arrive as a single literal rather than the union, which is what
@@ -211,6 +230,8 @@ export function buildScoreMatrix<K extends ScoreArrayKind>(
   what: string,
   fill: (data: ScoreArrayOf[K], integral: boolean) => void,
 ): ScoreMatrix<ScoreArrayOf[K]> {
+  validateDimension(rows, 'row', what)
+  validateDimension(cols, 'column', what)
   const { integral, view } = scoreArrayFactory(kind)
   const data = allocateScores(kind, rows * cols, what)
   fill(data, integral)

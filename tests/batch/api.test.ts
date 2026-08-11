@@ -1,13 +1,16 @@
 import { describe, expect, test, vi } from 'vitest'
 
+import * as indel from '../../src/algorithms/indel/index.js'
 import * as levenshtein from '../../src/algorithms/levenshtein/index.js'
 import {
   allocateScores,
+  buildScoreMatrix,
   roundHalfAwayFromZero,
   scoreArrayFactory,
 } from '../../src/batch/scoreArray.js'
 import { scorerCompilation } from '../../src/core/scorer.js'
 import { createScorer, scoreMatrix, scorePairs } from '../../src/index.js'
+import type { MaybeSequence } from '../../src/index.js'
 
 describe('batch scoring', () => {
   test('matrix operations consume Scorer objects', () => {
@@ -65,6 +68,23 @@ describe('batch scoring', () => {
     )
     expect(() => allocateScores('u8', -1, 'test')).toThrow(RangeError)
     expect(() => allocateScores('u8', 2 ** 32, 'test')).toThrow(RangeError)
+
+    // A dimension is checked on its own: the allocation sees only the product,
+    // and `-1 × -1` and `0.5 × 2` are both a length of one.
+    const noFill = () => {}
+    expect(buildScoreMatrix('f64', 0, 0, 'test', noFill).data.length).toBe(0)
+    for (const [rows, cols] of [
+      [-1, -1],
+      [0.5, 2],
+      [2, 0.5],
+      [1, -1],
+      [Number.NaN, 1],
+      [1, Number.POSITIVE_INFINITY],
+    ] as const) {
+      expect(() => buildScoreMatrix('f64', rows, cols, 'test', noFill)).toThrow(
+        RangeError,
+      )
+    }
   })
 
   test('prepares matrix choices once and mirrors symmetric matrices', () => {
@@ -220,5 +240,119 @@ describe('batch scoring', () => {
     expect(() => scorePairs(['a'], ['a'], { scorer, threshold: Infinity })).toThrow(
       RangeError,
     )
+  })
+
+  test('a fractional threshold means the same thing to a scorer and to batch', () => {
+    // A raw similarity is a count, so 2 does not clear 2.5. The kernels used to
+    // truncate the cutoff before deriving their distance budget, so batch —
+    // which trusts a built-in kernel to have applied the cutoff itself — stored
+    // a score `Scorer.score` rejected.
+    for (const metric of [levenshtein.similarity, indel.similarity]) {
+      const scorer = createScorer(metric)
+      const exact = scorer.score('abc', 'axc')
+      expect(exact).toBe(metric === indel.similarity ? 4 : 2)
+      for (const offset of [-1.1, -0.1, 0, 0.1, 0.5, 1]) {
+        const threshold = (exact ?? 0) + offset
+        const qualifies = offset <= 0
+        expect(scorer.score('abc', 'axc', { threshold })).toBe(
+          qualifies ? exact : undefined,
+        )
+        expect([...scorePairs(['abc'], ['axc'], { scorer, threshold })]).toEqual([
+          qualifies ? exact : 0,
+        ])
+        expect(scoreMatrix(['abc'], ['axc'], { scorer, threshold }).at(0, 0)).toBe(
+          qualifies ? exact : 0,
+        )
+      }
+    }
+  })
+
+  test('a rejected pair a custom scorer cannot express is refused, not stored', () => {
+    // `[0, Infinity]` is a legitimate bound for a custom distance and not a
+    // storable score: an integer destination turns it into 0 — the best
+    // distance there is — and a zero multiplier turns it into NaN.
+    const lengthGap = (left: MaybeSequence, right: MaybeSequence): number =>
+      Math.abs((left?.length ?? 0) - (right?.length ?? 0))
+    const unbounded = createScorer(lengthGap, {
+      direction: 'distance',
+      bounds: [0, Number.POSITIVE_INFINITY],
+      symmetric: true,
+    })
+    expect([
+      ...scorePairs(['abc'], ['abcdefgh'], { scorer: unbounded, threshold: 1 }),
+    ]).toEqual([Number.POSITIVE_INFINITY])
+    for (const into of ['i32', 'i16', 'u8', 'u8c'] as const) {
+      expect(() =>
+        scorePairs(['abc'], ['abcdefgh'], { scorer: unbounded, threshold: 1, into }),
+      ).toThrow(RangeError)
+      expect(() =>
+        scoreMatrix(['abc'], ['abcdefgh'], { scorer: unbounded, threshold: 1, into }),
+      ).toThrow(RangeError)
+    }
+    for (const scoreMultiplier of [0, -0]) {
+      expect(() =>
+        scorePairs(['abc'], ['abcdefgh'], {
+          scorer: unbounded,
+          threshold: 1,
+          scoreMultiplier,
+        }),
+      ).toThrow(RangeError)
+      expect(() =>
+        scoreMatrix(['abc'], ['abcdefgh'], {
+          scorer: unbounded,
+          threshold: 1,
+          scoreMultiplier,
+        }),
+      ).toThrow(RangeError)
+    }
+    // Without a threshold nothing is ever rejected, so the bound is never read.
+    expect([
+      ...scorePairs(['abc'], ['abcdefgh'], { scorer: unbounded, into: 'i32' }),
+    ]).toEqual([5])
+    // A similarity rejects with its lower bound, which is storable either way.
+    const unboundedSimilarity = createScorer((left, right) => (left === right ? 1 : 0), {
+      direction: 'similarity',
+      bounds: [0, Number.POSITIVE_INFINITY],
+      symmetric: true,
+    })
+    expect([
+      ...scorePairs(['a'], ['b'], {
+        scorer: unboundedSimilarity,
+        threshold: 1,
+        into: 'i32',
+      }),
+    ]).toEqual([0])
+
+    // The rejected score is on the scorer's own scale, so the multiplier and
+    // the rounding apply to it exactly once, the same way they apply to a real
+    // score. A finite bound of 3 at -2 is -6, not -3 and not 12.
+    const bounded = createScorer((left, right) => (left === right ? 0 : 2), {
+      direction: 'distance',
+      bounds: [0, 3],
+      symmetric: true,
+    })
+    expect([
+      ...scorePairs(['a', 'a'], ['a', 'b'], {
+        scorer: bounded,
+        threshold: 1,
+        scoreMultiplier: -2,
+        into: 'i8',
+      }),
+    ]).toEqual([0, -6])
+    expect(
+      scoreMatrix(['a'], ['a', 'b'], {
+        scorer: bounded,
+        threshold: 1,
+        scoreMultiplier: 1.5,
+      }).toArray(),
+    ).toEqual([[0, 4.5]])
+    expect(
+      scoreMatrix(['a'], ['a', 'b'], {
+        scorer: bounded,
+        threshold: 1,
+        scoreMultiplier: 1.5,
+        into: 'i8',
+      }).toArray(),
+    ).toEqual([[0, 5]])
   })
 })

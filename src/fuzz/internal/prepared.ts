@@ -1,8 +1,4 @@
-import {
-  lcsSeqLengthPrepared,
-  lcsSeqLengthPreparedBounded,
-  prepareLcsPattern,
-} from '../../algorithms/lcs/implementation.js'
+import { prepareLcsPattern } from '../../algorithms/lcs/implementation.js'
 import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
 /**
  * The prepared-query hook every fuzz scorer shares.
@@ -17,16 +13,16 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * ## The one-way rule
  *
  * This module sits above every scorer family and imports the reusable cores from
- * `basic`, `tokens` and `tokenScorers`. None of them may import this one, which
- * is what keeps the graph acyclic.
+ * `partialWindow.ts`, `tokens.ts` and `tokenSet.ts`. None of them may import this
+ * one, which is what keeps the graph acyclic.
  *
- * `composite.ts` is deliberately **not** among them. Its `wRatio_impl` and
- * The direct scorer implementations validate and convert raw input, exactly the work
- * already done by the time a branch below runs — so the composite strategies are
- * reproduced here over prepared state instead of called. The `wRatio` branch is
- * the clearest case: it mirrors `wRatio_impl`'s ladder of length-ratio tests and
- * 0.95/0.9/0.6 scalings against held state rather than fresh input. The two must
- * be kept in step by hand; a change to one is a change to both.
+ * `fuzzy.ts` is deliberately **not** among them. Its `wRatio_impl`, like every
+ * other public scorer's implementation, validates and converts raw input — the
+ * work already done by the time a branch below runs — so the composite strategy
+ * is reproduced here over prepared state rather than called. The `wRatio` branch
+ * mirrors that ladder of length-ratio tests and 0.95/0.9/0.6 scalings against
+ * held state. The two must be kept in step by hand; a change to one is a change
+ * to both, and `tests/fuzz/preparedParity.test.ts` is what says so out loud.
  */
 import {
   alignRepresentation,
@@ -46,13 +42,13 @@ import {
   partialAlignmentConverted,
   partialRatioConverted,
   partialRatioImpl,
+  ratioHeld,
 } from './partialWindow.js'
 import {
   hasWhitespaceOf,
   preparedTokenChoice,
   sortedOf,
   tokenChoicePreparer,
-  tokenForm,
   tokenViewOf,
 } from './tokens.js'
 import {
@@ -61,41 +57,6 @@ import {
   tokenRatioConverted,
   tokenSetRatioConverted,
 } from './tokenSet.js'
-
-/**
- * Ratio against immutable query-side LCS masks.
- *
- * Deliberately ignores `scoreHint`, which the caller receives and drops. The
- * only lever a hint could pull here is the bounded kernel's early exit, and a
- * hint is an estimate rather than a bound: budgeting the scan at an optimistic
- * hint means every candidate scoring between the cutoff and the hint is pruned
- * and then rescanned in full. Measured over an `extract` of 2000 choices where
- * the bounded path is reachable, that cost **1.49x** the kernel iterations at
- * `scoreHint: 90` and **1.71x** at `70`; with a cutoff already set it ran the
- * bounded kernel 1602 times where 806 sufficed. The same shape was already
- * found slower in Levenshtein, which sizes a *band* with its hint — a lever
- * the bit-parallel LCS does not have.
- */
-function ratioPrepared(
-  query: ArrayLike<unknown>,
-  pattern: PatternMask,
-  choice: ArrayLike<unknown>,
-  scoreCutoff: number,
-): number {
-  const maximum = query.length + choice.length
-  const ceiling =
-    (1 - (maximum - 2 * Math.min(query.length, choice.length)) / maximum) * 100
-  if (ceiling < scoreCutoff) return 0
-
-  const required = Math.max(0, Math.floor((scoreCutoff * maximum) / 200))
-  const lcs =
-    scoreCutoff >= 70 && maximum >= 128
-      ? lcsSeqLengthPreparedBounded(pattern, choice, 0, choice.length, required)
-      : lcsSeqLengthPrepared(pattern, choice, 0, choice.length)
-  if (lcs < 0) return 0
-  const score = (1 - (maximum - 2 * lcs) / maximum) * 100
-  return score >= scoreCutoff ? score : 0
-}
 
 /**
  * Whether this scorer ever splits an input into tokens.
@@ -142,8 +103,9 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
         ? preparedScorerSequence(prepareScorerChoice(query))
         : queryTokenChoice.sequence
     const a = heldQuery
-    // Built on first use rather than up front: only four of the ten kinds score
-    // through LCS masks, and `wRatio` reaches them only on some inputs.
+    // Built on first use rather than up front: `partialRatio` and `wRatio` are
+    // the only kinds that score through the query's own LCS masks, and `wRatio`
+    // reaches them only on some inputs.
     let lcsPattern: PatternMask | null = null
     const patternOf = (): PatternMask =>
       (lcsPattern ??= prepareLcsPattern(a, 0, a.length))
@@ -201,14 +163,18 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
     const convertedCharSetOf = (): CharSet =>
       (convertedCharSet ??= charSetOf(convSequence(a)))
 
+    // Each case reads the candidate for itself rather than a shared prelude
+    // decoding it for all seven. The prelude had to be written for the union of
+    // what the branches want — a `usesTokens` ternary, a `?.sequence`, a `??`
+    // against the sequence preparer — and two branches then decoded the same
+    // choice a second time to get a form the prelude had discarded the type of.
+    // Six copies of one line buys every branch its own shape.
     const score: PreparedScore = (rawChoice, rawCutoff) => {
-      const tokenChoice = usesTokens ? preparedTokenChoice(rawChoice) : null
-      const choiceView = tokenChoice ?? undefined
-      const b = tokenChoice?.sequence ?? preparedScorerSequence(rawChoice)
       const cutoff = rawCutoff ?? 0
 
       switch (kind) {
         case 'partialRatio': {
+          const b = preparedScorerSequence(rawChoice)
           // Unlike the mask kernels, the window scan prunes by comparing
           // elements with `===`, so a query held as a BMP string and a choice
           // expanded into code points have to be brought together first.
@@ -232,18 +198,30 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
             )?.score ?? 0
           )
         }
-        case 'tokenSetRatio':
-          return tokenSetRatioConverted(a, b, cutoff, queryView, choiceView)
-        case 'tokenRatio':
-          return tokenRatioConverted(a, b, cutoff, queryView, choiceView, sortedPatternOf)
+        case 'tokenSetRatio': {
+          const choice = preparedTokenChoice(rawChoice)
+          return tokenSetRatioConverted(a, choice.sequence, cutoff, queryView, choice)
+        }
+        case 'tokenRatio': {
+          const choice = preparedTokenChoice(rawChoice)
+          return tokenRatioConverted(
+            a,
+            choice.sequence,
+            cutoff,
+            queryView,
+            choice,
+            sortedPatternOf,
+          )
+        }
         case 'partialTokenSortRatio': {
+          const choice = preparedTokenChoice(rawChoice)
           // Through `partialAlignmentConverted` rather than
           // `partialRatioConverted`, so the sorted query's masks and pruning set
           // can be handed down. Without them this rebuilt the same mask for the
           // same sorted query once per candidate — the very thing the prepared
           // `partialRatio` path stopped doing.
           const sortedQuery = sortedOf(queryTokens)
-          const sortedChoice = sortedOf(preparedTokenChoice(rawChoice))
+          const sortedChoice = sortedOf(choice)
           // `partialAlignmentConverted` would ignore both when the candidate is
           // the shorter side, but these are arguments, so they would be built on
           // the way in regardless. Both memoise, so the waste is one mask and one
@@ -262,27 +240,44 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
             )?.score ?? 0
           )
         }
-        case 'partialTokenSetRatio':
-          return partialTokenSetRatioConverted(a, b, cutoff, queryView, choiceView)
-        case 'partialTokenRatio':
-          return partialTokenRatioConverted(
+        case 'partialTokenSetRatio': {
+          const choice = preparedTokenChoice(rawChoice)
+          return partialTokenSetRatioConverted(
             a,
-            b,
+            choice.sequence,
             cutoff,
             queryView,
-            choiceView,
+            choice,
+          )
+        }
+        case 'partialTokenRatio': {
+          const choice = preparedTokenChoice(rawChoice)
+          return partialTokenRatioConverted(
+            a,
+            choice.sequence,
+            cutoff,
+            queryView,
+            choice,
             sortedPatternOf,
             sortedCharSetOf,
           )
+        }
         case 'wRatio': {
-          if (a.length === 0 || b.length === 0 || cutoff > 100) return 0
           const preparedTokens = preparedTokenChoice(rawChoice)
+          const b = preparedTokens.sequence
+          if (a.length === 0 || b.length === 0 || cutoff > 100) return 0
           const unbaseScale = 0.95
           const lenRatio = a.length > b.length ? a.length / b.length : b.length / a.length
           let dynamicCutoff = cutoff
-          let result = ratioPrepared(a, patternOf(), b, dynamicCutoff)
+          let result = ratioHeld(patternOf(), a.length, b, dynamicCutoff)
 
           if (lenRatio < 1.5) {
+            // Raised ahead of the whitespace tests, exactly as `wRatio_impl`
+            // does: every scorer below answers 0 to a cutoff above 100, so this
+            // returns the same number without asking either side for its tokens.
+            dynamicCutoff = Math.max(dynamicCutoff, result) / unbaseScale
+            if (dynamicCutoff > 100) return result
+
             // Whether the query holds whitespace, not how many tokens it splits
             // into: a single token with a space around it still has its
             // token-sorted form differ from the input, so the shortcut past the
@@ -302,16 +297,16 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
             //
             if (!hasWhitespaceOf(queryTokens) && !hasWhitespaceOf(preparedTokens))
               return result
-            dynamicCutoff = Math.max(dynamicCutoff, result) / unbaseScale
             return Math.max(
               result,
               tokenRatioConverted(
                 a,
-                // Expanded here and not before: the shortcut above is the route
-                // most candidates take, and it needs no tokens. `a` is already
-                // code points, so this is what puts the two sides in the one
-                // form their token sets have to share.
-                tokenForm(b),
+                // Not through `tokenForm`, unlike `wRatio_impl`: a token kind
+                // prepares its choices with `prepareTokenChoice`, which converts
+                // unconditionally, so both sides are already the code points a
+                // token set has to be compared in. The raw path needs the
+                // expansion because it may still be holding two BMP strings.
+                b,
                 dynamicCutoff,
                 queryView,
                 preparedTokens,
@@ -322,31 +317,38 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparedScorerFactory {
 
           const partialScale = lenRatio <= 8 ? 0.9 : 0.6
           dynamicCutoff = Math.max(dynamicCutoff, result) / partialScale
+          // Rules out the window scan and the token component after it, whose
+          // cutoff is this number divided again.
+          if (dynamicCutoff > 100) return result
+
           // `nativeCharSetOf` without the representation test the `partialRatio`
-          // branch needs: `a` is the query, and `wRatio` holds a query as code
-          // points, so the pruning set is only ever built over that spelling.
-          // The candidate is the side that may still be a string, and the scan
-          // prunes with `===` — so it is expanded here, which is the same job
-          // `alignRepresentation` does for the `partialRatio` branch above.
-          const bPartial = alignRepresentation(b, a)
+          // branch needs, and the candidate without the `alignRepresentation`
+          // that branch puts it through. The scan prunes with `===`, so the two
+          // sides have to be spelled alike — and here they already are:
+          // `prepareTokenChoice` converts every choice, and the query took the
+          // same route, so neither can still be the BMP string that would meet
+          // `97` as `'a'`. `partialRatio` prepares with `prepareScorerChoice`
+          // instead, which does not convert, which is why the test stays there.
           const partial =
-            a.length <= bPartial.length
+            a.length <= b.length
               ? partialRatioImpl(
                   a,
-                  bPartial,
+                  b,
                   dynamicCutoff / 100,
                   patternOf(),
                   true,
                   nativeCharSetOf(),
                 ).score
-              : partialRatioConverted(a, bPartial, dynamicCutoff)
+              : partialRatioConverted(a, b, dynamicCutoff)
           result = Math.max(result, partial * partialScale)
           dynamicCutoff = Math.max(dynamicCutoff, result) / unbaseScale
+          if (dynamicCutoff > 100) return result
+
           return Math.max(
             result,
             partialTokenRatioConverted(
               a,
-              tokenForm(b),
+              b,
               dynamicCutoff,
               queryView,
               preparedTokens,

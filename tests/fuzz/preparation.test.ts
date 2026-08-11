@@ -82,6 +82,10 @@ describe('fuzz preparation invariants', () => {
 
   it('covers partial alignment and token-difference second passes', () => {
     expect(indelNormSimHeld(preparePattern('', 0, 0), 0, '', 0, 0, 0)).toBe(1)
+    // Two empty inputs are a perfect score, and a cutoff above 1 rejects even
+    // that. No caller asks for one — each scales a percentage in first — but the
+    // helper is exported, so it answers for itself rather than for them.
+    expect(indelNormSimHeld(preparePattern('', 0, 0), 0, '', 0, 0, 1.1)).toBe(0)
     expect(partialRatioAlignment('abc', 'zabc', { scoreCutoff: 101 })).toBeNull()
     expect(partialRatioImpl('abc', 'zabc', 1.1)).toEqual({
       score: 0,

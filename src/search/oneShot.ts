@@ -1,4 +1,4 @@
-import type { PreparedKernel } from '../core/protocol.js'
+import type { MetricCompilation, PreparedKernel } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
@@ -10,11 +10,13 @@ import {
   optionalThreshold,
   resultLimit,
   sequenceReader,
+  type SequenceReader,
 } from './snapshot.js'
 import type {
   BestOptions,
   Items,
   MatcherOptions,
+  Normalizer,
   SearchIterOptions,
   SearchOptions,
 } from './types.js'
@@ -58,9 +60,12 @@ function arrayItemsOf<T>(items: Items<T>): readonly T[] | null {
   return Array.isArray(items) ? items : null
 }
 
-// Streaming callers often stop after only a handful of matches. Preparing a
-// query before the first candidate made that case slower than direct pair
-// scoring; after eight retained choices the held representation amortizes.
+// Array `searchIter` callers often stop after only a handful of matches.
+// Preparing a query before the first candidate made that case slower than
+// direct pair scoring; after eight scored choices the held representation
+// amortizes. Only the array branch adapts: a generic iterable prepares once
+// up front, because counting a first-N window over a source that may not
+// finish is a different question than this one.
 const STREAM_PREPARE_AFTER = 8
 
 export function bestMatch<T, D extends Direction>(
@@ -259,9 +264,10 @@ export function search<T, D extends Direction>(
       : compilation.bounds[0]
     : null
   let cutoff = activeThreshold
-  let order = 0
 
   if (arrayItems !== null) {
+    // An array index is already the source order the heap breaks ties on, so
+    // the counter the generic branch keeps is one the array branch can read.
     for (let key = 0; key < arrayItems.length; key++) {
       const item = arrayItems[key]
       const sequence = readSequence(item)
@@ -269,22 +275,22 @@ export function search<T, D extends Direction>(
       const score = prepared(compilation.prepareChoice(sequence), cutoff)
       if (qualifies(compilation.direction, score, activeThreshold)) {
         if (limit === null) {
-          results.push({ item, key, score, order })
+          results.push({ item, key, score, order: key })
         } else if (results.length < limit) {
-          pushHeap(results, { item, key, score, order }, heapWorse)
+          pushHeap(results, { item, key, score, order: key }, heapWorse)
           if (results.length === limit) {
             cutoff = results[0].score
             if (optimal !== null && cutoff === optimal) break
           }
         } else if (better(compilation.direction, score, results[0].score)) {
-          replaceHeapRoot(results, { item, key, score, order }, heapWorse)
+          replaceHeapRoot(results, { item, key, score, order: key }, heapWorse)
           cutoff = results[0].score
           if (optimal !== null && cutoff === optimal) break
         }
       }
-      order++
     }
   } else {
+    let order = 0
     for (const entry of collectionEntries(items)) {
       const sequence = readSequence(entry.item)
       if (sequence === null) continue
@@ -339,18 +345,40 @@ export function searchIter<T, D extends Direction>(
   items: Items<T>,
   options: MatcherOptions<T, D> & SearchIterOptions,
 ): IterableIterator<Match<T, unknown>>
-export function* searchIter<T, D extends Direction>(
+export function searchIter<T, D extends Direction>(
   query: MaybeSequence,
   items: Items<T>,
   options: MatcherOptions<T, D> & SearchIterOptions,
 ): IterableIterator<Match<T, unknown>> {
+  // Call options and collection shape are read and checked here, so a caller
+  // who mutates their options object before iterating cannot change a search
+  // already asked for, and a wrong threshold, scorer, collection or
+  // `missingItems` is refused at the call rather than on the first `next()`.
+  // The query is processed lazily with the scoring — that is what the
+  // iterator is for, so an invalid query still throws from `next()`.
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
-  const compilation = scorerCompilation(options.scorer)
-  const normalized = normalizeQuery(query, options.normalize)
   const stableOptions: MatcherOptions<T, Direction> = options
+  return iterateMatches(
+    query,
+    items,
+    scorerCompilation(options.scorer),
+    sequenceReader(stableOptions, false),
+    options.normalize,
+    threshold,
+  )
+}
+
+function* iterateMatches<T>(
+  query: MaybeSequence,
+  items: Items<T>,
+  compilation: MetricCompilation<Direction>,
+  readSequence: SequenceReader<T>,
+  normalize: Normalizer | undefined,
+  threshold: number | null,
+): IterableIterator<Match<T, unknown>> {
+  const normalized = normalizeQuery(query, normalize)
   const arrayItems = arrayItemsOf(items)
-  const readSequence = sequenceReader(stableOptions, false)
 
   if (normalized === null) {
     const score = compilation.score(query, '', threshold)

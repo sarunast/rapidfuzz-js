@@ -35,8 +35,8 @@ import type { FuzzConfiguration, FuzzInput, FuzzOptions } from './types.js'
 
 /**
  * Weighted combination of the other scorers, picking a strategy from the length
- * ratio of the two inputs. Partial matches are scaled by 0.9, misordered full
- * matches by 0.95.
+ * ratio of the two inputs. Misordered full matches are scaled by 0.95, and
+ * partial matches by 0.9 up to an eightfold length difference and 0.6 past it.
  */
 export function wRatio_impl(
   s1: FuzzInput,
@@ -97,6 +97,16 @@ export function wRatio_impl(
   let endRatio = ratioConverted(a, b, scoreCutoff)
 
   if (lenRatio < 1.5) {
+    // Raised before the whitespace scans rather than after them. Every scorer
+    // below answers 0 to a cutoff above 100, so once the base ratio puts the
+    // token component out of reach — `endRatio` above 95, or a caller asking for
+    // it — `Math.max` returns `endRatio` whatever runs. Testing that here rather
+    // than at the `Math.max` skips two scans and both token conversions, which
+    // is the common shape in best-match search: the running best is fed back as
+    // the next cutoff, and it climbs.
+    scoreCutoff = Math.max(scoreCutoff, endRatio) / UNBASE_SCALE
+    if (scoreCutoff > 100) return endRatio
+
     // With no token separator on either side, neither token-set nor token-sort
     // ratio can improve on the already-computed base ratio. Stated as "contains
     // no whitespace" rather than "splits into one token" because that is what
@@ -111,7 +121,6 @@ export function wRatio_impl(
     ) {
       return endRatio
     }
-    scoreCutoff = Math.max(scoreCutoff, endRatio) / UNBASE_SCALE
     return Math.max(
       endRatio,
       tokenRatioConverted(tokenForm(a), tokenForm(b), scoreCutoff) * UNBASE_SCALE,
@@ -121,9 +130,17 @@ export function wRatio_impl(
   const PARTIAL_SCALE = lenRatio <= 8 ? 0.9 : 0.6
 
   scoreCutoff = Math.max(scoreCutoff, endRatio) / PARTIAL_SCALE
+  // Same exit, one scale earlier: a cutoff past 100 here rules out the partial
+  // scorer *and* the token one after it, whose cutoff is this number divided
+  // again. Skipping straight to `endRatio` saves the window scan as well as the
+  // two token conversions.
+  if (scoreCutoff > 100) return endRatio
+
   endRatio = Math.max(endRatio, partialRatioConverted(a, b, scoreCutoff) * PARTIAL_SCALE)
 
   scoreCutoff = Math.max(scoreCutoff, endRatio) / UNBASE_SCALE
+  if (scoreCutoff > 100) return endRatio
+
   return Math.max(
     endRatio,
     partialTokenRatioConverted(tokenForm(a), tokenForm(b), scoreCutoff) *

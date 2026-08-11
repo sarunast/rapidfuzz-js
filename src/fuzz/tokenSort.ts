@@ -20,7 +20,6 @@ export function prepareTokenSort(): PreparedScorerFactory {
   const choicePreparer = tokenChoicePreparer()
   const prepare: PrepareScorer = (query) => {
     const queryChoice = preparedTokenChoice(choicePreparer(query))
-    const held = queryChoice.sequence
     let pattern: PatternMask | null = null
     const patternOf = (): PatternMask => {
       if (pattern === null) {
@@ -31,13 +30,16 @@ export function prepareTokenSort(): PreparedScorerFactory {
     }
     const score: PreparedScore = (rawChoice, rawCutoff) => {
       const choice = preparedTokenChoice(rawChoice)
+      // `patternOf`, not `patternOf()`: the callee refuses an impossible cutoff
+      // before it sorts anything, and an argument would have built the query's
+      // masks on the way in regardless.
       return tokenSortRatioConverted(
-        held,
+        queryChoice.sequence,
         choice.sequence,
         rawCutoff ?? 0,
         queryChoice,
         choice,
-        patternOf(),
+        patternOf,
       )
     }
     return score

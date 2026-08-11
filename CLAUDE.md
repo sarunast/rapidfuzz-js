@@ -90,6 +90,27 @@ and the numeric DP loops in `src/algorithms/` would need a `!` or a `?? 0` on
 every single indexed read. Turning it off removes the need for the assertion
 rather than hiding it.
 
+## Type imports go at the top of the file
+
+Import types with a top-level `import type { Direction } from '../core/types.js'`,
+never inline as `import('../core/types.js').Direction` in a signature or
+annotation. Both erase to nothing, so this is about reading the file: the
+top-level form puts every dependency in one place, keeps the annotation short
+enough to read at a glance, and lets a rename or a moved module be fixed once.
+The inline form hides a module path in the middle of a parameter list, and
+repeats it at every use.
+
+No lint rule catches this — `.oxlintrc.json` says nothing about it — so
+convention is all that holds it. The `{@link import('./x.js').y}` spelling in a
+JSDoc comment is a different thing and stays.
+
+## Comments are short
+
+Two or three lines. A comment says what the code cannot: why a bound is that
+number, what a measurement found, what a non-obvious ordering protects. It does
+not narrate the code beside it, restate a type, or reproduce the investigation
+that produced it — a date, a version and the conclusion carry that.
+
 ## Coverage is 100%, and that is enforced
 
 `pnpm coverage` passes `--coverage.thresholds.100` and fails below it on all

@@ -12,6 +12,22 @@ export function canonicalRawCutoff(cutoff: number | null | undefined): number | 
   return cutoff == null ? null : truncatedRawCutoff(cutoff)
 }
 
+/**
+ * The integral similarity a fractional cutoff really demands.
+ *
+ * Raw similarities are counts, so `similarity >= cutoff` is exactly
+ * `similarity >= ceil(cutoff)`. Truncating instead admitted a similarity of 2
+ * against a cutoff of 2.5 — and, because every similarity kernel derives its
+ * distance budget from this, let the kernel search one edit further than the
+ * caller asked for. The public threshold is any finite number, so the fraction
+ * has to be honoured rather than rounded away.
+ */
+export function canonicalSimilarityCutoff(
+  cutoff: number | null | undefined,
+): number | null {
+  return cutoff == null ? null : Math.ceil(cutoff)
+}
+
 export function distanceCutoffFor(
   kind: PreparedMetricKind,
   rawCutoff: number | null | undefined,
@@ -22,7 +38,9 @@ export function distanceCutoffFor(
     case 'distance':
       return truncatedRawCutoff(rawCutoff)
     case 'similarity':
-      return maximum - truncatedRawCutoff(rawCutoff)
+      // `similarity >= cutoff` is `distance <= maximum - cutoff`, and both are
+      // counts, so the budget is the floor of that difference.
+      return maximum - Math.ceil(rawCutoff)
     case 'normalizedDistance':
       return rawCutoff * maximum
     case 'normalizedSimilarity':
@@ -38,8 +56,9 @@ export function distCutoff(distance: number, cutoff?: number | null): number {
 
 export function simCutoff(similarity: number, cutoff?: number | null): number {
   if (cutoff == null) return similarity
-  const bound = truncatedRawCutoff(cutoff)
-  return similarity >= bound ? similarity : 0
+  // Compared against the cutoff as given. Truncating here was the second half
+  // of the fractional-cutoff bug: a caller asking for 2.5 got 2 accepted.
+  return similarity >= cutoff ? similarity : 0
 }
 
 export function normDistCutoff(distance: number, cutoff?: number | null): number {

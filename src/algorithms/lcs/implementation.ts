@@ -11,6 +11,7 @@ import {
 import {
   alignRepresentation,
   canonicalRawCutoff,
+  canonicalSimilarityCutoff,
   convPair,
   distCutoff,
   normalize,
@@ -99,7 +100,7 @@ function lcsSeqSimilarity_impl(
   options: ScorerOptions = {},
 ): number {
   const [a, b] = convPair(s1, s2)
-  const cutoff = canonicalRawCutoff(options.scoreCutoff)
+  const cutoff = canonicalSimilarityCutoff(options.scoreCutoff)
   const misses = cutoff === null ? Number.MAX_SAFE_INTEGER : maximum(a, b) - cutoff
   return simCutoff(boundedLength(a, b, misses), cutoff)
 }
@@ -251,7 +252,7 @@ function prepareLcs(kind: PreparedLcsKind): PreparedScorerFactory {
           return distCutoff(max - length(b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
         }
         case 'similarity': {
-          const cutoff = canonicalRawCutoff(rawCutoff)
+          const cutoff = canonicalSimilarityCutoff(rawCutoff)
           const misses = cutoff === null ? Number.MAX_SAFE_INTEGER : max - cutoff
           return simCutoff(length(b, misses), cutoff)
         }

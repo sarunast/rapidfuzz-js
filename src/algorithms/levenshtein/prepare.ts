@@ -17,6 +17,7 @@ import {
   distance_,
   integralWeights,
   levenshteinRawCutoff,
+  levenshteinSimilarityCutoff,
   maximum,
   parseWeights,
   rawBound,
@@ -200,7 +201,7 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparedScore
           return cutoff === null || distance <= cutoff ? distance : cutoff + 1
         }
         case 'similarity': {
-          const cutoff = levenshteinRawCutoff(rawCutoff, integral)
+          const cutoff = levenshteinSimilarityCutoff(rawCutoff, integral)
           const bound =
             cutoff === null ? Number.MAX_SAFE_INTEGER : rawBound(max - cutoff, integral)
           return simCutoff(max - preparedDistance(b, bound), cutoff)

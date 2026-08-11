@@ -124,7 +124,6 @@ def main() -> None:
         "token-sort-ratio-sentences": fuzz.token_sort_ratio,
         "token-set-ratio-sentences": fuzz.token_set_ratio,
         "w-ratio-sentences": fuzz.WRatio,
-        "q-ratio-sentences": fuzz.QRatio,
     }
     for key, scorer in fuzz_metrics.items():
         results[key] = time_it(
