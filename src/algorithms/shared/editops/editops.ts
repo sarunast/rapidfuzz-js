@@ -15,34 +15,37 @@
  * still map. See README's "Differences from Python RapidFuzz" for the rest.
  */
 
-import { hasSurrogatePair } from '../scorerSupport.js'
+import { hasSurrogatePair } from '../sequence.js'
 import type { Editop, MatchingBlock, Opcode, OpcodeTag } from './types.js'
 
 export type { Editop, EditopTag, MatchingBlock, Opcode, OpcodeTag } from './types.js'
-
-const EDITOP_TAGS: ReadonlySet<unknown> = new Set(['replace', 'delete', 'insert'])
-const OPCODE_TAGS: ReadonlySet<unknown> = new Set([
-  'replace',
-  'delete',
-  'insert',
-  'equal',
-])
 
 /**
  * What a tag and a position have to be before the checks below mean anything.
  *
  * Every bound is written as a comparison, and a comparison against `NaN` or
  * `undefined` is false — so an unchecked position passed each of them and
- * reached code that assumes it is a whole number. A tag outside the set is
+ * reached code that assumes it is a whole number. A tag outside its union is
  * worse than useless: several branches test for one tag and treat everything
  * else as its opposite, so an unknown one is silently read as a deletion.
  */
-function checkTag(tag: unknown, allowed: ReadonlySet<unknown>): void {
-  if (!allowed.has(tag)) throw new TypeError(`invalid edit operation tag ${String(tag)}`)
+function checkEditopTag(tag: unknown): void {
+  if (tag !== 'replace' && tag !== 'delete' && tag !== 'insert') {
+    throw new TypeError(`invalid edit operation tag ${String(tag)}`)
+  }
 }
 
+function checkOpcodeTag(tag: unknown): void {
+  if (tag !== 'replace' && tag !== 'delete' && tag !== 'insert' && tag !== 'equal') {
+    throw new TypeError(`invalid edit operation tag ${String(tag)}`)
+  }
+}
+
+// Safe rather than merely whole: past 2^53 adjacent integers collide, so a
+// position up there is no longer an exact coordinate, and the per-element
+// loops in `opcodesToEditops` would be asked to run for years.
 function checkPosition(position: unknown): void {
-  if (typeof position !== 'number' || !Number.isInteger(position) || position < 0) {
+  if (typeof position !== 'number' || !Number.isSafeInteger(position) || position < 0) {
     throw new TypeError('edit operation positions must be whole and at least zero')
   }
 }
@@ -71,7 +74,7 @@ function checkLengths(srcLen: number, destLen: number): void {
  */
 function checkedEditop(op: Editop): Editop {
   checkOperation(op)
-  checkTag(op.tag, EDITOP_TAGS)
+  checkEditopTag(op.tag)
   checkPosition(op.srcPos)
   checkPosition(op.destPos)
 
@@ -89,7 +92,7 @@ interface DraftOpcode {
 
 function checkedOpcode(op: Opcode): DraftOpcode {
   checkOperation(op)
-  checkTag(op.tag, OPCODE_TAGS)
+  checkOpcodeTag(op.tag)
   checkPosition(op.srcStart)
   checkPosition(op.srcEnd)
   checkPosition(op.destStart)
@@ -340,6 +343,27 @@ function codePointView(s: string): string | string[] {
 }
 
 /**
+ * What both `apply` methods demand of their strings, in code points.
+ *
+ * Upstream checks neither length: its Python `Editops.apply` raises IndexError
+ * where its `Opcodes.apply` silently clamps, and both pass extra source text
+ * through — three behaviours for one mistake, and the JavaScript spellings of
+ * two of them would splice `"undefined"` into the answer. One refusal instead.
+ */
+function checkApplyLengths(
+  srcLength: number,
+  destLength: number,
+  srcLen: number,
+  destLen: number,
+): void {
+  if (srcLength !== srcLen || destLength !== destLen) {
+    throw new RangeError(
+      'apply expects strings whose lengths match the recorded srcLen and destLen',
+    )
+  }
+}
+
+/**
  * A run of unchanged text, as a string.
  *
  * The array branch is what {@link Opcodes.apply} has always done. Copying an
@@ -531,6 +555,8 @@ export class Editops {
     let srcPos = 0
 
     if (!hasSurrogatePair(source)) {
+      checkApplyLengths(source.length, dest.length, this.srcLen, this.destLen)
+
       for (const op of this.operations) {
         if (srcPos < op.srcPos) {
           out += source.slice(srcPos, op.srcPos)
@@ -551,6 +577,7 @@ export class Editops {
     }
 
     const src = Array.from(source)
+    checkApplyLengths(src.length, dest.length, this.srcLen, this.destLen)
 
     for (const op of this.operations) {
       while (srcPos < op.srcPos) {
@@ -659,6 +686,7 @@ export class Opcodes {
   apply(source: string, destination: string): string {
     const src = codePointView(source)
     const dest = codePointView(destination)
+    checkApplyLengths(src.length, dest.length, this.srcLen, this.destLen)
     let out = ''
     for (const op of this.operations) {
       if (op.tag === 'equal') {

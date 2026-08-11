@@ -217,6 +217,34 @@ describe('malformed input is refused rather than acted on', () => {
     expect(() => Editops.fromOperations([], -1, 3)).toThrow(TypeError)
     expect(() => Editops.fromOperations([], 3, Number.NaN)).toThrow(TypeError)
     expect(() => Opcodes.fromOperations([], 3, -1)).toThrow(TypeError)
+    // Past 2^53 adjacent integers collide, so a coordinate up there is not one.
+    expect(() => Editops.fromOperations([], 2 ** 53, 3)).toThrow(TypeError)
+    expect(() =>
+      Opcodes.fromOperations(
+        [{ tag: 'equal', srcStart: 0, srcEnd: 2 ** 53, destStart: 0, destEnd: 3 }],
+        2 ** 53,
+        3,
+      ),
+    ).toThrow(TypeError)
+  })
+
+  // Upstream checks neither string against the recorded lengths, and its three
+  // paths answer the same mistake three ways — IndexError, silent clamping,
+  // and extra source text passed through. Here both forms refuse alike.
+  it('rejects apply() strings whose lengths do not match the recorded ones', () => {
+    const ops = Editops.fromOperations([{ tag: 'replace', srcPos: 1, destPos: 1 }], 3, 3)
+    const blocks = ops.toOpcodes()
+
+    expect(() => ops.apply('abc', 'x')).toThrow(RangeError)
+    expect(() => ops.apply('abcd', 'xyz')).toThrow(RangeError)
+    expect(() => blocks.apply('abc', 'x')).toThrow(RangeError)
+    expect(() => blocks.apply('abcd', 'xyz')).toThrow(RangeError)
+
+    // Lengths count code points, not UTF-16 units, on the astral path too.
+    expect(() => ops.apply('a💩c', 'x💩zw')).toThrow(RangeError)
+    expect(ops.apply('a💩c', 'x💩z')).toBe('a💩c')
+    expect(ops.apply('abc', 'x💩z')).toBe('a💩c')
+    expect(blocks.apply('abc', 'x💩z')).toBe('a💩c')
   })
 
   // Reading `.tag` off one of these reported a list of operations as a missing
