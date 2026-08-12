@@ -26,6 +26,7 @@ import type { PreparedChoice, PreparedChoiceOf, Scorer, ScorerOf } from 'rapidfu
 import { similarity, tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
 import { distance } from 'rapidfuzz-js/levenshtein'
 import { distance as jaroWinklerDistance } from 'rapidfuzz-js/jaro-winkler'
+import { similarity as diceSimilarity } from 'rapidfuzz-js/dice'
 
 const scorer = createScorer(tokenSetSimilarity)
 
@@ -59,13 +60,19 @@ export const many: Scorer<'similarity'>[] = [
 ]
 export const scoreWith = (held: Scorer<'similarity'>) => held.score('a', 'b')
 
-// A loop over metrics compiles each of them, including two whose
+// A loop over metrics compiles each of them, including three whose
 // configurations have no key in common: without a configuration argument there
 // is nothing for \`Config\` to be inferred from, and inferring it anyway is what
 // used to refuse this.
-export const eachMetric = ([distance, jaroWinklerDistance] as const).map((metric) =>
-  createScorer(metric),
-)
+export const eachMetric = (
+  [distance, jaroWinklerDistance, diceSimilarity] as const
+).map((metric) => createScorer(metric))
+
+// A configured scorer's handle type is nameable too, and \`gramSize\` reaches the
+// consumer as an ordinary optional number rather than through an internal type.
+const grams = createScorer(diceSimilarity, { gramSize: 3 })
+export const gramHandle = (name: string): PreparedChoiceOf<typeof grams> =>
+  grams.prepareChoice(name)
 
 // A scorer's exact type is nameable from the metric alone, brand included —
 // the annotation a stored scorer wants without \`typeof\` gymnastics.

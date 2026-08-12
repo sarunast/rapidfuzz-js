@@ -3,7 +3,9 @@
   "version": "0.9.0",
   "description": "Fast fuzzy string matching for Node.js and the browser",
   "keywords": [
+    "cosine-similarity",
     "damerau-levenshtein",
+    "dice-coefficient",
     "edit-distance",
     "fuzzy",
     "fuzzy-matching",
@@ -12,8 +14,10 @@
     "hamming",
     "jaro-winkler",
     "levenshtein",
+    "n-gram",
     "rapidfuzz",
     "similarity",
+    "sorensen-dice",
     "string-matching"
   ],
   "homepage": "https://github.com/sarunast/rapidfuzz-js#readme",
@@ -63,6 +67,14 @@
     "./damerau-levenshtein": {
       "types": "./dist/algorithms/damerauLevenshtein/index.d.ts",
       "import": "./dist/algorithms/damerauLevenshtein/index.js"
+    },
+    "./cosine": {
+      "types": "./dist/algorithms/cosine/index.d.ts",
+      "import": "./dist/algorithms/cosine/index.js"
+    },
+    "./dice": {
+      "types": "./dist/algorithms/dice/index.d.ts",
+      "import": "./dist/algorithms/dice/index.js"
     },
     "./hamming": {
       "types": "./dist/algorithms/hamming/index.d.ts",

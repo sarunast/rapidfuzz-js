@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { normalizedSimilarity as cosineNormalizedSimilarity } from '../../src/algorithms/cosine/index.js'
 import {
   distance as damerauDistance,
   normalizedSimilarity as damerauNormalizedSimilarity,
 } from '../../src/algorithms/damerauLevenshtein/index.js'
+import { normalizedSimilarity as diceNormalizedSimilarity } from '../../src/algorithms/dice/index.js'
 import {
   distance as hammingDistance,
   normalizedSimilarity as hammingNormalizedSimilarity,
@@ -48,7 +50,9 @@ type SimilarityMetric = (a: MaybeSequence, b: MaybeSequence) => number
 type DistanceMetric = (a: MaybeSequence, b: MaybeSequence) => number
 
 const NORMALIZED_SIMILARITIES: ReadonlyArray<readonly [string, SimilarityMetric]> = [
+  ['Cosine', cosineNormalizedSimilarity],
   ['Damerau-Levenshtein', damerauNormalizedSimilarity],
+  ['Dice', diceNormalizedSimilarity],
   ['Hamming', hammingNormalizedSimilarity],
   ['Indel', indelNormalizedSimilarity],
   ['Jaro', jaroNormalizedSimilarity],

@@ -1,11 +1,23 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  distance as cosineDistance,
+  normalizedDistance as cosineNormalizedDistance,
+  normalizedSimilarity as cosineNormalizedSimilarity,
+  similarity as cosineSimilarity,
+} from '../../src/algorithms/cosine/index.js'
+import {
   distance as damerauDistance,
   normalizedDistance as damerauNormalizedDistance,
   normalizedSimilarity as damerauNormalizedSimilarity,
   similarity as damerauSimilarity,
 } from '../../src/algorithms/damerauLevenshtein/index.js'
+import {
+  distance as diceDistance,
+  normalizedDistance as diceNormalizedDistance,
+  normalizedSimilarity as diceNormalizedSimilarity,
+  similarity as diceSimilarity,
+} from '../../src/algorithms/dice/index.js'
 import {
   distance as hammingDistance,
   normalizedDistance as hammingNormalizedDistance,
@@ -68,6 +80,10 @@ import { createMatcher } from '../../src/search/index.js'
 type ScorerFactory = () => Scorer<Direction>
 
 const FAMILIES: ReadonlyArray<readonly [string, ScorerFactory]> = [
+  ['Cosine distance', () => createScorer(cosineDistance)],
+  ['Cosine similarity', () => createScorer(cosineSimilarity)],
+  ['Cosine normalized distance', () => createScorer(cosineNormalizedDistance)],
+  ['Cosine normalized similarity', () => createScorer(cosineNormalizedSimilarity)],
   ['Damerau-Levenshtein distance', () => createScorer(damerauDistance)],
   ['Damerau-Levenshtein similarity', () => createScorer(damerauSimilarity)],
   [
@@ -78,6 +94,10 @@ const FAMILIES: ReadonlyArray<readonly [string, ScorerFactory]> = [
     'Damerau-Levenshtein normalized similarity',
     () => createScorer(damerauNormalizedSimilarity),
   ],
+  ['Dice distance', () => createScorer(diceDistance)],
+  ['Dice similarity', () => createScorer(diceSimilarity)],
+  ['Dice normalized distance', () => createScorer(diceNormalizedDistance)],
+  ['Dice normalized similarity', () => createScorer(diceNormalizedSimilarity)],
   ['Hamming distance', () => createScorer(hammingDistance)],
   ['Hamming similarity', () => createScorer(hammingSimilarity)],
   ['Hamming normalized distance', () => createScorer(hammingNormalizedDistance)],

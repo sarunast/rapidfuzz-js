@@ -64,6 +64,8 @@ const EXPECTED = {
     'editops',
     'opcodes',
   ],
+  './cosine': ['distance', 'similarity', 'normalizedDistance', 'normalizedSimilarity'],
+  './dice': ['distance', 'similarity', 'normalizedDistance', 'normalizedSimilarity'],
   './osa': ['distance', 'similarity', 'normalizedDistance', 'normalizedSimilarity'],
   './damerau-levenshtein': [
     'distance',

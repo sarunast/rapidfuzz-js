@@ -1,0 +1,918 @@
+{
+  "dice": [
+    {
+      "left": "",
+      "right": "",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "",
+      "right": "",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "",
+      "right": "",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "",
+      "right": "",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "a",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "a",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "a",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "a",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "b",
+      "gramSize": 1,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "b",
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "b",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "b",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "ab",
+      "gramSize": 1,
+      "similarity": 0.6666666666666666
+    },
+    {
+      "left": "a",
+      "right": "ab",
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "ab",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "ab",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "ab",
+      "right": "ab",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "ab",
+      "right": "ab",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "ab",
+      "right": "ab",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "ab",
+      "right": "ab",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": "night",
+      "right": "nacht",
+      "gramSize": 1,
+      "similarity": 0.6
+    },
+    {
+      "left": "night",
+      "right": "nacht",
+      "gramSize": 2,
+      "similarity": 0.25
+    },
+    {
+      "left": "night",
+      "right": "nacht",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "night",
+      "right": "nacht",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "banana",
+      "right": "bananas",
+      "gramSize": 1,
+      "similarity": 0.9230769230769231
+    },
+    {
+      "left": "banana",
+      "right": "bananas",
+      "gramSize": 2,
+      "similarity": 0.9090909090909091
+    },
+    {
+      "left": "banana",
+      "right": "bananas",
+      "gramSize": 3,
+      "similarity": 0.8888888888888888
+    },
+    {
+      "left": "banana",
+      "right": "bananas",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "abcabcab",
+      "right": "ababab",
+      "gramSize": 1,
+      "similarity": 0.8571428571428571
+    },
+    {
+      "left": "abcabcab",
+      "right": "ababab",
+      "gramSize": 2,
+      "similarity": 0.5
+    },
+    {
+      "left": "abcabcab",
+      "right": "ababab",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "abcabcab",
+      "right": "ababab",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "kitten",
+      "right": "sitting",
+      "gramSize": 1,
+      "similarity": 0.6153846153846154
+    },
+    {
+      "left": "kitten",
+      "right": "sitting",
+      "gramSize": 2,
+      "similarity": 0.36363636363636365
+    },
+    {
+      "left": "kitten",
+      "right": "sitting",
+      "gramSize": 3,
+      "similarity": 0.2222222222222222
+    },
+    {
+      "left": "kitten",
+      "right": "sitting",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "the wonderful new york mets",
+      "right": "new york mets",
+      "gramSize": 1,
+      "similarity": 0.65
+    },
+    {
+      "left": "the wonderful new york mets",
+      "right": "new york mets",
+      "gramSize": 2,
+      "similarity": 0.631578947368421
+    },
+    {
+      "left": "the wonderful new york mets",
+      "right": "new york mets",
+      "gramSize": 3,
+      "similarity": 0.6111111111111112
+    },
+    {
+      "left": "the wonderful new york mets",
+      "right": "new york mets",
+      "gramSize": 7,
+      "similarity": 0.5
+    },
+    {
+      "left": "South Korea",
+      "right": "North Korea",
+      "gramSize": 1,
+      "similarity": 0.8181818181818182
+    },
+    {
+      "left": "South Korea",
+      "right": "North Korea",
+      "gramSize": 2,
+      "similarity": 0.7
+    },
+    {
+      "left": "South Korea",
+      "right": "North Korea",
+      "gramSize": 3,
+      "similarity": 0.6666666666666666
+    },
+    {
+      "left": "South Korea",
+      "right": "North Korea",
+      "gramSize": 7,
+      "similarity": 0.4
+    },
+    {
+      "left": "abcdef",
+      "right": "abcdef😀😀😀😀😀",
+      "gramSize": 1,
+      "similarity": 0.7058823529411765
+    },
+    {
+      "left": "abcdef",
+      "right": "abcdef😀😀😀😀😀",
+      "gramSize": 2,
+      "similarity": 0.6666666666666666
+    },
+    {
+      "left": "abcdef",
+      "right": "abcdef😀😀😀😀😀",
+      "gramSize": 3,
+      "similarity": 0.6153846153846154
+    },
+    {
+      "left": "abcdef",
+      "right": "abcdef😀😀😀😀😀",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "😀a",
+      "right": "😀b",
+      "gramSize": 1,
+      "similarity": 0.5
+    },
+    {
+      "left": "😀a",
+      "right": "😀b",
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": "😀a",
+      "right": "😀b",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "😀a",
+      "right": "😀b",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "😀😀",
+      "right": "😀😀",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "😀😀",
+      "right": "😀😀",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "😀😀",
+      "right": "😀😀",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "😀😀",
+      "right": "😀😀",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": "é",
+      "right": "é",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "é",
+      "right": "é",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "é",
+      "right": "é",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "é",
+      "right": "é",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "gramSize": 1,
+      "similarity": 0.6666666666666666
+    },
+    {
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": [1, 2, 3, 1, 2],
+      "right": [1, 2, 1, 2, 3],
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": [1, 2, 3, 1, 2],
+      "right": [1, 2, 1, 2, 3],
+      "gramSize": 2,
+      "similarity": 0.75
+    },
+    {
+      "left": [1, 2, 3, 1, 2],
+      "right": [1, 2, 1, 2, 3],
+      "gramSize": 3,
+      "similarity": 0.3333333333333333
+    },
+    {
+      "left": [1, 2, 3, 1, 2],
+      "right": [1, 2, 1, 2, 3],
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": ["foo", "bar"],
+      "right": ["foo", "baz"],
+      "gramSize": 1,
+      "similarity": 0.5
+    },
+    {
+      "left": ["foo", "bar"],
+      "right": ["foo", "baz"],
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": ["foo", "bar"],
+      "right": ["foo", "baz"],
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": ["foo", "bar"],
+      "right": ["foo", "baz"],
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": ["a,b", "c"],
+      "right": ["a", "b,c"],
+      "gramSize": 1,
+      "similarity": 0.0
+    },
+    {
+      "left": ["a,b", "c"],
+      "right": ["a", "b,c"],
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": ["a,b", "c"],
+      "right": ["a", "b,c"],
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": ["a,b", "c"],
+      "right": ["a", "b,c"],
+      "gramSize": 7,
+      "similarity": 0.0
+    }
+  ],
+  "cosine": [
+    {
+      "left": "",
+      "right": "",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "",
+      "right": "",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "",
+      "right": "",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "",
+      "right": "",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "a",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "a",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "a",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "a",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": "a",
+      "right": "b",
+      "gramSize": 1,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "b",
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "b",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "b",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "ab",
+      "gramSize": 1,
+      "similarity": 0.7071067811865475
+    },
+    {
+      "left": "a",
+      "right": "ab",
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "ab",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "a",
+      "right": "ab",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "ab",
+      "right": "ab",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "ab",
+      "right": "ab",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "ab",
+      "right": "ab",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "ab",
+      "right": "ab",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": "night",
+      "right": "nacht",
+      "gramSize": 1,
+      "similarity": 0.6
+    },
+    {
+      "left": "night",
+      "right": "nacht",
+      "gramSize": 2,
+      "similarity": 0.25
+    },
+    {
+      "left": "night",
+      "right": "nacht",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "night",
+      "right": "nacht",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "banana",
+      "right": "bananas",
+      "gramSize": 1,
+      "similarity": 0.9660917830792959
+    },
+    {
+      "left": "banana",
+      "right": "bananas",
+      "gramSize": 2,
+      "similarity": 0.9486832980505138
+    },
+    {
+      "left": "banana",
+      "right": "bananas",
+      "gramSize": 3,
+      "similarity": 0.9258200997725514
+    },
+    {
+      "left": "banana",
+      "right": "bananas",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "abcabcab",
+      "right": "ababab",
+      "gramSize": 1,
+      "similarity": 0.9045340337332909
+    },
+    {
+      "left": "abcabcab",
+      "right": "ababab",
+      "gramSize": 2,
+      "similarity": 0.6054055145966812
+    },
+    {
+      "left": "abcabcab",
+      "right": "ababab",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "abcabcab",
+      "right": "ababab",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "kitten",
+      "right": "sitting",
+      "gramSize": 1,
+      "similarity": 0.7462025072446364
+    },
+    {
+      "left": "kitten",
+      "right": "sitting",
+      "gramSize": 2,
+      "similarity": 0.3651483716701107
+    },
+    {
+      "left": "kitten",
+      "right": "sitting",
+      "gramSize": 3,
+      "similarity": 0.22360679774997896
+    },
+    {
+      "left": "kitten",
+      "right": "sitting",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "the wonderful new york mets",
+      "right": "new york mets",
+      "gramSize": 1,
+      "similarity": 0.9316051410668054
+    },
+    {
+      "left": "the wonderful new york mets",
+      "right": "new york mets",
+      "gramSize": 2,
+      "similarity": 0.6793662204867574
+    },
+    {
+      "left": "the wonderful new york mets",
+      "right": "new york mets",
+      "gramSize": 3,
+      "similarity": 0.6633249580710799
+    },
+    {
+      "left": "the wonderful new york mets",
+      "right": "new york mets",
+      "gramSize": 7,
+      "similarity": 0.5773502691896257
+    },
+    {
+      "left": "South Korea",
+      "right": "North Korea",
+      "gramSize": 1,
+      "similarity": 0.8593378488473195
+    },
+    {
+      "left": "South Korea",
+      "right": "North Korea",
+      "gramSize": 2,
+      "similarity": 0.7302967433402214
+    },
+    {
+      "left": "South Korea",
+      "right": "North Korea",
+      "gramSize": 3,
+      "similarity": 0.6666666666666666
+    },
+    {
+      "left": "South Korea",
+      "right": "North Korea",
+      "gramSize": 7,
+      "similarity": 0.4
+    },
+    {
+      "left": "abcdef",
+      "right": "abcdef😀😀😀😀😀",
+      "gramSize": 1,
+      "similarity": 0.4399413450640599
+    },
+    {
+      "left": "abcdef",
+      "right": "abcdef😀😀😀😀😀",
+      "gramSize": 2,
+      "similarity": 0.4767312946227962
+    },
+    {
+      "left": "abcdef",
+      "right": "abcdef😀😀😀😀😀",
+      "gramSize": 3,
+      "similarity": 0.5163977794943222
+    },
+    {
+      "left": "abcdef",
+      "right": "abcdef😀😀😀😀😀",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "😀a",
+      "right": "😀b",
+      "gramSize": 1,
+      "similarity": 0.5
+    },
+    {
+      "left": "😀a",
+      "right": "😀b",
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": "😀a",
+      "right": "😀b",
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": "😀a",
+      "right": "😀b",
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": "😀😀",
+      "right": "😀😀",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "😀😀",
+      "right": "😀😀",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "😀😀",
+      "right": "😀😀",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "😀😀",
+      "right": "😀😀",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": "é",
+      "right": "é",
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": "é",
+      "right": "é",
+      "gramSize": 2,
+      "similarity": 1.0
+    },
+    {
+      "left": "é",
+      "right": "é",
+      "gramSize": 3,
+      "similarity": 1.0
+    },
+    {
+      "left": "é",
+      "right": "é",
+      "gramSize": 7,
+      "similarity": 1.0
+    },
+    {
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "gramSize": 1,
+      "similarity": 0.6666666666666666
+    },
+    {
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": [1, 2, 3],
+      "right": [1, 4, 3],
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": [1, 2, 3, 1, 2],
+      "right": [1, 2, 1, 2, 3],
+      "gramSize": 1,
+      "similarity": 1.0
+    },
+    {
+      "left": [1, 2, 3, 1, 2],
+      "right": [1, 2, 1, 2, 3],
+      "gramSize": 2,
+      "similarity": 0.8333333333333334
+    },
+    {
+      "left": [1, 2, 3, 1, 2],
+      "right": [1, 2, 1, 2, 3],
+      "gramSize": 3,
+      "similarity": 0.3333333333333333
+    },
+    {
+      "left": [1, 2, 3, 1, 2],
+      "right": [1, 2, 1, 2, 3],
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": ["foo", "bar"],
+      "right": ["foo", "baz"],
+      "gramSize": 1,
+      "similarity": 0.5
+    },
+    {
+      "left": ["foo", "bar"],
+      "right": ["foo", "baz"],
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": ["foo", "bar"],
+      "right": ["foo", "baz"],
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": ["foo", "bar"],
+      "right": ["foo", "baz"],
+      "gramSize": 7,
+      "similarity": 0.0
+    },
+    {
+      "left": ["a,b", "c"],
+      "right": ["a", "b,c"],
+      "gramSize": 1,
+      "similarity": 0.0
+    },
+    {
+      "left": ["a,b", "c"],
+      "right": ["a", "b,c"],
+      "gramSize": 2,
+      "similarity": 0.0
+    },
+    {
+      "left": ["a,b", "c"],
+      "right": ["a", "b,c"],
+      "gramSize": 3,
+      "similarity": 0.0
+    },
+    {
+      "left": ["a,b", "c"],
+      "right": ["a", "b,c"],
+      "gramSize": 7,
+      "similarity": 0.0
+    }
+  ]
+}

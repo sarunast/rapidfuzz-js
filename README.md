@@ -99,6 +99,7 @@ Scores are never rescaled between families:
 | Raw edit/count distance and similarity | Native algorithm units |
 | Normalized distance and similarity     | `0–1`                  |
 | Jaro and Jaro-Winkler measures         | `0–1`                  |
+| Dice and Cosine measures               | `0–1`                  |
 
 Available subpaths:
 
@@ -108,7 +109,9 @@ rapidfuzz-js/levenshtein
 rapidfuzz-js/indel
 rapidfuzz-js/lcs
 rapidfuzz-js/osa
+rapidfuzz-js/cosine
 rapidfuzz-js/damerau-levenshtein
+rapidfuzz-js/dice
 rapidfuzz-js/hamming
 rapidfuzz-js/jaro
 rapidfuzz-js/jaro-winkler
@@ -121,7 +124,69 @@ and `normalizedSimilarity`. Levenshtein, Indel, LCS, and Hamming also export
 `editops` and `opcodes`. The `Editops` and `Opcodes` they return carry their
 alignment in `operations`, a readonly array, and are themselves iterable with a
 `length`, so `for (const op of editops(a, b))` and `[...editops(a, b)]` work
-without reaching through it.
+without reaching through it. Jaro, Jaro-Winkler, Dice, and Cosine are
+normalized by construction, so their `normalized*` exports are the same metrics
+under the names the other algorithms use.
+
+### Sørensen-Dice and Cosine
+
+`rapidfuzz-js/dice` and `rapidfuzz-js/cosine` compare two sequences as bags of
+n-grams rather than position by position, which is what you want when word
+order is unreliable and `fuzz`'s tokenisation is too coarse. Both read the same
+exact n-gram frequency profile and differ only in how they combine it:
+
+```text
+                2 · Σ min(a_g, b_g)                         Σ a_g · b_g
+Dice(A, B) = ─────────────────────────      Cosine(A, B) = ───────────────
+              gramCount(A) + gramCount(B)                   ‖A‖ · ‖B‖
+```
+
+Cosine here is the dot product of the two frequency vectors — not the
+intersection-count formula (`|A ∩ B| / sqrt(|A| · |B|)`) that some libraries
+ship under the same name. On `ab:3, bc:1` against `ab:2, bc:2` this one answers
+`0.894`; that one answers `0.75`.
+
+Three further choices are worth knowing, because other implementations make
+them differently:
+
+- **Multiset, not set.** A gram occurring three times on one side and twice on
+  the other contributes two for Dice and six for Cosine. Dice on
+  `('banana', 'bananas')` is `0.909091`; a set-based Dice answers `0.857143`.
+- **No padding.** Nothing is added at the ends, so `aba` and `bab` have the same
+  bigram multiset and score `1`. Implementations that wrap each input in guard
+  characters answer `0.5`.
+- **Sequences shorter than `gramSize` have no grams at all**, which would make
+  the ratio `0/0`. Two such sequences score `1` if they are equal and `0`
+  otherwise; against a sequence that does have grams they score `0`. So at the
+  default `gramSize` of 2, `('a', 'a')` is `1`, `('a', 'b')` is `0`, and
+  `('a', 'ab')` is `0` — for both metrics.
+
+`gramSize` is a scorer configuration, not a call argument — the same rule
+Levenshtein's `weights` and Hamming's `pad` follow:
+
+```ts
+import { createScorer } from 'rapidfuzz-js'
+import { similarity as diceSimilarity } from 'rapidfuzz-js/dice'
+import { similarity as cosineSimilarity } from 'rapidfuzz-js/cosine'
+
+diceSimilarity('night', 'nacht')
+// 0.25 — `ni ig gh ht` against `na ac ch ht` shares only `ht`
+
+cosineSimilarity('night', 'nacht')
+// 0.25 — the same, because every gram here occurs once
+
+createScorer(diceSimilarity, { gramSize: 3 }).score('night', 'nacht')
+// 0
+```
+
+A scorer left at the default and one written as `{ gramSize: 2 }` prepare
+interchangeable choices; a scorer at any other depth, or of the other metric,
+refuses theirs.
+
+Dice also carries an exact upper bound — `2 · min(gA, gB) / (gA + gB)` — that
+turns down a candidate on gram counts alone, before either profile is built.
+That makes it markedly cheaper than Cosine under a high threshold over a long
+candidate list. Cosine has no such bound.
 
 The `fuzz` subpath is the exception: it exports similarity scorers only. Two
 of them are easy to mix up:

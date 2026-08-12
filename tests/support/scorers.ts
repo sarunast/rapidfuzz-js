@@ -1,9 +1,25 @@
 import {
+  distance as cosineDistance,
+  normalizedDistance as cosineNormalizedDistance,
+  normalizedSimilarity as cosineNormalizedSimilarity,
+  similarity as cosineSimilarity,
+  type CosineDistanceConfiguration,
+  type CosineSimilarityConfiguration,
+} from '../../src/algorithms/cosine/index.js'
+import {
   distance as damerauDistance,
   normalizedDistance as damerauNormalizedDistance,
   normalizedSimilarity as damerauNormalizedSimilarity,
   similarity as damerauSimilarity,
 } from '../../src/algorithms/damerauLevenshtein/index.js'
+import {
+  distance as diceDistance,
+  normalizedDistance as diceNormalizedDistance,
+  normalizedSimilarity as diceNormalizedSimilarity,
+  similarity as diceSimilarity,
+  type DiceDistanceConfiguration,
+  type DiceSimilarityConfiguration,
+} from '../../src/algorithms/dice/index.js'
 import {
   distance as hammingDistance,
   normalizedDistance as hammingNormalizedDistance,
@@ -160,6 +176,11 @@ class MetricHarness<TDistanceConfig extends object, TSimilarityConfig extends ob
 
 type EmptyConfiguration = Record<never, never>
 
+export const Cosine = new MetricHarness<
+  CosineDistanceConfiguration,
+  CosineSimilarityConfiguration
+>(cosineDistance, cosineSimilarity, cosineNormalizedDistance, cosineNormalizedSimilarity)
+
 export const DamerauLevenshtein = new MetricHarness<
   EmptyConfiguration,
   SimilarityConfiguration
@@ -169,6 +190,11 @@ export const DamerauLevenshtein = new MetricHarness<
   damerauNormalizedDistance,
   damerauNormalizedSimilarity,
 )
+
+export const Dice = new MetricHarness<
+  DiceDistanceConfiguration,
+  DiceSimilarityConfiguration
+>(diceDistance, diceSimilarity, diceNormalizedDistance, diceNormalizedSimilarity)
 
 export const Hamming = new MetricHarness<
   HammingDistanceConfiguration,
