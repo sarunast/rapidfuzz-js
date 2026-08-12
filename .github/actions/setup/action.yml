@@ -1,13 +1,8 @@
 name: Set up pnpm and install
 description: Pins pnpm, installs Node with a warm pnpm cache, and installs dependencies from the lockfile.
 
-# The three steps every job here starts with, shared by the library's gate and
-# the docs deploy. Checkout stays in the caller: a local action cannot run until
-# the workspace holding it exists.
-#
-# Node is fixed at 24 rather than an input because both callers want it. CI does
-# run the tests on 22 as well, but that is a second `setup-node` partway through
-# an already-installed job, not another full setup.
+# Shared by the library's gate and the docs deploy. Checkout stays in the
+# caller: a local action cannot run until the workspace holding it exists.
 
 inputs:
   working-directory:
