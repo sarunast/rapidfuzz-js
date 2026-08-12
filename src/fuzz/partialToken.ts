@@ -16,6 +16,17 @@ export const partialTokenRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
     prepareFuzz('partialTokenRatio'),
   )
 
+/**
+ * The higher of `partialTokenSortSimilarity` and `partialTokenSetSimilarity`,
+ * `0..100` — the partial-window counterpart to `tokenSimilarity`.
+ *
+ * The most permissive scorer in the family after `weightedSimilarity`: it
+ * forgives word order, extra words, and containment all at once, which makes it
+ * prone to scoring unrelated pairs highly. Prefer a narrower scorer when you can
+ * name the problem.
+ *
+ * RapidFuzz calls it `partial_token_ratio`.
+ */
 export const partialTokenSimilarity: BuiltInMetric<
   'fuzz.partialTokenSimilarity',
   'similarity'

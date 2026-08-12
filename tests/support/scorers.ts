@@ -95,17 +95,17 @@ function compileForTest(metric: unknown, options: object | undefined): Scorer {
   return scorer
 }
 
-class MetricHarness<DistanceConfig extends object, SimilarityConfig extends object> {
-  readonly #distance: Metric<'distance', DistanceConfig>
-  readonly #similarity: Metric<'similarity', SimilarityConfig>
-  readonly #normalizedDistance: Metric<'distance', DistanceConfig>
-  readonly #normalizedSimilarity: Metric<'similarity', SimilarityConfig>
+class MetricHarness<TDistanceConfig extends object, TSimilarityConfig extends object> {
+  readonly #distance: Metric<'distance', TDistanceConfig>
+  readonly #similarity: Metric<'similarity', TSimilarityConfig>
+  readonly #normalizedDistance: Metric<'distance', TDistanceConfig>
+  readonly #normalizedSimilarity: Metric<'similarity', TSimilarityConfig>
 
   constructor(
-    distance: Metric<'distance', DistanceConfig>,
-    similarity: Metric<'similarity', SimilarityConfig>,
-    normalizedDistance: Metric<'distance', DistanceConfig>,
-    normalizedSimilarity: Metric<'similarity', SimilarityConfig>,
+    distance: Metric<'distance', TDistanceConfig>,
+    similarity: Metric<'similarity', TSimilarityConfig>,
+    normalizedDistance: Metric<'distance', TDistanceConfig>,
+    normalizedSimilarity: Metric<'similarity', TSimilarityConfig>,
   ) {
     this.#distance = distance
     this.#similarity = similarity
@@ -116,7 +116,7 @@ class MetricHarness<DistanceConfig extends object, SimilarityConfig extends obje
   distance(
     a: Sequence,
     b: Sequence,
-    options?: DistanceConfig & ExecutionOptions,
+    options?: TDistanceConfig & ExecutionOptions,
   ): number | undefined {
     const scorer = compileForTest(this.#distance, options)
     return options?.threshold === undefined
@@ -127,7 +127,7 @@ class MetricHarness<DistanceConfig extends object, SimilarityConfig extends obje
   similarity(
     a: Sequence,
     b: Sequence,
-    options?: SimilarityConfig & ExecutionOptions,
+    options?: TSimilarityConfig & ExecutionOptions,
   ): number | undefined {
     const scorer = compileForTest(this.#similarity, options)
     return options?.threshold === undefined
@@ -138,7 +138,7 @@ class MetricHarness<DistanceConfig extends object, SimilarityConfig extends obje
   normalizedDistance(
     a: Sequence,
     b: Sequence,
-    options?: DistanceConfig & ExecutionOptions,
+    options?: TDistanceConfig & ExecutionOptions,
   ): number | undefined {
     const scorer = compileForTest(this.#normalizedDistance, options)
     return options?.threshold === undefined
@@ -149,7 +149,7 @@ class MetricHarness<DistanceConfig extends object, SimilarityConfig extends obje
   normalizedSimilarity(
     a: Sequence,
     b: Sequence,
-    options?: SimilarityConfig & ExecutionOptions,
+    options?: TSimilarityConfig & ExecutionOptions,
   ): number | undefined {
     const scorer = compileForTest(this.#normalizedSimilarity, options)
     return options?.threshold === undefined

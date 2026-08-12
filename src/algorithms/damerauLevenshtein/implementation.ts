@@ -111,8 +111,7 @@ function nextBmpGeneration(): number {
 
 /**
  * Unrestricted Damerau-Levenshtein distance, allowing transposition of any two
- * elements. Unlike {@link import('./osa.js').osaDistance}, a substring may be
- * edited more than once.
+ * elements. Unlike `osaDistance`, a substring may be edited more than once.
  *
  * Uses the standard `da`-dictionary formulation, which needs the full
  * O(|s1| * |s2|) matrix rather than a rolling row.

@@ -21,15 +21,31 @@ const CAPITAL_SIGMA = 'Σ'
 /**
  * Lowercase, replace every non-alphanumeric character with a space, and trim.
  *
+ * ```ts
+ * normalizeText('  Wireless-Mechanical KEYBOARD!! ') // 'wireless mechanical keyboard'
+ * ```
+ *
  * Follows RapidFuzz's `utils.default_process`: an underscore separates, runs
  * are not collapsed (`'a---b'` → `'a   b'`), and no `NFC`/`NFKC` is applied.
+ * Like upstream it is opt-in — nothing applies it for you, because scoring what
+ * you were given is the only honest default and cleaning is a decision about
+ * your data.
+ *
+ * Pass it as the `normalize` option so it reaches both the choices and the
+ * query; applying it by hand to only one side is the classic mistake.
  *
  * Normalizes text; any other sequence is returned as it came. That is what
  * makes it the package's `Normalizer` for a collection of array-like choices,
  * where nothing about an element is text to lowercase.
+ *
+ * @returns The cleaned string, or the sequence unchanged if it was not text.
+ * @throws `TypeError` if the value is not a sequence at all — a number, a
+ * boolean, or an object with no array-like `length`.
  */
 export function normalizeText(value: string): string
-export function normalizeText<T extends ArrayLike<unknown>>(value: T): T
+export function normalizeText<TSequence extends ArrayLike<unknown>>(
+  value: TSequence,
+): TSequence
 export function normalizeText(value: Sequence): Sequence {
   // Returned through the guard rather than directly: this is a public entry
   // point, and what it hands back has to be a sequence whether or not it had

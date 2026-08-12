@@ -23,12 +23,14 @@ export type NoConfiguration = Readonly<Record<string, never>>
  * it; the overload for that takes a bare function and never looks for a hook.
  */
 export interface Metric<
-  D extends Direction,
-  Config extends object = NoConfiguration,
-  Brand = AnyBrand,
+  TDirection extends Direction,
+  TConfig extends object = NoConfiguration,
+  TBrand = AnyBrand,
 > {
   (a: MaybeSequence, b: MaybeSequence): number
-  readonly [COMPILE]: (configuration: Config | undefined) => MetricCompilation<D, Brand>
+  readonly [COMPILE]: (
+    configuration: TConfig | undefined,
+  ) => MetricCompilation<TDirection, TBrand>
 }
 
 /**
@@ -37,13 +39,15 @@ export interface Metric<
  * JavaScript, where the types do not apply, and `COMPILE in null` would throw
  * before the controlled error further down could be raised.
  *
- * `Object.hasOwn` rather than `in`: {@link import('./protocol.js').COMPILE} is
- * installed on the metric function itself, so an inherited hook is not a metric
- * this package made — it is something that borrowed a prototype from one.
+ * `Object.hasOwn` rather than `in`: `COMPILE` is installed on the metric
+ * function itself, so an inherited hook is not a metric this package made — it
+ * is something that borrowed a prototype from one.
  */
-export function isBuiltInMetric<D extends Direction, Config extends object, Brand>(
-  value: unknown,
-): value is Metric<D, Config, Brand> {
+export function isBuiltInMetric<
+  TDirection extends Direction,
+  TConfig extends object,
+  TBrand,
+>(value: unknown): value is Metric<TDirection, TConfig, TBrand> {
   if (typeof value !== 'function' || !Object.hasOwn(value, COMPILE)) return false
   const compile: unknown = Reflect.get(value, COMPILE)
   return typeof compile === 'function'

@@ -30,18 +30,26 @@ export type ScoreArrayOf = {
   readonly u8c: Uint8ClampedArray
 }
 
-/** The `into` option: which element type to store scores as. */
+/**
+ * The `into` option: which element type to store scores as, `'f64'` by default.
+ *
+ * A narrower type is a memory decision — `'u8'` holds any `0..100` fuzz score
+ * in an eighth of `'f64'`'s space — and the buffer transfers to a worker or to
+ * WebAssembly without copying. A score the type cannot hold is a `RangeError`
+ * rather than a silently wrapped number; `'u8c'` is the exception, saturating
+ * by definition, and so the way to ask for lossy storage deliberately.
+ */
 export type ScoreArrayKind = keyof ScoreArrayOf
 
 /** Any of the arrays {@link ScoreArrayOf} names. */
 export type ScoreArray = ScoreArrayOf[ScoreArrayKind]
 
 /**
- * Function properties rather than methods, so `A` is checked contravariantly
+ * Function properties rather than methods, so `TArray` is checked contravariantly
  * under `strictFunctionTypes` — a method declaration is bivariant, which would
  * let a `Float64Array` factory sit in the `u8` slot of the table below.
  */
-interface ScoreArrayFactory<A extends ScoreArray> {
+interface ScoreArrayFactory<TArray extends ScoreArray> {
   /** Whether the store holds integers, so a score has to be rounded before it. */
   readonly integral: boolean
   /**
@@ -53,9 +61,9 @@ interface ScoreArrayFactory<A extends ScoreArray> {
    * kind wraps silently, which is what a bound turns into a `RangeError`.
    */
   readonly range: readonly [number, number] | null
-  readonly allocate: (length: number) => A
+  readonly allocate: (length: number) => TArray
   /** A row, sharing the buffer rather than copying it. */
-  readonly view: (data: A, start: number, end: number) => A
+  readonly view: (data: TArray, start: number, end: number) => TArray
 }
 
 /**
@@ -72,7 +80,7 @@ interface ScoreArrayFactory<A extends ScoreArray> {
  * runtime, and no constructor has to be abstracted over.
  */
 const SCORE_ARRAYS: {
-  readonly [K in ScoreArrayKind]: ScoreArrayFactory<ScoreArrayOf[K]>
+  readonly [TKind in ScoreArrayKind]: ScoreArrayFactory<ScoreArrayOf[TKind]>
 } = {
   f64: {
     range: null,
@@ -131,9 +139,9 @@ const SCORE_ARRAYS: {
 }
 
 /** The factory for a kind, with its element type carried through. */
-export function scoreArrayFactory<K extends ScoreArrayKind>(
-  kind: K,
-): ScoreArrayFactory<ScoreArrayOf[K]> {
+export function scoreArrayFactory<TKind extends ScoreArrayKind>(
+  kind: TKind,
+): ScoreArrayFactory<ScoreArrayOf[TKind]> {
   const factory = SCORE_ARRAYS[kind]
   if (factory === undefined) {
     throw new RangeError(`unknown score array kind: ${String(kind)}`)
@@ -160,11 +168,11 @@ const MAX_LENGTH = 2 ** 32 - 1
  * not an array at all — and a typed-array constructor would coerce `1.5` to a
  * one-element array rather than say so.
  */
-export function allocateScores<K extends ScoreArrayKind>(
-  kind: K,
+export function allocateScores<TKind extends ScoreArrayKind>(
+  kind: TKind,
   length: number,
   what: string,
-): ScoreArrayOf[K] {
+): ScoreArrayOf[TKind] {
   if (length > MAX_LENGTH) {
     throw new RangeError(`${what} needs ${length} scores, more than an array can hold`)
   }
@@ -248,19 +256,19 @@ export function unstorableScore(
  * indexing is the only thing a flat array does not already give a caller, so
  * that is all this adds.
  */
-export interface ScoreMatrix<A extends ScoreArray = Float64Array> {
+export interface ScoreMatrix<TArray extends ScoreArray = Float64Array> {
   /** Number of queries. */
   readonly rows: number
   /** Number of choices. */
   readonly cols: number
   /** Row-major scores, `rows * cols` long. `data[row * cols + col]`. */
-  readonly data: A
+  readonly data: TArray
   /** The score of `queries[row]` against `choices[col]`. */
   at(row: number, col: number): number
   /** A copy as nested plain arrays. */
   toArray(): number[][]
   /** Each row in turn, as a view over {@link data} rather than a copy. */
-  [Symbol.iterator](): IterableIterator<A>
+  [Symbol.iterator](): IterableIterator<TArray>
 }
 
 /**
@@ -284,16 +292,16 @@ function validateDimension(value: number, name: string, what: string): void {
  *
  * `kind` has to arrive as a single literal rather than the union, which is what
  * lets `view` come back at the concrete element type and the row iterator
- * promise `A` instead of the whole union. Callers holding a runtime kind
+ * promise `TArray` instead of the whole union. Callers holding a runtime kind
  * dispatch to a literal first — see `scoreMatrix`.
  */
-export function buildScoreMatrix<K extends ScoreArrayKind>(
-  kind: K,
+export function buildScoreMatrix<TKind extends ScoreArrayKind>(
+  kind: TKind,
   rows: number,
   cols: number,
   what: string,
-  fill: (data: ScoreArrayOf[K], integral: boolean) => void,
-): ScoreMatrix<ScoreArrayOf[K]> {
+  fill: (data: ScoreArrayOf[TKind], integral: boolean) => void,
+): ScoreMatrix<ScoreArrayOf[TKind]> {
   validateDimension(rows, 'row', what)
   validateDimension(cols, 'column', what)
   const { integral, view } = scoreArrayFactory(kind)

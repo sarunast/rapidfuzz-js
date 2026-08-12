@@ -209,7 +209,14 @@ export function lcsSeqEditops(s1: Sequence, s2: Sequence): Editops {
   return editopsFromValidated(ops, srcLen, destLen)
 }
 
-/** {@link lcsSeqEditops} expressed as blocks. */
+/**
+ * {@link lcsSeqEditops} as contiguous ranges rather than single operations.
+ *
+ * Opcodes cover the whole of both inputs, including the `equal` stretches
+ * between edits, which is usually what a diff view or a highlighter wants —
+ * `editops` lists only the changes. The two convert into each other with
+ * `toEditops()` and `toOpcodes()`.
+ */
 export function lcsSeqOpcodes(s1: Sequence, s2: Sequence): Opcodes {
   return lcsSeqEditops(s1, s2).toOpcodes()
 }

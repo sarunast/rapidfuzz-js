@@ -6,6 +6,10 @@ import {
   postfixSimilarity,
 } from './implementation.js'
 
+/**
+ * How many elements fall outside the common suffix, counted across both
+ * inputs.
+ */
 export const distance: BuiltInMetric<'postfix.distance', 'distance'> =
   /* @__PURE__ */ builtInMetric({
     implementation: postfixDistance,
@@ -13,6 +17,14 @@ export const distance: BuiltInMetric<'postfix.distance', 'distance'> =
     direction: 'distance',
     bounds: [0, Number.POSITIVE_INFINITY],
   })
+/**
+ * The length of the run of identical elements at the **end** of both
+ * sequences.
+ *
+ * ```ts
+ * similarity('walking', 'running') // 3 — the shared 'ing'
+ * ```
+ */
 export const similarity: BuiltInMetric<'postfix.similarity', 'similarity'> =
   /* @__PURE__ */ builtInMetric({
     implementation: postfixSimilarity,
@@ -20,6 +32,9 @@ export const similarity: BuiltInMetric<'postfix.similarity', 'similarity'> =
     direction: 'similarity',
     bounds: [0, Number.POSITIVE_INFINITY],
   })
+/**
+ * {@link distance} as a `0..1` fraction of the longer input.
+ */
 export const normalizedDistance: BuiltInMetric<'postfix.normalizedDistance', 'distance'> =
   /* @__PURE__ */ builtInMetric({
     implementation: postfixNormalizedDistance,
@@ -27,6 +42,13 @@ export const normalizedDistance: BuiltInMetric<'postfix.normalizedDistance', 'di
     direction: 'distance',
     bounds: [0, 1],
   })
+/**
+ * The shared suffix length over the longer input, `0..1`.
+ *
+ * ```ts
+ * normalizedSimilarity('walking', 'running') // 0.4285…
+ * ```
+ */
 export const normalizedSimilarity: BuiltInMetric<
   'postfix.normalizedSimilarity',
   'similarity'

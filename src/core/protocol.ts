@@ -7,8 +7,8 @@ export interface PreparedKernel {
   (choice: unknown, threshold: number | null): number
 }
 
-interface Compilation<D extends Direction, Brand = AnyBrand> {
-  readonly direction: D
+interface Compilation<TDirection extends Direction, TBrand = AnyBrand> {
+  readonly direction: TDirection
   readonly bounds: readonly [number, number]
   readonly symmetric: boolean
   readonly score: (a: MaybeSequence, b: MaybeSequence, threshold: number | null) => number
@@ -27,24 +27,24 @@ interface Compilation<D extends Direction, Brand = AnyBrand> {
   readonly preparedChoiceKey: object
   // Never assigned and never read: it exists so a scorer's handles carry the
   // metric that made them into the type system.
-  readonly preparedChoiceBrand?: Brand
+  readonly preparedChoiceBrand?: TBrand
 }
 
 export interface TrustedMetricCompilation<
-  D extends Direction,
-  Brand = AnyBrand,
-> extends Compilation<D, Brand> {
+  TDirection extends Direction,
+  TBrand = AnyBrand,
+> extends Compilation<TDirection, TBrand> {
   readonly trusted: true
   readonly validate: (a: MaybeSequence, b: MaybeSequence) => void
 }
 
 export interface CustomMetricCompilation<
-  D extends Direction,
-  Brand = AnyBrand,
-> extends Compilation<D, Brand> {
+  TDirection extends Direction,
+  TBrand = AnyBrand,
+> extends Compilation<TDirection, TBrand> {
   readonly trusted: false
 }
 
-export type MetricCompilation<D extends Direction, Brand = AnyBrand> =
-  | TrustedMetricCompilation<D, Brand>
-  | CustomMetricCompilation<D, Brand>
+export type MetricCompilation<TDirection extends Direction, TBrand = AnyBrand> =
+  | TrustedMetricCompilation<TDirection, TBrand>
+  | CustomMetricCompilation<TDirection, TBrand>

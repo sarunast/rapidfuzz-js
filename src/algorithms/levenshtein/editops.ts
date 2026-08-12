@@ -38,7 +38,14 @@ export function levenshteinEditops(s1: Sequence, s2: Sequence): Editops {
   return editopsFromValidated(ops, full1.length, full2.length)
 }
 
-/** {@link levenshteinEditops} expressed as blocks. */
+/**
+ * {@link levenshteinEditops} as contiguous ranges rather than single operations.
+ *
+ * Opcodes cover the whole of both inputs, including the `equal` stretches
+ * between edits, which is usually what a diff view or a highlighter wants —
+ * `editops` lists only the changes. The two convert into each other with
+ * `toEditops()` and `toOpcodes()`.
+ */
 export function levenshteinOpcodes(s1: Sequence, s2: Sequence): Opcodes {
   return levenshteinEditops(s1, s2).toOpcodes()
 }

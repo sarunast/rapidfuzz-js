@@ -3,24 +3,29 @@ import { bestDistance } from './bestDistance.js'
 import { pushHeap, replaceHeapRoot } from './heap.js'
 import type { RawPreparedScore, StoredItem } from './types.js'
 
-function worse<T, K>(left: ScoredEntry<T, K>, right: ScoredEntry<T, K>): boolean {
+function worse<TItem, TKey>(
+  left: ScoredEntry<TItem, TKey>,
+  right: ScoredEntry<TItem, TKey>,
+): boolean {
   return (
     left.score > right.score || (left.score === right.score && left.order > right.order)
   )
 }
 
-function result<T, K>(entries: ScoredEntry<T, K>[]): readonly Match<T, K>[] {
+function result<TItem, TKey>(
+  entries: ScoredEntry<TItem, TKey>[],
+): readonly Match<TItem, TKey>[] {
   entries.sort((a, b) => a.score - b.score || a.order - b.order)
   return entries.map(({ item, key, score }) => ({ item, key, score }))
 }
 
-export function topDistance<T, K>(
-  items: readonly StoredItem<T, K>[],
+export function topDistance<TItem, TKey>(
+  items: readonly StoredItem<TItem, TKey>[],
   score: RawPreparedScore,
   threshold: number | null,
   limit: number | null,
   optimal: number | null,
-): readonly Match<T, K>[] {
+): readonly Match<TItem, TKey>[] {
   if (limit === 0) return []
   if (limit === 1) {
     const found = bestDistance(items, score, threshold, optimal)
@@ -31,7 +36,7 @@ export function topDistance<T, K>(
   // nothing is skipped before scoring, so a separate counter tracked `index`
   // exactly.
   if (limit !== null) {
-    const heap: ScoredEntry<T, K>[] = []
+    const heap: ScoredEntry<TItem, TKey>[] = []
     let cutoff = threshold
     for (let index = 0; index < items.length; index++) {
       const entry = items[index]
@@ -57,7 +62,7 @@ export function topDistance<T, K>(
     return result(heap)
   }
 
-  const results: ScoredEntry<T, K>[] = []
+  const results: ScoredEntry<TItem, TKey>[] = []
   for (let index = 0; index < items.length; index++) {
     const entry = items[index]
     const value = score(entry.prepared, threshold)

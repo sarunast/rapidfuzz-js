@@ -5,11 +5,11 @@ import type { Normalizer } from './types.js'
  * These are runtime exports for `core/scorer` and `search/` alone: no package
  * entrypoint re-exports them, so no consumer can reach either door.
  */
-export let createPreparedChoice: <Brand>(
+export let createPreparedChoice: <TBrand>(
   owner: object,
   value: unknown,
   normalize: Normalizer | undefined,
-) => PreparedChoice<Brand>
+) => PreparedChoice<TBrand>
 
 export let resolvePreparedChoice: (
   owner: object,
@@ -40,16 +40,16 @@ export type AnyBrand = any
  * own declaration emit name `Scorer<'similarity', 'fuzz.tokenSetSimilarity'>`
  * without importing anything of ours.
  */
-export class PreparedChoice<Brand = AnyBrand> {
+export class PreparedChoice<TBrand = AnyBrand> {
   // Phantom, never assigned, never read. `(value: Brand) => Brand` keeps Brand
-  // invariant: PreparedChoice<A> must not widen to PreparedChoice<A | B>.
+  // invariant: PreparedChoice<Brand> must not widen to a union of two brands.
   //
   // Protected rather than private because declaration emit erases the type of
   // a private member — `private brand;` — which would leave `Brand` unused in
   // the packed `.d.ts` and every consumer unprotected. The private constructor
   // refuses `extends` through the TypeScript API rather than at runtime, which
   // is enough here: the class is exported as a type, never as a value.
-  declare protected readonly brand: (value: Brand) => Brand
+  declare protected readonly brand: (value: TBrand) => TBrand
 
   readonly #owner: object
   readonly #value: unknown
@@ -65,11 +65,11 @@ export class PreparedChoice<Brand = AnyBrand> {
   }
 
   static {
-    createPreparedChoice = <Brand>(
+    createPreparedChoice = <TBrand>(
       owner: object,
       value: unknown,
       normalize: Normalizer | undefined,
-    ) => new PreparedChoice<Brand>(owner, value, normalize)
+    ) => new PreparedChoice<TBrand>(owner, value, normalize)
     resolvePreparedChoice = (owner, handle, normalize) => {
       // `#owner in handle` refuses anything the private constructor did not
       // build, including `Object.create(PreparedChoice.prototype)` forgeries

@@ -162,15 +162,21 @@ function indelNormalizedSimilarity_impl(
 }
 
 /**
- * Edit operations that turn `s1` into `s2`. Identical to
- * {@link import('./lcsSeq.js').lcsSeqEditops} — the Indel metric is the LCS
- * metric counted differently.
+ * Edit operations that turn `s1` into `s2`. Identical to `lcsSeqEditops` — the
+ * Indel metric is the LCS metric counted differently.
  */
 export function indelEditops(s1: Sequence, s2: Sequence): Editops {
   return lcsSeqEditops(s1, s2)
 }
 
-/** {@link indelEditops} expressed as blocks. */
+/**
+ * {@link indelEditops} as contiguous ranges rather than single operations.
+ *
+ * Opcodes cover the whole of both inputs, including the `equal` stretches
+ * between edits, which is usually what a diff view or a highlighter wants —
+ * `editops` lists only the changes. The two convert into each other with
+ * `toEditops()` and `toOpcodes()`.
+ */
 export function indelOpcodes(s1: Sequence, s2: Sequence): Opcodes {
   return lcsSeqEditops(s1, s2).toOpcodes()
 }

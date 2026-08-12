@@ -16,16 +16,16 @@ export interface PreparedCapability {
   readonly [PREPARE_SCORER]: PreparationFactory
 }
 
-export interface MetricImplementation<O extends ScorerOptions = ScorerOptions>
+export interface MetricImplementation<TOptions extends ScorerOptions = ScorerOptions>
   extends Flagged, PreparedCapability {
-  (left: Sequence, right: Sequence, options?: O): number
+  (left: Sequence, right: Sequence, options?: TOptions): number
 }
 
 export interface MaybeSequenceMetricImplementation<
-  O extends ScorerOptions = ScorerOptions,
+  TOptions extends ScorerOptions = ScorerOptions,
 >
   extends Flagged, PreparedCapability {
-  (left: MaybeSequence, right: MaybeSequence, options?: O): number
+  (left: MaybeSequence, right: MaybeSequence, options?: TOptions): number
 }
 
 export type ConfigurationSymmetryResolver = (
@@ -91,12 +91,12 @@ export type ErasedMetricImplementation = (
   options?: ScorerOptions,
 ) => number
 
-export function withPreparedFlags<F extends ErasedMetricImplementation>(
-  implementation: F,
+export function withPreparedFlags<TImplementation extends ErasedMetricImplementation>(
+  implementation: TImplementation,
   flags: ScorerFlags,
   prepare: PreparationFactory,
   registration: ScorerRegistration = {},
-): F & Flagged & PreparedCapability {
+): TImplementation & Flagged & PreparedCapability {
   // Decorates the implementation instead of wrapping it, so scoring pays no
   // extra call. Registering unconditionally replaces any earlier registration.
   const scorer = Object.assign(implementation, {

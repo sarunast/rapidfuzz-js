@@ -61,7 +61,7 @@ export const CALL_SEARCH_KEYS: readonly string[] = [
   'limit',
 ] as const satisfies readonly (keyof SearchOptions)[]
 
-export type SequenceReader<T> = (item: T) => Sequence | null
+export type SequenceReader<TItem> = (item: TItem) => Sequence | null
 
 /**
  * How a search reads its choices.
@@ -73,18 +73,18 @@ export type SequenceReader<T> = (item: T) => Sequence | null
  * text-mode reader itself, and `null` marks prepared mode for the one loop
  * that needs a `Sequence` rather than a prepared choice.
  */
-export interface ChoiceReader<T> {
-  readonly present: (item: T) => boolean
-  readonly read: (item: T) => unknown
-  readonly sequences: SequenceReader<T> | null
+export interface ChoiceReader<TItem> {
+  readonly present: (item: TItem) => boolean
+  readonly read: (item: TItem) => unknown
+  readonly sequences: SequenceReader<TItem> | null
 }
 
-export function choiceReader<T, B>(
-  options: ResolvedMatcherOptions<T, Direction, B>,
+export function choiceReader<TItem, TBrand>(
+  options: ResolvedMatcherOptions<TItem, Direction, TBrand>,
   prepareChoice: (choice: Sequence) => unknown,
   preparedChoiceKey: object,
   own: boolean,
-): ChoiceReader<T> {
+): ChoiceReader<TItem> {
   if (options.getPrepared === undefined) {
     // Two readers, built once: the loops read choices, and the null-query and
     // raw-score paths read sequences. Neither pays for the other.
@@ -112,7 +112,7 @@ export function choiceReader<T, B>(
     options.normalize === undefined
       ? undefined
       : requireFunction(options.normalize, 'normalize')
-  const read = (item: T): unknown =>
+  const read = (item: TItem): unknown =>
     resolvePreparedChoice(preparedChoiceKey, getPrepared(item), normalize)
   return {
     // Prepared mode has nothing to skip, so presence is the resolution itself:
@@ -126,10 +126,10 @@ export function choiceReader<T, B>(
   }
 }
 
-export function sequenceReader<T>(
-  options: ResolvedMatcherOptions<T, Direction>,
+export function sequenceReader<TItem>(
+  options: ResolvedMatcherOptions<TItem, Direction>,
   own: boolean,
-): SequenceReader<T> {
+): SequenceReader<TItem> {
   const retain = own ? snapshotSequence : identity
   return itemReader(options, retain)
 }
@@ -143,7 +143,10 @@ function identity(value: Sequence): Sequence {
  * collection never calls an accessor, so a search over one would otherwise
  * accept options no non-empty collection would.
  */
-function requireFunction<F>(value: F, name: string): F {
+function requireFunction<TImplementation>(
+  value: TImplementation,
+  name: string,
+): TImplementation {
   if (typeof value !== 'function') {
     throw new TypeError(`${name} must be a function`)
   }
@@ -159,10 +162,10 @@ function requireFunction<F>(value: F, name: string): F {
  * closure would add a call to that loop for every caller, including the ones
  * that never prepare anything.
  */
-function itemReader<T, R>(
-  options: ResolvedMatcherOptions<T, Direction>,
-  finish: (value: Sequence) => R,
-): (item: T) => R | null {
+function itemReader<TItem, TResult>(
+  options: ResolvedMatcherOptions<TItem, Direction>,
+  finish: (value: Sequence) => TResult,
+): (item: TItem) => TResult | null {
   const policy = options.missingItems ?? 'skip'
   // Checked once, before the specialized reader exists: an unknown policy is a
   // typo, and reading it as 'throw' by falling through the 'skip' test would

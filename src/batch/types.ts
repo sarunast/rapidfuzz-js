@@ -2,11 +2,15 @@ import type { Scorer } from '../core/scorer.js'
 import type { Direction, Normalizer } from '../core/types.js'
 import type { ScoreArrayKind } from './scoreArray.js'
 
-export interface BatchOptions<D extends Direction, K extends ScoreArrayKind = 'f64'> {
-  readonly scorer: Scorer<D>
+/** Shared by {@link scoreMatrix} and {@link scorePairs}. */
+export interface BatchOptions<
+  TDirection extends Direction,
+  TKind extends ScoreArrayKind = 'f64',
+> {
+  readonly scorer: Scorer<TDirection>
 
   /** Element type the scores are stored as. Defaults to `'f64'`. */
-  readonly into?: K | undefined
+  readonly into?: TKind | undefined
 
   /** Applied to every query and every choice before scoring. */
   readonly normalize?: Normalizer | undefined

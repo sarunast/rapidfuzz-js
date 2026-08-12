@@ -1,8 +1,8 @@
 import type { Items } from './types.js'
 
-export interface SourceEntry<T, K = unknown> {
-  readonly item: T
-  readonly key: K
+export interface SourceEntry<TItem, TKey = unknown> {
+  readonly item: TItem
+  readonly key: TKey
 }
 
 export function assertCollection(value: unknown): void {
@@ -43,7 +43,9 @@ function isIterable(value: object): value is Iterable<unknown> {
   return typeof Reflect.get(value, Symbol.iterator) === 'function'
 }
 
-export function* collectionEntries<T>(items: Items<T>): Generator<SourceEntry<T>> {
+export function* collectionEntries<TItem>(
+  items: Items<TItem>,
+): Generator<SourceEntry<TItem>> {
   assertCollection(items)
   if (isMapLike(items)) {
     for (const [key, item] of items) yield { item, key }
