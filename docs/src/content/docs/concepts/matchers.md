@@ -92,3 +92,9 @@ A Matcher snapshots *what it scores*, not *what it returns*:
 
 If the collection itself changes, build a new Matcher — construction is the
 cheap part compared to re-preparing on every query.
+
+When rebuilding doesn't fit — the collection is filtered differently per
+query, or preparation is worth keeping *across* rebuilds — prepare each
+candidate yourself and hand the handles to a one-shot search (or to
+`createMatcher` via `getPrepared`, which then resolves them once instead of
+preparing at all): [Prepared choices](/guides/prepared-choices/).

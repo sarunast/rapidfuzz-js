@@ -72,6 +72,13 @@ matcher.search('falcons', { threshold: 70 }) // fast
 The heuristic is simple: **can you name a second query? Build a
 [Matcher](/concepts/matchers/).**
 
+There's a third position between the two: if the collection has to stay
+yours — filtered differently per query, growing, carrying more than one
+searchable field — prepare each candidate yourself with
+`scorer.prepareChoice` and hand the handles back through `getPrepared`.
+One-shot flexibility, Matcher-grade speed:
+[Prepared choices](/guides/prepared-choices/).
+
 ## When you want scores, not rankings
 
 If the question is "score everything against everything" rather than "what

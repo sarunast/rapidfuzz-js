@@ -24,6 +24,12 @@ measured up to **7×** faster than re-preparing per call on token workloads.
 If you remember one thing from this page: *can you name a second query?
 Build a Matcher.*
 
+When a Matcher can't own the collection — you filter it per query, grow it,
+or keep it in your own index — the same preparation is available piecemeal:
+`scorer.prepareChoice` each candidate once and pass `getPrepared` to the
+one-shot searches. Same speed class, collection stays yours —
+[Prepared choices](/guides/prepared-choices/).
+
 ## 2. Set real thresholds
 
 A `threshold` isn't just a result filter — the edit-distance algorithms use
