@@ -13,6 +13,9 @@ Fast fuzzy matching for JavaScript and TypeScript, powered by the algorithms of
 - No runtime dependencies
 - Tree-shakeable algorithm subpaths
 
+This file is the tour. [API.md](./API.md) is the per-export reference: every
+signature, option, scale, and error message.
+
 ## Install
 
 ```sh
@@ -114,7 +117,10 @@ rapidfuzz-js/postfix
 
 Every algorithm subpath exposes `distance`, `similarity`, `normalizedDistance`,
 and `normalizedSimilarity`. Levenshtein, Indel, LCS, and Hamming also export
-`editops` and `opcodes`.
+`editops` and `opcodes`. The `Editops` and `Opcodes` they return carry their
+alignment in `operations`, a readonly array, and are themselves iterable with a
+`length`, so `for (const op of editops(a, b))` and `[...editops(a, b)]` work
+without reaching through it.
 
 The `fuzz` subpath is the exception: it exports similarity scorers only. Two
 of them are easy to mix up:
@@ -342,6 +348,15 @@ scoreMatrix(['cat'], ['cats'], {
 })
 ```
 
+A score the chosen element type cannot hold is a `RangeError`, not a wrapped
+number: `scoreMultiplier: 3` on a `0..100` scorer reaches `300`, which a `u8`
+would otherwise store as `44`. The check costs nothing where the scorer's
+bounds and multiplier prove every score fits, so a `0..100` scorer into `u8`
+stays as it was, and a `Infinity`-bounded distance into `u8` is still allowed —
+it is refused when a score actually arrives that does not fit, not up front.
+`u8c` is the exception, and the way to ask for the lossy behaviour on purpose:
+`Uint8ClampedArray` saturates to `0..255` by definition.
+
 ## RapidFuzz capability mapping
 
 | RapidFuzz                    | rapidfuzz-js                                                  |
@@ -370,9 +385,20 @@ const strict = createScorer(weightedSimilarity, { missing: 'throw' })
 strict.score(null, 'text') // throws TypeError
 ```
 
+Two missing operands are also `0`, not `100`: unknown compared with unknown is
+not a match, and scoring it perfect would sort every missing record to the top
+of a search.
+
 Distance scorers always throw on missing operands. Empty sequences are valid.
 Numbers (including `NaN`), booleans, and objects without a valid array-like
 `length` are invalid.
+
+Empty and whitespace-only inputs are where the fuzz scorers disagree with each
+other, and deliberately so — `tokenSetSimilarity`, `partialTokenSetSimilarity`
+and `weightedSimilarity` answer `0` where `similarity` and the sort-based
+scorers answer `100`. A side with no tokens has no set to intersect;
+FuzzyWuzzy returns `0` there and RapidFuzz keeps it (issue 110), so this port
+does too.
 
 Options objects — for searches, Matcher methods, `scoreMatrix`, `scorePairs`,
 and `prepareChoice` — reject unknown keys:

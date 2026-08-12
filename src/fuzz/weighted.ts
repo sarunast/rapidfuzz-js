@@ -152,5 +152,10 @@ export function wRatio_impl(
 export const wRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(wRatio_impl, FUZZ_FLAGS, prepareFuzz('wRatio'))
 
+/**
+ * Two empty inputs score `0`, not `100` — FuzzyWuzzy's answer, kept by
+ * RapidFuzz (issue 110). Whitespace-only inputs still have length, so those
+ * reach the ordinary strategy and score `100`.
+ */
 export const weightedSimilarity: BuiltInMetric<'fuzz.weightedSimilarity', 'similarity'> =
   /* @__PURE__ */ fuzzMetric(wRatio)
