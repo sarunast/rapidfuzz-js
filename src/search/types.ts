@@ -83,6 +83,38 @@ export type AnyMatcherOptions<
   | PreparedMatcherOptions<TItem, TDirection, TBrand>
 
 /**
+ * Searching a collection through one corpus-wide index — {@link MatcherOptions}
+ * with the two things an index cannot do taken away.
+ *
+ * The scorer must be a **similarity** scorer, which is a compile error rather
+ * than a throw: an index accumulates how much two sequences share, and ranking
+ * by a distance is a different search that nothing has measured. Whether that
+ * scorer has an indexed representation at all is checked when the matcher is
+ * built, because a custom scorer cannot be recognised by its type.
+ *
+ * `getPrepared` is refused for the same reason it exists: a prepared handle is
+ * the per-choice representation an index replaces.
+ */
+export interface IndexedMatcherOptions<TItem, TBrand = AnyBrand> {
+  /** A similarity scorer that offers an index — `dice` or `cosine` today. */
+  readonly scorer: Scorer<'similarity', TBrand>
+  /**
+   * Where the searchable text lives on an item. Required when items are not
+   * themselves sequences; results still carry your original item.
+   */
+  readonly getText?: ((item: TItem) => MaybeSequence) | undefined
+  /**
+   * Applied to every choice and to every query, so the two sides can never
+   * drift apart. See `normalizeText` for the built-in.
+   */
+  readonly normalize?: Normalizer | undefined
+  /** What to do with an item that has no text; `'skip'` by default. */
+  readonly missingItems?: MissingItemsPolicy | undefined
+  /** Not supported: an index replaces the handles this would supply. */
+  readonly getPrepared?: undefined
+}
+
+/**
  * What a reader is built from: both accessors at once, which the public union
  * refuses and a JavaScript caller can still pass. Reading them by value and
  * refusing the combination is `choiceReader`'s job, so the shape it takes has

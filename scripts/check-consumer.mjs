@@ -21,7 +21,12 @@ const output = mkdtempSync(join(root, '.consumer-check-'))
 const consumer = join(output, 'consumer.ts')
 const config = join(output, 'tsconfig.json')
 
-const source = `import { createMatcher, createScorer, searchIter } from 'rapidfuzz-js'
+const source = `import {
+  createIndexedMatcher,
+  createMatcher,
+  createScorer,
+  searchIter,
+} from 'rapidfuzz-js'
 import type { PreparedChoice, PreparedChoiceOf, Scorer, ScorerOf } from 'rapidfuzz-js'
 import { similarity, tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
 import { distance } from 'rapidfuzz-js/levenshtein'
@@ -50,6 +55,14 @@ export const matcher = (rows: readonly Stored[]) =>
 // through it is the same kind of handle as one made directly.
 export const fromMatcher = (rows: readonly Stored[]): Stored['prepared'] =>
   matcher(rows).scorer.prepareChoice('alpha')
+
+// Unannotated on purpose: an indexed matcher's type is inferred straight into
+// a consumer's own declaration emit, so anything it names has to be reachable
+// through the export map.
+export const indexed = createIndexedMatcher(['alpha', 'beta'], {
+  scorer: createScorer(diceSimilarity, { gramSize: 3 }),
+})
+export const indexedBest = indexed.best('alpha', { threshold: 0.5 })
 
 // Widening stays possible: \`Scorer<D>\` is still the type that holds a scorer
 // of any metric, which is what most annotations want.
@@ -105,6 +118,20 @@ const rows = [{ prepared: titles.prepareChoice('a') }]
 export const crossed = bestMatch('a', rows, {
   scorer: companies,
   getPrepared: (row) => row.prepared,
+})
+`
+
+const DISTANCE_LINE = 9
+const distanceIndex = `import { createIndexedMatcher, createScorer } from 'rapidfuzz-js'
+import { distance } from 'rapidfuzz-js/dice'
+
+const lengths = createScorer(distance)
+
+// Line ${DISTANCE_LINE} below — the call — is the one the diagnostic has to
+// name: an index ranks by how much two sequences share, so a distance scorer is
+// refused by the type rather than at construction, and no overload accepts one.
+export const ranked = createIndexedMatcher(['a'], {
+  scorer: lengths,
 })
 `
 
@@ -168,6 +195,24 @@ try {
     throw new Error(`expected the refusal to name PreparedChoice:\n${refusal}`)
   }
   console.log("✓ another metric's prepared choice is refused at compile time")
+
+  const distanceFile = join(output, 'distanceIndex.ts')
+  const distanceConfig = join(output, 'tsconfig.distance.json')
+  writeFileSync(distanceFile, distanceIndex)
+  writeFileSync(distanceConfig, JSON.stringify({ ...tsconfig, include: [distanceFile] }))
+  const distanceRefusal = typecheck(distanceConfig)
+  if (distanceRefusal === null) {
+    throw new Error('an indexed matcher accepted a distance scorer')
+  }
+  if (!distanceRefusal.includes(`distanceIndex.ts(${DISTANCE_LINE},`)) {
+    throw new Error(
+      `expected the refusal to name distanceIndex.ts line ${DISTANCE_LINE}:\n${distanceRefusal}`,
+    )
+  }
+  // The positive control lives in the main fixture above, which builds an
+  // indexed matcher from a similarity scorer and has already typechecked — so
+  // this refusal is about the direction rather than about the call shape.
+  console.log('✓ an indexed matcher refuses a distance scorer at compile time')
 
   // The third check: the consumer's OWN declaration emit. An inferred scorer
   // type in an exported const makes the compiler spell the brand out; if that

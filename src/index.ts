@@ -1,7 +1,13 @@
 export { createScorer } from './core/scorer.js'
 export { isMatch, scoreIfMatch } from './core/match.js'
 export { normalizeText } from './core/normalize.js'
-export { bestMatch, createMatcher, search, searchIter } from './search/index.js'
+export {
+  bestMatch,
+  createIndexedMatcher,
+  createMatcher,
+  search,
+  searchIter,
+} from './search/index.js'
 export { scoreMatrix, scorePairs } from './batch/index.js'
 
 export type { Metric } from './core/metric.js'
@@ -17,6 +23,7 @@ export type { PreparedChoice } from './core/prepared.js'
 export type { Direction, MaybeSequence, Normalizer, Sequence } from './core/types.js'
 export type {
   BestOptions,
+  IndexedMatcherOptions,
   Match,
   Matcher,
   MatcherOptions,

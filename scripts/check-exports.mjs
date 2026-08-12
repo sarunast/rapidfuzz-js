@@ -11,6 +11,7 @@ const EXPECTED = {
   '.': [
     'createScorer',
     'createMatcher',
+    'createIndexedMatcher',
     'bestMatch',
     'search',
     'searchIter',
