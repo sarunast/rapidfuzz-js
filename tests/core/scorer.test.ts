@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest'
 
+import * as cosine from '../../src/algorithms/cosine/index.js'
 import * as damerau from '../../src/algorithms/damerauLevenshtein/index.js'
+import * as dice from '../../src/algorithms/dice/index.js'
 import * as hamming from '../../src/algorithms/hamming/index.js'
 import * as indel from '../../src/algorithms/indel/index.js'
 import * as jaro from '../../src/algorithms/jaro/index.js'
@@ -41,6 +43,8 @@ describe('Metric and Scorer contracts', () => {
       postfix.normalizedSimilarity,
       jaro.similarity,
       jaroWinkler.similarity,
+      dice.similarity,
+      cosine.similarity,
     ]) {
       expect(metric('same', 'same')).toBe(1)
       expect(metric('a', 'b')).toBeGreaterThanOrEqual(0)
