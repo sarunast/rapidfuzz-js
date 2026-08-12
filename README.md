@@ -194,7 +194,11 @@ Anything else throws: a handle a scorer does not accept is refused as
 incompatible, and a value that is not a handle at all is refused as invalid.
 Built-in metrics also carry their identity in the type, so most of those
 mistakes are compile errors first — spell a stored handle's type with
-`PreparedChoiceOf<typeof scorer>`.
+`PreparedChoiceOf<typeof scorer>`, and a stored scorer's with
+`ScorerOf<typeof tokenSetSimilarity>`. The identity is the metric's own id
+literal, so your declaration emit spells it
+`Scorer<'similarity', 'fuzz.tokenSetSimilarity'>` without importing anything
+of ours.
 Widening a scorer to `Scorer<'similarity'>` gives that up deliberately: the
 type no longer names a metric, so only the runtime check remains.
 

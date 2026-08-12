@@ -1,5 +1,4 @@
 import { type Metric, type NoConfiguration } from '../../core/metric.js'
-import type { MetricBrand } from '../../core/prepared.js'
 import { COMPILE, type MetricCompilation } from '../../core/protocol.js'
 import { snapshotSequence, validatePair, validateSequence } from '../../core/sequence.js'
 import type {
@@ -21,11 +20,12 @@ import {
 /**
  * The type of a metric this package built, named by `Id`.
  *
- * The name is the whole of the metric's identity: `MetricBrand<Id>` is what
- * makes a prepared choice belong to one metric and not another, so an
- * algorithm module writes the name and infrastructure derives the rest.
- * `Options` is what the metric itself configures — the direction decides the
- * rest, since `missing` is accepted by a similarity and refused by a distance.
+ * The name is the whole of the metric's identity, and it is the brand as-is:
+ * the id literal is what makes a prepared choice belong to one metric and not
+ * another, and a bare literal survives a consumer's declaration emit where a
+ * wrapper type of ours could not be named. `Options` is what the metric itself
+ * configures — the direction decides the rest, since `missing` is accepted by
+ * a similarity and refused by a distance.
  */
 export type BuiltInMetric<
   Id extends string,
@@ -38,7 +38,7 @@ export type BuiltInMetric<
       ? SimilarityConfiguration
       : Options & SimilarityConfiguration
     : Options,
-  MetricBrand<Id>
+  Id
 >
 
 interface BuiltInMetricOptions<D extends Direction> {

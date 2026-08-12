@@ -26,6 +26,16 @@ export interface Scorer<D extends Direction = Direction, Brand = AnyBrand> {
 export type PreparedChoiceOf<S extends { prepareChoice: (choice: never) => unknown }> =
   ReturnType<S['prepareChoice']>
 
+// What `createScorer(metric)` infers, nameable from a metric alone — for the
+// annotation on a stored scorer that should keep its metric's brand.
+export type ScorerOf<M> = M extends Metric<
+  infer D extends Direction,
+  infer _Config extends object,
+  infer Brand
+>
+  ? Scorer<D, Brand>
+  : never
+
 export interface CustomScorerConfiguration<D extends Direction> {
   readonly direction: D
   readonly bounds: readonly [number, number]

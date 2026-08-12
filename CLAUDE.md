@@ -203,6 +203,16 @@ metric brand in the declarations a consumer compiles against, and is checked
 at runtime for scorer compatibility — `pnpm check:consumer` guards the second
 of those, which source-level type tests cannot see.
 
+Any type the public API can *infer* into a consumer's exported signature must
+be nameable without importing our internals: exported from a public
+entrypoint, or built from language-native constructs — the metric brand is
+the id literal itself for exactly this reason. A type that fails this rule
+typechecks everywhere and breaks only in the consumer's own declaration emit,
+as a deep `import("…/dist/…")`; `check-consumer.mjs` emits a consumer's
+declarations to catch it, but only for what its fixture exports — so a new
+inference surface gets an unannotated `export const` there in the same
+change.
+
 Prepared search must not add a per-candidate cost to the text search path.
 `bench/process.bench.ts` is where that is noticed.
 

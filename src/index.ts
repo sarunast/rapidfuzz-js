@@ -9,6 +9,7 @@ export type {
   CustomScorerConfiguration,
   PreparedChoiceOf,
   Scorer,
+  ScorerOf,
   ThresholdOptions,
 } from './core/scorer.js'
 export type { PreparedChoice } from './core/prepared.js'

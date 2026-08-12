@@ -21,25 +21,17 @@ export let resolvePreparedChoice: (owner: object, handle: unknown) => unknown
  */
 export type AnyBrand = any
 
-declare const METRIC_BRAND: unique symbol
-
-/**
- * The brand of a built-in metric, told apart by the name the metric declares.
- *
- * Phantom, and keyed by a symbol so it reads as one: no value of this type is
- * ever made, and no ordinary object shape can be one by accident. The name is
- * a compile-time discriminator — nothing exposes it at runtime, and no API
- * takes one.
- */
-export interface MetricBrand<Id extends string> {
-  readonly [METRIC_BRAND]: Id
-}
-
 /**
  * A choice prepared by `scorer.prepareChoice`, opaque to the caller. The state
  * lives in `#` fields, so a spread or `Object.keys` sees nothing, and the
  * `Brand` parameter carries which built-in metric produced it — a Levenshtein
  * handle does not typecheck where a Jaro scorer's is expected.
+ *
+ * A built-in brand is the metric's own id literal, `'levenshtein.distance'`,
+ * not a wrapper type: the brand is phantom and invariant, forgery is already
+ * refused at runtime by `#owner`, and a bare literal is what lets a consumer's
+ * own declaration emit name `Scorer<'similarity', 'fuzz.tokenSetSimilarity'>`
+ * without importing anything of ours.
  */
 export class PreparedChoice<Brand = AnyBrand> {
   // Phantom, never assigned, never read. `(value: Brand) => Brand` keeps Brand
