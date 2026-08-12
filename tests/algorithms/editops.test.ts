@@ -64,6 +64,21 @@ it('holds the operations it was given', () => {
   expect(editops().destLen).toBe(9)
 })
 
+it('iterates its operations, and counts them without handing the array out', () => {
+  expect([...editops()]).toEqual(EDITOP_LIST)
+  expect([...opcodes()]).toEqual(OPCODE_LIST)
+  expect(editops().length).toBe(EDITOP_LIST.length)
+  expect(opcodes().length).toBe(OPCODE_LIST.length)
+
+  const seen: EditopTag[] = []
+  for (const op of editops()) seen.push(op.tag)
+  expect(seen).toEqual(['delete', 'replace', 'insert', 'insert', 'insert'])
+
+  const empty = Editops.fromOperations([], 0, 0)
+  expect([...empty]).toEqual([])
+  expect(empty.length).toBe(0)
+})
+
 it('compares Editops for equality', () => {
   const ops = levenshteinEditops('aaabaaa', 'abbaaabba')
   const rebuilt = Editops.fromOperations(ops.operations, ops.srcLen, ops.destLen)

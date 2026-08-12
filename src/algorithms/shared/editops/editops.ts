@@ -434,6 +434,19 @@ export class Editops {
       new Editops(operations, srcLen, destLen)
   }
 
+  /** How many operations there are, without reaching for {@link operations}. */
+  get length(): number {
+    return this.operations.length
+  }
+
+  /**
+   * Delegated rather than generated: `yield*` over the same array would build a
+   * generator to forward what the array's own iterator already answers.
+   */
+  [Symbol.iterator](): IterableIterator<Editop> {
+    return this.operations[Symbol.iterator]()
+  }
+
   /** Build from operations that have not been checked, as upstream's constructor does. */
   static fromOperations(
     operations: readonly Editop[],
@@ -637,6 +650,14 @@ export class Opcodes {
   static {
     opcodesFromValidated = (operations, srcLen, destLen) =>
       new Opcodes(operations, srcLen, destLen)
+  }
+
+  get length(): number {
+    return this.operations.length
+  }
+
+  [Symbol.iterator](): IterableIterator<Opcode> {
+    return this.operations[Symbol.iterator]()
   }
 
   static fromOperations(
