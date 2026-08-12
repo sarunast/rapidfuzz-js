@@ -16,6 +16,7 @@ import {
 } from './snapshot.js'
 import type {
   AnyMatcherOptions,
+  ResolvedMatcherOptions,
   BestOptions,
   ItemIterable,
   Items,
@@ -56,25 +57,31 @@ function missingSimilarityTop<T, K>(
 export function createMatcher<T, D extends Direction, B>(
   items: readonly T[],
   options: AnyMatcherOptions<T, D, B>,
-): Matcher<T, number, D>
+): Matcher<T, number, D, B>
 export function createMatcher<K, T, D extends Direction, B>(
   items: ReadonlyMap<K, T>,
   options: AnyMatcherOptions<T, D, B>,
-): Matcher<T, K, D>
+): Matcher<T, K, D, B>
 export function createMatcher<T, D extends Direction, B>(
   items: ItemIterable<T>,
   options: AnyMatcherOptions<T, D, B>,
-): Matcher<T, number, D>
+): Matcher<T, number, D, B>
 export function createMatcher<T, D extends Direction, B>(
   items: Readonly<Record<string, T>>,
   options: AnyMatcherOptions<T, D, B>,
-): Matcher<T, string, D>
+): Matcher<T, string, D, B>
 export function createMatcher<T, D extends Direction, B>(
   items: Items<T>,
   options: AnyMatcherOptions<T, D, B>,
-): Matcher<T, unknown, D> {
+): Matcher<T, unknown, D, B> {
+  // Read exactly once each: a getter or proxy could otherwise answer one thing
+  // to the reader and another to the copy below, leaving a matcher whose
+  // choices and queries were normalized by different functions.
   const scorer = options.scorer
   const normalize = options.normalize
+  const getPrepared = options.getPrepared
+  const getText = options.getText
+  const missingItems = options.missingItems
   // Same order as the one-shot entry points: the collection is checked before
   // anything semantic, so a wrong argument is refused the same way whichever
   // API the caller reached for.
@@ -91,24 +98,15 @@ export function createMatcher<T, D extends Direction, B>(
   // A copy, so a caller who mutates their options object afterwards cannot
   // change a matcher that has already read them. The properties are declared
   // as `| undefined`, so naming an absent one costs nothing.
-  const stableOptions: AnyMatcherOptions<T, Direction, B> =
-    options.getPrepared === undefined
-      ? {
-          scorer: options.scorer,
-          getText: options.getText,
-          normalize: options.normalize,
-          missingItems: options.missingItems,
-        }
-      : {
-          scorer: options.scorer,
-          getPrepared: options.getPrepared,
-          normalize: options.normalize,
-          // Copied although the type says they are absent, so a JavaScript
-          // caller who passed both kinds of accessor is refused here rather
-          // than quietly served the prepared one.
-          getText: options.getText,
-          missingItems: options.missingItems,
-        }
+  // Both accessors travel through, so a JavaScript caller who passed each kind
+  // is refused by the reader rather than quietly served the prepared one.
+  const stableOptions: ResolvedMatcherOptions<T, Direction, B> = {
+    scorer,
+    getText,
+    getPrepared,
+    normalize,
+    missingItems,
+  }
   const stored: StoredItem<T, unknown>[] = []
   // Every handle is resolved here, once, so a query pays nothing for the mode
   // it was built in — the drivers read `prepared` the same way either way.

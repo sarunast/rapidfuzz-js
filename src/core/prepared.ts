@@ -1,8 +1,7 @@
 /**
- * Assigned from inside the class body because the constructor is private —
- * anything reachable from an exported class is public API, and these are the
- * doors past it. Exported for `core/scorer` and `search/`, left out of every
- * public entrypoint.
+ * Assigned from inside the class body because its constructor is private.
+ * These are runtime exports for `core/scorer` and `search/` alone: no package
+ * entrypoint re-exports them, so no consumer can reach either door.
  */
 export let createPreparedChoice: <Brand>(
   owner: object,
@@ -48,8 +47,9 @@ export class PreparedChoice<Brand = AnyBrand> {
   //
   // Protected rather than private because declaration emit erases the type of
   // a private member — `private brand;` — which would leave `Brand` unused in
-  // the packed `.d.ts` and every consumer unprotected. Nothing can reach it:
-  // the constructor is private, so the class cannot be extended.
+  // the packed `.d.ts` and every consumer unprotected. The private constructor
+  // refuses `extends` through the TypeScript API rather than at runtime, which
+  // is enough here: the class is exported as a type, never as a value.
   declare protected readonly brand: (value: Brand) => Brand
 
   readonly #owner: object
@@ -61,7 +61,8 @@ export class PreparedChoice<Brand = AnyBrand> {
   }
 
   static {
-    createPreparedChoice = (owner, value) => new PreparedChoice(owner, value)
+    createPreparedChoice = <Brand>(owner: object, value: unknown) =>
+      new PreparedChoice<Brand>(owner, value)
     resolvePreparedChoice = (owner, handle) => {
       // `#owner in handle` refuses anything the private constructor did not
       // build, including `Object.create(PreparedChoice.prototype)` forgeries

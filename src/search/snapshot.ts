@@ -5,15 +5,19 @@ import {
   validateSequence,
 } from '../core/sequence.js'
 import type { Direction, MaybeSequence, Normalizer, Sequence } from '../core/types.js'
-import type { AnyMatcherOptions, MatcherOptions } from './types.js'
+import type { ResolvedMatcherOptions } from './types.js'
 
 export type SequenceReader<T> = (item: T) => Sequence | null
 
 /**
- * How a search reads its choices. `read` answers `null` for an item the search
- * skips, which only text mode has — a prepared choice is either resolved or an
- * error. `sequences` is the text-mode reader itself, and `null` marks prepared
- * mode for the one loop that needs a `Sequence` rather than a prepared choice.
+ * How a search reads its choices.
+ *
+ * `read` answers the prepared representation, or `null` for an item text mode
+ * skips — a prepared choice is either resolved or an error. Its type is
+ * `unknown` because the representation is erased at this boundary, which is
+ * also why the type cannot say what the prose just did. `sequences` is the
+ * text-mode reader itself, and `null` marks prepared mode for the one loop
+ * that needs a `Sequence` rather than a prepared choice.
  */
 export interface ChoiceReader<T> {
   readonly present: (item: T) => boolean
@@ -22,7 +26,7 @@ export interface ChoiceReader<T> {
 }
 
 export function choiceReader<T, B>(
-  options: AnyMatcherOptions<T, Direction, B>,
+  options: ResolvedMatcherOptions<T, Direction, B>,
   prepareChoice: (choice: Sequence) => unknown,
   preparedChoiceKey: object,
   own: boolean,
@@ -46,7 +50,8 @@ export function choiceReader<T, B>(
   if (options.getText !== undefined || options.missingItems !== undefined) {
     throw new TypeError('getPrepared cannot be combined with getText or missingItems')
   }
-  const getPrepared = options.getPrepared
+  const getPrepared = requireFunction(options.getPrepared, 'getPrepared')
+  if (options.normalize !== undefined) requireFunction(options.normalize, 'normalize')
   const read = (item: T): unknown =>
     resolvePreparedChoice(preparedChoiceKey, getPrepared(item))
   return {
@@ -62,7 +67,7 @@ export function choiceReader<T, B>(
 }
 
 export function sequenceReader<T>(
-  options: MatcherOptions<T, Direction>,
+  options: ResolvedMatcherOptions<T, Direction>,
   own: boolean,
 ): SequenceReader<T> {
   const retain = own ? snapshotSequence : identity
@@ -70,6 +75,18 @@ export function sequenceReader<T>(
 }
 
 function identity(value: Sequence): Sequence {
+  return value
+}
+
+/**
+ * Checked where the reader is built rather than where it is called: an empty
+ * collection never calls an accessor, so a search over one would otherwise
+ * accept options no non-empty collection would.
+ */
+function requireFunction<F>(value: F, name: string): F {
+  if (typeof value !== 'function') {
+    throw new TypeError(`${name} must be a function`)
+  }
   return value
 }
 
@@ -83,7 +100,7 @@ function identity(value: Sequence): Sequence {
  * that never prepare anything.
  */
 function itemReader<T, R>(
-  options: MatcherOptions<T, Direction>,
+  options: ResolvedMatcherOptions<T, Direction>,
   finish: (value: Sequence) => R,
 ): (item: T) => R | null {
   const policy = options.missingItems ?? 'skip'
@@ -93,7 +110,10 @@ function itemReader<T, R>(
   if (policy !== 'skip' && policy !== 'throw') {
     throw new TypeError("missingItems must be 'skip' or 'throw'")
   }
-  const normalize = options.normalize
+  const normalize =
+    options.normalize === undefined
+      ? undefined
+      : requireFunction(options.normalize, 'normalize')
 
   if (options.getText === undefined) {
     if (normalize === undefined) {
@@ -114,7 +134,7 @@ function itemReader<T, R>(
     }
   }
 
-  const getText = options.getText
+  const getText = requireFunction(options.getText, 'getText')
   if (normalize === undefined) {
     return (item) => {
       if (item == null) {

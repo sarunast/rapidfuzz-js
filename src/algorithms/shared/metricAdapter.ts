@@ -1,7 +1,7 @@
 import { type Metric, type NoConfiguration } from '../../core/metric.js'
 import type { MetricBrand } from '../../core/prepared.js'
 import { COMPILE, type MetricCompilation } from '../../core/protocol.js'
-import { validatePair, validateSequence } from '../../core/sequence.js'
+import { snapshotSequence, validatePair, validateSequence } from '../../core/sequence.js'
 import type {
   Direction,
   MaybeSequence,
@@ -164,6 +164,13 @@ export function builtInMetric<D extends Direction, Config extends object, Brand>
       rawScore,
       prepareQuery: preparation.prepareQuery,
       prepareChoice: preparation.prepareChoice,
+      // `convSequence` copies a string and a plain array-like on its way to a
+      // prepared representation, and keeps a typed array by reference. Only
+      // that one has to be copied for a handle the caller keeps.
+      prepareOwnedChoice: (choice) =>
+        preparation.prepareChoice(
+          ArrayBuffer.isView(choice) ? snapshotSequence(choice) : choice,
+        ),
       preparedChoiceKey: configured ? Object.freeze({}) : defaultPreparedChoiceKey,
     }
   }

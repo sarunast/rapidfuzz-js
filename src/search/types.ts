@@ -13,8 +13,8 @@ export type Items<T> =
 
 export type MissingItemsPolicy = 'skip' | 'throw'
 
-export interface MatcherOptions<T, D extends Direction = Direction> {
-  readonly scorer: Scorer<D>
+export interface MatcherOptions<T, D extends Direction = Direction, B = AnyBrand> {
+  readonly scorer: Scorer<D, B>
   readonly getText?: ((item: T) => MaybeSequence) | undefined
   readonly normalize?: Normalizer | undefined
   readonly missingItems?: MissingItemsPolicy | undefined
@@ -34,8 +34,26 @@ export interface PreparedMatcherOptions<
 }
 
 export type AnyMatcherOptions<T, D extends Direction = Direction, B = AnyBrand> =
-  | MatcherOptions<T, D>
+  | MatcherOptions<T, D, B>
   | PreparedMatcherOptions<T, D, B>
+
+/**
+ * What a reader is built from: both accessors at once, which the public union
+ * refuses and a JavaScript caller can still pass. Reading them by value and
+ * refusing the combination is `choiceReader`'s job, so the shape it takes has
+ * to be able to hold one.
+ */
+export interface ResolvedMatcherOptions<
+  T,
+  D extends Direction = Direction,
+  B = AnyBrand,
+> {
+  readonly scorer: Scorer<D, B>
+  readonly getText?: ((item: T) => MaybeSequence) | undefined
+  readonly getPrepared?: ((item: T) => PreparedChoice<NoInfer<B>>) | undefined
+  readonly normalize?: Normalizer | undefined
+  readonly missingItems?: MissingItemsPolicy | undefined
+}
 
 export interface BestOptions {
   readonly threshold?: number | undefined
@@ -46,9 +64,11 @@ export interface SearchOptions extends BestOptions {
   readonly limit?: number | null | undefined
 }
 
-export interface Matcher<T, K, D extends Direction = Direction> {
+export interface Matcher<T, K, D extends Direction = Direction, B = AnyBrand> {
   readonly size: number
-  readonly scorer: Scorer<D>
+  // Branded like the scorer it was built from, so a handle made through
+  // `matcher.scorer` keeps the compile-time half of its identity.
+  readonly scorer: Scorer<D, B>
   readonly best: (query: MaybeSequence, options?: BestOptions) => Match<T, K> | undefined
   readonly search: (
     query: MaybeSequence,

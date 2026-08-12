@@ -9,7 +9,7 @@ Fast fuzzy matching for JavaScript and TypeScript, powered by the algorithms of
 [RapidFuzz](https://github.com/rapidfuzz/RapidFuzz).
 
 - Node.js 22+, browsers, and edge runtimes
-- ESM with strict TypeScript declarations
+- ESM with strict TypeScript declarations, TypeScript 5.4+
 - No runtime dependencies
 - Tree-shakeable algorithm subpaths
 
@@ -163,6 +163,9 @@ function* plausible(query: Query) {
 for (const match of searchIter(query.name, plausible(query), {
   scorer,
   getPrepared: (row) => row.prepared,
+  // The choices were normalized before they were prepared, so the query has
+  // to be normalized too, or the two sides are not being compared alike.
+  normalize: normalizeText,
 })) {
   // scored against handles prepared once, however many queries run
 }

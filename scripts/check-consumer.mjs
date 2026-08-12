@@ -24,6 +24,7 @@ const source = `import { createMatcher, createScorer, searchIter } from 'rapidfu
 import type { PreparedChoice, PreparedChoiceOf, Scorer } from 'rapidfuzz-js'
 import { similarity, tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
 import { distance } from 'rapidfuzz-js/levenshtein'
+import { distance as jaroWinklerDistance } from 'rapidfuzz-js/jaro-winkler'
 
 const scorer = createScorer(tokenSetSimilarity)
 
@@ -43,6 +44,11 @@ export const stream = (query: string, rows: Iterable<Stored>) =>
 export const matcher = (rows: readonly Stored[]) =>
   createMatcher(rows, { scorer, getPrepared: (row) => row.prepared })
 
+// A matcher keeps the brand of the scorer it was built from, so a handle made
+// through it is the same kind of handle as one made directly.
+export const fromMatcher = (rows: readonly Stored[]): Stored['prepared'] =>
+  matcher(rows).scorer.prepareChoice('alpha')
+
 // Widening stays possible: \`Scorer<D>\` is still the type that holds a scorer
 // of any metric, which is what most annotations want.
 export const held: Scorer<'distance'> = createScorer(distance)
@@ -51,6 +57,14 @@ export const many: Scorer<'similarity'>[] = [
   createScorer(tokenSetSimilarity),
 ]
 export const scoreWith = (held: Scorer<'similarity'>) => held.score('a', 'b')
+
+// A loop over metrics compiles each of them, including two whose
+// configurations have no key in common: without a configuration argument there
+// is nothing for \`Config\` to be inferred from, and inferring it anyway is what
+// used to refuse this.
+export const eachMetric = ([distance, jaroWinklerDistance] as const).map((metric) =>
+  createScorer(metric),
+)
 
 // Both spellings of a handle's type are nameable from outside the package.
 export type Handle = PreparedChoiceOf<typeof scorer>

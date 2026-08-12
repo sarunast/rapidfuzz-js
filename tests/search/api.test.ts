@@ -820,6 +820,32 @@ describe('one-shot search and Matcher', () => {
     }
   })
 
+  test('an accessor that is not a function is refused before any item is read', () => {
+    // An empty collection never calls one, so the check belongs where the
+    // reader is built: otherwise a search over `[]` accepts options that a
+    // search over one item would refuse.
+    for (const [option, message] of [
+      ['getPrepared', 'getPrepared must be a function'],
+      ['getText', 'getText must be a function'],
+      ['normalize', 'normalize must be a function'],
+    ] as const) {
+      const options = { scorer, [option]: null }
+      for (const entry of [bestMatch, search, searchIter, createMatcher]) {
+        const args = entry === createMatcher ? [[], options] : ['a', [], options]
+        expect(() => Reflect.apply(entry, undefined, args)).toThrow(message)
+      }
+    }
+    // Prepared mode reads the query through `normalize` and never builds a
+    // text reader, so it has to make the same check for itself.
+    expect(() =>
+      Reflect.apply(bestMatch, undefined, [
+        'a',
+        [],
+        { scorer, getPrepared: () => scorer.prepareChoice('alpha'), normalize: null },
+      ]),
+    ).toThrow('normalize must be a function')
+  })
+
   test('getPrepared cannot be combined with the text-side options', () => {
     const handle = scorer.prepareChoice('alpha')
     for (const extra of [{ getText: () => 'alpha' }, { missingItems: 'skip' }]) {

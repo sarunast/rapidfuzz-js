@@ -431,6 +431,43 @@ describe('Metric and Scorer contracts', () => {
     ).toBe(100)
   })
 
+  test('a handle owns its sequence, whatever the scorer prepares from', () => {
+    // A handle outlives the call that made it, so mutating the sequence
+    // afterwards must not reach through it. Built-in preparation converts a
+    // string and a plain array-like, and used to keep a typed array by
+    // reference; a custom metric is handed the sequence itself.
+    const scorer = createScorer(levenshtein.distance)
+    const typed = new Uint8Array([97, 98, 99])
+    const array = [97, 98, 99]
+    const custom = createScorer((a, b) => (String(a) === String(b) ? 1 : 0), {
+      direction: 'similarity',
+      bounds: [0, 1],
+      symmetric: true,
+    })
+    const mutable = ['a', 'b', 'c']
+    const rows = [{ handle: scorer.prepareChoice(typed) }]
+    const arrayRows = [{ handle: scorer.prepareChoice(array) }]
+    const customRows = [{ handle: custom.prepareChoice(mutable) }]
+
+    typed[0] = 120
+    array[0] = 120
+    mutable[0] = 'z'
+
+    expect(
+      bestMatch([97, 98, 99], rows, { scorer, getPrepared: (row) => row.handle })?.score,
+    ).toBe(0)
+    expect(
+      bestMatch([97, 98, 99], arrayRows, { scorer, getPrepared: (row) => row.handle })
+        ?.score,
+    ).toBe(0)
+    expect(
+      bestMatch(['a', 'b', 'c'], customRows, {
+        scorer: custom,
+        getPrepared: (row) => row.handle,
+      })?.score,
+    ).toBe(1)
+  })
+
   test('a custom metric prepares choices through its own protocol', () => {
     let calls = 0
     const custom = createScorer(

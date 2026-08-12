@@ -1,7 +1,7 @@
 import { isBuiltInMetric, type Metric } from './metric.js'
 import { createPreparedChoice, type AnyBrand, type PreparedChoice } from './prepared.js'
 import { COMPILE, type MetricCompilation } from './protocol.js'
-import { validatePair, validateSequence } from './sequence.js'
+import { snapshotSequence, validatePair, validateSequence } from './sequence.js'
 import {
   impossibleTrustedThreshold,
   qualifies,
@@ -64,6 +64,9 @@ function customCompilation<D extends Direction, B>(
     rawScore,
     prepareQuery: (query) => (choice) => rawScore(query, validatePreparedChoice(choice)),
     prepareChoice: (choice) => choice,
+    // A custom metric is handed the sequence itself, so a handle that outlives
+    // the call needs a copy of its own.
+    prepareOwnedChoice: (choice) => snapshotSequence(choice),
     // Fresh per call: a custom metric is whatever the caller passed, so two
     // scorers built from one function still prepare choices for themselves.
     preparedChoiceKey: Object.freeze({}),
@@ -114,10 +117,13 @@ function fromCompilation<D extends Direction, B>(
     bounds: Object.freeze([compilation.bounds[0], compilation.bounds[1]]),
     symmetric: compilation.symmetric,
     score: createScoreMethod(compilation),
+    // Owned, not borrowed: a handle outlives this call, so mutating the
+    // sequence afterwards must not reach through it. `createMatcher` snapshots
+    // for the same reason, and the two have to agree.
     prepareChoice: (choice) =>
       createPreparedChoice(
         compilation.preparedChoiceKey,
-        compilation.prepareChoice(validateSequence(choice)),
+        compilation.prepareOwnedChoice(validateSequence(choice)),
       ),
   }
   compilations.set(scorer, compilation)
@@ -126,14 +132,21 @@ function fromCompilation<D extends Direction, B>(
 
 export function createScorer<D extends Direction, Config extends object, B>(
   metric: Metric<D, Config, B>,
-  configuration?: Config,
+  configuration: Config,
 ): Scorer<D, B>
-// A metric whose brand cannot be pinned — a union of several, as a loop over
-// an array of them produces — still compiles a scorer; what it gives up is the
-// compile-time half of the prepared-choice check.
-export function createScorer<D extends Direction, Config extends object>(
-  metric: Metric<D, Config, AnyBrand>,
-  configuration?: Config,
+// Without a configuration there is nothing to infer `Config` from, and trying
+// to is what refused a union of metrics whose configurations have no key in
+// common — `levenshtein.distance` beside `jaroWinkler.distance`, as a loop over
+// an array of metrics produces.
+export function createScorer<D extends Direction, B>(
+  metric: Metric<D, never, B>,
+  configuration?: undefined,
+): Scorer<D, B>
+// A metric whose brand cannot be pinned still compiles a scorer; what it gives
+// up is the compile-time half of the prepared-choice check.
+export function createScorer<D extends Direction>(
+  metric: Metric<D, never, AnyBrand>,
+  configuration?: undefined,
 ): Scorer<D>
 export function createScorer<D extends Direction>(
   metric: (a: MaybeSequence, b: MaybeSequence) => number,

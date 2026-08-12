@@ -371,20 +371,23 @@ export function searchIter<T, D extends Direction, B>(
   // The query is processed lazily with the scoring — that is what the
   // iterator is for, so an invalid query still throws from `next()`.
   const threshold = optionalThreshold(options.threshold)
+  // Read before the generator exists, each exactly once: what the iterator
+  // scores with is settled at the call, not at the first `next()`.
+  const scorer = options.scorer
+  const normalize = options.normalize
   assertCollection(items)
-  const stableOptions: AnyMatcherOptions<T, Direction, B> = options
-  const compilation = scorerCompilation(options.scorer)
+  const compilation = scorerCompilation(scorer)
   return iterateMatches(
     query,
     items,
     compilation,
     choiceReader(
-      stableOptions,
+      options,
       compilation.prepareChoice,
       compilation.preparedChoiceKey,
       false,
     ),
-    options.normalize,
+    normalize,
     threshold,
   )
 }
