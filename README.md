@@ -13,21 +13,33 @@ Fast fuzzy matching for JavaScript and TypeScript, powered by the algorithms of
 - No runtime dependencies
 - Tree-shakeable algorithm subpaths
 
+This file is the tour. [API.md](./API.md) is the per-export reference: every
+signature, option, scale, and error message.
+
 ## Install
 
 ```sh
 npm install rapidfuzz-js
 ```
 
-## The API in one minute
+## Quick start
 
-Version 0.6 follows one composition model:
+Comparing two values needs no setup — metrics are plain functions:
 
-```text
-Metric → Scorer object → Matcher
+```ts
+import { similarity } from 'rapidfuzz-js/fuzz'
+
+similarity('this is a test', 'this is a test!') // 96.55…
 ```
 
-Import metrics from algorithm subpaths and orchestration from the package root:
+The rest of the API builds on one composition model:
+
+```text
+Metric → Scorer → Matcher
+```
+
+Metrics come from algorithm subpaths; orchestration comes from the package
+root:
 
 ```ts
 import { createMatcher, createScorer, normalizeText } from 'rapidfuzz-js'
@@ -47,26 +59,25 @@ const matcher = createMatcher(products, {
 })
 
 matcher.best('mechanical keybord', { threshold: 70 })
-// { item: products[0], key: 0, score: ... }
+// { item: { title: 'Wireless mechanical keyboard' }, key: 0, score: 78.26… }
 ```
 
-Use `bestMatch` or `search` for one ranked query, `searchIter` for lazy
-source-order results, and a `Matcher` when the same collection will receive
-many queries.
+A `Matcher` prepares a collection once and answers many queries. For a single
+query, use the standalone `bestMatch`, `search`, or `searchIter` instead.
 
 ## Metrics and score scales
 
 Metrics are directly callable:
 
 ```ts
-import { similarity as fuzzySimilarity } from 'rapidfuzz-js/fuzz'
+import { similarity } from 'rapidfuzz-js/fuzz'
 import {
   distance as levenshteinDistance,
   normalizedSimilarity as levenshteinNormalizedSimilarity,
   similarity as levenshteinSimilarity,
 } from 'rapidfuzz-js/levenshtein'
 
-fuzzySimilarity('this is a test', 'this is a test!')
+similarity('this is a test', 'this is a test!')
 // 96.55172413793103 (0–100)
 
 levenshteinDistance('lewenstein', 'levenshtein')
@@ -79,7 +90,7 @@ levenshteinNormalizedSimilarity('abc', 'axc')
 // 0.6666666666666667
 ```
 
-The library never rescales between families:
+Scores are never rescaled between families:
 
 | Operation                              | Scale                  |
 | -------------------------------------- | ---------------------- |
@@ -104,114 +115,71 @@ rapidfuzz-js/prefix
 rapidfuzz-js/postfix
 ```
 
-Every algorithm subpath exposes `distance`, `similarity`,
-`normalizedDistance`, and `normalizedSimilarity`. Levenshtein, Indel, LCS,
-and Hamming also export `editops` and `opcodes`.
+Every algorithm subpath exposes `distance`, `similarity`, `normalizedDistance`,
+and `normalizedSimilarity`. Levenshtein, Indel, LCS, and Hamming also export
+`editops` and `opcodes`. The `Editops` and `Opcodes` they return carry their
+alignment in `operations`, a readonly array, and are themselves iterable with a
+`length`, so `for (const op of editops(a, b))` and `[...editops(a, b)]` work
+without reaching through it.
 
-## Scorer objects
+The `fuzz` subpath is the exception: it exports similarity scorers only. Two
+of them are easy to mix up:
 
-`createScorer` freezes direction, bounds, symmetry, algorithm configuration,
-and private preparation hooks into a reusable object:
+- `similarity` compares the two strings exactly as given, in one pass.
+- `weightedSimilarity` also tries substring and word-reordering comparisons and
+  returns the best weighted score.
+
+`weightedSimilarity` is the general-purpose choice: it stays high where
+`similarity` drops — reordered words, one string contained in the other, large
+length differences. Reach for the other fuzz scorers (`partialSimilarity`,
+`tokenSortSimilarity`, `tokenSetSimilarity`, …) when you want exactly one of
+those strategies.
+
+## Scorers
+
+`createScorer` bundles a metric with its direction, bounds, symmetry, and
+configuration into a reusable object:
 
 ```ts
 import { createScorer } from 'rapidfuzz-js'
 import { distance } from 'rapidfuzz-js/levenshtein'
 
-const weighted = createScorer(distance, {
+const scorer = createScorer(distance, {
   weights: { insertion: 1, deletion: 1, substitution: 2 },
 })
 
-weighted.direction // 'distance'
-weighted.bounds // [0, Infinity]
-weighted.symmetric // true
-weighted.score('kitten', 'sitting') // 5
-weighted.score('kitten', 'sitting', { threshold: 3 }) // undefined
+scorer.direction // 'distance'
+scorer.bounds // [0, Infinity]
+scorer.symmetric // true
+scorer.score('kitten', 'sitting') // 5
+scorer.score('kitten', 'sitting', { threshold: 3 }) // undefined
 ```
 
-Similarity thresholds are minimums. Distance thresholds are maximums. A
+Similarity thresholds are minimums, distance thresholds are maximums. A
 threshold uses the scorer's own scale and must be finite.
 
-`scoreIfMatch` provides the thresholded result as a standalone operation;
+`scoreIfMatch` returns the thresholded score as a standalone operation;
 `isMatch` returns only the boolean.
 
-### Reusable prepared choices
-
-`prepareChoice` returns an opaque handle holding one choice in the form the
-scorer's kernels want. Store it beside your own data and hand it back through
-`getPrepared`, and a search that would re-prepare every candidate on every
-query prepares nothing:
-
-```ts
-import { createScorer, normalizeText, searchIter } from 'rapidfuzz-js'
-import { tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
-
-const scorer = createScorer(tokenSetSimilarity)
-const companies = records.map((record) => ({
-  record,
-  prepared: scorer.prepareChoice(normalizeText(record.name)),
-}))
-
-// The guards run before the scorer does, and only survivors are scored.
-function* plausible(query: Query) {
-  for (const row of companies) {
-    if (row.record.country !== query.country) continue
-    if (!sharesADigit(row.record.postcode, query.postcode)) continue
-    yield row
-  }
-}
-
-for (const match of searchIter(query.name, plausible(query), {
-  scorer,
-  getPrepared: (row) => row.prepared,
-  // The choices were normalized before they were prepared, so the query has
-  // to be normalized too, or the two sides are not being compared alike.
-  normalize: normalizeText,
-})) {
-  // scored against handles prepared once, however many queries run
-}
-```
-
-That ordering is the point: a generator decides what is worth scoring, and the
-scoring pays nothing to prepare what it accepts. `createMatcher` amortizes the
-same preparation but owns the collection — it snapshots one field up front, so
-there is no place to put a guard and no way to grow it. Here the collection
-stays yours. `createMatcher` accepts `getPrepared` too, and resolves every
-handle once at construction.
-
-Which scorers accept a handle is decided conservatively, by identity rather
-than by proving two preparations equivalent:
-
-| Prepared by                                    | Accepted by                            |
-| ---------------------------------------------- | -------------------------------------- |
-| a scorer using a metric's default preparation  | any scorer of that metric using it too |
-| a scorer with configuration the metric records | that scorer alone                      |
-| a custom metric's scorer                       | that scorer alone                      |
-
-So two separately created `createScorer(fuzz.similarity)` scorers share their
-handles; treat a configured or custom scorer as owning the handles it made.
-
-Anything else throws: a handle a scorer does not accept is refused as
-incompatible, and a value that is not a handle at all is refused as invalid.
-Built-in metrics also carry their identity in the type, so most of those
-mistakes are compile errors first — spell a stored handle's type with
-`PreparedChoiceOf<typeof scorer>`.
-Widening a scorer to `Scorer<'similarity'>` gives that up deliberately: the
-type no longer names a metric, so only the runtime check remains.
-
-Prepared mode is strict. There is nothing to skip, so `missingItems` is not
-accepted, and neither is `getText` beside it. `normalize` still applies to the
-query, but never to a choice — the choice was prepared before the search saw
-it, so normalize it yourself when you prepare it.
-
 ## One query or many
+
+|              |                                                             |
+| ------------ | ----------------------------------------------------------- |
+| `bestMatch`  | the best single match                                       |
+| `search`     | ranked top matches — five by default, `limit: null` for all |
+| `searchIter` | lazily yields every qualifying match, in source order       |
+
+`search` ranks, so it buffers results; `searchIter` does not rank and buffers
+nothing. Each takes only the options it defines — passing `limit` to
+`bestMatch` or `searchIter` throws rather than being ignored.
 
 One-shot search streams its input and does not retain the collection:
 
 ```ts
 import { bestMatch, createScorer, search, searchIter } from 'rapidfuzz-js'
-import { fuzzySimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(fuzzySimilarity)
+const scorer = createScorer(weightedSimilarity)
 const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 bestMatch('new york jet', teams, { scorer })
@@ -225,7 +193,7 @@ for (const match of searchIter('new york', teams, {
 }
 ```
 
-A Matcher snapshots searchable sequences and prepares them once:
+A `Matcher` snapshots the collection and prepares it once:
 
 ```ts
 import { createMatcher } from 'rapidfuzz-js'
@@ -238,17 +206,117 @@ matcher.search('new york', { limit: null }) // every result, best first
 matcher.searchIter('new york', { threshold: 60 }) // lazy, source order
 ```
 
-Arrays and iterables use source positions as keys. Maps retain map keys — any
-map-shaped value is read as a map, including one typed as an iterable of
-entries, since nothing at runtime can tell which of the two was meant. Plain
-objects retain property names. Missing source items and missing `getText`
-results are skipped by default without compacting those keys; use
-`missingItems: 'throw'` to reject them instead. A single string is not a
-collection of its characters and is rejected.
+Keys follow the collection: arrays and iterables use source positions, maps
+keep their keys (anything map-shaped is read as a map, even when typed as an
+iterable of entries — the runtime cannot tell them apart), and plain objects
+keep property names. Missing items and missing `getText` results are skipped
+by default without renumbering keys; `missingItems: 'throw'` rejects them
+instead. A single string is rejected — it is not a collection of characters.
 
-Strings are retained. Non-string array-like sequences are shallow-copied into
-Matcher-owned storage, so later top-level mutations do not change search
-scores. Returned items and nested element objects remain live references.
+Strings are retained as-is. Other array-like sequences are shallow-copied, so
+mutating the source later does not change scores. Returned items and nested
+objects stay live references.
+
+## Reusable prepared choices
+
+`prepareChoice` converts one choice into the form the scorer's kernels want
+and returns it as an opaque handle. Store the handle beside your own data and
+return it from `getPrepared`, and searches skip preparation entirely:
+
+```ts
+import { createScorer, normalizeText, searchIter } from 'rapidfuzz-js'
+import { tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
+
+const scorer = createScorer(tokenSetSimilarity)
+const companies = records.map((record) => ({
+  record,
+  prepared: scorer.prepareChoice(record.name, { normalize: normalizeText }),
+}))
+
+// Cheap guards run first; only survivors are scored.
+function* plausible(query: Query) {
+  for (const row of companies) {
+    if (row.record.country !== query.country) continue
+    if (!sharesADigit(row.record.postcode, query.postcode)) continue
+    yield row
+  }
+}
+
+for (const match of searchIter(query.name, plausible(query), {
+  scorer,
+  getPrepared: (row) => row.prepared,
+  // Must be the normalizer the choices were prepared with; a different one,
+  // or none, throws.
+  normalize: normalizeText,
+})) {
+  // handles are prepared once, however many queries run
+}
+```
+
+This pattern keeps the collection yours: a generator filters candidates before
+any scoring happens. `createMatcher` amortizes the same preparation but owns
+the collection, so there is no place for a guard. It accepts `getPrepared` too
+and resolves every handle once at construction.
+
+### Normalization is all-or-nothing
+
+Either the library normalizes both sides, or you do. The handle records which:
+
+```ts
+// Library-managed: the handle records the normalizer, and the search must
+// name the same one.
+const prepared = scorer.prepareChoice(name, { normalize: normalizeText })
+searchIter(query, rows, { scorer, getPrepared, normalize: normalizeText })
+
+// Caller-managed: you normalize both sides yourself and tell the search
+// nothing.
+const prepared = scorer.prepareChoice(normalizeText(name))
+searchIter(normalizeText(query), rows, { scorer, getPrepared })
+```
+
+Mixing the two throws. `prepareChoice(normalizeText(name))` produces the same
+text as the first line but records no normalizer, so a search that normalizes
+its query cannot verify the choice was normalized the same way, and refuses.
+
+The check compares function identity — two arrow functions with the same body
+count as different normalizers — so define one function and pass it to both
+sides. This also means a normalizer must be deterministic: one that reads
+mutable outside state passes the identity check but can still normalize the
+two sides differently, and no check can catch that. To reconfigure a
+normalizer, create a new function instead of mutating captured state.
+
+`normalizeText` lowercases, replaces every non-alphanumeric character with a
+space, and trims. Non-string sequences pass through unchanged, so it works as
+the `Normalizer` for array-like choices too. Values that are not sequences at
+all are still refused.
+
+### Which scorers accept a handle
+
+Compatibility is decided by identity, not by proving two preparations
+equivalent:
+
+| Prepared by                                    | Accepted by                            |
+| ---------------------------------------------- | -------------------------------------- |
+| a scorer using a metric's default preparation  | any scorer of that metric using it too |
+| a scorer with configuration the metric records | that scorer alone                      |
+| a custom metric's scorer                       | that scorer alone                      |
+
+Two separately created `createScorer(fuzz.similarity)` scorers share handles;
+a configured or custom scorer owns the handles it made.
+
+Anything else throws: an incompatible handle is refused, and a value that is
+not a handle at all is refused as invalid. Built-in metrics carry their
+identity in the type, so most of these mistakes are compile errors first.
+Spell a stored handle's type as `PreparedChoiceOf<typeof scorer>` and a stored
+scorer's as `ScorerOf<typeof tokenSetSimilarity>`. The identity is the
+metric's own id literal — declaration emit spells it
+`Scorer<'similarity', 'fuzz.tokenSetSimilarity'>` without importing anything
+from this package. Widening to `Scorer<'similarity'>` drops the metric from
+the type, leaving only the runtime check.
+
+Prepared mode is strict: `missingItems` and `getText` are not accepted —
+there is nothing to skip or extract. `normalize` applies to the query only,
+never to a choice; a choice is normalized when it is prepared.
 
 ## Matrices and paired scoring
 
@@ -265,7 +333,7 @@ scorePairs(['cat', 'dog'], ['cats', 'dogs'], { scorer })
 ```
 
 Set `into` to `f64`, `f32`, `i32`, `i16`, `i8`, `u32`, `u16`, `u8`, or `u8c`
-to select the typed-array storage. Batch `threshold` uses the scorer's natural
+to choose the typed-array storage. Batch `threshold` uses the scorer's
 unscaled domain; `scoreMultiplier` is applied afterward:
 
 ```ts
@@ -280,13 +348,21 @@ scoreMatrix(['cat'], ['cats'], {
 })
 ```
 
-## RapidFuzz capability mapping
+A score the chosen element type cannot hold is a `RangeError`, not a wrapped
+number: `scoreMultiplier: 3` on a `0..100` scorer reaches `300`, which a `u8`
+would otherwise store as `44`. The check costs nothing where the scorer's
+bounds and multiplier prove every score fits, so a `0..100` scorer into `u8`
+stays as it was, and a `Infinity`-bounded distance into `u8` is still allowed —
+it is refused when a score actually arrives that does not fit, not up front.
+`u8c` is the exception, and the way to ask for the lossy behaviour on purpose:
+`Uint8ClampedArray` saturates to `0..255` by definition.
 
-The API preserves RapidFuzz's mathematical operations while using
-JavaScript-native orchestration:
+## RapidFuzz capability mapping
 
 | RapidFuzz                    | rapidfuzz-js                                                  |
 | ---------------------------- | ------------------------------------------------------------- |
+| `fuzz.ratio`                 | `similarity`                                                  |
+| `fuzz.WRatio`                | `weightedSimilarity` (`QRatio` has no counterpart)            |
 | `process.extractOne`         | `bestMatch`                                                   |
 | `process.extract`            | `search`                                                      |
 | `process.extract_iter`       | `searchIter`                                                  |
@@ -296,30 +372,51 @@ JavaScript-native orchestration:
 | `scorer_kwargs`              | `createScorer(metric, configuration)`                         |
 | repeated prepared extraction | `createMatcher`, or `scorer.prepareChoice` with `getPrepared` |
 
-Public `processor`, `scoreHint`, and worker APIs are omitted, as are raw
-prepared representations — `scorer.prepareChoice` hands back an opaque handle
-instead, which is the supported way to reuse preparation across queries.
-Normalization belongs at search/batch boundaries. QRatio is intentionally omitted because it only changes ratio's
-empty-input compatibility result; WRatio remains available as
-`fuzzySimilarity`.
+For everything RapidFuzz spells differently — extraction, cutoffs, scorer
+configuration, prepared reuse — the table above is the whole translation.
 
 ## Missing and invalid values
 
-Only `null` and `undefined` are missing. Similarity scorers return `0` for a
-missing operand by default:
+Only `null` and `undefined` count as missing. Similarity scorers return `0`
+for a missing operand by default:
 
 ```ts
-const strict = createScorer(fuzzySimilarity, { missing: 'throw' })
+const strict = createScorer(weightedSimilarity, { missing: 'throw' })
 strict.score(null, 'text') // throws TypeError
 ```
+
+Two missing operands are also `0`, not `100`: unknown compared with unknown is
+not a match, and scoring it perfect would sort every missing record to the top
+of a search.
 
 Distance scorers always throw on missing operands. Empty sequences are valid.
 Numbers (including `NaN`), booleans, and objects without a valid array-like
 `length` are invalid.
 
+Empty and whitespace-only inputs are where the fuzz scorers disagree with each
+other, and deliberately so — `tokenSetSimilarity`, `partialTokenSetSimilarity`
+and `weightedSimilarity` answer `0` where `similarity` and the sort-based
+scorers answer `100`. A side with no tokens has no set to intersect;
+FuzzyWuzzy returns `0` there and RapidFuzz keeps it (issue 110), so this port
+does too.
+
+Options objects — for searches, Matcher methods, `scoreMatrix`, `scorePairs`,
+and `prepareChoice` — reject unknown keys:
+
+```ts
+search(query, choices, { scorer, thresold: 90 })
+// TypeError: unknown search option 'thresold'
+```
+
+Without this, the misspelling would typecheck (TypeScript's excess-property
+check only covers fresh object literals) and silently return unthresholded
+results. The threshold argument to `score`, `isMatch`, and `scoreIfMatch` is
+not enumerated: its one key is required, so a misspelling already fails with
+`threshold must be finite`.
+
 ## Custom metrics
 
-Custom metrics must declare enough metadata for safe ordering and validation:
+Custom metrics declare the metadata needed for ordering and validation:
 
 ```ts
 const custom = createScorer((a, b) => (a === b ? 1 : 0), {
@@ -329,12 +426,30 @@ const custom = createScorer((a, b) => (a === b ? 1 : 0), {
 })
 ```
 
-Every custom result must be finite and inside its declared bounds. The result
-is validated before thresholding, ordering, or pruning.
+Every custom result must be finite and inside its declared bounds; results are
+validated before thresholding, ordering, or pruning.
 
 A custom scorer prepares choices like any other, and its handles belong to it
-alone: two scorers built from the same function still prepare for themselves,
-because nothing about a plain function says the two are interchangeable.
+alone — two scorers built from the same function do not share handles, because
+nothing about a plain function proves they are interchangeable. A built-in
+scorer's handle holds a precomputed kernel representation; a custom scorer's
+holds an owned snapshot of the sequence, since there is nothing else to
+precompute for a plain function. Ownership, the compatibility check, and the
+opaque shape are the same for both.
+
+## Small by construction
+
+Bundle size is a structural property here, not something measured after the
+fact:
+
+- `"sideEffects": false`, and nothing runs at import time, so bundlers can
+  drop whatever a build does not reach.
+- Standalone named functions, never namespace objects — touching one member of
+  a namespace object keeps every member alive.
+- Algorithms live on their own subpaths and are never re-exported from the
+  root: importing `rapidfuzz-js/jaro` pays for Jaro and nothing else.
+- No runtime dependencies and no Node built-ins, so the same build runs
+  unchanged in browsers and edge runtimes.
 
 ## Performance and package validation
 
@@ -351,8 +466,8 @@ The benchmark vocabulary maps directly to the public API:
 
 The release check runs type checking, linting, formatting, all functional
 tests, the build, export-map validation, package validation, and tarball
-inspection. Source maps are shipped with embedded source content; TypeScript
-source files are not included in the package.
+inspection. Source maps ship with embedded source content; TypeScript source
+files are not included in the package.
 
 ## License
 

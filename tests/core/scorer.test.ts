@@ -18,6 +18,7 @@ import {
   createMatcher,
   createScorer,
   isMatch,
+  normalizeText,
   scoreIfMatch,
 } from '../../src/index.js'
 
@@ -61,7 +62,7 @@ describe('Metric and Scorer contracts', () => {
       fuzz.partialTokenSortSimilarity,
       fuzz.partialTokenSetSimilarity,
       fuzz.partialTokenSimilarity,
-      fuzz.fuzzySimilarity,
+      fuzz.weightedSimilarity,
     ]) {
       expect(metric('new york mets', 'new york mets')).toBeGreaterThanOrEqual(0)
     }
@@ -69,7 +70,7 @@ describe('Metric and Scorer contracts', () => {
   })
 
   test('scorer metadata, configuration, freezing, and thresholds are scale aware', () => {
-    const fuzzy = createScorer(fuzz.fuzzySimilarity)
+    const fuzzy = createScorer(fuzz.weightedSimilarity)
     const normalized = createScorer(levenshtein.normalizedSimilarity, {
       weights: { insertion: 1, deletion: 2, substitution: 1 },
     })
@@ -429,6 +430,49 @@ describe('Metric and Scorer contracts', () => {
         getPrepared: (row) => row.handle,
       })?.score,
     ).toBe(100)
+  })
+
+  test('prepareChoice normalizes what it prepares, and records that it did', () => {
+    const scorer = createScorer(fuzz.tokenSetSimilarity)
+    const normalizing = { normalize: normalizeText }
+    const handle = scorer.prepareChoice('New York Mets!', normalizing)
+    // Normalized where it was prepared, so the handle holds the same text a
+    // pre-normalized argument would have produced — and knows which function
+    // produced it, which a caller doing that themselves could not record.
+    expect(
+      bestMatch('new york mets', [{ handle }], {
+        scorer,
+        getPrepared: (row) => row.handle,
+        ...normalizing,
+      })?.score,
+    ).toBe(100)
+    // Named but absent is the shape the type admits, and prepares nothing.
+    expect(
+      bestMatch('New York Mets!', [{ handle: scorer.prepareChoice('New York Mets!') }], {
+        scorer,
+        getPrepared: (row) => row.handle,
+        normalize: undefined,
+      })?.score,
+    ).toBe(100)
+    for (const invalid of [null, 1, 'nope', {}]) {
+      expect(() =>
+        Reflect.apply(scorer.prepareChoice, scorer, ['alpha', { normalize: invalid }]),
+      ).toThrow('normalize must be a function')
+    }
+    expect(() => scorer.prepareChoice('alpha', { normalize: () => null })).toThrow(
+      'normalize returned a missing value',
+    )
+    // `null` is not an absent option bag, and reading it with `?.` used to make
+    // it one — an unnormalized handle from a call that asked for normalization.
+    expect(() => Reflect.apply(scorer.prepareChoice, scorer, ['alpha', null])).toThrow(
+      'prepareChoice options must be an object',
+    )
+    expect(() =>
+      Reflect.apply(scorer.prepareChoice, scorer, [
+        'alpha',
+        { normalise: normalizeText },
+      ]),
+    ).toThrow("unknown prepareChoice option 'normalise'")
   })
 
   test('a handle owns its sequence, whatever the scorer prepares from', () => {

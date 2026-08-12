@@ -8,9 +8,9 @@
 // reach the same bucket, or one identity is counted as two tokens.
 import { describe, expect, it } from 'vitest'
 
-import { wRatio } from '../../src/fuzz/fuzzy.js'
 import { tokenSetRatio } from '../../src/fuzz/tokenSet.js'
 import { tokenSortRatio } from '../../src/fuzz/tokenSort.js'
+import { wRatio } from '../../src/fuzz/weighted.js'
 import { matrixScores } from '../support/matrix.js'
 
 describe('tokens holding objects', () => {

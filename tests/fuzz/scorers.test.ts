@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
-import { wRatio } from '../../src/fuzz/fuzzy.js'
+import { createScorer } from '../../src/core/scorer.js'
+import * as publicFuzz from '../../src/fuzz/index.js'
 import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partial.js'
 import { partialTokenRatio } from '../../src/fuzz/partialToken.js'
 import { partialTokenSetRatio } from '../../src/fuzz/partialTokenSet.js'
@@ -12,6 +13,7 @@ import { tokenRatio } from '../../src/fuzz/token.js'
 import { tokenSetRatio } from '../../src/fuzz/tokenSet.js'
 import { tokenSortRatio } from '../../src/fuzz/tokenSort.js'
 import type { FuzzInput, FuzzOptions } from '../../src/fuzz/types.js'
+import { wRatio } from '../../src/fuzz/weighted.js'
 import { callUntyped } from '../support/common.js'
 
 /**
@@ -240,6 +242,34 @@ it('treats two empty strings as a perfect match or as no match, per scorer', () 
   // no match when there are no words
   expect(fuzz.tokenSetRatio('    ', '    ')).toBe(0)
   expect(fuzz.partialTokenSetRatio('    ', '    ')).toBe(0)
+})
+
+// The split above is FuzzyWuzzy's, kept by RapidFuzz (issue 110), and the
+// public metrics are what a caller reaches it through. Pinned here so that
+// making the three of them answer 100 — which reads like fixing an
+// inconsistency — fails as the compatibility break it would be.
+it('carries the empty-input split through to the public scorers', () => {
+  const scorers = [
+    [publicFuzz.similarity, 100],
+    [publicFuzz.partialSimilarity, 100],
+    [publicFuzz.tokenSimilarity, 100],
+    [publicFuzz.tokenSortSimilarity, 100],
+    [publicFuzz.partialTokenSimilarity, 100],
+    [publicFuzz.partialTokenSortSimilarity, 100],
+    [publicFuzz.weightedSimilarity, 0],
+    [publicFuzz.tokenSetSimilarity, 0],
+    [publicFuzz.partialTokenSetSimilarity, 0],
+  ] as const
+
+  for (const [metric, expected] of scorers) {
+    expect(createScorer(metric).score('', '')).toBe(expected)
+  }
+  for (const metric of [
+    publicFuzz.tokenSetSimilarity,
+    publicFuzz.partialTokenSetSimilarity,
+  ]) {
+    expect(createScorer(metric).score('    ', '    ')).toBe(0)
+  }
 })
 
 describe('invalid input throws', () => {

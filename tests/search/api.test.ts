@@ -26,6 +26,9 @@ import type { ItemIterable } from '../../src/search/types.js'
 
 describe('one-shot search and Matcher', () => {
   const scorer = createScorer(fuzz.similarity)
+  // One object, so preparation and search name the same function: the handle
+  // check compares normalizers by identity.
+  const normalizing = { normalize: normalizeText }
 
   test('Matcher snapshots non-string sequences and retains original items and keys', () => {
     const text = ['a', 'b', 'c']
@@ -311,7 +314,7 @@ describe('one-shot search and Matcher', () => {
       fuzz.partialTokenSortSimilarity,
       fuzz.partialTokenSetSimilarity,
       fuzz.partialTokenSimilarity,
-      fuzz.fuzzySimilarity,
+      fuzz.weightedSimilarity,
     ]
     for (const metric of metrics) {
       const prepared = createMatcher(
@@ -872,27 +875,121 @@ describe('one-shot search and Matcher', () => {
     ).toBe(100)
   })
 
-  test('a prepared search normalizes the query alone', () => {
-    const rows = [{ prepared: scorer.prepareChoice('New York Mets!') }]
+  test('a prepared search scores handles normalized as its query is', () => {
+    const rows = [{ prepared: scorer.prepareChoice('New York Mets!', normalizing) }]
     const read = (row: (typeof rows)[number]) => row.prepared
-    // The choice was prepared from unnormalized text and stays that way, so a
-    // normalized query only matches what the caller normalized themselves.
-    const raw = bestMatch('new york mets', rows, {
-      scorer,
-      getPrepared: read,
-      normalize: normalizeText,
-    })
-    expect(raw?.score).toBeLessThan(100)
-    const normalizedRows = [
-      { prepared: scorer.prepareChoice(normalizeText('New York Mets!')) },
-    ]
+    // Both sides through the same normalizer, so a query the choice never saw
+    // in that spelling still matches it exactly.
     expect(
-      bestMatch('NEW YORK METS', normalizedRows, {
+      bestMatch('NEW YORK METS', rows, { scorer, getPrepared: read, ...normalizing })
+        ?.score,
+    ).toBe(100)
+    expect(
+      createMatcher(rows, { scorer, getPrepared: read, ...normalizing }).best(
+        'NEW YORK METS',
+      )?.score,
+    ).toBe(100)
+  })
+
+  test('a prepared search refuses a handle normalized unlike its query', () => {
+    const plain = [{ prepared: scorer.prepareChoice('New York Mets!') }]
+    const normalized = [{ prepared: scorer.prepareChoice('New York Mets!', normalizing) }]
+    const read = (row: { prepared: PreparedChoiceOf<typeof scorer> }) => row.prepared
+    // The mistake the check exists for: text prepared raw, scored against a
+    // query that was normalized, which used to answer a plausible 0.
+    expect(() =>
+      bestMatch('new york mets', plain, { scorer, getPrepared: read, ...normalizing }),
+    ).toThrow('this search normalizes, the prepared choice was not')
+    expect(() =>
+      bestMatch('new york mets', normalized, { scorer, getPrepared: read }),
+    ).toThrow('prepared choice was normalized, this search is not')
+    // Identity, not equivalence: a normalizer that does the same thing is
+    // still a different function.
+    expect(() =>
+      bestMatch('new york mets', normalized, {
+        scorer,
+        getPrepared: read,
+        normalize: (value) => normalizeText(value),
+      }),
+    ).toThrow('prepared choice was normalized by a different function than this search')
+    // Every entry point resolves through the same reader.
+    for (const entry of [bestMatch, search, createMatcher]) {
+      const options = { scorer, getPrepared: read, ...normalizing }
+      const args = entry === createMatcher ? [plain, options] : ['a', plain, options]
+      expect(() => Reflect.apply(entry, undefined, args)).toThrow(TypeError)
+    }
+    expect(() =>
+      searchIter('a', plain, { scorer, getPrepared: read, ...normalizing }).next(),
+    ).toThrow(TypeError)
+  })
+
+  test('normalize is read once, so an accessor cannot split the two sides', () => {
+    // The check compares the handle's normalizer to the search's, and both used
+    // to be read from the options object separately: an accessor answering a
+    // different function on a later read satisfied the check and then
+    // normalized the query some other way, scoring a pair made differently.
+    const identity = (value: Sequence): Sequence => value
+    const rows = [{ prepared: scorer.prepareChoice('ZURICH', normalizing) }]
+    let reads = 0
+    const options = {
+      scorer,
+      getPrepared: (row: (typeof rows)[number]) => row.prepared,
+      get normalize() {
+        reads++
+        return reads === 1 ? normalizeText : identity
+      },
+    }
+    for (const run of [
+      () => bestMatch('ZÜRICH!', rows, options)?.score,
+      () => search('ZÜRICH!', rows, options)[0]?.score,
+      () => [...searchIter('ZÜRICH!', rows, options)][0]?.score,
+      () => createMatcher(rows, options).best('ZÜRICH!')?.score,
+    ]) {
+      reads = 0
+      // The normalized score, not the 0 an unnormalized query would answer.
+      expect(run()).toBeCloseTo(83.333, 3)
+      expect(reads).toBe(1)
+    }
+  })
+
+  test('a caller who preprocesses both sides names no normalizer at all', () => {
+    // The other supported arrangement: preparation and query are the caller's,
+    // the search normalizes nothing, and the two sides still agree.
+    const rows = [{ prepared: scorer.prepareChoice(normalizeText('New York Mets!')) }]
+    expect(
+      bestMatch(normalizeText('NEW YORK METS'), rows, {
         scorer,
         getPrepared: (row) => row.prepared,
-        normalize: normalizeText,
       })?.score,
     ).toBe(100)
+  })
+
+  test('a candidate a guard rejects is never read or checked', () => {
+    // A generator decides what is worth scoring, so a handle prepared under
+    // another normalizer — or none — costs nothing until it is yielded.
+    let reads = 0
+    const rows = [
+      { keep: false, prepared: scorer.prepareChoice('alpha') },
+      { keep: true, prepared: scorer.prepareChoice('Alpha!', normalizing) },
+    ]
+    function* plausible(): Generator<(typeof rows)[number]> {
+      for (const row of rows) {
+        if (!row.keep) continue
+        yield row
+      }
+    }
+    const matches = [
+      ...searchIter('ALPHA', plausible(), {
+        scorer,
+        getPrepared: (row) => {
+          reads++
+          return row.prepared
+        },
+        ...normalizing,
+      }),
+    ]
+    expect(matches.map((match) => match.score)).toEqual([100])
+    expect(reads).toBe(1)
   })
 
   test('a missing query answers presence through the prepared reader', () => {
@@ -1038,5 +1135,80 @@ describe('one-shot search and Matcher', () => {
     const distance = createScorer(levenshtein.distance)
     expect(() => createMatcher([], { scorer: distance }).best(null)).toThrow(TypeError)
     expect(() => bestMatch(null, [], { scorer: distance })).toThrow(TypeError)
+  })
+
+  test('an option a call does not define is refused rather than ignored', () => {
+    // The defect this exists for: a misspelled optional key leaves the call
+    // typechecking — freshness is lost the moment the object is a variable —
+    // and silently turns the behaviour it names off.
+    const misspelled = { scorer, thresold: 90 }
+    for (const [entry, label] of [
+      [bestMatch, 'bestMatch'],
+      [search, 'search'],
+      [searchIter, 'searchIter'],
+      [createMatcher, 'createMatcher'],
+    ] as const) {
+      const args =
+        entry === createMatcher ? [['x'], misspelled] : ['a', ['x'], misspelled]
+      expect(() => Reflect.apply(entry, undefined, args)).toThrow(
+        `unknown ${label} option 'thresold'`,
+      )
+      // Refused where the call is made, not where it is iterated: the shape of
+      // the call is settled before any scoring.
+      const bad = entry === createMatcher ? [['x'], null] : ['a', ['x'], null]
+      expect(() => Reflect.apply(entry, undefined, bad)).toThrow(
+        `${label} options must be an object`,
+      )
+    }
+    // Each entry point takes the keys it defines. `limit` is `search`'s, so a
+    // bag carrying it is not shared with the two that would ignore it.
+    expect(() =>
+      Reflect.apply(bestMatch, undefined, ['a', ['x'], { scorer, limit: 1 }]),
+    ).toThrow("unknown bestMatch option 'limit'")
+    expect(() =>
+      Reflect.apply(searchIter, undefined, ['a', ['x'], { scorer, limit: 1 }]),
+    ).toThrow("unknown searchIter option 'limit'")
+    // Named but left undefined is still a misspelling, not an absent option.
+    expect(() =>
+      Reflect.apply(search, undefined, ['a', ['x'], { scorer, limti: undefined }]),
+    ).toThrow("unknown search option 'limti'")
+  })
+
+  test('a Matcher method takes the threshold and the limit, and no more', () => {
+    const matcher = createMatcher(['alpha'], { scorer })
+    // A scorer named here would be ignored — the Matcher scores with the one it
+    // was built from — so it is refused instead.
+    expect(() => Reflect.apply(matcher.best, matcher, ['alpha', { scorer }])).toThrow(
+      "unknown matcher.best option 'scorer'",
+    )
+    expect(() =>
+      Reflect.apply(matcher.searchIter, matcher, ['alpha', { threshold: 1, limit: 1 }]),
+    ).toThrow("unknown matcher.searchIter option 'limit'")
+    expect(() =>
+      Reflect.apply(matcher.search, matcher, ['alpha', { thresold: 1 }]),
+    ).toThrow("unknown matcher.search option 'thresold'")
+    for (const method of [matcher.best, matcher.search, matcher.searchIter]) {
+      expect(() => Reflect.apply(method, matcher, ['alpha', null])).toThrow(
+        'options must be an object',
+      )
+    }
+    // No options at all is the common call, and has no keys to walk.
+    expect(matcher.best('alpha')?.score).toBe(100)
+    expect(matcher.search('alpha', { limit: 1, threshold: 90 })).toHaveLength(1)
+    expect(Array.from(matcher.searchIter('alpha', { threshold: 90 }))).toHaveLength(1)
+  })
+
+  test('search at limit 1 keeps its own option list', () => {
+    // It answers through the same scan `bestMatch` runs, which must not mean
+    // being checked a second time against a list without `limit` in it.
+    expect(search('alpha', ['beta', 'alpha'], { scorer, limit: 1 })).toEqual([
+      { item: 'alpha', key: 1, score: 100 },
+    ])
+    const match = bestMatch('alpha', ['beta', 'alpha'], { scorer })
+    expect(search('alpha', ['beta', 'alpha'], { scorer, limit: 1 })[0]).toEqual(match)
+    // And the checks it delegates past still run in the same order.
+    expect(() =>
+      Reflect.apply(search, undefined, ['a', 'not a collection', { scorer, limit: 1 }]),
+    ).toThrow(TypeError)
   })
 })

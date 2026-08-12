@@ -5,7 +5,61 @@ import {
   validateSequence,
 } from '../core/sequence.js'
 import type { Direction, MaybeSequence, Normalizer, Sequence } from '../core/types.js'
-import type { ResolvedMatcherOptions } from './types.js'
+import type {
+  BestOptions,
+  MatcherOptions,
+  PreparedMatcherOptions,
+  ResolvedMatcherOptions,
+  SearchOptions,
+} from './types.js'
+
+/**
+ * The keys each public entry point defines, in the file that already decides
+ * search's option policy.
+ *
+ * Written out rather than composed from one another: `isolatedDeclarations`
+ * refuses to infer an array with a spread in it. `satisfies` catches a nonsense
+ * key; it cannot prove the list is complete.
+ */
+type AnyMatcherOptionKey =
+  | keyof MatcherOptions<unknown>
+  | keyof PreparedMatcherOptions<unknown>
+
+export const MATCHER_OPTION_KEYS: readonly string[] = [
+  'scorer',
+  'getText',
+  'getPrepared',
+  'normalize',
+  'missingItems',
+] as const satisfies readonly AnyMatcherOptionKey[]
+
+export const BEST_OPTION_KEYS: readonly string[] = [
+  'scorer',
+  'getText',
+  'getPrepared',
+  'normalize',
+  'missingItems',
+  'threshold',
+] as const satisfies readonly (AnyMatcherOptionKey | keyof BestOptions)[]
+
+export const SEARCH_OPTION_KEYS: readonly string[] = [
+  'scorer',
+  'getText',
+  'getPrepared',
+  'normalize',
+  'missingItems',
+  'threshold',
+  'limit',
+] as const satisfies readonly (AnyMatcherOptionKey | keyof SearchOptions)[]
+
+export const CALL_BEST_KEYS: readonly string[] = [
+  'threshold',
+] as const satisfies readonly (keyof BestOptions)[]
+
+export const CALL_SEARCH_KEYS: readonly string[] = [
+  'threshold',
+  'limit',
+] as const satisfies readonly (keyof SearchOptions)[]
 
 export type SequenceReader<T> = (item: T) => Sequence | null
 
@@ -51,9 +105,15 @@ export function choiceReader<T, B>(
     throw new TypeError('getPrepared cannot be combined with getText or missingItems')
   }
   const getPrepared = requireFunction(options.getPrepared, 'getPrepared')
-  if (options.normalize !== undefined) requireFunction(options.normalize, 'normalize')
+  // The same normalizer the query goes through: a handle prepared under a
+  // different one — or none — is refused rather than scored against a query it
+  // was never comparable to.
+  const normalize =
+    options.normalize === undefined
+      ? undefined
+      : requireFunction(options.normalize, 'normalize')
   const read = (item: T): unknown =>
-    resolvePreparedChoice(preparedChoiceKey, getPrepared(item))
+    resolvePreparedChoice(preparedChoiceKey, getPrepared(item), normalize)
   return {
     // Prepared mode has nothing to skip, so presence is the resolution itself:
     // a missing or foreign handle throws here as it does anywhere else.

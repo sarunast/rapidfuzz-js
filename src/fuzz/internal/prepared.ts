@@ -16,7 +16,7 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * `partialWindow.ts`, `tokens.ts` and `tokenSet.ts`. None of them may import this
  * one, which is what keeps the graph acyclic.
  *
- * `fuzzy.ts` is deliberately **not** among them. Its `wRatio_impl`, like every
+ * `weighted.ts` is deliberately **not** among them. Its `wRatio_impl`, like every
  * other public scorer's implementation, validates and converts raw input — the
  * work already done by the time a branch below runs — so the composite strategy
  * is reproduced here over prepared state rather than called. The `wRatio` branch

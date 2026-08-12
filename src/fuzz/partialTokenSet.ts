@@ -16,6 +16,10 @@ export const partialTokenSetRatio: MaybeSequenceMetricImplementation<FuzzOptions
     prepareFuzz('partialTokenSetRatio'),
   )
 
+/**
+ * As with `tokenSetSimilarity`, two tokenless inputs score `0` rather than
+ * `100` — FuzzyWuzzy's answer, kept by RapidFuzz (issue 110).
+ */
 export const partialTokenSetSimilarity: BuiltInMetric<
   'fuzz.partialTokenSetSimilarity',
   'similarity'

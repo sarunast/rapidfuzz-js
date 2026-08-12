@@ -52,7 +52,7 @@ import { distance as osaDistance } from '../../dist/algorithms/osa/index.js'
 import { distance as postfixDistance } from '../../dist/algorithms/postfix/index.js'
 import { distance as prefixDistance } from '../../dist/algorithms/prefix/index.js'
 import {
-  fuzzySimilarity,
+  weightedSimilarity,
   partialSimilarity,
   similarity as fuzzSimilarity,
   tokenSetSimilarity,
@@ -586,9 +586,9 @@ if (pythonPath !== null) {
   ])
   againstPython.push([
     'w-ratio-sentences',
-    'fuzz.fuzzySimilarity, sentences',
+    'fuzz.weightedSimilarity, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) fuzzySimilarity(a, b)
+      for (const [a, b] of corpus.sentences) weightedSimilarity(a, b)
     },
   ])
   againstPython.push([

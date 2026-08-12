@@ -1,6 +1,16 @@
 import type { MetricCompilation } from '../core/protocol.js'
 import { impossibleTrustedThreshold, validateThreshold } from '../core/threshold.js'
 import type { Direction } from '../core/types.js'
+import type { ScoreArrayKind } from './scoreArray.js'
+import type { BatchOptions } from './types.js'
+
+export const BATCH_OPTION_KEYS: readonly string[] = [
+  'scorer',
+  'into',
+  'normalize',
+  'threshold',
+  'scoreMultiplier',
+] as const satisfies readonly (keyof BatchOptions<Direction, ScoreArrayKind>)[]
 
 export interface ResolvedBatchOptions {
   readonly threshold: number | null

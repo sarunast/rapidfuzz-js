@@ -34,6 +34,13 @@ const config: UserConfig = defineConfig({
   target: 'es2022',
   platform: 'neutral',
   sourcemap: true,
+  // "No runtime dependencies, and no Node built-ins in `src/`" as a build
+  // failure rather than a convention. `neverBundle` keeps any npm import out of
+  // the output, so an accidental one survives as a bare import instead of being
+  // folded in silently; the empty `onlyImport` whitelist then refuses output
+  // that imports anything at all. Built-ins are exempt only under
+  // `platform: 'node'`, which this is not.
+  deps: { neverBundle: true, onlyImport: [] },
   plugins: [
     codecovRollupPlugin({
       enableBundleAnalysis: uploadToken !== undefined,

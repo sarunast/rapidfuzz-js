@@ -16,5 +16,10 @@ export const tokenSetRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
     prepareFuzz('tokenSetRatio'),
   )
 
+/**
+ * Two inputs with no tokens between them score `0`, not `100`: an empty or
+ * whitespace-only side has no set to intersect. FuzzyWuzzy answers `0` here and
+ * RapidFuzz keeps it (issue 110), so this is compatibility rather than identity.
+ */
 export const tokenSetSimilarity: BuiltInMetric<'fuzz.tokenSetSimilarity', 'similarity'> =
   /* @__PURE__ */ fuzzMetric(tokenSetRatio)

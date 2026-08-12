@@ -1,3 +1,4 @@
+import { assertOptionKeys } from '../core/options.js'
 import type { MetricCompilation, PreparedKernel } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
@@ -6,6 +7,8 @@ import { assertCollection, collectionEntries } from './collection.js'
 import { pushHeap, replaceHeapRoot } from './internal/heap.js'
 import type { Match, ScoredEntry } from './results.js'
 import {
+  BEST_OPTION_KEYS,
+  SEARCH_OPTION_KEYS,
   choiceReader,
   normalizeQuery,
   optionalThreshold,
@@ -17,8 +20,31 @@ import type {
   ItemIterable,
   Items,
   AnyMatcherOptions,
+  ResolvedMatcherOptions,
   SearchOptions,
 } from './types.js'
+
+/**
+ * Every option read exactly once, as `createMatcher` does it.
+ *
+ * The reader and the query have to be handed the same normalizer: an accessor
+ * that answers one function to each passes the prepared-choice check and then
+ * scores against a query normalized some other way, which is the silent
+ * mismatch that check exists to refuse.
+ */
+function stableOptionsOf<T, D extends Direction, B>(
+  options: AnyMatcherOptions<T, D, B>,
+  scorer: ResolvedMatcherOptions<T, Direction, B>['scorer'],
+  normalize: Normalizer | undefined,
+): ResolvedMatcherOptions<T, Direction, B> {
+  return {
+    scorer,
+    getText: options.getText,
+    getPrepared: options.getPrepared,
+    normalize,
+    missingItems: options.missingItems,
+  }
+}
 
 function better(direction: Direction, score: number, current: number): boolean {
   return direction === 'similarity' ? score > current : score < current
@@ -97,12 +123,32 @@ export function bestMatch<T, D extends Direction, B>(
   items: Items<T>,
   options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): Match<T, unknown> | undefined {
+  assertOptionKeys(options, BEST_OPTION_KEYS, 'bestMatch')
   // Argument shape is checked before any semantic exit: an impossible
   // threshold must not turn an invalid collection into an empty result.
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
-  const compilation = scorerCompilation(options.scorer)
-  const stableOptions: AnyMatcherOptions<T, Direction, B> = options
+  return bestOfCollection(query, items, options, threshold)
+}
+
+/**
+ * The scan itself, with its options already read.
+ *
+ * Separate from the public `bestMatch` so `search` can delegate to it at
+ * `limit: 1` without its own options being checked a second time — against a
+ * key list that does not include `limit`, which is the one key that call is
+ * certain to carry.
+ */
+function bestOfCollection<T, D extends Direction, B>(
+  query: MaybeSequence,
+  items: Items<T>,
+  options: AnyMatcherOptions<T, D, B>,
+  threshold: number | null,
+): Match<T, unknown> | undefined {
+  const scorer = options.scorer
+  const compilation = scorerCompilation(scorer)
+  const normalize = options.normalize
+  const stableOptions = stableOptionsOf(options, scorer, normalize)
   // Before the query is normalized, so `search` at any limit refuses a wrong
   // option in the same order — `limit: 1` delegates here.
   const choices = choiceReader(
@@ -111,7 +157,7 @@ export function bestMatch<T, D extends Direction, B>(
     compilation.preparedChoiceKey,
     false,
   )
-  const normalized = normalizeQuery(query, options.normalize)
+  const normalized = normalizeQuery(query, normalize)
   const arrayItems = arrayItemsOf(items)
 
   if (normalized === null) {
@@ -208,17 +254,20 @@ export function search<T, D extends Direction, B>(
   items: Items<T>,
   options: AnyMatcherOptions<T, D, B> & SearchOptions,
 ): readonly Match<T, unknown>[] {
+  assertOptionKeys(options, SEARCH_OPTION_KEYS, 'search')
   // Argument shape is checked before any semantic exit: `limit: 0` must not
   // excuse an invalid collection or a non-finite threshold.
   const limit = resultLimit(options.limit)
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
   if (limit === 1) {
-    const match = bestMatch(query, items, options)
+    const match = bestOfCollection(query, items, options, threshold)
     return match === undefined ? [] : [match]
   }
-  const compilation = scorerCompilation(options.scorer)
-  const stableOptions: AnyMatcherOptions<T, Direction, B> = options
+  const scorer = options.scorer
+  const compilation = scorerCompilation(scorer)
+  const normalize = options.normalize
+  const stableOptions = stableOptionsOf(options, scorer, normalize)
   const choices = choiceReader(
     stableOptions,
     compilation.prepareChoice,
@@ -229,7 +278,7 @@ export function search<T, D extends Direction, B>(
   // scorer and an unknown `missingItems` the way every other limit does. What
   // it still skips is the work: no query normalization, no traversal.
   if (limit === 0) return []
-  const normalized = normalizeQuery(query, options.normalize)
+  const normalized = normalizeQuery(query, normalize)
   const arrayItems = arrayItemsOf(items)
 
   if (normalized === null) {
@@ -370,6 +419,7 @@ export function searchIter<T, D extends Direction, B>(
   // `missingItems` is refused at the call rather than on the first `next()`.
   // The query is processed lazily with the scoring — that is what the
   // iterator is for, so an invalid query still throws from `next()`.
+  assertOptionKeys(options, BEST_OPTION_KEYS, 'searchIter')
   const threshold = optionalThreshold(options.threshold)
   // Read before the generator exists, each exactly once: what the iterator
   // scores with is settled at the call, not at the first `next()`.
@@ -382,7 +432,7 @@ export function searchIter<T, D extends Direction, B>(
     items,
     compilation,
     choiceReader(
-      options,
+      stableOptionsOf(options, scorer, normalize),
       compilation.prepareChoice,
       compilation.preparedChoiceKey,
       false,

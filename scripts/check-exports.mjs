@@ -30,7 +30,7 @@ const EXPECTED = {
     'partialTokenSortSimilarity',
     'partialTokenSetSimilarity',
     'partialTokenSimilarity',
-    'fuzzySimilarity',
+    'weightedSimilarity',
   ],
   './levenshtein': [
     'distance',

@@ -1,15 +1,16 @@
 // @ts-check
 // Typechecks a consumer against the BUILT declarations rather than `src/`.
 //
-// A metric's brand is `MetricBrand<'levenshtein.distance'>`, written once in
-// the type of the metric it names. If declaration emit ever stopped writing
-// those brands out, or wrote them somewhere a consumer cannot name,
+// A metric's brand is its id literal, `'levenshtein.distance'`, written once
+// in the type of the metric it names. If declaration emit ever stopped
+// writing those brands out, or wrote them somewhere a consumer cannot name,
 // `PreparedChoiceOf` would resolve to an unusable type — and nothing inside
 // `src/` could tell.
 // Declaration emit erasing the type of a `private` member is exactly how that
-// went wrong once.
+// went wrong once; a brand spelled as an internal wrapper type is how a
+// consumer's own emit went wrong once, which is what the third check watches.
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
@@ -21,7 +22,7 @@ const consumer = join(output, 'consumer.ts')
 const config = join(output, 'tsconfig.json')
 
 const source = `import { createMatcher, createScorer, searchIter } from 'rapidfuzz-js'
-import type { PreparedChoice, PreparedChoiceOf, Scorer } from 'rapidfuzz-js'
+import type { PreparedChoice, PreparedChoiceOf, Scorer, ScorerOf } from 'rapidfuzz-js'
 import { similarity, tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
 import { distance } from 'rapidfuzz-js/levenshtein'
 import { distance as jaroWinklerDistance } from 'rapidfuzz-js/jaro-winkler'
@@ -65,6 +66,11 @@ export const scoreWith = (held: Scorer<'similarity'>) => held.score('a', 'b')
 export const eachMetric = ([distance, jaroWinklerDistance] as const).map((metric) =>
   createScorer(metric),
 )
+
+// A scorer's exact type is nameable from the metric alone, brand included —
+// the annotation a stored scorer wants without \`typeof\` gymnastics.
+export const titled: ScorerOf<typeof tokenSetSimilarity> =
+  createScorer(tokenSetSimilarity)
 
 // Both spellings of a handle's type are nameable from outside the package.
 export type Handle = PreparedChoiceOf<typeof scorer>
@@ -155,6 +161,43 @@ try {
     throw new Error(`expected the refusal to name PreparedChoice:\n${refusal}`)
   }
   console.log("✓ another metric's prepared choice is refused at compile time")
+
+  // The third check: the consumer's OWN declaration emit. An inferred scorer
+  // type in an exported const makes the compiler spell the brand out; if that
+  // spelling ever needs a type of ours that the export map does not reach, the
+  // emit degrades to a deep `import("...")` into the package — declarations
+  // that typecheck here and break the moment they are published.
+  const emitDir = join(output, 'emit')
+  const emitConfig = join(output, 'tsconfig.emit.json')
+  writeFileSync(
+    emitConfig,
+    JSON.stringify({
+      ...tsconfig,
+      compilerOptions: {
+        ...tsconfig.compilerOptions,
+        noEmit: false,
+        declaration: true,
+        emitDeclarationOnly: true,
+        outDir: emitDir,
+      },
+    }),
+  )
+  const emitFailure = typecheck(emitConfig)
+  if (emitFailure !== null) {
+    throw new Error(`the consumer's declaration emit failed:\n${emitFailure}`)
+  }
+  const emitted = readFileSync(join(emitDir, 'consumer.d.ts'), 'utf8')
+  if (emitted.includes('dist/')) {
+    throw new Error(
+      `the consumer's declarations deep-import into the package:\n${emitted}`,
+    )
+  }
+  if (!emitted.includes(`"fuzz.tokenSetSimilarity"`)) {
+    throw new Error(
+      `expected the emitted declarations to spell the brand as a literal:\n${emitted}`,
+    )
+  }
+  console.log("✓ the consumer's own declaration emit stays portable")
 } finally {
   rmSync(output, { recursive: true, force: true })
 }

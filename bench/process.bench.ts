@@ -5,7 +5,7 @@ import {
   similarity as levenshteinSimilarity,
 } from '../src/algorithms/levenshtein/index.js'
 import {
-  fuzzySimilarity,
+  weightedSimilarity,
   similarity as fuzzSimilarity,
   tokenSortSimilarity,
 } from '../src/fuzz/index.js'
@@ -31,7 +31,7 @@ const titleQueries = sentences(30, 5, 0x1122_3344)
 const titleQuery = 'alpha bravo charlie delta echo'
 
 const fuzzy = createScorer(fuzzSimilarity)
-const adaptive = createScorer(fuzzySimilarity)
+const adaptive = createScorer(weightedSimilarity)
 const tokenSort = createScorer(tokenSortSimilarity)
 const rawDistance = createScorer(levenshteinDistance)
 const rawSimilarity = createScorer(levenshteinSimilarity)
@@ -49,8 +49,11 @@ const titleMatcher = createMatcher(titles, {
 // What the prepared-choice cases measure against their Matcher siblings: the
 // same amortized preparation, held by the caller instead of by a snapshot.
 const preparedChoices = choices.map((text) => ({ prepared: fuzzy.prepareChoice(text) }))
+// Library-managed normalization, because the search below names a normalizer:
+// a handle that normalized its own text records nothing, and the two sides are
+// refused rather than scored against each other.
 const preparedTitles = titles.map((text) => ({
-  prepared: tokenSort.prepareChoice(normalizeText(text)),
+  prepared: tokenSort.prepareChoice(text, { normalize: normalizeText }),
 }))
 
 describe('direct Metric and Scorer calls', () => {

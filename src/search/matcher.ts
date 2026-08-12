@@ -1,3 +1,4 @@
+import { assertOptionKeys } from '../core/options.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
@@ -9,6 +10,9 @@ import { topSimilarity } from './internal/topSimilarity.js'
 import type { StoredItem } from './internal/types.js'
 import type { Match } from './results.js'
 import {
+  CALL_BEST_KEYS,
+  CALL_SEARCH_KEYS,
+  MATCHER_OPTION_KEYS,
   choiceReader,
   normalizeQuery,
   optionalThreshold,
@@ -74,6 +78,7 @@ export function createMatcher<T, D extends Direction, B>(
   items: Items<T>,
   options: AnyMatcherOptions<T, D, B>,
 ): Matcher<T, unknown, D, B> {
+  assertOptionKeys(options, MATCHER_OPTION_KEYS, 'createMatcher')
   // Read exactly once each: a getter or proxy could otherwise answer one thing
   // to the reader and another to the copy below, leaving a matcher whose
   // choices and queries were normalized by different functions.
@@ -137,6 +142,9 @@ export function createMatcher<T, D extends Direction, B>(
     query: MaybeSequence,
     call?: BestOptions,
   ): Match<T, unknown> | undefined => {
+    // Guarded rather than checked unconditionally: an absent options object is
+    // the common call, and it has no keys to walk.
+    if (call !== undefined) assertOptionKeys(call, CALL_BEST_KEYS, 'matcher.best')
     const threshold = optionalThreshold(call?.threshold)
     const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
@@ -161,6 +169,7 @@ export function createMatcher<T, D extends Direction, B>(
     query: MaybeSequence,
     call?: SearchOptions,
   ): readonly Match<T, unknown>[] => {
+    if (call !== undefined) assertOptionKeys(call, CALL_SEARCH_KEYS, 'matcher.search')
     const limit = resultLimit(call?.limit)
     const threshold = optionalThreshold(call?.threshold)
     if (limit === 0) return []
@@ -190,6 +199,7 @@ export function createMatcher<T, D extends Direction, B>(
     // Read where the call is made, not where iteration starts: a caller who
     // mutates their options object between the two would otherwise change a
     // search already asked for. Scoring stays lazy; only the number is taken.
+    if (call !== undefined) assertOptionKeys(call, CALL_BEST_KEYS, 'matcher.searchIter')
     const threshold = optionalThreshold(call?.threshold)
     function* iterate(): Generator<Match<T, unknown>> {
       const normalized = normalizeQuery(query, normalize)
