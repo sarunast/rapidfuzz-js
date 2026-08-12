@@ -287,6 +287,24 @@ describe('every execution path agrees', () => {
     ).toBeCloseTo(exact, 12)
   })
 
+  it('takes the smaller trigram count whichever side holds it', () => {
+    // The prepared trigram kernel walks the query's counts and compares each
+    // against the choice's, so a repeat has to be checked from both directions.
+    const scorer = createScorer(diceMetric, { gramSize: 3 })
+    const repeated = 'abcabcabc'
+    const once = 'abcxyz'
+    for (const [query, choice] of [
+      [once, repeated],
+      [repeated, once],
+    ]) {
+      const rows = [{ prepared: scorer.prepareChoice(choice) }]
+      expect(
+        bestMatch(query, rows, { scorer, getPrepared: (row) => row.prepared })?.score,
+        `${query} vs ${choice}`,
+      ).toBeCloseTo(scorer.score(query, choice), 12)
+    }
+  })
+
   it('keeps a prepared choice usable after its source array changes', () => {
     const scorer = createScorer(diceMetric)
     const source = Array.from('alphabet')

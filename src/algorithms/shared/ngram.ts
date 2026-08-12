@@ -294,6 +294,12 @@ export function parseGramSize(options: Readonly<Record<string, unknown>>): numbe
  * loops over those plus a `Map.get` per gram. Measured over 100 queries against
  * 1000 prepared bigram choices, at four length pairs: 0.69-0.74x the cost of
  * walking both tries per candidate.
+ *
+ * Flattened up to `gramSize` 3, which is where the depths a caller actually
+ * asks for stop: the trigram kernel measured 0.48x (12-char) and 0.62x
+ * (32-char) against the generic walk over the same 100x1000 shape, because that
+ * walk allocates three stack arrays for every candidate. Deeper stays generic —
+ * a fourth level of nested key arrays buys a case nobody has asked for.
  */
 export interface FrequencyKernel {
   (choice: NGramProfile): number
@@ -315,6 +321,13 @@ function flattenUnigrams(query: NGramProfile): [unknown[], number[]] {
   return [keys, frequencies]
 }
 
+interface FlatTrigramLevel {
+  readonly firstKeys: unknown[]
+  readonly secondKeys: unknown[][]
+  readonly thirdKeys: unknown[][][]
+  readonly frequencies: number[][][]
+}
+
 function flattenBigrams(query: NGramProfile): FlatLevel {
   const firstKeys: unknown[] = []
   const secondKeys: unknown[][] = []
@@ -331,6 +344,34 @@ function flattenBigrams(query: NGramProfile): FlatLevel {
     frequencies.push(counts)
   }
   return { firstKeys, secondKeys, frequencies }
+}
+
+function flattenTrigrams(query: NGramProfile): FlatTrigramLevel {
+  const firstKeys: unknown[] = []
+  const secondKeys: unknown[][] = []
+  const thirdKeys: unknown[][][] = []
+  const frequencies: number[][][] = []
+  for (const [first, child] of childrenOf(query.root)) {
+    const seconds: unknown[] = []
+    const thirds: unknown[][] = []
+    const counts: number[][] = []
+    for (const [second, grandchild] of childrenOf(child)) {
+      const keys: unknown[] = []
+      const values: number[] = []
+      for (const [third, count] of countsOf(grandchild)) {
+        keys.push(third)
+        values.push(count)
+      }
+      seconds.push(second)
+      thirds.push(keys)
+      counts.push(values)
+    }
+    firstKeys.push(first)
+    secondKeys.push(seconds)
+    thirdKeys.push(thirds)
+    frequencies.push(counts)
+  }
+  return { firstKeys, secondKeys, thirdKeys, frequencies }
 }
 
 export function sharedFrequencyKernel(query: NGramProfile): FrequencyKernel {
@@ -372,6 +413,36 @@ export function sharedFrequencyKernel(query: NGramProfile): FrequencyKernel {
       return shared
     }
   }
+  if (gramSize === 3) {
+    const { firstKeys, secondKeys, thirdKeys, frequencies } = flattenTrigrams(query)
+    return (choice) => {
+      const children = childrenOf(choice.root)
+      let shared = 0
+      for (let index = 0; index < firstKeys.length; index++) {
+        const child = children.get(firstKeys[index])
+        if (child === undefined) continue
+        const level = childrenOf(child)
+        const seconds = secondKeys[index]
+        const thirds = thirdKeys[index]
+        const mine = frequencies[index]
+        for (let inner = 0; inner < seconds.length; inner++) {
+          const grandchild = level.get(seconds[inner])
+          if (grandchild === undefined) continue
+          const counts = countsOf(grandchild)
+          const keys = thirds[inner]
+          const values = mine[inner]
+          for (let leaf = 0; leaf < keys.length; leaf++) {
+            const other = counts.get(keys[leaf])
+            if (other !== undefined) {
+              const count = values[leaf]
+              shared += count < other ? count : other
+            }
+          }
+        }
+      }
+      return shared
+    }
+  }
   return (choice) => sharedFrequency(query, choice)
 }
 
@@ -403,6 +474,33 @@ export function dotProductKernel(query: NGramProfile): FrequencyKernel {
         for (let inner = 0; inner < keys.length; inner++) {
           const other = counts.get(keys[inner])
           if (other !== undefined) product += mine[inner] * other
+        }
+      }
+      return product
+    }
+  }
+  if (gramSize === 3) {
+    const { firstKeys, secondKeys, thirdKeys, frequencies } = flattenTrigrams(query)
+    return (choice) => {
+      const children = childrenOf(choice.root)
+      let product = 0
+      for (let index = 0; index < firstKeys.length; index++) {
+        const child = children.get(firstKeys[index])
+        if (child === undefined) continue
+        const level = childrenOf(child)
+        const seconds = secondKeys[index]
+        const thirds = thirdKeys[index]
+        const mine = frequencies[index]
+        for (let inner = 0; inner < seconds.length; inner++) {
+          const grandchild = level.get(seconds[inner])
+          if (grandchild === undefined) continue
+          const counts = countsOf(grandchild)
+          const keys = thirds[inner]
+          const values = mine[inner]
+          for (let leaf = 0; leaf < keys.length; leaf++) {
+            const other = counts.get(keys[leaf])
+            if (other !== undefined) product += values[leaf] * other
+          }
         }
       }
       return product

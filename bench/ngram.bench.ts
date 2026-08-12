@@ -47,6 +47,11 @@ const preparedChoices = choices.map((text) => ({ prepared: scorer.prepareChoice(
 const preparedCosineChoices = choices.map((text) => ({
   prepared: cosine.prepareChoice(text),
 }))
+// Trigrams are the other depth a caller picks by hand, and the only other one
+// the query kernel flattens; everything deeper walks both tries per candidate.
+const preparedTrigramChoices = choices.map((text) => ({
+  prepared: trigrams.prepareChoice(text),
+}))
 
 // Every case below inlines its own loop rather than calling one shared helper,
 // for the reason `bench/distance.bench.ts` gives: V8 attaches an inline cache
@@ -160,6 +165,15 @@ describe('dice search', () => {
     for (const each of queries) {
       search(each, preparedChoices, {
         scorer,
+        limit: null,
+        getPrepared: (row) => row.prepared,
+      })
+    }
+  })
+  measure('trigrams, 100 queries, 1000 prepared choices', () => {
+    for (const each of queries) {
+      search(each, preparedTrigramChoices, {
+        scorer: trigrams,
         limit: null,
         getPrepared: (row) => row.prepared,
       })
