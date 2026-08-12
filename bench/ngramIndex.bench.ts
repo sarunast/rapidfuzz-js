@@ -1,53 +1,40 @@
 /**
- * Indexed n-gram search against the exhaustive Matcher path it would replace.
+ * `createIndexedMatcher` against the exhaustive `createMatcher` path it
+ * replaces.
  *
- * The prototype lives in `bench/tooling/ngramIndex.ts` and is bench-only: it is
- * an experiment in whether one corpus-wide inverted representation can replace
- * the N prepared tries a Dice/Cosine Matcher retains. Correctness, structural
- * counters and retained memory are `bench/tooling/ngram-index-scale.ts`; this
- * file is the part that needs the harness's adaptive sampling.
+ * This measured the bench-only prototype until the representation shipped;
+ * it now measures the real thing, through the public API, with the query
+ * conversion inside the timed body because a real query pays for it.
  *
- * Both arms of every pair see the same corpus and the same queries, and the
- * indexed arm builds its query profile inside the measured body, because a real
- * query would.
+ * Both arms of every pair see the same corpus and the same queries.
+ *
+ * **Mixed id widths, deliberately.** The 10,000-choice indexes store posting
+ * ids in a `Uint16Array` and the 100,000-choice one in a `Uint32Array`, and
+ * both are alive in this process at once — which the Stage B harness never
+ * did, because it was comparing the two widths and had to keep each load site
+ * monomorphic. Production has no such luxury: an application can hold indexes
+ * of both sizes, so this file is where that costs something if it ever does.
  */
 
 import { similarity as cosineMetric } from '../src/algorithms/cosine/index.js'
 import { similarity as diceMetric } from '../src/algorithms/dice/index.js'
-import { buildProfile } from '../src/algorithms/shared/ngram.js'
-import { createMatcher, createScorer, search } from '../src/index.js'
+import {
+  createIndexedMatcher,
+  createMatcher,
+  createScorer,
+  search,
+} from '../src/index.js'
 import { sentences, words } from './tooling/corpus.js'
 import { describe, measure } from './tooling/harness.js'
-import { NGramIndex } from './tooling/ngramIndex.js'
 
 const GRAM_SIZE = 3
 
 const dice = createScorer(diceMetric, { gramSize: GRAM_SIZE })
 const cosine = createScorer(cosineMetric, { gramSize: GRAM_SIZE })
 
-function indexOf(choices: readonly string[]): NGramIndex {
-  const index = new NGramIndex(GRAM_SIZE, choices.length)
-  for (let id = 0; id < choices.length; id++) index.addSequence(id, choices[id])
-  index.compact()
-  return index
-}
-
-// What the index build costs when it goes the long way round, through a profile
-// per choice. Kept beside the real one because the difference is the whole
-// argument for `addSequence`.
-function indexViaProfiles(choices: readonly string[]): NGramIndex {
-  const index = new NGramIndex(GRAM_SIZE, choices.length)
-  for (let id = 0; id < choices.length; id++) {
-    index.add(id, buildProfile(choices[id], GRAM_SIZE))
-  }
-  index.compact()
-  return index
-}
-
 // Two shapes rather than one: 24 random letters give a near-flat gram
 // distribution, while sentences of short words repeat theirs, which is what
-// lengthens posting lists. The scale script carries the degenerate two-letter
-// corpus, where this representation is known to lose.
+// lengthens posting lists.
 const small = words(1_000, 24)
 const medium = words(10_000, 24)
 const large = words(100_000, 24, 0x0ba7_d101)
@@ -58,10 +45,11 @@ const mediumQueries = medium.slice(0, 100)
 const phraseQueries = phrases.slice(0, 100)
 const oneQuery = large[50_000]
 
-const smallIndex = indexOf(small)
-const mediumIndex = indexOf(medium)
-const largeIndex = indexOf(large)
-const phraseIndex = indexOf(phrases)
+const smallIndexed = createIndexedMatcher(small, { scorer: dice })
+const mediumIndexed = createIndexedMatcher(medium, { scorer: dice })
+const largeIndexed = createIndexedMatcher(large, { scorer: dice })
+const phraseIndexed = createIndexedMatcher(phrases, { scorer: dice })
+const mediumCosineIndexed = createIndexedMatcher(medium, { scorer: cosine })
 
 const smallMatcher = createMatcher(small, { scorer: dice })
 const mediumMatcher = createMatcher(medium, { scorer: dice })
@@ -83,38 +71,31 @@ const controlPrepared = controlChoices.map((text) => ({
 // while its call site was still monomorphic.
 
 describe('ngram index build', () => {
-  // The indexed arm pays for every profile it builds and then drops, because
-  // that is what `createMatcher` pays to retain them.
-  measure('index, 1000 choices', () => indexOf(small))
+  measure('indexed, 1000 choices', () => createIndexedMatcher(small, { scorer: dice }))
   measure('matcher, 1000 choices', () => createMatcher(small, { scorer: dice }))
-  measure('index, 10000 choices', () => indexOf(medium))
+  measure('indexed, 10000 choices', () => createIndexedMatcher(medium, { scorer: dice }))
   measure('matcher, 10000 choices', () => createMatcher(medium, { scorer: dice }))
-  measure('index via profiles, 10000 choices', () => indexViaProfiles(medium))
 })
 
 describe('dice search, 1000 choices', () => {
   measure('indexed, 100 queries, threshold 0.5', () => {
-    for (const query of smallQueries) {
-      smallIndex.diceSearch(buildProfile(query, GRAM_SIZE), 0.5, 5)
-    }
+    for (const query of smallQueries)
+      smallIndexed.search(query, { limit: 5, threshold: 0.5 })
   })
   measure('exhaustive, 100 queries, threshold 0.5', () => {
     for (const query of smallQueries)
       smallMatcher.search(query, { limit: 5, threshold: 0.5 })
   })
   measure('indexed, 100 queries, threshold 0.8', () => {
-    for (const query of smallQueries) {
-      smallIndex.diceSearch(buildProfile(query, GRAM_SIZE), 0.8, 5)
-    }
+    for (const query of smallQueries)
+      smallIndexed.search(query, { limit: 5, threshold: 0.8 })
   })
   measure('exhaustive, 100 queries, threshold 0.8', () => {
     for (const query of smallQueries)
       smallMatcher.search(query, { limit: 5, threshold: 0.8 })
   })
   measure('indexed, best, 100 queries', () => {
-    for (const query of smallQueries) {
-      smallIndex.diceBest(buildProfile(query, GRAM_SIZE), null)
-    }
+    for (const query of smallQueries) smallIndexed.best(query)
   })
   measure('exhaustive, best, 100 queries', () => {
     for (const query of smallQueries) smallMatcher.best(query)
@@ -123,45 +104,54 @@ describe('dice search, 1000 choices', () => {
 
 describe('dice search, 10000 choices', () => {
   measure('indexed, 100 hits, threshold 0.5', () => {
-    for (const query of mediumQueries) {
-      mediumIndex.diceSearch(buildProfile(query, GRAM_SIZE), 0.5, 5)
-    }
+    for (const query of mediumQueries)
+      mediumIndexed.search(query, { limit: 5, threshold: 0.5 })
   })
   measure('exhaustive, 100 hits, threshold 0.5', () => {
-    for (const query of mediumQueries) {
+    for (const query of mediumQueries)
       mediumMatcher.search(query, { limit: 5, threshold: 0.5 })
-    }
   })
   measure('indexed, 100 misses, threshold 0.5', () => {
-    for (const query of smallQueries) {
-      mediumIndex.diceSearch(buildProfile(query, GRAM_SIZE), 0.5, 5)
-    }
+    for (const query of smallQueries)
+      mediumIndexed.search(query, { limit: 5, threshold: 0.5 })
   })
   measure('exhaustive, 100 misses, threshold 0.5', () => {
-    for (const query of smallQueries) {
+    for (const query of smallQueries)
       mediumMatcher.search(query, { limit: 5, threshold: 0.5 })
-    }
   })
   measure('indexed, best, 100 hits', () => {
-    for (const query of mediumQueries) {
-      mediumIndex.diceBest(buildProfile(query, GRAM_SIZE), null)
-    }
+    for (const query of mediumQueries) mediumIndexed.best(query)
   })
   measure('exhaustive, best, 100 hits', () => {
     for (const query of mediumQueries) mediumMatcher.best(query)
+  })
+  // `searchIter` is the member an index changes the shape of: it settles the
+  // whole qualifying set before yielding where the exhaustive path scores as it
+  // goes, so this pair is a genuine comparison rather than a formality.
+  measure('indexed, searchIter, 100 hits', () => {
+    for (const query of mediumQueries) {
+      for (const match of mediumIndexed.searchIter(query, { threshold: 0.5 })) {
+        if (match.score < 0) throw new Error('unreachable')
+      }
+    }
+  })
+  measure('exhaustive, searchIter, 100 hits', () => {
+    for (const query of mediumQueries) {
+      for (const match of mediumMatcher.searchIter(query, { threshold: 0.5 })) {
+        if (match.score < 0) throw new Error('unreachable')
+      }
+    }
   })
 })
 
 describe('cosine search, 10000 choices', () => {
   measure('indexed, 100 hits, threshold 0.5', () => {
-    for (const query of mediumQueries) {
-      mediumIndex.cosineSearch(buildProfile(query, GRAM_SIZE), 0.5, 5)
-    }
+    for (const query of mediumQueries)
+      mediumCosineIndexed.search(query, { limit: 5, threshold: 0.5 })
   })
   measure('exhaustive, 100 hits, threshold 0.5', () => {
-    for (const query of mediumQueries) {
+    for (const query of mediumQueries)
       mediumCosineMatcher.search(query, { limit: 5, threshold: 0.5 })
-    }
   })
 })
 
@@ -170,64 +160,39 @@ describe('cosine search, 10000 choices', () => {
 // candidate count dominates.
 describe('dice search, 10000 sentences', () => {
   measure('indexed, 100 hits, threshold 0.5', () => {
-    for (const query of phraseQueries) {
-      phraseIndex.diceSearch(buildProfile(query, GRAM_SIZE), 0.5, 5)
-    }
+    for (const query of phraseQueries)
+      phraseIndexed.search(query, { limit: 5, threshold: 0.5 })
   })
   measure('exhaustive, 100 hits, threshold 0.5', () => {
-    for (const query of phraseQueries) {
+    for (const query of phraseQueries)
       phraseMatcher.search(query, { limit: 5, threshold: 0.5 })
-    }
   })
-})
-
-// Prefix filtering walks only the query grams needed to prove a candidate could
-// reach the threshold, so what it saves grows with the threshold. Paired against
-// full accumulation on the same index, and against the exhaustive path, at the
-// two thresholds where the difference is worth seeing.
-describe('dice prefix filtering, 10000 choices', () => {
-  measure('full, 100 hits, threshold 0.8', () => {
-    for (const query of mediumQueries) {
-      mediumIndex.diceSearch(buildProfile(query, GRAM_SIZE), 0.8, 5)
-    }
-  })
-  measure('prefix, 100 hits, threshold 0.8', () => {
-    for (const query of mediumQueries) {
-      mediumIndex.dicePrefixSearch(buildProfile(query, GRAM_SIZE), 0.8, 5)
-    }
+  measure('indexed, 100 hits, threshold 0.8', () => {
+    for (const query of phraseQueries)
+      phraseIndexed.search(query, { limit: 5, threshold: 0.8 })
   })
   measure('exhaustive, 100 hits, threshold 0.8', () => {
-    for (const query of mediumQueries) {
-      mediumMatcher.search(query, { limit: 5, threshold: 0.8 })
-    }
-  })
-  measure('full, 100 sentences, threshold 0.8', () => {
-    for (const query of phraseQueries) {
-      phraseIndex.diceSearch(buildProfile(query, GRAM_SIZE), 0.8, 5)
-    }
-  })
-  measure('prefix, 100 sentences, threshold 0.8', () => {
-    for (const query of phraseQueries) {
-      phraseIndex.dicePrefixSearch(buildProfile(query, GRAM_SIZE), 0.8, 5)
-    }
+    for (const query of phraseQueries)
+      phraseMatcher.search(query, { limit: 5, threshold: 0.8 })
   })
 })
 
 // One query, not a hundred: the exhaustive arm is tens of milliseconds per
 // query at this size, and a hundred of them would make one sample longer than
-// the whole rest of the file.
+// the whole rest of the file. This is also the only group whose index stores
+// 32-bit posting ids, against the 16-bit ones every group above shares.
 describe('dice search, 100000 choices', () => {
   measure('indexed, 1 query, threshold 0.5', () =>
-    largeIndex.diceSearch(buildProfile(oneQuery, GRAM_SIZE), 0.5, 5),
+    largeIndexed.search(oneQuery, { limit: 5, threshold: 0.5 }),
   )
   measure('exhaustive, 1 query, threshold 0.5', () =>
     largeMatcher.search(oneQuery, { limit: 5, threshold: 0.5 }),
   )
-  measure('full, 1 query, threshold 0.8', () =>
-    largeIndex.diceSearch(buildProfile(oneQuery, GRAM_SIZE), 0.8, 5),
+  measure('indexed, 1 query, threshold 0.8', () =>
+    largeIndexed.search(oneQuery, { limit: 5, threshold: 0.8 }),
   )
-  measure('prefix, 1 query, threshold 0.8', () =>
-    largeIndex.dicePrefixSearch(buildProfile(oneQuery, GRAM_SIZE), 0.8, 5),
+  measure('exhaustive, 1 query, threshold 0.8', () =>
+    largeMatcher.search(oneQuery, { limit: 5, threshold: 0.8 }),
   )
 })
 
@@ -235,8 +200,7 @@ describe('dice search, 100000 choices', () => {
 // search > 100 queries, 1000 prepared choices`, on the same corpus. An index
 // changes what this process allocates, so the shared `Map.get` sites here can go
 // polymorphic in a way they never do in that file. If this case reads materially
-// slower than its twin, the time comparisons above are contaminated and only the
-// scale script's numbers can be trusted.
+// slower than its twin, the time comparisons above are contaminated.
 describe('control, matches bench/ngram.bench.ts', () => {
   const controlScorer = createScorer(diceMetric)
   measure('100 queries, 1000 prepared choices', () => {

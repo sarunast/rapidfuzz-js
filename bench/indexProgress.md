@@ -41,36 +41,30 @@ optional Dice prefix strategy beside them.
 
 ## Files
 
-| File                                  | What it is                                    |
-| ------------------------------------- | --------------------------------------------- |
-| `bench/tooling/ngramIndex.ts`         | the prototype                                 |
-| `bench/tooling/ngram-index-scale.ts`  | entry point; bundles the payload with esbuild |
-| `bench/tooling/ngram-index-report.ts` | parity, counters, memory, sweeps              |
-| `bench/ngramIndex.bench.ts`           | the harness-sampled timings                   |
-| `bench/comparison/ngram-index.mjs`    | against uFuzzy                                |
+**Stage C shipped it, and the prototype is gone.** The representation lives in
+`src/algorithms/shared/ngramIndex.ts` behind `createIndexedMatcher`; parity
+against the exhaustive Matcher moved to `tests/algorithms/ngramIndex.test.ts`
+and `tests/search/indexedMatcher.test.ts`, where CI runs it on every change
+rather than a script run by hand. `bench/tooling/ngramIndex.ts` and the
+report/scale harness that drove it are deleted — everything they proved is
+below, and keeping a second implementation alive beside the shipped one would
+have cost more than it could tell us.
+
+| File                               | What it is                          |
+| ---------------------------------- | ----------------------------------- |
+| `bench/ngramIndex.bench.ts`        | indexed against exhaustive, sampled |
+| `bench/comparison/ngram-index.mjs` | against uFuzzy                      |
 
 ```sh
-node --expose-gc bench/tooling/ngram-index-scale.ts --parity --runs=3000
-node --expose-gc bench/tooling/ngram-index-scale.ts --counters --max=100000
-node --expose-gc bench/tooling/ngram-index-scale.ts --counters --sweep --n=10000
-node --expose-gc bench/tooling/ngram-index-scale.ts --memory --n=100000 \
-  --corpus=zipf-words --gram=3 --arm=index
-node --expose-gc bench/tooling/ngram-index-scale.ts --peak --n=1000000 \
-  --corpus=zipf-words --gram=3 --build=direct
 pnpm bench ngramIndex
 node bench/comparison/ngram-index.mjs
+pnpm test tests/algorithms/ngramIndex.test.ts tests/search/indexedMatcher.test.ts
 ```
 
-Flags that matter: `--build=direct|profile`, `--keys=auto|bmp|full|string`,
-`--dense-cutoff=<share>|off`, `--threshold=`, `--sweep`,
-`--arm=index|profiles|matcher`, `--corpus=`, `--n=`. `--dense` runs the probe
-that decided dense postings were worth building; `--select` and `--accumulate`
-profile the two halves of a query, the latter one class at a time via `--query=`
-because profiling a second class in the same process moves a rung by 1.8x.
-
-Every row records `buildMode`, `keyMode`, `threshold` and `limit`. Two runs
-differing only in `--keys` used to emit byte-identical rows, which made a
-directory of JSON output unattributable after the fact.
+The flags that used to sit here — `--build`, `--keys`, `--dense-cutoff`,
+`--narrow-ids`, `--narrow-accumulator` — were each an A/B with an answer, and
+every answer is now fixed policy in the shipped code. What they measured is in
+the tables below; the switches themselves went with the prototype.
 
 ## Landed, with the number that justified it
 
@@ -702,7 +696,38 @@ that is not Stage B.
 
 ## Open — and closed to further optimisation
 
-**Stage C is architecture, not another 20% off postings.** The question is how an
+### Stage C, as shipped
+
+`createIndexedMatcher` landed across six commits. What the plan assumed and the
+shipped code measured differ in two places worth recording, both found by
+measuring the real thing rather than the prototype:
+
+- **Construction is faster, not slower.** The prototype's 1.4x came from its
+  profile-building ingest; production extracts grams directly, so the index
+  never builds the per-choice tries a Matcher keeps. On 10,000 `node_modules`
+  paths: 79 ms against the Matcher's 141 ms for Dice, 59 against 108 for Cosine.
+- **Dice's adverse case is 1x, not 3x.** A query of `'node_modules/'` reaches
+  every choice anyway, and Dice's exhaustive path prunes it on a length bound
+  the index has no use for. Cosine keeps 32x on the same row only because its
+  exhaustive path has no such bound to prune with.
+
+Retained memory through the public API: **235 B/choice against 18,049** — 77x.
+Measuring that needed the trap this log already carries: a heap delta inside one
+process reported the index as retaining a _negative_ amount, because the build
+reclaims corpus-construction garbage the baseline collection never reached. A
+discarded warm-up build before the baseline fixes it, and a do-nothing control
+arm reading 0 bytes is what says the method works.
+
+On the sampled bench, where the corpus is 24 random letters and so far more
+selective than file paths: **1,746x** at 10,000 choices and **3,064x** at
+100,000. The contamination control reads 33.38 ms against its twin's 32.75 ms
+in `bench/ngram.bench.ts`, 1.9% apart, so those comparisons are clean.
+
+Prefix filtering did **not** ship. It was never part of the architectural case,
+and carrying it into production would have meant a second query path to keep
+exact for a gain that only appears at high thresholds on skewed corpora.
+
+**Stage D is architecture, not another 20% off postings.** The question is how an
 index integrates with `Matcher` without damaging the scorer API, and the leading
 answer is an **explicit** `createIndexedMatcher` rather than silently changing
 what `createMatcher` builds — indexing changes construction strategy, rebuild

@@ -53,8 +53,8 @@ const LIMIT = 5
 // ---------------------------------------------------------------- our arms
 
 /**
- * One bundle holding the prototype, the metric and the Matcher, built on the
- * fly. esbuild resolves `.js` specifiers back to `.ts`; node does not.
+ * One bundle holding the two constructors and the metric, built on the fly.
+ * esbuild resolves `.js` specifiers back to `.ts`; node does not.
  */
 async function loadOurs() {
   const { build } = await import('esbuild')
@@ -64,10 +64,8 @@ async function loadOurs() {
   writeFileSync(
     entry,
     [
-      `export { NGramIndex } from ${JSON.stringify(join(root, 'bench/tooling/ngramIndex.ts'))}`,
-      `export { buildProfile } from ${JSON.stringify(join(root, 'src/algorithms/shared/ngram.ts'))}`,
       `export { similarity as diceMetric } from ${JSON.stringify(join(root, 'src/algorithms/dice/index.ts'))}`,
-      `export { createMatcher, createScorer } from ${JSON.stringify(join(root, 'src/index.ts'))}`,
+      `export { createIndexedMatcher, createMatcher, createScorer } from ${JSON.stringify(join(root, 'src/index.ts'))}`,
     ].join('\n'),
   )
   try {
@@ -200,12 +198,8 @@ const searcher = new uFuzzy()
 
 for (const count of sizes) {
   const corpus = buildCorpus(count)
-  const index = new ours.NGramIndex(GRAM_SIZE, count)
   const startedIndex = process.hrtime.bigint()
-  for (let id = 0; id < count; id++) {
-    index.add(id, ours.buildProfile(corpus.choices[id], GRAM_SIZE))
-  }
-  index.compact()
+  const indexed = ours.createIndexedMatcher(corpus.choices, { scorer })
   const indexBuild = Number(process.hrtime.bigint() - startedIndex) / 1e6
 
   const startedMatcher = process.hrtime.bigint()
@@ -225,26 +219,19 @@ for (const count of sizes) {
   for (const [name, query] of corpus.queries) {
     const full = time(runs, () => searcher.search(corpus.choices, query))
     const filtered = time(runs, () => searcher.filter(corpus.choices, query))
-    const indexed = time(runs, () =>
-      index.diceSearch(ours.buildProfile(query, GRAM_SIZE), THRESHOLD, LIMIT),
-    )
-    const prefixed = time(runs, () =>
-      index.dicePrefixSearch(ours.buildProfile(query, GRAM_SIZE), THRESHOLD, LIMIT),
+    const ourIndexed = time(runs, () =>
+      indexed.search(query, { limit: LIMIT, threshold: THRESHOLD }),
     )
     const scanned =
       matcher === null
         ? null
         : time(runs, () => matcher.search(query, { limit: LIMIT, threshold: THRESHOLD }))
     const theirMatches = searcher.filter(corpus.choices, query)?.length ?? 0
-    const ourMatches = index.diceSearch(
-      ours.buildProfile(query, GRAM_SIZE),
-      THRESHOLD,
-      null,
-    ).length
+    const ourMatches = indexed.search(query, { limit: null, threshold: THRESHOLD }).length
     console.log(
       `  ${name.padEnd(16)}${formatMs(full).padStart(11)}${formatMs(filtered).padStart(15)}` +
-        `${formatMs(indexed).padStart(13)}${formatMs(prefixed).padStart(14)}` +
-        `${(scanned === null ? 'n/a' : formatMs(scanned)).padStart(16)}   ` +
+        `${formatMs(ourIndexed).padStart(15)}` +
+        `${(scanned === null ? 'n/a' : formatMs(scanned)).padStart(18)}   ` +
         `${theirMatches} / ${ourMatches}`,
     )
   }
