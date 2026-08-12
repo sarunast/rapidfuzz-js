@@ -8,6 +8,14 @@ Every number below comes from a single recorded pass of
 internal `bench/process.bench.ts` for the `Matcher` table. Rerunning replaces
 all of them together; do not update one table from a later run.
 
+The n-gram section is the one exception, and it is marked as such: Dice and
+Cosine were added after that pass, so their tables come from a later one. They
+carry no absolute times for that reason. Every figure in them is a ratio
+between two libraries measured in the same process on the same corpus, which
+is what makes them comparable to the rest without being from the same pass —
+and they were reproduced across three runs. The next full re-record should
+fold them in and drop this paragraph.
+
 ## Summary
 
 The recorded comparison shows that `rapidfuzz-js`:
@@ -17,6 +25,9 @@ The recorded comparison shows that `rapidfuzz-js`:
 - is 2.9–19.5× faster than `fuzzball` for the measured Levenshtein workloads;
 - is about 16× faster than `fuzzball` for `similarity` and 5× faster for
   best-match search;
+- computes Dice 1.22–1.45× faster than the other multiset implementations and
+  Cosine 2.57–3.39× faster than the only comparable one, losing only to
+  `dice-coefficient` below about 64 characters;
 - answers repeated queries over a stable collection 5.14× faster through a
   `Matcher` than through the same one-shot search, and scores a held query
   1.29× faster than scoring each pair directly;
@@ -92,6 +103,81 @@ The comparisons do not all use the same algorithm:
 The last two rows compare complete matching tasks, not identical scoring
 algorithms. Use them to understand runtime for this corpus, not scoring quality
 or semantic equivalence.
+
+### Sørensen-Dice and Cosine over n-grams
+
+Recorded in a later pass than the tables above, so these are ratios only —
+see the note at the top. Before timing, the runner checks that every contender
+in the first table returns our number for every pair in the corpus. All four
+compute Dice over a _multiset_ of bigrams, which is what `similarity` from
+`rapidfuzz-js/dice` does; the n-gram checks use a tolerance rather than `!==`,
+because Dice is a ratio of integers and comes back identical while cosine
+divides by a square root.
+
+| Input                      | `dice-coefficient` | `fast-dice-coefficient` | `string-similarity` | `string-comparison` |
+| -------------------------- | ------------------ | ----------------------- | ------------------- | ------------------- |
+| 8 characters, 200 pairs    | ❌ 2.51× slower    | ✅ **1.24× faster**     | ✅ **1.26× faster** | ✅ **1.29× faster** |
+| 32 characters, 200 pairs   | ❌ 1.74× slower    | ✅ **1.22× faster**     | ✅ **1.28× faster** | ✅ **1.40× faster** |
+| 128 characters, 200 pairs  | ✅ **1.44×**       | ✅ **1.30× faster**     | ✅ **1.36× faster** | ✅ **1.35× faster** |
+| 1,024 characters, 25 pairs | ✅ **10.00×**      | ✅ **1.42× faster**     | ✅ **1.45× faster** | ✅ **1.39× faster** |
+
+`dice-coefficient` is the only JavaScript library measured here that beats
+`rapidfuzz-js` at its own metric, and the reason is structural rather than
+incidental. It compares two bigram arrays with a nested scan, allocating
+nothing: `O(n·m)` work with no setup, against our `O(n)` work behind a trie
+that has to be built first. The build dominates while the strings are short,
+the quadratic term dominates once they are not, and the crossover sits near 64
+characters. For short words scored one pair at a time, it is the faster
+choice.
+
+Cosine has one true competitor: `wink-nlp-utils` bags the n-grams with their
+counts and `wink-distance` takes the cosine of two such bags. The pair agrees
+with `cosineSimilarity` to within 2e-16, and is the only other frequency-vector
+n-gram cosine in JavaScript.
+
+| Input                      | `wink` bag-of-n-grams + `bow.cosine` |
+| -------------------------- | ------------------------------------ |
+| 8 characters, 200 pairs    | ✅ **3.16× faster**                  |
+| 32 characters, 200 pairs   | ✅ **3.19× faster**                  |
+| 128 characters, 200 pairs  | ✅ **3.39× faster**                  |
+| 1,024 characters, 25 pairs | ✅ **2.57× faster**                  |
+
+At `gramSize: 3` over 128 characters, Dice measured 1.20× faster than
+`dice-coefficient` and Cosine 3.35× faster than the wink pair.
+
+For 20 queries against 2,000 choices, where a `Matcher` profiles each choice
+once instead of once per query:
+
+| Workload          | Compared with                          | Result for `rapidfuzz-js` |
+| ----------------- | -------------------------------------- | ------------------------- |
+| `bestMatch`, Dice | `string-similarity.findBestMatch`      | ✅ **1.68× faster**       |
+| `bestMatch`, Dice | `fast-dice-coefficient` loop           | ✅ **1.58× faster**       |
+| `bestMatch`, Dice | `dice-coefficient` loop                | ❌ 1.10× slower           |
+| `Matcher`, Dice   | `string-similarity.findBestMatch`      | ✅ **6.41× faster**       |
+| `Matcher`, Dice   | `fast-dice-coefficient` loop           | ✅ **6.28× faster**       |
+| `Matcher`, Dice   | `dice-coefficient` with prebuilt grams | ✅ **4.17× faster**       |
+| `Matcher`, Cosine | `wink` loop                            | ✅ **20.04× faster**      |
+| `Matcher`, Cosine | `wink` with prebuilt bags              | ✅ **12.62× faster**      |
+
+The `dice-coefficient` rows are the same story as the pairwise table at a
+different scale: over 12-character choices its allocation-free scan keeps it
+ahead of a one-shot `bestMatch`, and a `Matcher` passes it anyway by not
+rebuilding the profiles.
+
+Three contenders are measured by the suite but excluded from the tables above,
+because they answer a different question:
+
+| Library                    | What it computes                                     | Measured                 |
+| -------------------------- | ---------------------------------------------------- | ------------------------ |
+| `talisman/metrics/dice`    | Dice over a **set** of bigrams                       | 2.32–2.79× faster for us |
+| `natural.DiceCoefficient`  | Dice over a **set** of bigrams                       | 1.45–1.60× faster for us |
+| `string-comparison.cosine` | Binary vector over **characters**, not n-gram counts | 1.40–2.82× slower for us |
+
+Set-based Dice scores `'aaaa'` against `'aaa'` as `1` where the multiset form
+answers `0.8`, so those two do strictly less work. `string-comparison`'s
+cosine is doubly different: it is binary rather than frequency-weighted, and
+over characters rather than grams, which makes `'iwmaxzsz'` and `'iwmaxssz'`
+score a flat `1`.
 
 ## Held inputs: what a Matcher reuses
 

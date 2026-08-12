@@ -35,7 +35,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { similarity as cosineSimilarity } from '../../dist/algorithms/cosine/index.js'
 import { distance as damerauLevenshteinDistance } from '../../dist/algorithms/damerauLevenshtein/index.js'
+import { similarity as diceSimilarity } from '../../dist/algorithms/dice/index.js'
 import { distance as hammingDistance } from '../../dist/algorithms/hamming/index.js'
 import { distance as indelDistance } from '../../dist/algorithms/indel/index.js'
 import { similarity as jaroSimilarity } from '../../dist/algorithms/jaro/index.js'
@@ -68,11 +70,13 @@ import {
 
 // The contenders are dependencies of `bench/comparison/package.json`, not of
 // the library — nothing in `src/`, `tests/` or the baseline benchmarks needs
-// them, and a contributor running `pnpm check` should not be made to install
-// six fuzzy-matching packages first. Node resolves them out of
+// them, and a contributor running `pnpm check` should not be made to install a
+// dozen fuzzy-matching packages first. Node resolves them out of
 // `bench/comparison/node_modules`, and this import is guarded so a missing
 // install is a sentence rather than a stack trace.
 let fastestLevenshtein, Fuse, fuzzball, jsLevenshtein, leven, stringSimilarity
+let bigram, trigram, diceCoefficient, fastDice, natural, stringComparison
+let talismanDice, winkNGramUtilities, winkDistance
 try {
   ;({ distance: fastestLevenshtein } = await import('fastest-levenshtein'))
   ;({ default: Fuse } = await import('fuse.js'))
@@ -80,6 +84,14 @@ try {
   ;({ default: jsLevenshtein } = await import('js-levenshtein'))
   ;({ default: leven } = await import('leven'))
   stringSimilarity = await import('string-similarity')
+  ;({ diceCoefficient } = await import('dice-coefficient'))
+  ;({ bigram, trigram } = await import('n-gram'))
+  ;({ default: fastDice } = await import('fast-dice-coefficient'))
+  ;({ default: talismanDice } = await import('talisman/metrics/dice.js'))
+  ;({ default: stringComparison } = await import('string-comparison'))
+  ;({ default: natural } = await import('natural'))
+  ;({ default: winkNGramUtilities } = await import('wink-nlp-utils'))
+  ;({ default: winkDistance } = await import('wink-distance'))
 } catch {
   console.error(
     'The comparison libraries are not installed. They are kept out of the root\n' +
@@ -89,6 +101,24 @@ try {
   process.exit(1)
 }
 const { compareTwoStrings, findBestMatch } = stringSimilarity
+
+/**
+ * No JavaScript package ships n-gram cosine as one call. `wink-nlp-utils` bags
+ * the n-grams with their counts and `wink-distance` takes the cosine of two
+ * such bags, and the pair of them is our `cosineSimilarity` exactly — agreement
+ * below is to 2e-16. Both halves are timed, because both are the work.
+ *
+ * @param {number} gramSize
+ * @returns {(first: string, second: string) => number}
+ */
+function winkCosine(gramSize) {
+  return (first, second) =>
+    1 -
+    winkDistance.bow.cosine(
+      winkNGramUtilities.string.bong(first, gramSize),
+      winkNGramUtilities.string.bong(second, gramSize),
+    )
+}
 
 /**
  * fuzzball preprocesses both inputs unless told not to — `full_process` lower
@@ -126,16 +156,24 @@ const titleMatcher = createMatcher(corpus.titles, { scorer: tokenSortScorer })
  *
  * A distance benchmark against something that computes a different number is
  * not a benchmark, it is a table. The four Levenshtein implementations below
- * are checked against ours on every pair in the corpus; the Dice and Bitap
- * contenders further down are *not* checked, because they genuinely score
- * something else, and the report says so rather than pretending otherwise.
+ * are checked against ours on every pair in the corpus, and so are the four
+ * n-gram contenders that do compute our number; the Bitap and set-of-bigrams
+ * contenders are *not* checked, because they genuinely score something else,
+ * and the report says so rather than pretending otherwise.
  *
  * `fuzzball` is checked twice over, because it is the one contender descended
  * from the same source as this library — a port of fuzzywuzzy, where RapidFuzz
  * began. Its distances are ours exactly; its `ratio` family is ours rounded to
  * the nearest integer, which is fuzzywuzzy's own convention and the only
  * difference between the two libraries' numbers.
+ *
+ * The n-gram contenders are checked to a tolerance rather than by `!==`: Dice
+ * is a ratio of integers and comes back identical, but cosine divides by a
+ * square root, and `wink-distance` takes it as `1 - distance` over two
+ * separately-normalised bags. That last subtraction is where the 2e-16 lives.
  */
+const NGRAM_TOLERANCE = 1e-12
+
 function checkAgreement() {
   /** @type {string[]} */
   const problems = []
@@ -162,6 +200,34 @@ function checkAgreement() {
     const theirs = fuzzball.ratio(first, second, RAW)
     if (theirs !== rounded) {
       problems.push(`fuzzball ratio: ${theirs} vs ${rounded} on "${first}"`)
+    }
+  }
+
+  // `string-similarity` and `string-comparison` strip whitespace before
+  // bigramming, so they are checked on the single-word pairs only — on a phrase
+  // they score a string neither library was handed. `corpus.pairs` has no
+  // spaces in it, which is what makes that split clean.
+  for (const length of PAIR_LENGTHS) {
+    for (const [first, second] of corpus.pairs[String(length)]) {
+      const dice = diceSimilarity(first, second)
+      const cosine = cosineSimilarity(first, second)
+      /** @type {[string, number, number][]} */
+      const others = [
+        ['dice-coefficient', diceCoefficient(first, second), dice],
+        ['fast-dice-coefficient', fastDice(first, second), dice],
+        ['string-similarity', compareTwoStrings(first, second), dice],
+        [
+          'string-comparison dice',
+          stringComparison.diceCoefficient.similarity(first, second),
+          dice,
+        ],
+        ['wink bag-of-n-grams cosine', winkCosine(2)(first, second), cosine],
+      ]
+      for (const [name, theirs, ours] of others) {
+        if (Math.abs(theirs - ours) > NGRAM_TOLERANCE) {
+          problems.push(`${name}: ${theirs} vs ${ours} on ${length}-char pair`)
+        }
+      }
     }
   }
 
@@ -432,6 +498,251 @@ contest(
   runMatcherTokenSearch,
   runFuzzballTokenSearch,
   'same token-sort scorer; fuzzball re-reads the collection every query',
+)
+
+/**
+ * The n-gram metrics have more company in JavaScript than the edit distances
+ * do — Dice over bigrams is what most "string similarity" packages mean by the
+ * phrase — so the contenders divide into two kinds, and the report keeps them
+ * apart:
+ *
+ *   - **Our number exactly.** `dice-coefficient`, `fast-dice-coefficient`,
+ *     `string-similarity` and `string-comparison` all take Dice over a
+ *     *multiset* of bigrams, which is what `diceSimilarity` does. Checked above
+ *     on every pair in the corpus.
+ *   - **A different number.** `talisman` and `natural` take it over a *set*, so
+ *     a bigram occurring three times counts once; on `'aaaa'` against `'aaa'`
+ *     they answer 1 where we answer 0.8. They are timed because they are what a
+ *     reader will find under the same name, and the ratio is the honest thing
+ *     to show, but they are not solving the same problem.
+ *
+ * `string-comparison`'s cosine is in the second kind twice over: it is over the
+ * *characters* of the two strings as a binary vector, so it cannot see order at
+ * all and scores `'iwmaxzsz'` against `'iwmaxssz'` a flat 1 where we say 0.714.
+ */
+const diceScorer = createScorer(diceSimilarity)
+const cosineScorer = createScorer(cosineSimilarity)
+const diceMatcher = createMatcher(corpus.choices, { scorer: diceScorer })
+const cosineMatcher = createMatcher(corpus.choices, { scorer: cosineScorer })
+
+/** @type {[string, (first: string, second: string) => number, string][]} */
+const diceContenders = [
+  ['dice-coefficient', diceCoefficient, 'same number'],
+  ['fast-dice-coefficient', fastDice, 'same number'],
+  ['string-similarity', compareTwoStrings, 'same number on space-free input'],
+  [
+    'string-comparison',
+    (first, second) => stringComparison.diceCoefficient.similarity(first, second),
+    'same number on space-free input',
+  ],
+  ['talisman/metrics/dice', talismanDice, 'theirs is over a set of bigrams'],
+  ['natural.DiceCoefficient', natural.DiceCoefficient, 'theirs is over a set of bigrams'],
+]
+
+console.log('\nSørensen-Dice over bigrams — one pair at a time')
+for (const length of PAIR_LENGTHS) {
+  const pairs = corpus.pairs[String(length)]
+  const label = `${length} chars, ${pairs.length} pairs`
+  for (const [name, theirs, note] of diceContenders) {
+    contest(
+      label,
+      name,
+      () => {
+        for (const [first, second] of pairs) diceSimilarity(first, second)
+      },
+      () => {
+        for (const [first, second] of pairs) theirs(first, second)
+      },
+      note,
+    )
+  }
+}
+
+console.log('\nCosine over bigrams — one pair at a time')
+const winkBigramCosine = winkCosine(2)
+for (const length of PAIR_LENGTHS) {
+  const pairs = corpus.pairs[String(length)]
+  const label = `${length} chars, ${pairs.length} pairs`
+  contest(
+    label,
+    'wink bong + bow.cosine',
+    () => {
+      for (const [first, second] of pairs) cosineSimilarity(first, second)
+    },
+    () => {
+      for (const [first, second] of pairs) winkBigramCosine(first, second)
+    },
+    'same number to 2e-16 — checked above',
+  )
+  contest(
+    label,
+    'string-comparison cosine',
+    () => {
+      for (const [first, second] of pairs) cosineSimilarity(first, second)
+    },
+    () => {
+      for (const [first, second] of pairs) {
+        stringComparison.cosine.similarity(first, second)
+      }
+    },
+    'theirs is over characters, not n-grams, as a binary vector',
+  )
+}
+
+// Trigrams, because `gramSize` is a parameter here and a rewrite in most of the
+// contenders: `dice-coefficient` reaches them by being handed gram arrays, and
+// wink by an argument. The other four are bigram-only.
+console.log('\nTrigrams — one pair at a time, 128 chars')
+const trigramPairs = corpus.pairs['128']
+const winkTrigramCosine = winkCosine(3)
+contest(
+  `dice, gramSize 3`,
+  'dice-coefficient',
+  () => {
+    for (const [first, second] of trigramPairs) {
+      diceSimilarity(first, second, { gramSize: 3 })
+    }
+  },
+  () => {
+    for (const [first, second] of trigramPairs) {
+      diceCoefficient(trigram(first), trigram(second))
+    }
+  },
+  'same number; theirs is handed prebuilt trigram arrays',
+)
+contest(
+  `cosine, gramSize 3`,
+  'wink bong + bow.cosine',
+  () => {
+    for (const [first, second] of trigramPairs) {
+      cosineSimilarity(first, second, { gramSize: 3 })
+    }
+  },
+  () => {
+    for (const [first, second] of trigramPairs) winkTrigramCosine(first, second)
+  },
+  'same number to 2e-16',
+)
+
+/**
+ * The shape a contender with no search API is used in: score every choice and
+ * keep the best. It is what the packages' own READMEs show, and what
+ * `findBestMatch` does internally.
+ *
+ * @param {(first: string, second: string) => number} score
+ * @returns {() => void}
+ */
+function bestByLoop(score) {
+  return () => {
+    for (const query of corpus.queries) {
+      let best = -1
+      for (const choice of corpus.choices) {
+        const value = score(query, choice)
+        if (value > best) best = value
+      }
+    }
+  }
+}
+
+const runDiceOneShot = () => {
+  for (const query of corpus.queries) {
+    bestMatch(query, corpus.choices, { scorer: diceScorer })
+  }
+}
+const runDiceMatcher = () => {
+  for (const query of corpus.queries) diceMatcher.best(query)
+}
+const runCosineMatcher = () => {
+  for (const query of corpus.queries) cosineMatcher.best(query)
+}
+const runFindBestMatch = () => {
+  for (const query of corpus.queries) findBestMatch(query, corpus.choices)
+}
+
+console.log('\nDice search — 20 queries, 2,000 choices')
+contest(
+  'bestMatch',
+  'string-similarity findBestMatch',
+  runDiceOneShot,
+  runFindBestMatch,
+  'their only search API; same number, and it scores every choice',
+)
+contest(
+  'bestMatch',
+  'fast-dice-coefficient loop',
+  runDiceOneShot,
+  bestByLoop(fastDice),
+  'same number',
+)
+contest(
+  'bestMatch',
+  'dice-coefficient loop',
+  runDiceOneShot,
+  bestByLoop(diceCoefficient),
+  'same number',
+)
+contest(
+  'Matcher',
+  'string-similarity findBestMatch',
+  runDiceMatcher,
+  runFindBestMatch,
+  'the collection is prepared once, theirs is re-bigrammed every query',
+)
+contest(
+  'Matcher',
+  'fast-dice-coefficient loop',
+  runDiceMatcher,
+  bestByLoop(fastDice),
+  'the collection is prepared once',
+)
+
+// `dice-coefficient` takes prebuilt gram arrays, which is the one prepared mode
+// among the contenders — so this row is prepared against prepared, and the only
+// one in the section where both sides amortize the same thing.
+const prebuiltBigrams = corpus.choices.map((choice) => bigram(choice))
+contest(
+  'Matcher',
+  'dice-coefficient, prebuilt bigrams',
+  runDiceMatcher,
+  () => {
+    for (const query of corpus.queries) {
+      const left = bigram(query)
+      let best = -1
+      for (const right of prebuiltBigrams) {
+        const value = diceCoefficient(left, right)
+        if (value > best) best = value
+      }
+    }
+  },
+  'both sides hold the collection; theirs is an O(n·m) scan per pair',
+)
+
+console.log('\nCosine search — 20 queries, 2,000 choices')
+const prebuiltBags = corpus.choices.map((choice) =>
+  winkNGramUtilities.string.bong(choice, 2),
+)
+contest(
+  'Matcher',
+  'wink loop',
+  runCosineMatcher,
+  bestByLoop(winkBigramCosine),
+  'same number; theirs bags both sides every pair',
+)
+contest(
+  'Matcher',
+  'wink, prebuilt bags',
+  runCosineMatcher,
+  () => {
+    for (const query of corpus.queries) {
+      const left = winkNGramUtilities.string.bong(query, 2)
+      let best = -1
+      for (const right of prebuiltBags) {
+        const value = 1 - winkDistance.bow.cosine(left, right)
+        if (value > best) best = value
+      }
+    }
+  },
+  'both sides hold the collection',
 )
 
 /**

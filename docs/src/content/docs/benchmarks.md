@@ -50,6 +50,68 @@ against ours. `string-similarity` uses Dice similarity over bigrams;
 rapidfuzz-js scans every choice. Read the last two rows as runtime for this
 corpus, not as a verdict on scoring quality.
 
+## Dice and Cosine
+
+Dice and Cosine were added after the pass that produced the tables above, so
+these rows come from a later one — every figure here is a ratio between two
+libraries timed in the same process, reproduced across three runs. The runner
+checks that every contender in this table returns our number for every pair in
+the corpus before timing it: all four take Dice over a _multiset_ of bigrams,
+which is what `similarity` from `rapidfuzz-js/dice` does.
+
+| Input                      | `dice-coefficient` | `fast-dice-coefficient` | `string-similarity` | `string-comparison` |
+| -------------------------- | ------------------ | ----------------------- | ------------------- | ------------------- |
+| 8 characters, 200 pairs    | ❌ 2.51× slower    | ✅ **1.24× faster**     | ✅ **1.26× faster** | ✅ **1.29× faster** |
+| 32 characters, 200 pairs   | ❌ 1.74× slower    | ✅ **1.22× faster**     | ✅ **1.28× faster** | ✅ **1.40× faster** |
+| 128 characters, 200 pairs  | ✅ **1.44×**       | ✅ **1.30× faster**     | ✅ **1.36× faster** | ✅ **1.35× faster** |
+| 1,024 characters, 25 pairs | ✅ **10.00×**      | ✅ **1.42× faster**     | ✅ **1.45× faster** | ✅ **1.39× faster** |
+
+`dice-coefficient` is the one library that beats us, and it is worth
+understanding why. It compares two bigram arrays with a nested scan — no map,
+no allocation — which is `O(n·m)` but has nothing to build. Below roughly 64
+characters that trade wins; above it the quadratic term takes over, and by
+1,024 characters it is an order of magnitude behind. If your inputs are short
+words and Dice is all you need, it is the faster choice.
+
+Cosine has almost no competition: `wink-nlp-utils` bagging n-grams with
+`wink-distance` taking the cosine of the two bags is the only other true
+n-gram cosine in JavaScript, and it agrees with ours to 2e-16.
+
+| Input                      | `wink` bag-of-n-grams + `bow.cosine` |
+| -------------------------- | ------------------------------------ |
+| 8 characters, 200 pairs    | ✅ **3.16× faster**                  |
+| 32 characters, 200 pairs   | ✅ **3.19× faster**                  |
+| 128 characters, 200 pairs  | ✅ **3.39× faster**                  |
+| 1,024 characters, 25 pairs | ✅ **2.57× faster**                  |
+
+At `gramSize: 3` over 128 characters, Dice is 1.20× faster than
+`dice-coefficient` and Cosine 3.35× faster than the wink pair.
+
+Searching is where the gap widens, because a `Matcher` profiles each choice
+once instead of once per query — 20 queries over 2,000 choices:
+
+| Workload          | Compared with                          | Result for `rapidfuzz-js` |
+| ----------------- | -------------------------------------- | ------------------------- |
+| `bestMatch`, Dice | `string-similarity.findBestMatch`      | ✅ **1.68× faster**       |
+| `bestMatch`, Dice | `fast-dice-coefficient` loop           | ✅ **1.58× faster**       |
+| `bestMatch`, Dice | `dice-coefficient` loop                | ❌ 1.10× slower           |
+| `Matcher`, Dice   | `string-similarity.findBestMatch`      | ✅ **6.41× faster**       |
+| `Matcher`, Dice   | `fast-dice-coefficient` loop           | ✅ **6.28× faster**       |
+| `Matcher`, Dice   | `dice-coefficient` with prebuilt grams | ✅ **4.17× faster**       |
+| `Matcher`, Cosine | `wink` loop                            | ✅ **20.04× faster**      |
+| `Matcher`, Cosine | `wink` with prebuilt bags              | ✅ **12.62× faster**      |
+
+Three contenders are deliberately absent from the tables above, because they
+do not compute the same thing:
+
+- `talisman/metrics/dice` and `natural.DiceCoefficient` take Dice over a
+  **set** of bigrams, so `'aaaa'` against `'aaa'` is `1` where we answer
+  `0.8`. We measure 1.45–2.79× faster than both, but they are doing less work.
+- `string-comparison`'s `cosine` is a binary vector over **characters**, not a
+  frequency vector over n-grams — it scores `'iwmaxzsz'` against `'iwmaxssz'`
+  a flat `1`. It is 1.40–2.82× faster than our Cosine and answers a different
+  question.
+
 ## Why a Matcher pays
 
 Most of the cost of a fuzzy query is preparing the inputs, not scoring them,
