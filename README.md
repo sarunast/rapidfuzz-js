@@ -288,6 +288,30 @@ Strings are retained as-is. Other array-like sequences are shallow-copied, so
 mutating the source later does not change scores. Returned items and nested
 objects stay live references.
 
+For a Dice or Cosine scorer over a large collection, `createIndexedMatcher`
+builds the same `Matcher` over one inverted n-gram index instead of a prepared
+handle per choice:
+
+```ts
+import { createIndexedMatcher, createScorer } from 'rapidfuzz-js'
+import { similarity as diceSimilarity } from 'rapidfuzz-js/dice'
+
+const matcher = createIndexedMatcher(files, {
+  scorer: createScorer(diceSimilarity, { gramSize: 3 }),
+  getText: (file) => file.path,
+})
+matcher.search('src/algorthms/dice.ts', { limit: 5, threshold: 0.5 })
+```
+
+Every member behaves the same and the scores are exact. On 10,000 file paths a
+query measured **45-63x faster**, retaining **235 bytes a choice against
+18,049**, and construction is faster too. It is not uniformly faster: a query
+made of grams nearly every choice shares reaches everything anyway and measured
+**1x** for Dice. Only `dice.similarity` and `cosine.similarity` offer one —
+anything else throws at construction, a distance scorer is a compile error, and
+`searchIter` settles its whole result before yielding rather than scoring
+lazily.
+
 ## Reusable prepared choices
 
 `prepareChoice` converts one choice into the form the scorer's kernels want
@@ -430,18 +454,19 @@ it is refused when a score actually arrives that does not fit, not up front.
 
 ## RapidFuzz capability mapping
 
-| RapidFuzz                    | rapidfuzz-js                                                  |
-| ---------------------------- | ------------------------------------------------------------- |
-| `fuzz.ratio`                 | `similarity`                                                  |
-| `fuzz.WRatio`                | `weightedSimilarity` (`QRatio` has no counterpart)            |
-| `process.extractOne`         | `bestMatch`                                                   |
-| `process.extract`            | `search`                                                      |
-| `process.extract_iter`       | `searchIter`                                                  |
-| `process.cdist` / `cpdist`   | `scoreMatrix` / `scorePairs`                                  |
-| `score_cutoff`               | `threshold`                                                   |
-| `score_multiplier`           | `scoreMultiplier`                                             |
-| `scorer_kwargs`              | `createScorer(metric, configuration)`                         |
-| repeated prepared extraction | `createMatcher`, or `scorer.prepareChoice` with `getPrepared` |
+| RapidFuzz                      | rapidfuzz-js                                                  |
+| ------------------------------ | ------------------------------------------------------------- |
+| `fuzz.ratio`                   | `similarity`                                                  |
+| `fuzz.WRatio`                  | `weightedSimilarity` (`QRatio` has no counterpart)            |
+| `process.extractOne`           | `bestMatch`                                                   |
+| `process.extract`              | `search`                                                      |
+| `process.extract_iter`         | `searchIter`                                                  |
+| `process.cdist` / `cpdist`     | `scoreMatrix` / `scorePairs`                                  |
+| `score_cutoff`                 | `threshold`                                                   |
+| `score_multiplier`             | `scoreMultiplier`                                             |
+| `scorer_kwargs`                | `createScorer(metric, configuration)`                         |
+| repeated prepared extraction   | `createMatcher`, or `scorer.prepareChoice` with `getPrepared` |
+| large-collection n-gram search | `createIndexedMatcher` (no RapidFuzz counterpart)             |
 
 For everything RapidFuzz spells differently — extraction, cutoffs, scorer
 configuration, prepared reuse — the table above is the whole translation.

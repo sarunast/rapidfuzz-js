@@ -85,6 +85,16 @@ Preparing choices removes most of that from repeated searches; see
 metric and gram size, so a Cosine scorer refuses one built by a Dice scorer,
 and a `gramSize: 3` scorer refuses one built at the default.
 
+## Searching a large collection
+
+Both Dice and Cosine can be searched through
+[`createIndexedMatcher`](/concepts/matchers/#indexed-matchers-for-dice-and-cosine),
+which builds one inverted n-gram index over the collection instead of preparing
+each choice. It is the same Matcher afterwards, with the same exact results, and
+on 10,000 file paths it measured 45–63x faster per query and 77x smaller —
+except on a query made of grams that nearly every choice shares, which is where
+the idea stops paying.
+
 ## When to use it
 
 Reach for Cosine over Dice when **how often** a gram appears is signal rather
