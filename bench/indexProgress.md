@@ -189,9 +189,10 @@ makes it scale.
 
 Synthetic corpora say where the crossover is. This says which side of it a real
 workload sits on. **12,947 file paths** from the checkout's `node_modules`,
-sampled at a stride across the sorted list — the first 12,947 in order are one or
-two packages' worth of near-identical paths, a fake corpus wearing a real one's
-name, and slicing rather than striding overstated posting traffic 19x.
+sampled at proportional positions across the sorted list — a contiguous prefix is
+one or two packages' worth of near-identical paths, a fake corpus wearing a real
+one's name, and it overstated posting traffic 19x. An integer stride is not
+enough either: at 10,000 of 12,947 it floors to 1, which is the prefix again.
 
 Trigrams, threshold 0.5, limit 5, 8 distinct queries per class, milliseconds:
 
@@ -206,7 +207,11 @@ Trigrams, threshold 0.5, limit 5, 8 distinct queries per class, milliseconds:
 | rare substring   |     0.2009 |  0.0782 | 0.0052 |      3x |
 
 Cosine on the same corpus: 31–33x on the hit and typo classes, 93–1,603x on the
-selective ones. Build: **index 100.7 ms, Matcher 120–198 ms.**
+selective ones. Build: **index 98–102 ms, Matcher 120–242 ms** across four runs.
+
+Repeated four times, because this machine spikes: the hit and typo classes read
+16–24x every time, with one outlier run at 11–18x where the indexed arm alone
+went 1.8x slower — load, not a finding. The table is the median run.
 
 Three things this corpus says that no synthetic one did:
 
@@ -232,8 +237,8 @@ Memory, same corpus, one arm per process:
 Two comparisons, deliberately: index against **profiles** is the representation
 question, and index against the whole **Matcher** is what a caller retains. They
 differ by 0.77 MB — the per-choice row holding item, key and prepared value is
-**3% of what a Matcher keeps**, so the profiles are essentially all of it. The
-earlier index-vs-Matcher figures were not meaningfully flattering.
+**0.3% of what a Matcher keeps**, so the profiles are 99.7% of it. The earlier
+index-vs-Matcher figures were not meaningfully flattering.
 
 ## Peak build memory
 
@@ -244,24 +249,34 @@ CSR arrays it settles into. Sampled inside the build loop — the build is one
 synchronous run, so a timer would never get a look. All figures over the corpus
 baseline, direct build, trigrams:
 
-| corpus      |         n | retained | peak heap | peak RSS | ratio |
-| ----------- | --------: | -------: | --------: | -------: | ----: |
-| alphabet-26 | 1,000,000 |  80.5 MB |    625 MB |   957 MB |  7.8x |
-| zipf-words  | 1,000,000 |  74.6 MB |    820 MB |  1046 MB | 11.0x |
-| file-paths  |    12,947 |  4.72 MB |   46.6 MB |   185 MB |  9.9x |
+| corpus      |         n | retained | peak build | peak RSS | ratio |
+| ----------- | --------: | -------: | ---------: | -------: | ----: |
+| alphabet-26 | 1,000,000 |  80.5 MB |     647 MB |   962 MB |  8.0x |
+| zipf-words  | 1,000,000 |  74.5 MB |     841 MB |  1056 MB | 11.3x |
+| file-paths  |    12,947 |  4.68 MB |    56.7 MB |   196 MB | 12.1x |
 
-**Peak runs 8–11x the final size, and that is fine.** A million choices index
-inside ~1 GB RSS, while a million prepared profiles would retain ~3.3 GB — the
-builder's high-water mark is still four times below the representation it
-replaces. So the two-pass CSR build (count posting lengths, allocate exactly,
-fill) stays a named fix and is **not** implemented: it trades a second corpus
-traversal for a problem nothing has yet.
+Peak build is `heapUsed + arrayBuffers` **sampled as one sum**, over the same sum
+at the baseline. Tracking the two maxima separately and subtracting a combined
+baseline from a heap-only peak is not the peak of anything: it undercounts by
+whatever the corpus already held in buffers, and the two need not peak at the
+same instant.
+
+**Peak runs 8–12x the final size, and that is fine.** A million choices index
+inside ~1 GB RSS, while a million prepared profiles would retain ~3.3 GB — so the
+builder's high-water mark is **roughly three times below** (3.15x against the
+Zipf RSS, 3.45x against the 26-letter one) the steady state of the representation
+it replaces. Peak against peak would be a kinder comparison and is not the one
+that matters; RSS is what a machine has to find. So the two-pass CSR build (count
+posting lengths, allocate exactly, fill) stays a named fix and is **not**
+implemented: it trades a second corpus traversal for a problem nothing has yet.
 
 ## Correctness
 
 Parity compares against `matcher.search`/`.best` on **key, score and order**:
-**31,680 fixed cases across six build/key configurations**, plus randomised
-corpora that draw their configuration too. Covers gram sizes 2 and 3, thresholds
+**40,320 fixed cases across the whole build × key product**, generated rather
+than listed — a hand-written list claimed to be the product while missing
+`profile + bmp` and `direct + full` — plus randomised corpora that draw their
+configuration too. Covers gram sizes 2 and 3, thresholds
 `null`/0/0.5/0.8/1, limits 0/1/3/`null`, duplicate choices, sequences shorter
 than `gramSize`, gramless queries, astral characters and lone surrogates.
 
@@ -270,7 +285,9 @@ separate keying path, so parity covers the product rather than whichever
 configuration the last flag selected. Every measuring mode now runs a **smoke
 subset first, under the configuration it is about to measure** — milliseconds
 against a run of minutes, and the alternative was producing timings for an
-unvalidated path.
+unvalidated path. The memory and peak modes included: they are not scoring
+benchmarks, but they build through a specific builder and key scheme, and a byte
+count for a representation that answers wrong is no better than a timing for one.
 
 Mutation-verified twice — the suite is only worth what it catches:
 
@@ -364,7 +381,12 @@ accumulation, **C** optimised inverted (prefix filtering).
 - **Each query class carries 8 distinct queries**, cycled through the timed runs.
   Timing one query in a loop rewarms exactly the posting slices that query
   touches — free for the index, worthless to the exhaustive arm, which walks the
-  whole corpus either way. p50 and p95 are both recorded.
+  whole corpus either way.
+- **p95 is `null` below 40 samples**, which means at 10k and above. With 5
+  samples `sorted[floor(0.95 × 5)]` is the maximum, reported under a percentile's
+  name; with 15 it is still the maximum. The tail number for a large corpus
+  belongs to `pnpm bench ngramIndex`, where adaptive sampling takes hundreds of
+  samples, not to a script whose exhaustive arm costs 16 ms a call.
 - **`substitute` samples positions without replacement.** Picking each
   independently let two edits land on the same character, and on a small
   alphabet the second could undo the first — a "2 typos" row measuring an exact
