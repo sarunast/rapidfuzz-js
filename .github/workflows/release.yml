@@ -26,11 +26,10 @@ permissions:
 
 jobs:
   # The whole of CI, run against the tagged commit rather than trusted from
-  # whenever main last went green: check on Node 24, the tests again on Node 22,
-  # and `pnpm coverage` with its 100% threshold. Coverage is the part the
-  # release job's own `pnpm check` does not cover — `check` runs the tests
-  # uninstrumented — so without this a release could ship below the line CI
-  # holds every other day.
+  # whenever main last went green: the gate on Node 24, and `pnpm coverage`
+  # with its 100% threshold. Coverage is the part the release job's own
+  # `pnpm check` does not cover — `check` runs the tests uninstrumented — so
+  # without this a release could ship below the line CI holds every other day.
   #
   # `secrets: inherit` is for the Codecov upload inside it; nothing else there
   # reads a secret, and the job cannot see the npm environment's.
