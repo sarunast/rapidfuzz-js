@@ -18,6 +18,15 @@ const long = similarPairs(100, 128)
 const veryLong = similarPairs(20, 512)
 const huge = similarPairs(5, 4096)
 const dissimilar = pairs(words(200, 32))
+// The shape the shared profile is deliberately slower on: one gram repeated
+// thousands of times is one trie node whose count is walked up, where a
+// serialized-key map would have hit a single hash slot. Kept as its own case so
+// that trade — much less prepared memory for this — is a number rather than a
+// claim, and so a future trie change has to say what it does to it.
+const repetitive = Array.from({ length: 5 }, (_value, index) => {
+  const letter = String.fromCharCode(0x61 + index)
+  return [letter.repeat(4096), `${letter.repeat(4095)}b`]
+})
 // Lengths alone put these out of reach of a high cutoff, which is the case the
 // gram-count bound exists to answer without building either trie.
 const lengthSkewed = words(100, 512, 0x0ba7_d101).map((value, index) =>
@@ -63,6 +72,9 @@ describe('diceSimilarity', () => {
   measure('4096 chars, similar', () => {
     for (const [a, b] of huge) diceSimilarity(a, b)
   })
+  measure('4096 chars, one repeated gram', () => {
+    for (const [a, b] of repetitive) diceSimilarity(a, b)
+  })
   measure('trigrams, 128 chars, similar', () => {
     for (const [a, b] of long) trigrams.score(a, b)
   })
@@ -95,6 +107,9 @@ describe('cosineSimilarity', () => {
   })
   measure('4096 chars, similar', () => {
     for (const [a, b] of huge) cosineSimilarity(a, b)
+  })
+  measure('4096 chars, one repeated gram', () => {
+    for (const [a, b] of repetitive) cosineSimilarity(a, b)
   })
 })
 
