@@ -1,0 +1,92 @@
+name: Docs
+
+# Publishes the Starlight site in docs/ to GitHub Pages.
+#
+# The trigger is the *published release* rather than the tag that produced it.
+# Release.yml already turns a `v*` tag into a GitHub release, so the chain is
+#
+#   git push origin v0.9.0  →  Release  →  release published  →  Docs
+#
+# which means the site goes out only after the tagged commit passed CI and the
+# package actually reached npm. Triggering on the tag directly would race that:
+# the docs would advertise a version npm had not accepted yet, and a failed
+# publish would leave the two disagreeing with no way back but a manual rebuild.
+#
+# `workflow_dispatch` is the escape hatch, for a docs-only fix that should not
+# wait for a release and for the first deploy. It reads the branch or tag chosen
+# in the "Run workflow" dropdown, so a rebuild of an older release means picking
+# that tag there.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one part-way: a half-uploaded artifact
+# would still be promoted by the deploy job. `cancel-in-progress: false` differs
+# from ci.yml deliberately — there, a superseded run is waste; here it is a
+# half-published site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write # promote the uploaded artifact to the live site
+  id-token: write # deploy-pages authenticates over OIDC, not a token
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The docs project builds its API reference from ../src, and TypeDoc
+      # writes a "Defined in" link per symbol from the *tracked* path — so the
+      # working tree it reads has to be a real checkout, not a tarball.
+      - uses: pnpm/action-setup@v6
+
+      # docs/ has no packageManager field of its own; the action above reads the
+      # root package.json and pins the same pnpm the library uses. Adding one to
+      # docs/package.json looks tidier and is not: it makes pnpm re-verify the
+      # lockfile against its supply-chain policy before every script, so a
+      # dependency published in the last day fails `pnpm build` outright.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: docs/pnpm-lock.yaml
+
+      # docs/ is its own pnpm project with its own lockfile — it is not a
+      # workspace member of the library. It also builds without the root's
+      # node_modules or dist: `rapidfuzz-js` is a `link:..` dependency, and
+      # tsconfig.typedoc.json resolves every public subpath to ../src rather
+      # than to the built declarations. So there is nothing to install or build
+      # at the root, and adding it would only be a slower way to reach the same
+      # artifact.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+        working-directory: docs
+
+      - name: Build
+        run: pnpm build
+        working-directory: docs
+
+      # The version badge in the header comes from the root package.json, which
+      # is why this reads the checkout rather than the registry: on a release
+      # run the checkout is the tagged commit, so the badge and the release
+      # agree by construction.
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Pages exposes the deployed URL through this environment; it also gives the
+    # repository a place to require a reviewer before the site changes.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
