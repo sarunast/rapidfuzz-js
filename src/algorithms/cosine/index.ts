@@ -63,8 +63,9 @@ export const distance: BuiltInMetric<
  * Two things surprise people arriving from elsewhere. This is the dot product
  * of the frequency vectors, not the intersection-count formula
  * `|A ∩ B| / √(|A| · |B|)` — Otsuka-Ochiai — that several packages publish
- * under the name; the two agree only when no gram repeats. And a repeated gram
- * dominates, as the second line above shows.
+ * under the name; the two always agree when no gram repeats, and can part
+ * company once one does. And a repeated gram dominates, as the second line
+ * above shows.
  *
  * Prefer `dice.similarity` when scoring a query against many candidates: Dice
  * bounds its score from gram counts and rejects a hopeless candidate without

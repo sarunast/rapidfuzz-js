@@ -40,8 +40,9 @@ If you are porting a threshold from another library, check these before
 trusting it:
 
 - **Multiset, not set.** A gram occurring three times on one side and twice on
-  the other contributes two. `('banana', 'bananas')` is `0.909091`; a
-  set-based Dice answers `0.857143`.
+  the other contributes `min(3, 2) = 2` to the overlap sum, and so four to the
+  numerator above it. `('banana', 'bananas')` is `0.909091`; a set-based Dice
+  answers `0.857143`.
 - **No padding.** Nothing is added at the ends, so `aba` and `bab` have the
   same bigram bag and score `1`. Implementations that wrap each input in guard
   characters answer `0.5`.
@@ -70,7 +71,8 @@ Bigrams are forgiving and generic. Larger grams demand longer runs of exact
 agreement, which sharpens a long-text comparison and makes short inputs
 collapse to `0` — a trigram scorer cannot see anything in common between two
 five-letter words that differ in the middle. A `gramSize` below `1`, or one
-that is not an integer, is a `RangeError`.
+that is not a _safe_ integer, is a `RangeError` — `1e300` is an integer, and a
+trie that deep is not a request anyone means.
 
 Not every sequence is text: elements are compared by identity, so
 `similarity([1, 2, 3], [1, 2, 4])` is `0.5`, and astral characters are
@@ -79,12 +81,18 @@ compared as whole code points rather than as surrogate halves.
 ## Searching with a threshold
 
 Dice carries an exact upper bound on its own score — `2 · min(gA, gB) / (gA +
-gB)`, computable from the two gram _counts_ alone. Under a threshold that
-rejects a candidate too long or too short to reach the cutoff **before either
-bag of grams is built**, which makes it markedly cheaper than
-[Cosine](/algorithms/cosine/) over a long candidate list: 100 length-skewed
-pairs at `threshold: 0.8` measure 0.005 ms here against 4.2 ms through
-Cosine, which has no such bound and builds both profiles every time.
+gB)` whenever either sequence has a gram, and the `0/0` case above when
+neither does — computable from the two gram _counts_ alone. Under a threshold
+that rejects a candidate too long or too short to reach the cutoff **before
+either bag of grams is built**, which makes it markedly cheaper than
+[Cosine](/algorithms/cosine/): 100 length-skewed pairs at `threshold: 0.8`
+measure 0.005 ms here against 4.2 ms through Cosine, which has no such bound
+and builds both profiles every time.
+
+That saving is a property of scoring a pair. Passing raw text to `search` does
+not get it: each candidate is turned into a profile as it is read, before the
+bound is in a position to reject it. Hand `search` prepared choices, or use a
+`Matcher`, when the candidates are long and the threshold is high.
 
 ```ts
 import { createScorer, search } from 'rapidfuzz-js'
