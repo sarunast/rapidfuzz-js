@@ -65,12 +65,32 @@ function rng(seed: number): () => number {
   }
 }
 
-const BINARY: readonly string[] = ['a', 'b']
 const LOWER: readonly string[] = [...'abcdefghijklmnopqrstuvwxyz']
 
-type CorpusClass = 'alphabet-2' | 'alphabet-26' | 'zipf-words'
+/**
+ * `alphabet-<k>` is uniform text over `k` letters, and `k` is the dial that
+ * moves the predictor: with `k` letters there are `k ** gramSize` possible
+ * grams, so a bigger alphabet spreads the corpus over more, shorter posting
+ * lists. The sweep exists because the first round measured only 2 and 26, which
+ * left the whole middle of the range — where the index stops paying — unmeasured.
+ */
+type CorpusClass = `alphabet-${number}` | 'zipf-words'
 
 const CORPUS_CLASSES: readonly CorpusClass[] = ['alphabet-2', 'alphabet-26', 'zipf-words']
+
+const SWEEP_CLASSES: readonly CorpusClass[] = [
+  'alphabet-3',
+  'alphabet-4',
+  'alphabet-5',
+  'alphabet-6',
+  'alphabet-8',
+  'alphabet-10',
+  'alphabet-12',
+  'alphabet-16',
+  'alphabet-20',
+  'alphabet-26',
+  'zipf-words',
+]
 
 type QueryClass =
   | 'exact hit'
@@ -205,9 +225,12 @@ function uniformCorpus(
 }
 
 function corpusOf(kind: CorpusClass, count: number, gramSize: number): Corpus {
-  if (kind === 'alphabet-2') return uniformCorpus(count, gramSize, BINARY, 0x2545_f491)
-  if (kind === 'alphabet-26') return uniformCorpus(count, gramSize, LOWER, 0x9e37_79b9)
-  return zipfCorpus(count, gramSize)
+  if (kind === 'zipf-words') return zipfCorpus(count, gramSize)
+  const letters = Number(kind.slice('alphabet-'.length))
+  if (!Number.isSafeInteger(letters) || letters < 2 || letters > LOWER.length) {
+    throw new RangeError(`alphabet size ${kind} is outside 2..${LOWER.length}`)
+  }
+  return uniformCorpus(count, gramSize, LOWER.slice(0, letters), 0x9e37_79b9)
 }
 
 // ---------------------------------------------------------------- index build
@@ -223,11 +246,18 @@ interface BuiltIndex {
  * construction. Handing prepared profiles to `add` would answer a different
  * question and answer it flatteringly.
  */
+let packedKeys = true
+let directBuild = false
+
 function buildIndex(choices: readonly string[], gramSize: number): BuiltIndex {
   const started = process.hrtime.bigint()
-  const index = new NGramIndex(gramSize, choices.length)
-  for (let id = 0; id < choices.length; id++) {
-    index.add(id, buildProfile(choices[id], gramSize))
+  const index = new NGramIndex(gramSize, choices.length, packedKeys)
+  if (directBuild) {
+    for (let id = 0; id < choices.length; id++) index.addSequence(id, choices[id])
+  } else {
+    for (let id = 0; id < choices.length; id++) {
+      index.add(id, buildProfile(choices[id], gramSize))
+    }
   }
   index.compact()
   return { index, buildMs: Number(process.hrtime.bigint() - started) / 1e6 }
@@ -532,6 +562,8 @@ interface CounterRow {
   readonly indexBuildMs: number
   readonly matcherBuildMs: number | null
   readonly gramVariety: number
+  readonly meanShare: number
+  readonly weightedShare: number
 }
 
 let counterThreshold = 0.5
@@ -553,6 +585,7 @@ function counterRows(
   built: BuiltIndex,
 ): CounterRow[] {
   const index = built.index
+  const statistics = index.postingStatistics()
   const runs = counterRuns(n)
   const rows: CounterRow[] = []
   for (const metric of METRICS) {
@@ -640,6 +673,8 @@ function counterRows(
         indexBuildMs: built.buildMs,
         matcherBuildMs,
         gramVariety: index.gramVariety(),
+        meanShare: statistics.meanShare,
+        weightedShare: statistics.weightedShare,
       })
     }
   }
@@ -724,10 +759,15 @@ interface Options {
   readonly gramSize: number | null
   readonly arm: Arm | null
   readonly threshold: number
+  readonly sweep: boolean
+  readonly packedKeys: boolean
+  readonly directBuild: boolean
 }
 
 function corpusClassOf(value: string): CorpusClass {
-  const found = CORPUS_CLASSES.find((candidate) => candidate === value)
+  const found = [...CORPUS_CLASSES, ...SWEEP_CLASSES].find(
+    (candidate) => candidate === value,
+  )
   if (found === undefined) throw new Error(`unknown corpus ${value}`)
   return found
 }
@@ -754,10 +794,18 @@ function parseOptions(): Options {
   let gramSize: number | null = null
   let arm: Arm | null = null
   let threshold = 0.5
+  let sweep = false
+  let packedKeys = true
+  let directBuild = false
   for (const argument of process.argv.slice(2)) {
     if (argument === '--parity') mode = 'parity'
     else if (argument === '--counters') mode = 'counters'
     else if (argument === '--memory') mode = 'memory'
+    else if (argument === '--sweep') sweep = true
+    else if (argument === '--build=direct') directBuild = true
+    else if (argument === '--build=profile') directBuild = false
+    else if (argument === '--keys=string') packedKeys = false
+    else if (argument === '--keys=packed') packedKeys = true
     else if (argument.startsWith('--max=')) max = numberOf(argument, '--max=')
     else if (argument.startsWith('--runs=')) runs = numberOf(argument, '--runs=')
     else if (argument.startsWith('--n=')) n = numberOf(argument, '--n=')
@@ -773,7 +821,19 @@ function parseOptions(): Options {
       arm = armOf(argument.slice('--arm='.length))
     } else throw new Error(`unknown argument ${argument}`)
   }
-  return { mode, max, runs, n, corpus, gramSize, arm, threshold }
+  return {
+    mode,
+    max,
+    runs,
+    n,
+    corpus,
+    gramSize,
+    arm,
+    threshold,
+    sweep,
+    packedKeys,
+    directBuild,
+  }
 }
 
 /**
@@ -787,6 +847,8 @@ function gramSizesFor(n: number): readonly number[] {
 
 const options = parseOptions()
 counterThreshold = options.threshold
+packedKeys = options.packedKeys
+directBuild = options.directBuild
 
 if (options.mode === 'parity') {
   await parity(options.runs)
@@ -800,7 +862,7 @@ if (options.mode === 'parity') {
   for (const n of SIZES) {
     if (n > options.max) continue
     if (options.n !== null && n !== options.n) continue
-    for (const corpusClass of CORPUS_CLASSES) {
+    for (const corpusClass of options.sweep ? SWEEP_CLASSES : CORPUS_CLASSES) {
       if (options.corpus !== null && corpusClass !== options.corpus) continue
       for (const gramSize of gramSizesFor(n)) {
         if (options.gramSize !== null && gramSize !== options.gramSize) continue
