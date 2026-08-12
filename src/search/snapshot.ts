@@ -33,6 +33,19 @@ export const MATCHER_OPTION_KEYS: readonly string[] = [
   'missingItems',
 ] as const satisfies readonly AnyMatcherOptionKey[]
 
+/**
+ * `getPrepared` is deliberately absent: a prepared handle is the per-choice
+ * representation an index replaces, so it is not an option of that constructor
+ * at all — refused by the type, and named by this list for a caller who reaches
+ * it from JavaScript.
+ */
+export const INDEXED_MATCHER_OPTION_KEYS: readonly string[] = [
+  'scorer',
+  'getText',
+  'normalize',
+  'missingItems',
+]
+
 export const BEST_OPTION_KEYS: readonly string[] = [
   'scorer',
   'getText',
