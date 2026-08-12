@@ -403,7 +403,7 @@ function checkCase(each: ParityCase): void {
 }
 
 const THRESHOLDS: readonly (number | null)[] = [null, 0, 0.5, 0.8, 1]
-const LIMITS: readonly (number | null)[] = [1, 3, null]
+const LIMITS: readonly (number | null)[] = [0, 1, 3, null]
 
 const FIXED_CORPORA: readonly (readonly string[])[] = [
   [],
@@ -564,6 +564,7 @@ interface CounterRow {
   readonly gramVariety: number
   readonly meanShare: number
   readonly weightedShare: number
+  readonly termWeightedShare: number
 }
 
 let counterThreshold = 0.5
@@ -675,6 +676,7 @@ function counterRows(
         gramVariety: index.gramVariety(),
         meanShare: statistics.meanShare,
         weightedShare: statistics.weightedShare,
+        termWeightedShare: statistics.termWeightedShare,
       })
     }
   }
