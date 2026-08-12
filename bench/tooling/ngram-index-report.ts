@@ -762,10 +762,99 @@ function smokeParity(config: ExperimentConfig): number {
   )
 }
 
+/**
+ * The `Uint16` id width is chosen at `choiceCount <= 0x1_0000`, and every
+ * corpus in the matrix above is small enough that only one side of that
+ * comparison is ever taken. A wrong bound there does not throw — it wraps an id
+ * and answers the wrong choice — so the two sizes either side of it are pinned
+ * directly, with the only match placed last so the largest id is the one that
+ * has to survive.
+ */
+function idWidthBoundary(): number {
+  let cases = 0
+  for (const choiceCount of [0x1_0000, 0x1_0001]) {
+    const choices: string[] = new Array(choiceCount).fill('')
+    const last = choiceCount - 1
+    choices[last] = 'abc'
+    for (const config of [
+      {
+        buildMode: 'direct',
+        keyMode: 'auto',
+        denseCutoff: DENSE_CUTOFF,
+        narrowIds: true,
+        narrowAccumulator: false,
+      },
+      {
+        buildMode: 'direct',
+        keyMode: 'auto',
+        denseCutoff: DENSE_CUTOFF,
+        narrowIds: true,
+        narrowAccumulator: true,
+      },
+    ] satisfies ExperimentConfig[]) {
+      const index = buildIndex(choices, 3, config).index
+      const found = index.diceBest(buildProfile('abc', 3), 0.5)
+      if (found === undefined || found.id !== last || found.score !== 1) {
+        throw new Error(
+          `id width boundary: ${choiceCount} choices answered ${JSON.stringify(found)}, expected id ${last} at score 1`,
+        )
+      }
+      cases++
+    }
+  }
+  return cases
+}
+
+/**
+ * "An index built narrow refuses Cosine" has to hold for every query shape or
+ * it is not a contract. A gramless query is answered before accumulation is
+ * reached, so guarding the loop alone left `cosineSearch('')` succeeding on an
+ * index that refused every other query.
+ */
+function narrowRefusesCosine(): number {
+  const config: ExperimentConfig = {
+    buildMode: 'direct',
+    keyMode: 'auto',
+    denseCutoff: DENSE_CUTOFF,
+    narrowIds: true,
+    narrowAccumulator: true,
+  }
+  const index = buildIndex(['abc', 'abcd', ''], 3, config).index
+  let cases = 0
+  for (const query of ['abc', '', 'a']) {
+    const profile = buildProfile(query, 3)
+    for (const call of [
+      () => index.cosineBest(profile, null),
+      () => index.cosineSearch(profile, null, 3),
+      () => index.cosineSearch(profile, 0.5, null),
+    ]) {
+      let refused = false
+      try {
+        call()
+      } catch (error) {
+        refused = error instanceof TypeError
+      }
+      if (!refused) {
+        throw new Error(`a narrow index answered Cosine for ${JSON.stringify(query)}`)
+      }
+      cases++
+    }
+  }
+  return cases
+}
+
 async function parity(runs: number): Promise<void> {
   const cases = fixedParity(CONFIGS, FIXED_CORPORA, FIXED_QUERIES)
   process.stdout.write(
     `${JSON.stringify({ kind: 'parity', mode: 'fixed', cases, configs: CONFIGS.length })}\n`,
+  )
+  process.stdout.write(
+    `${JSON.stringify({
+      kind: 'parity',
+      mode: 'boundary',
+      idWidth: idWidthBoundary(),
+      narrowCosine: narrowRefusesCosine(),
+    })}\n`,
   )
 
   const fc = await import('fast-check')

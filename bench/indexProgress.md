@@ -399,8 +399,21 @@ the accumulator for the time.
 Dice only. Cosine's dot product is bounded by `queryGrams × choiceGrams` rather
 than by the query alone, so a long query against a long choice can carry it past
 32 bits; an index built narrow refuses Cosine rather than wrapping into a wrong
-score. Dice's own condition — `query.gramCount ≤ 0x7fff_ffff` — is checked rather
+score — on the **entry points**, because a gramless query is answered before
+accumulation is reached and guarding the loop alone left `cosineSearch('')`
+succeeding on an index that refused every other query. A contract holds for
+every input shape or it is not one. Dice's own condition — `query.gramCount ≤ 0x7fff_ffff` — is checked rather
 than assumed, because its failure mode is a wrong answer, not a thrown error.
+
+Two regressions pin what the 241,920-case matrix structurally cannot. Every
+corpus in it is small, so only one side of `choiceCount <= 0x1_0000` is ever
+taken — and a wrong bound there does not throw, it wraps an id and answers the
+wrong choice. Corpora of exactly 65,536 and 65,537, with the only match placed
+last, are checked directly; mutating the bound to `<= 0x1_0001` reports
+`65537 choices answered undefined, expected id 65536`. The narrow-Cosine refusal
+is checked across gramless and gram-bearing queries for the same reason:
+restoring the guard to its old position inside `cosineAccumulate` reports
+`a narrow index answered Cosine for ""`.
 
 ### Skipping the unmodified candidates: measured, and it does not pay
 
