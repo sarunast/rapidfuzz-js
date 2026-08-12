@@ -1,6 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    // Load-bearing for `engines.node >= 22`: with no `types` and no runtime
+    // dependencies, this bound is the whole compatibility guarantee. A stdlib
+    // call newer than ES2022 cannot reach src/, and every Node from 18 up
+    // implements ES2022 — which is why CI does not also run the suite on the
+    // oldest supported Node. Raising this raises the floor in engines too.
     "lib": ["ES2022"],
     "module": "ESNext",
     "moduleResolution": "bundler",
