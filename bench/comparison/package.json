@@ -4,6 +4,7 @@
   "description": "Contenders for bench/comparison/run.mjs. Deliberately not root devDependencies: nothing in the library, the test suite or the baseline benchmarks needs them, so a contributor should not install six fuzzy-matching packages to run pnpm check. Install them here, on the one occasion the comparison is run.",
   "type": "module",
   "dependencies": {
+    "@leeoniya/ufuzzy": "1.0.19",
     "dice-coefficient": "2.1.1",
     "fast-dice-coefficient": "1.0.3",
     "fastest-levenshtein": "1.0.16",
