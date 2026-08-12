@@ -88,6 +88,12 @@ function missingSimilarityTop<TItem, TKey>(
  * Pass `getPrepared` instead of `getText` to supply handles you prepared
  * yourself, which are then resolved once here rather than prepared at all.
  *
+ * `searchIter` here is lazy in the strong sense: it scores in collection order
+ * as the iterator advances, so a caller who stops early pays only for what they
+ * consumed. That is a property of this constructor rather than of the
+ * {@link Matcher} interface — `createIndexedMatcher` returns the same values in
+ * the same order, having settled them before the first one.
+ *
  * @param items Array, `Map`, plain object or any iterable — the shape decides
  * what `key` is on every result this Matcher returns.
  * @returns A frozen {@link Matcher} exposing `best`, `search`, `searchIter`,
