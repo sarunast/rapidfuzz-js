@@ -18,35 +18,35 @@ import {
 } from './scorerSupport.js'
 
 /**
- * The type of a metric this package built, named by `Id`.
+ * The type of a metric this package built, named by `TId`.
  *
  * The name is the whole of the metric's identity, and it is the brand as-is:
  * the id literal is what makes a prepared choice belong to one metric and not
  * another, and a bare literal survives a consumer's declaration emit where a
- * wrapper type of ours could not be named. `Options` is what the metric itself
+ * wrapper type of ours could not be named. `TConfig` is what the metric itself
  * configures — the direction decides the rest, since `missing` is accepted by
  * a similarity and refused by a distance.
  */
 export type BuiltInMetric<
-  Id extends string,
-  D extends Direction,
-  Options extends object = NoConfiguration,
+  TId extends string,
+  TDirection extends Direction,
+  TConfig extends object = NoConfiguration,
 > = Metric<
-  D,
-  D extends 'similarity'
-    ? Options extends NoConfiguration
+  TDirection,
+  TDirection extends 'similarity'
+    ? TConfig extends NoConfiguration
       ? SimilarityConfiguration
-      : Options & SimilarityConfiguration
-    : Options,
-  Id
+      : TConfig & SimilarityConfiguration
+    : TConfig,
+  TId
 >
 
-interface BuiltInMetricOptions<D extends Direction> {
+interface BuiltInMetricOptions<TDirection extends Direction> {
   readonly implementation: ErasedMetricImplementation & PreparedCapability
   readonly directImplementation?:
     | ((a: MaybeSequence, b: MaybeSequence) => number)
     | undefined
-  readonly direction: D
+  readonly direction: TDirection
   readonly bounds: readonly [number, number]
   readonly configurationKeys?: readonly string[] | undefined
 }
@@ -64,9 +64,9 @@ function configurationObject(given: unknown): object {
   return given
 }
 
-function configurationRecord<D extends Direction>(
+function configurationRecord<TDirection extends Direction>(
   configuration: object,
-  direction: D,
+  direction: TDirection,
   configurationKeys: readonly string[],
 ): {
   readonly record: Readonly<Record<string, unknown>> & ScorerOptions
@@ -93,9 +93,11 @@ function configurationRecord<D extends Direction>(
   return { record, missing }
 }
 
-export function builtInMetric<D extends Direction, Config extends object, Brand>(
-  options: BuiltInMetricOptions<D>,
-): Metric<D, Config, Brand> {
+export function builtInMetric<
+  TDirection extends Direction,
+  TConfig extends object,
+  TBrand,
+>(options: BuiltInMetricOptions<TDirection>): Metric<TDirection, TConfig, TBrand> {
   // One per metric, shared by every scorer it compiles with default
   // configuration, so choices prepared by one such scorer are accepted by
   // another. A configured scorer gets its own below.
@@ -117,7 +119,7 @@ export function builtInMetric<D extends Direction, Config extends object, Brand>
       if (typeof b !== 'string') validateSequence(b)
       return implementation(a, b)
     })
-  const compile = (given: Config | undefined): MetricCompilation<D, Brand> => {
+  const compile = (given: TConfig | undefined): MetricCompilation<TDirection, TBrand> => {
     const { record: initial, missing } = configurationRecord(
       configurationObject(given),
       options.direction,

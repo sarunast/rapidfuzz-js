@@ -56,14 +56,32 @@ proof is visible — `filter((x) => x !== undefined)` narrows where
 read in the numeric DP loops under `src/algorithms/` would need a `!` or a
 `?? 0`. Turning it off removes the need for the assertion rather than hiding it.
 
+## Type parameters are named, and `T`-prefixed
+
+Every type parameter is a `T`-prefixed noun saying what it holds — `TItem`,
+`TKey`, `TDirection`, `TBrand`, `TConfig`, `TKind`, `TArray`, `TMetric`,
+`TScorer`. A bare letter is banned: these names surface in the published
+`.d.ts`, in editor tooltips and in the generated API reference, where `<T, D, B>`
+tells a consumer nothing.
+
 ## Type imports go at the top of the file
 
 `import type { Direction } from '../core/types.js'`, never inline as
 `import('../core/types.js').Direction` in a signature or annotation. Both erase
 to nothing, so this is about reading the file: the top-level form puts every
 dependency in one place and lets a rename be fixed once. No lint rule catches
-it. The `{@link import('./x.js').y}` spelling in JSDoc is a different thing and
-stays.
+it.
+
+## `{@link}` names a symbol, never a module path
+
+`{@link import('./tokenSort.js').tokenSortSimilarity}` does not resolve.
+TypeDoc renders it verbatim, so the published reference reads
+"The higher of import('./tokenSort.js').tokenSortSimilarity and …" — a relative
+path into our source, shown to someone who imported a package.
+
+Write `{@link name}` when the symbol is in the same file, and a plain
+`` `name` `` code span across modules. A code span is worth more than a broken
+link: the name is what a reader searches for, and the sidebar is one click away.
 
 ## Code speaks for itself
 
@@ -76,8 +94,43 @@ what a measurement found, what a non-obvious ordering protects, why the obvious
 simpler form is wrong. Two or three lines. Not the investigation that produced
 it — a date, a version and the conclusion carry that.
 
-**Types carry no comments unless asked for.** Behaviour a caller needs to know
-goes in README.md; a rule the compiler enforces needs no prose beside it.
+This governs the **inside** of a module. The public surface is the exception,
+and it is a hard requirement — see below.
+
+## Every public export carries a JSDoc block
+
+Everything the twelve entry points export — **functions, constants, types,
+interfaces, and the members of an interface** — is documented, with no
+exceptions. This is the opposite rule to the one above, and deliberately: an
+internal comment competes with a better name, while a `.d.ts` with no prose
+leaves a consumer nothing at all. It is what a reader sees on hover, and what
+the generated API reference renders.
+
+A block earns its place by carrying what the signature cannot:
+
+- **What it measures or does**, in one sentence a reader can act on.
+- **The scale**, whenever a number comes back — `0..100`, `0..1`, or a count.
+  A raw `similarity` is not a percentage and has to say so.
+- **A worked example** for anything with a choice to make. Take the numbers
+  from running the built package, never from memory; a wrong figure in a doc is
+  worse than no figure.
+- **`@throws` with the real error class.** `TypeError` and `RangeError` are not
+  interchangeable here — check which one the code actually raises.
+- **The trap.** Say where the export is the wrong tool: token-set containment
+  scoring a flat `100`, `bestMatch` returning the least-bad candidate without a
+  threshold. A reference that only lists strengths is how the wrong scorer gets
+  chosen.
+
+Two mechanical points, both of which have silently swallowed docs here:
+
+- On an **overloaded** function the block goes above the _first_ signature —
+  that is the one editors and TypeDoc read.
+- An **interface with documented properties is not a documented interface**.
+  Hovering the type name shows the block above `interface`, and nothing else.
+
+New exports arrive documented. To check the whole surface, read the emitted
+`dist/**/*.d.ts` rather than the sources: that is what a consumer compiles
+against, and it is where a lost or misplaced block shows up.
 
 ## Coverage is 100%, and that is enforced
 

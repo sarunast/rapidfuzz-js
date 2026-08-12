@@ -244,7 +244,14 @@ export function hammingEditops(
   return editopsFromValidated(ops, a.length, b.length)
 }
 
-/** {@link hammingEditops} expressed as blocks. */
+/**
+ * {@link hammingEditops} as contiguous ranges rather than single operations.
+ *
+ * Opcodes cover the whole of both inputs, including the `equal` stretches
+ * between edits, which is usually what a diff view or a highlighter wants —
+ * `editops` lists only the changes. The two convert into each other with
+ * `toEditops()` and `toOpcodes()`.
+ */
 export function hammingOpcodes(
   s1: Sequence,
   s2: Sequence,

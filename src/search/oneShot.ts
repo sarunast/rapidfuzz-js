@@ -32,11 +32,11 @@ import type {
  * scores against a query normalized some other way, which is the silent
  * mismatch that check exists to refuse.
  */
-function stableOptionsOf<T, D extends Direction, B>(
-  options: AnyMatcherOptions<T, D, B>,
-  scorer: ResolvedMatcherOptions<T, Direction, B>['scorer'],
+function stableOptionsOf<TItem, TDirection extends Direction, TBrand>(
+  options: AnyMatcherOptions<TItem, TDirection, TBrand>,
+  scorer: ResolvedMatcherOptions<TItem, Direction, TBrand>['scorer'],
   normalize: Normalizer | undefined,
-): ResolvedMatcherOptions<T, Direction, B> {
+): ResolvedMatcherOptions<TItem, Direction, TBrand> {
   return {
     scorer,
     getText: options.getText,
@@ -61,19 +61,19 @@ function qualifies(
   )
 }
 
-function worse<T, K>(
+function worse<TItem, TKey>(
   direction: Direction,
-  left: ScoredEntry<T, K>,
-  right: ScoredEntry<T, K>,
+  left: ScoredEntry<TItem, TKey>,
+  right: ScoredEntry<TItem, TKey>,
 ): boolean {
   if (left.score !== right.score) return better(direction, right.score, left.score)
   return left.order > right.order
 }
 
-function orderedResults<T, K>(
+function orderedResults<TItem, TKey>(
   direction: Direction,
-  entries: ScoredEntry<T, K>[],
-): readonly Match<T, K>[] {
+  entries: ScoredEntry<TItem, TKey>[],
+): readonly Match<TItem, TKey>[] {
   entries.sort((a, b) => {
     const byScore = direction === 'similarity' ? b.score - a.score : a.score - b.score
     return byScore || a.order - b.order
@@ -81,7 +81,7 @@ function orderedResults<T, K>(
   return entries.map(({ item, key, score }) => ({ item, key, score }))
 }
 
-function arrayItemsOf<T>(items: Items<T>): readonly T[] | null {
+function arrayItemsOf<TItem>(items: Items<TItem>): readonly TItem[] | null {
   return Array.isArray(items) ? items : null
 }
 
@@ -93,36 +93,66 @@ function arrayItemsOf<T>(items: Items<T>): readonly T[] | null {
 // finish is a different question than this one.
 const STREAM_PREPARE_AFTER = 8
 
-export function bestMatch<T, D extends Direction, B>(
+/**
+ * The single best match for a query, or `undefined` when nothing clears the
+ * threshold — the "did you mean?" shape.
+ *
+ * ```ts
+ * bestMatch('new york jet', teams, { scorer, threshold: 70 })
+ * // { item: 'New York Jets', key: 1, score: 72 }
+ * ```
+ *
+ * Always set a threshold. "Best" otherwise means *best available*, so a query
+ * with no real match still returns whichever choice is least unlike it — which
+ * is how suggestion features end up proposing nonsense.
+ *
+ * Prepares every choice on every call, which is the right trade for a one-off
+ * question and the wrong one for a search box: build a `Matcher` when you can
+ * name a second query, or pass `getPrepared` to reuse handles you hold. The
+ * scan stops early once a choice hits the scorer's best possible score, since
+ * nothing later can beat it.
+ *
+ * @param query Compared against every choice. Normalized by `normalize` first,
+ * if given.
+ * @param items Array, `Map`, plain object or any iterable — the shape decides
+ * what `key` is on the result.
+ * @returns The winning {@link Match}, or `undefined` if the collection is empty
+ * or nothing clears the threshold.
+ * @throws `TypeError` for an unknown option key, for both `getText` and
+ * `getPrepared` at once, for an item the scorer's missing policy refuses, or
+ * for a prepared handle from an incompatible scorer.
+ * @throws `RangeError` if `threshold` is not a finite number.
+ */
+export function bestMatch<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: readonly T[],
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): Match<T, number> | undefined
-export function bestMatch<K, T, D extends Direction, B>(
+  items: readonly TItem[],
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): Match<TItem, number> | undefined
+export function bestMatch<TKey, TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: ReadonlyMap<K, T>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): Match<T, K> | undefined
-export function bestMatch<T, D extends Direction, B>(
+  items: ReadonlyMap<TKey, TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): Match<TItem, TKey> | undefined
+export function bestMatch<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: ItemIterable<T>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): Match<T, number> | undefined
-export function bestMatch<T, D extends Direction, B>(
+  items: ItemIterable<TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): Match<TItem, number> | undefined
+export function bestMatch<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: Readonly<Record<string, T>>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): Match<T, string> | undefined
-export function bestMatch<T, D extends Direction, B>(
+  items: Readonly<Record<string, TItem>>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): Match<TItem, string> | undefined
+export function bestMatch<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: Items<T>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): Match<T, unknown> | undefined
-export function bestMatch<T, D extends Direction, B>(
+  items: Items<TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): Match<TItem, unknown> | undefined
+export function bestMatch<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: Items<T>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): Match<T, unknown> | undefined {
+  items: Items<TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): Match<TItem, unknown> | undefined {
   assertOptionKeys(options, BEST_OPTION_KEYS, 'bestMatch')
   // Argument shape is checked before any semantic exit: an impossible
   // threshold must not turn an invalid collection into an empty result.
@@ -139,12 +169,12 @@ export function bestMatch<T, D extends Direction, B>(
  * key list that does not include `limit`, which is the one key that call is
  * certain to carry.
  */
-function bestOfCollection<T, D extends Direction, B>(
+function bestOfCollection<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: Items<T>,
-  options: AnyMatcherOptions<T, D, B>,
+  items: Items<TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand>,
   threshold: number | null,
-): Match<T, unknown> | undefined {
+): Match<TItem, unknown> | undefined {
   const scorer = options.scorer
   const compilation = scorerCompilation(scorer)
   const normalize = options.normalize
@@ -196,7 +226,7 @@ function bestOfCollection<T, D extends Direction, B>(
       ? compilation.bounds[1]
       : compilation.bounds[0]
     : null
-  let found: Match<T, unknown> | undefined
+  let found: Match<TItem, unknown> | undefined
   let cutoff = activeThreshold
 
   if (arrayItems !== null) {
@@ -229,31 +259,59 @@ function bestOfCollection<T, D extends Direction, B>(
   return found
 }
 
-export function search<T, D extends Direction, B>(
+/**
+ * A ranked list of matches, best first — autocomplete dropdowns and results
+ * pages.
+ *
+ * ```ts
+ * search('new york', teams, { scorer, threshold: 60, limit: 2 })
+ * // [ { item: 'New York Jets', key: 1, score: 68.4 },
+ * //   { item: 'New York Giants', key: 2, score: 68.4 } ]
+ * ```
+ *
+ * The two options compose: `threshold` decides what deserves to appear at all,
+ * `limit` how many you show. Ties keep the order the collection had.
+ *
+ * Use {@link searchIter} when you want to stop early instead of ranking
+ * everything, and {@link bestMatch} when one winner is enough.
+ *
+ * @param query Compared against every choice.
+ * @param items Array, `Map`, plain object or any iterable — the shape decides
+ * what `key` is on each result.
+ * @returns Up to `limit` {@link Match} results, best first. Empty when nothing
+ * clears the threshold. `limit` defaults to `5`; `null` returns every
+ * qualifying match.
+ * @throws `TypeError` for an unknown option key, for both `getText` and
+ * `getPrepared` at once, for an item the scorer's missing policy refuses, or
+ * for a prepared handle from an incompatible scorer.
+ * @throws `RangeError` if `threshold` is not finite, or `limit` is negative or
+ * not an integer.
+ */
+export function search<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: readonly T[],
-  options: AnyMatcherOptions<T, D, B> & SearchOptions,
-): readonly Match<T, number>[]
-export function search<K, T, D extends Direction, B>(
+  items: readonly TItem[],
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & SearchOptions,
+): readonly Match<TItem, number>[]
+export function search<TKey, TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: ReadonlyMap<K, T>,
-  options: AnyMatcherOptions<T, D, B> & SearchOptions,
-): readonly Match<T, K>[]
-export function search<T, D extends Direction, B>(
+  items: ReadonlyMap<TKey, TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & SearchOptions,
+): readonly Match<TItem, TKey>[]
+export function search<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: ItemIterable<T>,
-  options: AnyMatcherOptions<T, D, B> & SearchOptions,
-): readonly Match<T, number>[]
-export function search<T, D extends Direction, B>(
+  items: ItemIterable<TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & SearchOptions,
+): readonly Match<TItem, number>[]
+export function search<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: Readonly<Record<string, T>>,
-  options: AnyMatcherOptions<T, D, B> & SearchOptions,
-): readonly Match<T, string>[]
-export function search<T, D extends Direction, B>(
+  items: Readonly<Record<string, TItem>>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & SearchOptions,
+): readonly Match<TItem, string>[]
+export function search<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: Items<T>,
-  options: AnyMatcherOptions<T, D, B> & SearchOptions,
-): readonly Match<T, unknown>[] {
+  items: Items<TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & SearchOptions,
+): readonly Match<TItem, unknown>[] {
   assertOptionKeys(options, SEARCH_OPTION_KEYS, 'search')
   // Argument shape is checked before any semantic exit: `limit: 0` must not
   // excuse an invalid collection or a non-finite threshold.
@@ -284,7 +342,7 @@ export function search<T, D extends Direction, B>(
   if (normalized === null) {
     const score = compilation.score(query, '', threshold)
     if (!qualifies('similarity', score, threshold)) return []
-    const results: Match<T, unknown>[] = []
+    const results: Match<TItem, unknown>[] = []
     if (arrayItems !== null) {
       for (let key = 0; key < arrayItems.length; key++) {
         const item = arrayItems[key]
@@ -315,9 +373,11 @@ export function search<T, D extends Direction, B>(
     : threshold
 
   const prepared = compilation.prepareQuery(normalized)
-  const results: ScoredEntry<T, unknown>[] = []
-  const heapWorse = (left: ScoredEntry<T, unknown>, right: ScoredEntry<T, unknown>) =>
-    worse(compilation.direction, left, right)
+  const results: ScoredEntry<TItem, unknown>[] = []
+  const heapWorse = (
+    left: ScoredEntry<TItem, unknown>,
+    right: ScoredEntry<TItem, unknown>,
+  ) => worse(compilation.direction, left, right)
   // Once a full heap holds nothing but optimal scores, later candidates can
   // only tie, and a tie loses on order — so the scan is finished. The Matcher
   // drivers stop on the same condition.
@@ -383,36 +443,70 @@ export function search<T, D extends Direction, B>(
   return orderedResults(compilation.direction, results)
 }
 
-export function searchIter<T, D extends Direction, B>(
+/**
+ * Every qualifying match, streamed lazily in **collection order** rather than
+ * by score — which is why it takes no `limit`.
+ *
+ * Candidates are pulled one at a time, so stopping early leaves the rest
+ * unscored. Pair it with a generator to run cheap guards before any scoring:
+ *
+ * ```ts
+ * for (const match of searchIter(query, plausible(query), {
+ *   scorer,
+ *   getPrepared: (row) => row.prepared,
+ *   threshold: 80,
+ * })) {
+ *   return match // the rest of the collection is never guarded or scored
+ * }
+ * ```
+ *
+ * Two things to know when the source is a generator: `key` counts what was
+ * *yielded*, so filtering renumbers it and you should carry your own id on the
+ * item; and a generator is consumed once, so call the generator function per
+ * query rather than reusing its result.
+ *
+ * Use {@link search} when you need results ranked, and {@link bestMatch} when
+ * you want the highest-scoring one rather than the first acceptable one.
+ *
+ * @param query Compared against every choice.
+ * @param items Array, `Map`, plain object or any iterable, pulled on demand.
+ * @returns An iterator of {@link Match} in collection order, yielding only what
+ * clears the threshold.
+ * @throws `TypeError` for an unknown option key — note `limit` is not one of
+ * them — for both `getText` and `getPrepared` at once, for an item the scorer's
+ * missing policy refuses, or for a prepared handle from an incompatible scorer.
+ * @throws `RangeError` if `threshold` is not a finite number.
+ */
+export function searchIter<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: readonly T[],
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): IterableIterator<Match<T, number>>
-export function searchIter<K, T, D extends Direction, B>(
+  items: readonly TItem[],
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): IterableIterator<Match<TItem, number>>
+export function searchIter<TKey, TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: ReadonlyMap<K, T>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): IterableIterator<Match<T, K>>
-export function searchIter<T, D extends Direction, B>(
+  items: ReadonlyMap<TKey, TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): IterableIterator<Match<TItem, TKey>>
+export function searchIter<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: ItemIterable<T>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): IterableIterator<Match<T, number>>
-export function searchIter<T, D extends Direction, B>(
+  items: ItemIterable<TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): IterableIterator<Match<TItem, number>>
+export function searchIter<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: Readonly<Record<string, T>>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): IterableIterator<Match<T, string>>
-export function searchIter<T, D extends Direction, B>(
+  items: Readonly<Record<string, TItem>>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): IterableIterator<Match<TItem, string>>
+export function searchIter<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: Items<T>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): IterableIterator<Match<T, unknown>>
-export function searchIter<T, D extends Direction, B>(
+  items: Items<TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): IterableIterator<Match<TItem, unknown>>
+export function searchIter<TItem, TDirection extends Direction, TBrand>(
   query: MaybeSequence,
-  items: Items<T>,
-  options: AnyMatcherOptions<T, D, B> & BestOptions,
-): IterableIterator<Match<T, unknown>> {
+  items: Items<TItem>,
+  options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
+): IterableIterator<Match<TItem, unknown>> {
   // Call options and collection shape are read and checked here, so a caller
   // who mutates their options object before iterating cannot change a search
   // already asked for, and a wrong threshold, scorer, collection or
@@ -442,14 +536,14 @@ export function searchIter<T, D extends Direction, B>(
   )
 }
 
-function* iterateMatches<T>(
+function* iterateMatches<TItem>(
   query: MaybeSequence,
-  items: Items<T>,
+  items: Items<TItem>,
   compilation: MetricCompilation<Direction>,
-  choices: ChoiceReader<T>,
+  choices: ChoiceReader<TItem>,
   normalize: Normalizer | undefined,
   threshold: number | null,
-): IterableIterator<Match<T, unknown>> {
+): IterableIterator<Match<TItem, unknown>> {
   const normalized = normalizeQuery(query, normalize)
   const arrayItems = arrayItemsOf(items)
 

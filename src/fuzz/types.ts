@@ -8,6 +8,13 @@
 import type { MaybeSequence } from '../algorithms/shared/scorerSupport.js'
 import type { SimilarityConfiguration } from '../core/types.js'
 
+/**
+ * What every fuzz scorer accepts through `createScorer`.
+ *
+ * Only the missing-value policy: the fuzz family has no tuning knobs, because
+ * each scorer *is* the strategy — you pick a different export rather than
+ * configure this one.
+ */
 export type FuzzConfiguration = SimilarityConfiguration
 
 /**

@@ -1,11 +1,11 @@
 import type { DriverMatch, RawPreparedScore, StoredItem } from './types.js'
 
-export function bestDistance<T, K>(
-  items: readonly StoredItem<T, K>[],
+export function bestDistance<TItem, TKey>(
+  items: readonly StoredItem<TItem, TKey>[],
   score: RawPreparedScore,
   threshold: number | null,
   optimal: number | null,
-): DriverMatch<T, K> | undefined {
+): DriverMatch<TItem, TKey> | undefined {
   // The winner is carried as the stored entry it already is, so a run of
   // improvements allocates one result rather than one per improvement.
   //
@@ -13,7 +13,7 @@ export function bestDistance<T, K>(
   // custom metric may return the sentinel as a real score, and a bare
   // `value < bestScore` would then select nothing. The sentinel is only here
   // to mirror `bestSimilarity`.
-  let best: StoredItem<T, K> | undefined
+  let best: StoredItem<TItem, TKey> | undefined
   let bestScore = Number.POSITIVE_INFINITY
   let cutoff = threshold
   for (let index = 0; index < items.length; index++) {

@@ -22,20 +22,40 @@ function normalizeInputs(
   return values.map((value) => normalizeSequence(validateSequence(value), normalize))
 }
 
-export function scorePairs<D extends Direction>(
+/**
+ * Score two sequences element-wise — `queries[i]` against `choices[i]`.
+ *
+ * ```ts
+ * scorePairs(['cat', 'dog'], ['cats', 'dogs'], { scorer })
+ * // Float64Array [85.71…, 85.71…]
+ * ```
+ *
+ * The element-wise counterpart to {@link scoreMatrix}: use this when the two
+ * arrays are already paired up, and the matrix when you need the cross product.
+ * Both write into one typed array with no per-score allocation.
+ *
+ * @param queries One side of each pair.
+ * @param choices The other side, positionally matched.
+ * @returns One score per index, in the element type `into` names.
+ * @throws `TypeError` for an unknown option key, or for an operand that is not
+ * a valid sequence.
+ * @throws `RangeError` if the two arrays are different lengths, or if a score
+ * does not fit the `into` element type.
+ */
+export function scorePairs<TDirection extends Direction>(
   queries: readonly Sequence[],
   choices: readonly Sequence[],
-  options: BatchOptions<D, 'f64'>,
+  options: BatchOptions<TDirection, 'f64'>,
 ): Float64Array
-export function scorePairs<D extends Direction, K extends ScoreArrayKind>(
+export function scorePairs<TDirection extends Direction, TKind extends ScoreArrayKind>(
   queries: readonly Sequence[],
   choices: readonly Sequence[],
-  options: BatchOptions<D, K> & { readonly into: K },
-): ScoreArrayOf[K]
-export function scorePairs<D extends Direction>(
+  options: BatchOptions<TDirection, TKind> & { readonly into: TKind },
+): ScoreArrayOf[TKind]
+export function scorePairs<TDirection extends Direction>(
   queries: readonly Sequence[],
   choices: readonly Sequence[],
-  options: BatchOptions<D, ScoreArrayKind>,
+  options: BatchOptions<TDirection, ScoreArrayKind>,
 ): ScoreArray {
   assertOptionKeys(options, BATCH_OPTION_KEYS, 'scorePairs')
   if (queries.length !== choices.length) {

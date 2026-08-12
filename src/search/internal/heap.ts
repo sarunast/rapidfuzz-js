@@ -1,10 +1,10 @@
 /** Whether `left` should be closer to the heap root than `right`. */
-export type HigherPriority<T> = (left: T, right: T) => boolean
+export type HigherPriority<TItem> = (left: TItem, right: TItem) => boolean
 
-export function pushHeap<T>(
-  heap: T[],
-  value: T,
-  higherPriority: HigherPriority<T>,
+export function pushHeap<TItem>(
+  heap: TItem[],
+  value: TItem,
+  higherPriority: HigherPriority<TItem>,
 ): void {
   let child = heap.length
   heap.push(value)
@@ -19,10 +19,10 @@ export function pushHeap<T>(
 }
 
 /** Replaces the root of a non-empty heap and restores the heap invariant. */
-export function replaceHeapRoot<T>(
-  heap: T[],
-  value: T,
-  higherPriority: HigherPriority<T>,
+export function replaceHeapRoot<TItem>(
+  heap: TItem[],
+  value: TItem,
+  higherPriority: HigherPriority<TItem>,
 ): void {
   let parent = 0
   const length = heap.length

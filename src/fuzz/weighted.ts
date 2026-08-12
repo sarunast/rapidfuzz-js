@@ -153,9 +153,39 @@ export const wRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(wRatio_impl, FUZZ_FLAGS, prepareFuzz('wRatio'))
 
 /**
+ * Picks the strategies that suit the pair, scales each by how much it can be
+ * trusted for those lengths, and reports the best result, `0..100`.
+ *
+ * The adaptive one, and the right default. It always computes `similarity` as a
+ * base, then picks what else to try from the ratio of the two lengths:
+ *
+ * - **below 1.5** — the inputs are comparable, so it also tries
+ *   `tokenSimilarity`, scaled by `0.95`. With no whitespace on either side there
+ *   are no tokens to reorder, and it stops at the base.
+ * - **1.5 and above** — one side is much longer, so it tries `partialSimilarity`
+ *   and `partialTokenSimilarity` instead, scaled by `0.9` — or by `0.6` once the
+ *   longer side is more than eight times the shorter, where a best window means
+ *   much less.
+ *
+ * The result is the **maximum**, not a consensus: the scale factors are what
+ * keep a broader strategy honest, since a partial match has to beat the
+ * whole-string score by more than a tenth before it can win.
+ *
+ * ```ts
+ * weightedSimilarity('smith john', 'john smith') // 95
+ * weightedSimilarity('new york jets', 'the new york jets play tonight') // 90
+ * weightedSimilarity('this is a test', 'this is a test!') // 96.55…
+ * ```
+ *
+ * Start here, look at the pairs it gets wrong on your data, and only pin a
+ * specific scorer once you can name the failure. What you give up is
+ * explainability: the number does not tell you which strategy produced it.
+ *
  * Two empty inputs score `0`, not `100` — FuzzyWuzzy's answer, kept by
  * RapidFuzz (issue 110). Whitespace-only inputs still have length, so those
  * reach the ordinary strategy and score `100`.
+ *
+ * RapidFuzz calls it `WRatio`.
  */
 export const weightedSimilarity: BuiltInMetric<'fuzz.weightedSimilarity', 'similarity'> =
   /* @__PURE__ */ fuzzMetric(wRatio)

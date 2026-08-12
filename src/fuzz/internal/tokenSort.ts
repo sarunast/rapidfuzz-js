@@ -8,13 +8,13 @@ import { sortedOf, tokenPair, tokenViewOf, type PreparedTokenChoice } from './to
  * `sortedPatternA` must build the masks of `sortedA` — the caller holding one
  * is the only way to know that, since a mask cannot be checked against the
  * sequence it came from. It is a thunk for the same reason
- * {@link import('./tokenSet.js').tokenRatioConverted} takes one: arguments are
- * evaluated before the callee runs, so a caller passing the built masks would
- * build them behind the cutoff guard below rather than in front of it.
+ * `tokenRatioConverted` takes one: arguments are evaluated before the callee
+ * runs, so a caller passing the built masks would build them behind the cutoff
+ * guard below rather than in front of it.
  *
- * It is scored through {@link indelNormSimHeld} rather than
- * {@link import('./partialWindow.js').ratioHeld} because the sorted forms are
- * built here and their lengths are already in hand; either way the arithmetic is
+ * It is scored through {@link indelNormSimHeld} rather than `ratioHeld`
+ * because the sorted forms are built here and their lengths are already in
+ * hand; either way the arithmetic is
  * `indelNormSimRange`'s with the LCS kernel swapped, which is what keeps a
  * prepared query from disagreeing with an unprepared one in the last ULP.
  */

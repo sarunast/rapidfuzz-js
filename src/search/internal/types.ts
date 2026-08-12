@@ -1,10 +1,10 @@
-export interface StoredItem<T, K> {
-  readonly item: T
-  readonly key: K
+export interface StoredItem<TItem, TKey> {
+  readonly item: TItem
+  readonly key: TKey
   readonly prepared: unknown
 }
 
-export type DriverMatch<T, K> = Match<T, K>
+export type DriverMatch<TItem, TKey> = Match<TItem, TKey>
 
 export interface RawPreparedScore {
   /** Returns the actual score when it qualifies; pruning may return only a miss. */

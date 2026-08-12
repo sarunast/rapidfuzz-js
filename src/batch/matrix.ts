@@ -86,20 +86,48 @@ function fill(
   }
 }
 
-export function scoreMatrix<D extends Direction>(
+/**
+ * Score every query against every choice, into one typed array.
+ *
+ * ```ts
+ * const matrix = scoreMatrix(['cat', 'dog'], ['cats', 'dogs'], { scorer })
+ * matrix.at(0, 1) // score('cat', 'dogs')
+ * matrix.data // row-major Float64Array, rows * cols long
+ * ```
+ *
+ * An `R × C` matrix costs `R + C` preparations rather than `R × C`: each query
+ * is prepared once for its row and each choice once for its column. Scores are
+ * written straight into the store, so no result object is allocated per pair.
+ *
+ * A symmetric scorer over identical inputs is scored once per unordered pair
+ * and mirrored.
+ *
+ * Use this when you want the whole grid of numbers. When the question is
+ * "which choices match best", that is a search — `bestMatch` or `search` —
+ * which can prune with a threshold instead of scoring everything.
+ *
+ * @param queries Rows of the matrix.
+ * @param choices Columns of the matrix.
+ * @returns A {@link ScoreMatrix} view over the store: `at(row, col)`,
+ * `toArray()`, and row-wise iteration, all over `data` without copying.
+ * @throws `TypeError` for an unknown option key, or for an operand that is not
+ * a valid sequence.
+ * @throws `RangeError` if a score does not fit the `into` element type.
+ */
+export function scoreMatrix<TDirection extends Direction>(
   queries: readonly Sequence[],
   choices: readonly Sequence[],
-  options: BatchOptions<D, 'f64'>,
+  options: BatchOptions<TDirection, 'f64'>,
 ): ScoreMatrix<Float64Array>
-export function scoreMatrix<D extends Direction, K extends ScoreArrayKind>(
+export function scoreMatrix<TDirection extends Direction, TKind extends ScoreArrayKind>(
   queries: readonly Sequence[],
   choices: readonly Sequence[],
-  options: BatchOptions<D, K> & { readonly into: K },
-): ScoreMatrix<ScoreArrayOf[K]>
-export function scoreMatrix<D extends Direction>(
+  options: BatchOptions<TDirection, TKind> & { readonly into: TKind },
+): ScoreMatrix<ScoreArrayOf[TKind]>
+export function scoreMatrix<TDirection extends Direction>(
   queries: readonly Sequence[],
   choices: readonly Sequence[],
-  options: BatchOptions<D, ScoreArrayKind>,
+  options: BatchOptions<TDirection, ScoreArrayKind>,
 ): ScoreMatrix<ScoreArray> {
   assertOptionKeys(options, BATCH_OPTION_KEYS, 'scoreMatrix')
   // Configuration first, data second — the order `scorePairs` uses. Reaching

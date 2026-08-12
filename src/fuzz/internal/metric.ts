@@ -10,9 +10,9 @@ const BOUNDS: readonly [number, number] = [0, 100]
  * The two facts every fuzz metric shares: the direction, and the percentage
  * scale. Which metric it is stays with the declaration, in its type.
  */
-export function fuzzMetric<Config extends object, Brand>(
+export function fuzzMetric<TConfig extends object, TBrand>(
   implementation: MaybeSequenceMetricImplementation<FuzzOptions>,
-): Metric<'similarity', Config, Brand> {
+): Metric<'similarity', TConfig, TBrand> {
   return builtInMetric({
     implementation,
     direction: 'similarity',
