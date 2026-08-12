@@ -34,7 +34,8 @@ Two things about this definition surprise people arriving from elsewhere.
 **It is the dot product of the frequency vectors**, not the
 intersection-count formula `|A ∩ B| / sqrt(|A| · |B|)` — Otsuka-Ochiai — that
 several JavaScript and Python packages publish under the name "cosine". The
-two agree only when no gram repeats.
+two always agree when no gram repeats, and can part company once one does —
+though not always, since a profile scored against itself is `1` either way.
 
 **Repeats therefore dominate.** A gram occurring three times against twice
 contributes six, where Dice counts two. That is the whole difference between
@@ -65,7 +66,8 @@ import { similarity } from 'rapidfuzz-js/cosine'
 createScorer(similarity, { gramSize: 3 }).score('banana', 'bananas') // 0.926
 ```
 
-A `gramSize` below `1`, or one that is not an integer, is a `RangeError`.
+A `gramSize` below `1`, or one that is not a _safe_ integer, is a `RangeError`
+— `1e300` is an integer, and a trie that deep is not a request anyone means.
 Elements are compared by identity, so arrays of anything work and astral
 characters compare as whole code points.
 

@@ -150,8 +150,10 @@ Three further choices are worth knowing, because other implementations make
 them differently:
 
 - **Multiset, not set.** A gram occurring three times on one side and twice on
-  the other contributes two for Dice and six for Cosine. Dice on
-  `('banana', 'bananas')` is `0.909091`; a set-based Dice answers `0.857143`.
+  the other contributes `min(3, 2) = 2` to Dice's overlap sum — four to its
+  numerator, which is twice that — and `3 · 2 = 6` to Cosine's dot product.
+  Dice on `('banana', 'bananas')` is `0.909091`; a set-based Dice answers
+  `0.857143`.
 - **No padding.** Nothing is added at the ends, so `aba` and `bab` have the same
   bigram multiset and score `1`. Implementations that wrap each input in guard
   characters answer `0.5`.
@@ -183,10 +185,13 @@ A scorer left at the default and one written as `{ gramSize: 2 }` prepare
 interchangeable choices; a scorer at any other depth, or of the other metric,
 refuses theirs.
 
-Dice also carries an exact upper bound — `2 · min(gA, gB) / (gA + gB)` — that
-turns down a candidate on gram counts alone, before either profile is built.
-That makes it markedly cheaper than Cosine under a high threshold over a long
-candidate list. Cosine has no such bound.
+Dice also carries an exact upper bound — `2 · min(gA, gB) / (gA + gB)`, with
+the `0/0` case above standing in when neither sequence has a gram — that turns
+down a candidate on gram counts alone, before either profile is built. That
+makes it markedly cheaper than Cosine under a high threshold when scoring a
+pair. Cosine has no such bound. Note that a `search` over raw text profiles
+each candidate as it reads it, so the bound saves nothing there; prepared
+choices or a `Matcher` are what let it apply.
 
 The `fuzz` subpath is the exception: it exports similarity scorers only. Two
 of them are easy to mix up:
