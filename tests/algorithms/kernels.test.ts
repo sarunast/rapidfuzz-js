@@ -861,27 +861,42 @@ describe('the OSA kernel agrees with its dynamic program', () => {
     },
   )
 
-  // The property tests above draw their lengths at random, so which run crosses
-  // a word boundary changes with the seed. These widths are the boundaries
-  // themselves, held as a permanent oracle against the dynamic program.
-  it.each([31, 32, 33, 63, 64, 65, 97])(
-    'matches the dynamic program at %i elements, whatever the text length',
+  // The case above is the carry on its own. Here it has to survive the rest of
+  // the recurrence moving at the same time: the row carries `hp`/`hn` across the
+  // same boundary, and an insertion shifts the whole alignment out from under
+  // the transposition. Deterministic, so which run crosses a boundary does not
+  // depend on a seed the way the properties above do.
+  it.each([33, 64, 65, 96, 97, 128])(
+    'carries a transposition at %i elements with other edits in flight',
     (length) => {
-      const build = (n: number, seed: number): number[] => {
-        let state = (seed * 2_654_435_761) >>> 0
-        const out: number[] = []
-        for (let i = 0; i < n; i++) {
-          state = (Math.imul(state, 0x0001_9660) + 0x3c6e_f35f) >>> 0
-          out.push(97 + ((state >>> 8) % 3))
-        }
-        return out
-      }
+      // Strides coprime with their period, so no two adjacent elements are
+      // equal — a swap of two equal elements is not a transposition at all,
+      // and a generator that produced one would make this vacuous.
+      const builders = [
+        (i: number) => 97 + ((i * 3) % 5),
+        (i: number) => 97 + ((i * 3) % 4),
+      ]
 
-      for (const textLength of [1, length - 1, length, length + 1, length + 7]) {
-        for (const seed of [1, 2, 3]) {
-          const pattern = build(length, seed * 31)
-          const text = build(textLength, seed * 17 + 1)
-          expect(osaManyWords(pattern, text)).toBe(osaReference(pattern, text))
+      for (const build of builders) {
+        const pattern = Array.from({ length }, (_, i) => build(i))
+
+        for (const at of [31, 63, 95]) {
+          if (at + 1 >= length) continue
+          const swapped = pattern.slice()
+          swapped[at] = pattern[at + 1]
+          swapped[at + 1] = pattern[at]
+
+          const texts = [
+            swapped,
+            [...swapped.slice(0, 5), 120, ...swapped.slice(5)],
+            [...swapped.slice(0, at - 1), 121, ...swapped.slice(at)],
+            [...swapped.slice(0, at + 2), 122, ...swapped.slice(at + 3)],
+            swapped.slice(0, length - 1),
+            [...swapped, 123],
+          ]
+          for (const text of texts) {
+            expect(osaManyWords(pattern, text)).toBe(osaReference(pattern, text))
+          }
         }
       }
     },

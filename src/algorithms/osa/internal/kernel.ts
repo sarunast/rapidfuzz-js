@@ -306,7 +306,7 @@ export function osaPrepared(
       const matches = base < 0 ? 0 : masks[base + word]
 
       const transposed =
-        ((~d0 & matches) << 1) & previousMatches
+        (((~d0 & matches) << 1) | ((~d0Last & matchesLastWord) >>> 31)) & previousMatches
       const x = matches | hnCarry
       d0 = (((x & vp) + vp) ^ vp) | x | vn | transposed | 0
       let hp = vn | ~(d0 | vp)
