@@ -25,8 +25,27 @@ export class NGramProfile {
   ) {}
 }
 
+/**
+ * The two node shapes a fixed-depth builder knows it is making. Descending
+ * through one costs no null check, which is what lets the specialized builders
+ * below read a level without `childrenOf`.
+ */
+interface GramLeaf extends GramNode {
+  children: null
+  counts: Map<unknown, number>
+}
+
+interface GramBranch extends GramNode {
+  children: Map<unknown, GramLeaf>
+  counts: null
+}
+
 function emptyNode(): GramNode {
   return { children: null, counts: null }
+}
+
+function leafNode(): GramLeaf {
+  return { children: null, counts: new Map<unknown, number>() }
 }
 
 // `NaN !== NaN`, which is the element equality every other metric here uses,
@@ -35,6 +54,87 @@ function emptyNode(): GramNode {
 // `gramCount` and `squaredNorm`, so denominators and search bounds stay right.
 function isUnmatchable(element: unknown): boolean {
   return typeof element === 'number' && Number.isNaN(element)
+}
+
+/**
+ * Consecutive grams overlap in every element but one, so a fixed depth carries
+ * the window forward and reads each element once where the generic loop
+ * re-reads it `gramSize` times — and builds each node in its final shape
+ * rather than assigning into an empty one.
+ *
+ * `bench/ngram.bench.ts`: 1.25x on the direct comparisons at both depths,
+ * 1.09-1.12x on raw search, 1.82x on 4096 characters of one repeated gram, and
+ * no move on the prepared-choice cases — which build no profile in the
+ * measured loop, and are the control saying this is the builder. Construction
+ * timed on its own is only 8% of that, and the profiles are identical to the
+ * byte at 100k retained, so measure a change here through the bench rather
+ * than in a loop of your own.
+ */
+function bigramProfile(elements: ArrayLike<unknown>, gramCount: number): NGramProfile {
+  const children = new Map<unknown, GramLeaf>()
+  const root: GramBranch = { children, counts: null }
+  let first = elements[0]
+  let lastUnmatchable = isUnmatchable(first) ? 0 : -1
+  let squaredNorm = 0
+  for (let start = 0; start < gramCount; start++) {
+    const end = start + 1
+    const second = elements[end]
+    if (isUnmatchable(second)) lastUnmatchable = end
+    if (lastUnmatchable >= start) {
+      squaredNorm++
+      first = second
+      continue
+    }
+    let child = children.get(first)
+    if (child === undefined) {
+      child = leafNode()
+      children.set(first, child)
+    }
+    const counts = child.counts
+    const count = counts.get(second) ?? 0
+    squaredNorm += 2 * count + 1
+    counts.set(second, count + 1)
+    first = second
+  }
+  return new NGramProfile(2, gramCount, squaredNorm, root, null)
+}
+
+function trigramProfile(elements: ArrayLike<unknown>, gramCount: number): NGramProfile {
+  const children = new Map<unknown, GramBranch>()
+  const root: GramNode = { children, counts: null }
+  let first = elements[0]
+  let second = elements[1]
+  let lastUnmatchable = isUnmatchable(second) ? 1 : isUnmatchable(first) ? 0 : -1
+  let squaredNorm = 0
+  for (let start = 0; start < gramCount; start++) {
+    const end = start + 2
+    const third = elements[end]
+    if (isUnmatchable(third)) lastUnmatchable = end
+    if (lastUnmatchable >= start) {
+      squaredNorm++
+      first = second
+      second = third
+      continue
+    }
+    let child = children.get(first)
+    if (child === undefined) {
+      child = { children: new Map<unknown, GramLeaf>(), counts: null }
+      children.set(first, child)
+    }
+    const level = child.children
+    let grandchild = level.get(second)
+    if (grandchild === undefined) {
+      grandchild = leafNode()
+      level.set(second, grandchild)
+    }
+    const counts = grandchild.counts
+    const count = counts.get(third) ?? 0
+    squaredNorm += 2 * count + 1
+    counts.set(third, count + 1)
+    first = second
+    second = third
+  }
+  return new NGramProfile(3, gramCount, squaredNorm, root, null)
 }
 
 /**
@@ -52,10 +152,14 @@ export function profileOfElements(
   elements: ArrayLike<unknown>,
   gramSize: number,
 ): NGramProfile {
-  const root = emptyNode()
   const gramCount = elements.length - gramSize + 1
-  if (gramCount <= 0) return new NGramProfile(gramSize, 0, 0, root, elements)
+  if (gramCount <= 0) {
+    return new NGramProfile(gramSize, 0, 0, emptyNode(), elements)
+  }
+  if (gramSize === 2) return bigramProfile(elements, gramCount)
+  if (gramSize === 3) return trigramProfile(elements, gramCount)
 
+  const root = emptyNode()
   // Each element is tested once rather than once per window it appears in, so
   // a gram is skipped by comparing its start against the last one seen.
   let lastUnmatchable = -1
@@ -150,10 +254,11 @@ function dotCounts(a: GramNode, b: GramNode): number {
 /**
  * `Σ min(a_g, b_g)` over the grams the two profiles share.
  *
- * The two shallow depths get literal loops. The generic walk allocates three
- * stack arrays per comparison and a prepared search runs one comparison per
- * candidate, which measured 1.6x the specialized bigram loop over 100 queries
- * against 1000 prepared choices — and bigrams are the default.
+ * The three depths a caller asks for get literal loops. The generic walk
+ * allocates three stack arrays per comparison, which measured 1.6x the
+ * specialized bigram loop over 100 queries against 1000 prepared choices — and
+ * over prebuilt trigram profiles, at four lengths from 12 to 512 characters,
+ * 1.2-1.7x the literal trigram loop below.
  *
  * Deeper than that it is iterative over an explicit stack, not recursive:
  * `gramSize` is caller-supplied and equals the trie depth, so recursion would
@@ -168,6 +273,20 @@ export function sharedFrequency(a: NGramProfile, b: NGramProfile): number {
     for (const [element, childA] of childrenOf(a.root)) {
       const childB = childrenB.get(element)
       if (childB !== undefined) shared += sharedCounts(childA, childB)
+    }
+    return shared
+  }
+  if (gramSize === 3) {
+    const childrenB = childrenOf(b.root)
+    let shared = 0
+    for (const [first, childA] of childrenOf(a.root)) {
+      const childB = childrenB.get(first)
+      if (childB === undefined) continue
+      const levelB = childrenOf(childB)
+      for (const [second, grandchildA] of childrenOf(childA)) {
+        const grandchildB = levelB.get(second)
+        if (grandchildB !== undefined) shared += sharedCounts(grandchildA, grandchildB)
+      }
     }
     return shared
   }
@@ -216,6 +335,20 @@ export function dotProduct(a: NGramProfile, b: NGramProfile): number {
     for (const [element, childA] of childrenOf(a.root)) {
       const childB = childrenB.get(element)
       if (childB !== undefined) product += dotCounts(childA, childB)
+    }
+    return product
+  }
+  if (gramSize === 3) {
+    const childrenB = childrenOf(b.root)
+    let product = 0
+    for (const [first, childA] of childrenOf(a.root)) {
+      const childB = childrenB.get(first)
+      if (childB === undefined) continue
+      const levelB = childrenOf(childB)
+      for (const [second, grandchildA] of childrenOf(childA)) {
+        const grandchildB = levelB.get(second)
+        if (grandchildB !== undefined) product += dotCounts(grandchildA, grandchildB)
+      }
     }
     return product
   }
@@ -305,20 +438,44 @@ export interface FrequencyKernel {
   (choice: NGramProfile): number
 }
 
+/**
+ * A kernel that may stop early once `minimumShared` is out of reach, returning
+ * some count below it rather than the true intersection. Only a caller that
+ * would reject anything smaller may pass one — see `sharedFrequencyKernel`.
+ */
+export interface BoundedFrequencyKernel {
+  (choice: NGramProfile, minimumShared: number): number
+}
+
 interface FlatLevel {
   readonly firstKeys: unknown[]
   readonly secondKeys: unknown[][]
   readonly frequencies: number[][]
+  readonly remaining: Int32Array
 }
 
-function flattenUnigrams(query: NGramProfile): [unknown[], number[]] {
+/**
+ * `remaining[index]` is the frequency still to come from group `index` onward,
+ * so `shared + remaining[index]` is everything the walk could still reach.
+ * Summed from the inserted counts and never from `gramCount`: a gram holding
+ * `NaN` counts toward the latter and can never be matched.
+ */
+function remainingTotals(totals: readonly number[]): Int32Array {
+  const remaining = new Int32Array(totals.length + 1)
+  for (let index = totals.length - 1; index >= 0; index--) {
+    remaining[index] = remaining[index + 1] + totals[index]
+  }
+  return remaining
+}
+
+function flattenUnigrams(query: NGramProfile): [unknown[], number[], Int32Array] {
   const keys: unknown[] = []
   const frequencies: number[] = []
   for (const [element, count] of countsOf(query.root)) {
     keys.push(element)
     frequencies.push(count)
   }
-  return [keys, frequencies]
+  return [keys, frequencies, remainingTotals(frequencies)]
 }
 
 interface FlatTrigramLevel {
@@ -326,24 +483,29 @@ interface FlatTrigramLevel {
   readonly secondKeys: unknown[][]
   readonly thirdKeys: unknown[][][]
   readonly frequencies: number[][][]
+  readonly remaining: Int32Array
 }
 
 function flattenBigrams(query: NGramProfile): FlatLevel {
   const firstKeys: unknown[] = []
   const secondKeys: unknown[][] = []
   const frequencies: number[][] = []
+  const totals: number[] = []
   for (const [first, child] of childrenOf(query.root)) {
     const keys: unknown[] = []
     const counts: number[] = []
+    let total = 0
     for (const [second, count] of countsOf(child)) {
       keys.push(second)
       counts.push(count)
+      total += count
     }
     firstKeys.push(first)
     secondKeys.push(keys)
     frequencies.push(counts)
+    totals.push(total)
   }
-  return { firstKeys, secondKeys, frequencies }
+  return { firstKeys, secondKeys, frequencies, remaining: remainingTotals(totals) }
 }
 
 function flattenTrigrams(query: NGramProfile): FlatTrigramLevel {
@@ -351,16 +513,19 @@ function flattenTrigrams(query: NGramProfile): FlatTrigramLevel {
   const secondKeys: unknown[][] = []
   const thirdKeys: unknown[][][] = []
   const frequencies: number[][][] = []
+  const totals: number[] = []
   for (const [first, child] of childrenOf(query.root)) {
     const seconds: unknown[] = []
     const thirds: unknown[][] = []
     const counts: number[][] = []
+    let total = 0
     for (const [second, grandchild] of childrenOf(child)) {
       const keys: unknown[] = []
       const values: number[] = []
       for (const [third, count] of countsOf(grandchild)) {
         keys.push(third)
         values.push(count)
+        total += count
       }
       seconds.push(second)
       thirds.push(keys)
@@ -370,18 +535,41 @@ function flattenTrigrams(query: NGramProfile): FlatTrigramLevel {
     secondKeys.push(seconds)
     thirdKeys.push(thirds)
     frequencies.push(counts)
+    totals.push(total)
   }
-  return { firstKeys, secondKeys, thirdKeys, frequencies }
+  return {
+    firstKeys,
+    secondKeys,
+    thirdKeys,
+    frequencies,
+    remaining: remainingTotals(totals),
+  }
 }
 
-export function sharedFrequencyKernel(query: NGramProfile): FrequencyKernel {
+/**
+ * The intersection above, plus the one bound the gram counts cannot express:
+ * candidates of the query's own length have an upper bound of 1 however little
+ * they share, so only what the walk has found so far can turn them down.
+ * `shared + remaining[index]` is everything still reachable, and a rising search
+ * cutoff makes that fail sooner the longer the search runs.
+ *
+ * `bench/ngram.bench.ts`, over 2000 same-length candidates: 1.12-1.20x on
+ * `search` with a limit and a threshold, and nothing worse anywhere — the
+ * `bounded` flag exists for that second half, since an unlimited search asks for
+ * no minimum and must not pay a load per group to be told so. `bestMatch` over
+ * the same candidates gains 0-7%: it starts at no cutoff and only raises one as
+ * it goes, so the bound arrives late.
+ */
+export function sharedFrequencyKernel(query: NGramProfile): BoundedFrequencyKernel {
   const gramSize = query.gramSize
   if (gramSize === 1) {
-    const [keys, frequencies] = flattenUnigrams(query)
-    return (choice) => {
+    const [keys, frequencies, remaining] = flattenUnigrams(query)
+    return (choice, minimumShared) => {
       const counts = countsOf(choice.root)
+      const bounded = minimumShared > 0
       let shared = 0
       for (let index = 0; index < keys.length; index++) {
+        if (bounded && shared + remaining[index] < minimumShared) return shared
         const other = counts.get(keys[index])
         if (other !== undefined) {
           const mine = frequencies[index]
@@ -392,11 +580,13 @@ export function sharedFrequencyKernel(query: NGramProfile): FrequencyKernel {
     }
   }
   if (gramSize === 2) {
-    const { firstKeys, secondKeys, frequencies } = flattenBigrams(query)
-    return (choice) => {
+    const { firstKeys, secondKeys, frequencies, remaining } = flattenBigrams(query)
+    return (choice, minimumShared) => {
       const children = childrenOf(choice.root)
+      const bounded = minimumShared > 0
       let shared = 0
       for (let index = 0; index < firstKeys.length; index++) {
+        if (bounded && shared + remaining[index] < minimumShared) return shared
         const child = children.get(firstKeys[index])
         if (child === undefined) continue
         const counts = countsOf(child)
@@ -414,11 +604,14 @@ export function sharedFrequencyKernel(query: NGramProfile): FrequencyKernel {
     }
   }
   if (gramSize === 3) {
-    const { firstKeys, secondKeys, thirdKeys, frequencies } = flattenTrigrams(query)
-    return (choice) => {
+    const { firstKeys, secondKeys, thirdKeys, frequencies, remaining } =
+      flattenTrigrams(query)
+    return (choice, minimumShared) => {
       const children = childrenOf(choice.root)
+      const bounded = minimumShared > 0
       let shared = 0
       for (let index = 0; index < firstKeys.length; index++) {
+        if (bounded && shared + remaining[index] < minimumShared) return shared
         const child = children.get(firstKeys[index])
         if (child === undefined) continue
         const level = childrenOf(child)

@@ -5,7 +5,7 @@ import {
 import { similarity as cosineMetric } from '../src/algorithms/cosine/index.js'
 import { diceDistance, diceSimilarity } from '../src/algorithms/dice/implementation.js'
 import { similarity as diceMetric } from '../src/algorithms/dice/index.js'
-import { createMatcher, createScorer, search } from '../src/index.js'
+import { bestMatch, createMatcher, createScorer, search } from '../src/index.js'
 import { pairs, similarPairs, words } from './tooling/corpus.js'
 import { describe, measure } from './tooling/harness.js'
 
@@ -36,10 +36,20 @@ const lengthSkewed = words(100, 512, 0x0ba7_d101).map((value, index) =>
 const choices = words(1_000, 12)
 const query = 'abcdefghijkl'
 const queries = words(100, 12, 0x1357_9bdf)
+// Same length as the query and unrelated to it, so the gram-count bound is 1
+// for every one of them and only the score itself can reject a candidate. This
+// is the shape a content-aware bound would have to earn its branch on.
+const sameLength = words(2_000, 12, 0x0f1e_2d3c)
+// The other side of the same question: a short query against long choices,
+// where the bound rejects on gram counts alone but a raw search has already
+// built the candidate's trie to find them.
+const longChoices = words(1_000, 512, 0x0ba7_d101)
+const shortQuery = 'abcdefghijklmnopqrstuvwxyzabcdef'
 
 const scorer = createScorer(diceMetric)
 const cosine = createScorer(cosineMetric)
 const trigrams = createScorer(diceMetric, { gramSize: 3 })
+const cosineTrigrams = createScorer(cosineMetric, { gramSize: 3 })
 const matcher = createMatcher(choices, { scorer })
 // What the prepared-choice cases measure against the raw ones: the profile of
 // every candidate built once, held by the caller.
@@ -51,6 +61,11 @@ const preparedCosineChoices = choices.map((text) => ({
 // the query kernel flattens; everything deeper walks both tries per candidate.
 const preparedTrigramChoices = choices.map((text) => ({
   prepared: trigrams.prepareChoice(text),
+}))
+// The two trigram kernels duplicate their hot loops on purpose, so each needs
+// its own case: one can regress without touching the other.
+const preparedCosineTrigramChoices = choices.map((text) => ({
+  prepared: cosineTrigrams.prepareChoice(text),
 }))
 
 // Every case below inlines its own loop rather than calling one shared helper,
@@ -116,6 +131,9 @@ describe('cosineSimilarity', () => {
   measure('4096 chars, one repeated gram', () => {
     for (const [a, b] of repetitive) cosineSimilarity(a, b)
   })
+  measure('trigrams, 128 chars, similar', () => {
+    for (const [a, b] of long) cosineTrigrams.score(a, b)
+  })
 })
 
 describe('cosineDistance', () => {
@@ -179,6 +197,20 @@ describe('dice search', () => {
       })
     }
   })
+  // A rising cutoff is the only thing rejecting anything here: every candidate
+  // is the query's length, so the gram-count bound is 1 throughout.
+  measure('bestMatch, 2000 same-length choices', () => {
+    bestMatch(query, sameLength, { scorer })
+  })
+  measure('limit 5, 2000 same-length choices, threshold 0.5', () => {
+    search(query, sameLength, { scorer, limit: 5, threshold: 0.5 })
+  })
+  // What the gram-count bound cannot save on a raw search: it rejects on the
+  // counts alone, but `prepareChoice` has built the candidate's trie before the
+  // kernel ever sees it.
+  measure('32-char query, 1000 raw 512-char choices, threshold 0.8', () => {
+    search(shortQuery, longChoices, { scorer, limit: null, threshold: 0.8 })
+  })
 })
 
 describe('cosine search', () => {
@@ -192,6 +224,15 @@ describe('cosine search', () => {
     for (const each of queries) {
       search(each, preparedCosineChoices, {
         scorer: cosine,
+        limit: null,
+        getPrepared: (row) => row.prepared,
+      })
+    }
+  })
+  measure('trigrams, 100 queries, 1000 prepared choices', () => {
+    for (const each of queries) {
+      search(each, preparedCosineTrigramChoices, {
+        scorer: cosineTrigrams,
         limit: null,
         getPrepared: (row) => row.prepared,
       })

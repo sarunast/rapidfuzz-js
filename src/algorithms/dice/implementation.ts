@@ -9,7 +9,7 @@ import {
   sharedFrequencyKernel,
   validGramSize,
   zeroGramSimilarity,
-  type FrequencyKernel,
+  type BoundedFrequencyKernel,
   type NGramProfile,
 } from '../shared/ngram.js'
 import {
@@ -73,9 +73,23 @@ function directSimilarity(
   return similarity >= scoreCutoff ? similarity : 0
 }
 
+/**
+ * A whole number of shared grams the kernel may stop below, so its loop tests
+ * integers rather than dividing per gram.
+ *
+ * Two short of the count the cutoff asks for, and deliberately: the product
+ * rounds either way, by far less than one gram but by enough that `Math.ceil`
+ * of it can land a step above the true boundary. Slack costs the walk one more
+ * group before it gives up; being a step too strict would reject a candidate
+ * that scored exactly at the cutoff.
+ */
+function relaxedShared(denominator: number, scoreCutoff: number): number {
+  return Math.ceil((scoreCutoff * denominator) / 2) - 2
+}
+
 function preparedSimilarity(
   a: NGramProfile,
-  shared: FrequencyKernel,
+  shared: BoundedFrequencyKernel,
   b: NGramProfile,
   scoreCutoff: number,
 ): number {
@@ -86,7 +100,13 @@ function preparedSimilarity(
     return similarity >= scoreCutoff ? similarity : 0
   }
   if (similarityBound(gramsA, gramsB) < scoreCutoff) return 0
-  const similarity = (2 * shared(b)) / (gramsA + gramsB)
+  const denominator = gramsA + gramsB
+  // Anything the kernel stops short of is below the cutoff, and the comparison
+  // below turns it into the same `0` the full walk would have produced. An
+  // unlimited search never asks for anything, and must not pay a division to
+  // be told so.
+  const minimumShared = scoreCutoff > 0 ? relaxedShared(denominator, scoreCutoff) : 0
+  const similarity = (2 * shared(b, minimumShared)) / denominator
   return similarity >= scoreCutoff ? similarity : 0
 }
 
@@ -94,7 +114,8 @@ function preparedSimilarity(
  * Sørensen-Dice similarity over n-gram frequencies, in `[0, 1]`.
  *
  * Multiset, not set: a gram occurring three times on one side and twice on the
- * other contributes two. No padding is added at the ends.
+ * other contributes `min(3, 2) = 2` to the shared count, and so four to the
+ * numerator. No padding is added at the ends.
  *
  * If the similarity is smaller than `scoreCutoff`, `0` is returned.
  */
