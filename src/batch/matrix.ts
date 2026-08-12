@@ -12,6 +12,8 @@ import {
   type ScoreArrayKind,
   type ScoreArrayOf,
   type ScoreMatrix,
+  scoreStoreRange,
+  unstorableScore,
 } from './scoreArray.js'
 import type { BatchOptions } from './types.js'
 
@@ -29,6 +31,7 @@ function fill(
   queries: readonly Sequence[],
   choices: readonly Sequence[],
   compilation: MetricCompilation<Direction>,
+  kind: ScoreArrayKind,
   store: ScoreArray,
   integral: boolean,
   symmetric: boolean,
@@ -36,6 +39,13 @@ function fill(
   multiplier: number,
 ): void {
   const rejected = rejectedScore(compilation, threshold, multiplier, integral)
+  // Read out of the tuple once: what the cell loop below can afford is a
+  // predictable test against three loop-invariant locals, which is what a
+  // scorer whose whole scaled range is provably storable then skips entirely.
+  const limit = scoreStoreRange(kind, compilation.bounds, multiplier)
+  const bounded = limit !== null
+  const lowest = limit === null ? 0 : limit[0]
+  const highest = limit === null ? 0 : limit[1]
   // After the rejection check, so an unusable one is still reported, and before
   // preparing the choices: with no rows there is no cell to score them for.
   if (queries.length === 0) return
@@ -66,6 +76,10 @@ function fill(
           : rejected
       const scaled = score * multiplier
       const stored = integral ? roundHalfAwayFromZero(scaled) : scaled
+      // Negated, so a `NaN` could not pass the way it passes a comparison.
+      if (bounded && !(stored >= lowest && stored <= highest)) {
+        unstorableScore(stored, kind, 'scoreMatrix')
+      }
       store[rowOffset + column] = stored
       if (symmetric && row !== column) store[column * columns + row] = stored
     }
@@ -114,6 +128,7 @@ export function scoreMatrix<D extends Direction>(
         normalizedQueries,
         normalizedChoices,
         compilation,
+        kind,
         data,
         integral,
         symmetric,

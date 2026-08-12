@@ -415,6 +415,72 @@ describe('batch scoring', () => {
     ).toEqual([[0, 5]])
   })
 
+  test('a score the element type cannot hold is refused rather than wrapped', () => {
+    const lengthGap = (left: MaybeSequence, right: MaybeSequence): number =>
+      Math.abs((left?.length ?? 0) - (right?.length ?? 0))
+    const unbounded = createScorer(lengthGap, {
+      direction: 'distance',
+      bounds: [0, Number.POSITIVE_INFINITY],
+      symmetric: true,
+    })
+    // An `Infinity` bound proves nothing, and rejecting the call on it would
+    // make every integer distance matrix illegal. What is actually stored is
+    // what decides.
+    expect([
+      ...scorePairs(['abc'], ['abcde'], { scorer: unbounded, into: 'u8' }),
+    ]).toEqual([2])
+    const long = 'a'.repeat(300)
+    for (const [entry, label] of [
+      [scoreMatrix, 'scoreMatrix'],
+      [scorePairs, 'scorePairs'],
+    ] as const) {
+      expect(() =>
+        Reflect.apply(entry, undefined, [
+          [''],
+          [long],
+          { scorer: unbounded, into: 'u8' },
+        ]),
+      ).toThrow(`${label} produced the score 300, which 'u8' cannot store`)
+      // The low end of the range is its own refusal, and a negative multiplier
+      // is the only way a score reaches it.
+      expect(() =>
+        Reflect.apply(entry, undefined, [
+          ['abc'],
+          ['abcde'],
+          { scorer: unbounded, into: 'u8', scoreMultiplier: -1 },
+        ]),
+      ).toThrow(`${label} produced the score -2, which 'u8' cannot store`)
+    }
+    // The multiplier is part of what has to fit: a 0..100 scorer is storable in
+    // a u8 at 1 and is not at 3.
+    const percent = createScorer((left, right) => (left === right ? 100 : 25), {
+      direction: 'similarity',
+      bounds: [0, 100],
+      symmetric: true,
+    })
+    expect([...scorePairs(['a'], ['a'], { scorer: percent, into: 'u8' })]).toEqual([100])
+    expect(() =>
+      scorePairs(['a'], ['a'], { scorer: percent, into: 'u8', scoreMultiplier: 3 }),
+    ).toThrow(RangeError)
+    expect(() =>
+      scorePairs(['a'], ['a'], { scorer: percent, into: 'u8', scoreMultiplier: -1 }),
+    ).toThrow(RangeError)
+    // Half a unit either way is enough to leave the range, since the score is
+    // rounded away from zero before it is stored.
+    expect(() =>
+      scorePairs(['a'], ['a'], { scorer: percent, into: 'u8', scoreMultiplier: 2.555 }),
+    ).toThrow(RangeError)
+    // `u8c` saturates by definition, which is how a caller asks for the lossy
+    // behaviour on purpose.
+    expect([
+      ...scorePairs(['a'], ['a'], { scorer: percent, into: 'u8c', scoreMultiplier: 3 }),
+    ]).toEqual([255])
+    // A float destination holds anything a metric can produce.
+    expect([
+      ...scorePairs(['a'], ['a'], { scorer: percent, into: 'f32', scoreMultiplier: 3 }),
+    ]).toEqual([300])
+  })
+
   test('an option a batch call does not define is refused rather than ignored', () => {
     const scorer = createScorer(levenshtein.normalizedSimilarity)
     // Misspelled, so the threshold it names is silently not applied — the

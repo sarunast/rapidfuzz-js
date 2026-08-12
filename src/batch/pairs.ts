@@ -10,6 +10,8 @@ import {
   type ScoreArray,
   type ScoreArrayKind,
   type ScoreArrayOf,
+  scoreStoreRange,
+  unstorableScore,
 } from './scoreArray.js'
 import type { BatchOptions } from './types.js'
 
@@ -52,6 +54,12 @@ export function scorePairs<D extends Direction>(
   const scores = allocateScores(kind, queries.length, 'scorePairs')
   const integral = kind !== 'f64' && kind !== 'f32'
   const rejected = rejectedScore(compilation, threshold, multiplier, integral)
+  // See `scoreStoreRange`: proven-storable scorers pay nothing, and everything
+  // else is tested against three locals the closure closes over.
+  const limit = scoreStoreRange(kind, compilation.bounds, multiplier)
+  const bounded = limit !== null
+  const lowest = limit === null ? 0 : limit[0]
+  const highest = limit === null ? 0 : limit[1]
   // One closure, with the invariant tests inside it. Choosing between two
   // closures — one that qualifies and one that cannot — measured 1.02-1.18x
   // *slower* over six pair workloads, worst on the custom-scorer case it was
@@ -65,7 +73,12 @@ export function scorePairs<D extends Direction>(
         ? score
         : rejected
     const scaled = thresholded * multiplier
-    return integral ? roundHalfAwayFromZero(scaled) : scaled
+    const stored = integral ? roundHalfAwayFromZero(scaled) : scaled
+    // Negated, so a `NaN` could not pass the way it passes a comparison.
+    if (bounded && !(stored >= lowest && stored <= highest)) {
+      unstorableScore(stored, kind, 'scorePairs')
+    }
+    return stored
   }
   const sameInput = Object.is(queries, choices)
   if (options.normalize === undefined) {

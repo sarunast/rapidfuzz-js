@@ -44,6 +44,15 @@ export type ScoreArray = ScoreArrayOf[ScoreArrayKind]
 interface ScoreArrayFactory<A extends ScoreArray> {
   /** Whether the store holds integers, so a score has to be rounded before it. */
   readonly integral: boolean
+  /**
+   * The scores the store keeps as written, or `null` when every score is one.
+   *
+   * `null` for the two float kinds, which hold any score a metric can produce,
+   * and for `u8c`: `Uint8ClampedArray` exists to saturate, so an out-of-range
+   * score there is the documented answer rather than a lost one. Every other
+   * kind wraps silently, which is what a bound turns into a `RangeError`.
+   */
+  readonly range: readonly [number, number] | null
   readonly allocate: (length: number) => A
   /** A row, sharing the buffer rather than copying it. */
   readonly view: (data: A, start: number, end: number) => A
@@ -66,46 +75,55 @@ const SCORE_ARRAYS: {
   readonly [K in ScoreArrayKind]: ScoreArrayFactory<ScoreArrayOf[K]>
 } = {
   f64: {
+    range: null,
     integral: false,
     allocate: (n) => new Float64Array(n),
     view: (d, s, e) => d.subarray(s, e),
   },
   f32: {
+    range: null,
     integral: false,
     allocate: (n) => new Float32Array(n),
     view: (d, s, e) => d.subarray(s, e),
   },
   i32: {
+    range: [-(2 ** 31), 2 ** 31 - 1],
     integral: true,
     allocate: (n) => new Int32Array(n),
     view: (d, s, e) => d.subarray(s, e),
   },
   i16: {
+    range: [-32768, 32767],
     integral: true,
     allocate: (n) => new Int16Array(n),
     view: (d, s, e) => d.subarray(s, e),
   },
   i8: {
+    range: [-128, 127],
     integral: true,
     allocate: (n) => new Int8Array(n),
     view: (d, s, e) => d.subarray(s, e),
   },
   u32: {
+    range: [0, 2 ** 32 - 1],
     integral: true,
     allocate: (n) => new Uint32Array(n),
     view: (d, s, e) => d.subarray(s, e),
   },
   u16: {
+    range: [0, 65535],
     integral: true,
     allocate: (n) => new Uint16Array(n),
     view: (d, s, e) => d.subarray(s, e),
   },
   u8: {
+    range: [0, 255],
     integral: true,
     allocate: (n) => new Uint8Array(n),
     view: (d, s, e) => d.subarray(s, e),
   },
   u8c: {
+    range: null,
     integral: true,
     allocate: (n) => new Uint8ClampedArray(n),
     view: (d, s, e) => d.subarray(s, e),
@@ -175,6 +193,52 @@ export function allocateScores<K extends ScoreArrayKind>(
 export function roundHalfAwayFromZero(value: number): number {
   const rounded = value < 0 ? -Math.round(-value) : Math.round(value)
   return rounded === 0 ? 0 : rounded
+}
+
+/**
+ * The bound every stored score has to be tested against, or `null` when none
+ * does.
+ *
+ * A store that cannot hold a score does not say so: an integer typed array
+ * wraps `300` written into a `u8` to `44`, which reads as a score. Refusing the
+ * *kind* up front on the scorer's bounds alone would be far too coarse — a
+ * Levenshtein distance is bounded by `Infinity` and is almost always a number a
+ * `u8` holds — so the range is proven where it can be and tested where it
+ * cannot.
+ *
+ * The proof is the two ends of `bounds`, scaled and rounded exactly as a score
+ * is: rounding is monotone, so the extremes stay the extremes. `Infinity`, a
+ * `NaN` from `Infinity * 0`, and anything else that fails a comparison fall
+ * through to the tested path rather than out of it. What the proof rests on is
+ * the scorer's own declaration — a metric returning scores outside the bounds
+ * it states is unchecked here, as it is everywhere else.
+ */
+export function scoreStoreRange(
+  kind: ScoreArrayKind,
+  bounds: readonly [number, number],
+  multiplier: number,
+): readonly [number, number] | null {
+  const { range } = scoreArrayFactory(kind)
+  if (range === null) return null
+  const low = roundHalfAwayFromZero(
+    Math.min(bounds[0] * multiplier, bounds[1] * multiplier),
+  )
+  const high = roundHalfAwayFromZero(
+    Math.max(bounds[0] * multiplier, bounds[1] * multiplier),
+  )
+  return low >= range[0] && high <= range[1] ? null : range
+}
+
+/** The refusal {@link scoreStoreRange}'s bound leads to, worded once. */
+export function unstorableScore(
+  value: number,
+  kind: ScoreArrayKind,
+  what: string,
+): never {
+  throw new RangeError(
+    `${what} produced the score ${value}, which '${kind}' cannot store: score ` +
+      `into a wider element type, or into 'u8c' to saturate instead`,
+  )
 }
 
 /**
