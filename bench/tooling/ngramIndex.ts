@@ -96,7 +96,16 @@ export interface IndexCounters {
 interface Postings {
   readonly ordinals: Map<string | number, number>
   readonly offsets: Uint32Array
-  readonly ids: Uint32Array
+  /**
+   * Narrowed to `Uint16` when the corpus fits, which is the largest single rung
+   * of the accumulation loop: the ids are read sequentially, one per posting
+   * entry, so halving them halves the loop's stream.
+   *
+   * One process must build at one width or the load site sees both element
+   * kinds and the measurement is of the mixture — the same reason `packedKeys`
+   * exists as a flag rather than a heuristic.
+   */
+  readonly ids: Uint16Array | Uint32Array
   readonly counts: Uint8Array | Uint16Array | Uint32Array | null
   /**
    * Which ordinals are stored inverted — `1` for a list whose slice holds the
@@ -460,12 +469,13 @@ export class NGramIndex {
   private readonly squaredNorm: Float64Array
   private readonly gramless: GramlessChoice[] = []
   /**
-   * Per-query scratch. `Float64Array` rather than an integer width: a single
-   * gram can repeat far more than a `Uint16Array` holds — 100k identical
-   * characters is a legal choice — and at 1M choices this is 8 MB with no
-   * accumulation-overflow question at all.
+   * Per-query scratch, 8 MB at a million choices. `Float64Array` by default
+   * because Cosine's dot product has no width that is obviously enough — a
+   * single gram can repeat far more than a `Uint16Array` holds, 100k identical
+   * characters being a legal choice. `narrowAccumulator` halves it for Dice,
+   * whose overlap is bounded by the query's own gram count.
    */
-  private readonly accumulator: Float64Array
+  private readonly accumulator: Int32Array | Float64Array
   private readonly touched: number[] = []
   /** Candidates that outlived the cheap prunes, reused across queries. */
   private readonly survivors: number[] = []
@@ -516,6 +526,25 @@ export class NGramIndex {
      * did before dense lists existed and what the A/B measures against.
      */
     private readonly denseCutoff: number | null = DENSE_CUTOFF,
+    /**
+     * Store posting ids in the narrowest word the corpus fits in. `false` keeps
+     * `Uint32Array` at every size, which is what the A/B measures against — and
+     * it has to be a flag rather than a size threshold alone, because a process
+     * that builds one index of each width measures neither.
+     */
+    private readonly narrowIds = true,
+    /**
+     * Hold Dice's shared counts in an `Int32Array` rather than a `Float64Array`.
+     * They are integral — a sum of `min(queryCount, choiceCount)` terms, less one
+     * per dense list — and bounded by the query's gram count, so the narrow word
+     * is exact up to a query of 2.1 billion grams.
+     *
+     * Dice only: Cosine's dot product is integral too but bounded by
+     * `queryGrams × choiceGrams`, which a long query against a long choice can
+     * carry past 32 bits. An index built this way refuses Cosine rather than
+     * quietly wrapping.
+     */
+    private readonly narrowAccumulator = false,
   ) {
     // A rung too wide for this depth overflows the safe-integer range in
     // `partial * radix + value`, and the loss of precision shows up as two grams
@@ -527,7 +556,9 @@ export class NGramIndex {
     this.radix = packedKeys ? (startRadix ?? feasibleRadices(gramSize)[0] ?? null) : null
     this.gramCount = new Uint32Array(choiceCount)
     this.squaredNorm = new Float64Array(choiceCount)
-    this.accumulator = new Float64Array(choiceCount)
+    this.accumulator = narrowAccumulator
+      ? new Int32Array(choiceCount)
+      : new Float64Array(choiceCount)
   }
 
   /**
@@ -747,7 +778,12 @@ export class NGramIndex {
     }
     const ordinals = new Map<string | number, number>()
     const offsets = new Uint32Array(builder.size + 1)
-    const ids = new Uint32Array(hybridTotal)
+    // A `Uint16` id holds 0…65,535, so a corpus of exactly 65,536 choices is the
+    // largest that fits.
+    const ids =
+      this.narrowIds && this.choiceCount <= 0x1_0000
+        ? new Uint16Array(hybridTotal)
+        : new Uint32Array(hybridTotal)
     const counts =
       widest <= 1
         ? null
@@ -854,6 +890,7 @@ export class NGramIndex {
     weightedShare: number
     termWeightedShare: number
     countsWidthBytes: number
+    idsWidthBytes: number
     maxCount: number
     singletonEntryShare: number
     singletonListShare: number
@@ -937,6 +974,7 @@ export class NGramIndex {
       termWeightedShare:
         termTotal === 0 ? 0 : termWeighted / termTotal / this.choiceCount,
       countsWidthBytes: counts === null ? 0 : counts.BYTES_PER_ELEMENT,
+      idsWidthBytes: postings.ids.BYTES_PER_ELEMENT,
       maxCount,
       singletonEntryShare: documentEntries === 0 ? 0 : singletonEntries / documentEntries,
       singletonListShare: distinctGrams === 0 ? 0 : singletonLists / distinctGrams,
@@ -1504,6 +1542,13 @@ export class NGramIndex {
     if (query.gramSize !== this.gramSize) {
       throw new TypeError('query gram size does not match the index')
     }
+    // Dice's overlap cannot exceed the query's own gram count, so this is the
+    // whole of the narrow accumulator's exactness condition. Unreachable for any
+    // real text — it is 2.1 billion grams — and stated rather than assumed,
+    // because the failure mode is a wrong score rather than a thrown error.
+    if (this.narrowAccumulator && query.gramCount > 0x7fff_ffff) {
+      throw new RangeError('query is too large for a narrow accumulator')
+    }
     this.requirePostings()
     const counters = this.counters
     counters.postingEntriesTouched = 0
@@ -1631,7 +1676,15 @@ export class NGramIndex {
     return false
   }
 
+  /**
+   * Cosine's dot product is bounded by `queryGrams × choiceGrams`, not by the
+   * query alone, so the narrow accumulator is not safe for it and this refuses
+   * rather than wrapping into a wrong score.
+   */
   private cosineAccumulate(): void {
+    if (this.narrowAccumulator) {
+      throw new TypeError('a narrow accumulator holds Dice only')
+    }
     const postings = this.requirePostings()
     const accumulator = this.accumulator
     const touched = this.touched

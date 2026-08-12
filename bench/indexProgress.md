@@ -91,6 +91,8 @@ directory of JSON output unattributable after the fact.
 | Dense postings — a list covering most of the corpus stores the exceptions                   | 1.83–2.30x on hit/typo; retained 4.77 MB → 3.81 MB                                          |
 | One selection kernel per metric, arithmetic in the loop rather than a callback              | select 0.1664 → 0.0467 ms (3.6x); end to end 1.41–1.92x                                     |
 | Generation marks dropped from both accumulation kernels                                     | 1.10–1.32x end to end, and 4 bytes per choice of scratch                                    |
+| `Uint16` posting ids when the corpus fits — no faster, kept for the bytes                   | retained 3.05 MB → 2.11 MB (31%); query 0.96–1.00x                                          |
+| `Int32` accumulator for Dice, which refuses Cosine                                          | **1.05–1.68x**; the accumulator rung goes from +0.0650 ms to nothing                        |
 
 ## Dense postings — store who does _not_ have the gram
 
@@ -350,6 +352,55 @@ statistic points the wrong way by 2.8x. The ceiling is 0.0055 ms on `exact hit`,
 zero on `common substring`, and 0.0015 ms on the class where every list
 qualifies. The index-wide `counts === null` split already banks the only case
 where this is free.
+
+### Narrowing the two streams: one wins, one does not, and they do not compose
+
+Both remaining candidates were width changes on the traffic the ladder had left,
+so both were run — separately, and then together, because two changes relieving
+the same pressure would show up as a `D` no better than the better of `B` and
+`C`. Four arms, each in its own processes so no load site sees two element kinds:
+
+| Dice, file-paths, 10k | A wide | B `Uint16` ids | C `Int32` acc | D both |   B/A |   C/A |   D/A |
+| --------------------- | -----: | -------------: | ------------: | -----: | ----: | ----: | ----: |
+| exact hit             | 0.1778 |         0.1777 |        0.1458 | 0.1513 | 1.00x | 1.22x | 1.17x |
+| 1 typo                | 0.2030 |         0.2040 |        0.1223 | 0.1212 | 1.00x | 1.66x | 1.68x |
+| 2 typos               | 0.1948 |         0.1966 |        0.1163 | 0.1158 | 0.99x | 1.67x | 1.68x |
+| common substring      | 0.0422 |         0.0437 |        0.0343 | 0.0343 | 0.96x | 1.23x | 1.23x |
+| rare substring        | 0.0413 |         0.0415 |        0.0349 | 0.0354 | 1.00x | 1.18x | 1.17x |
+
+**`Uint16` ids are worth nothing in time and 31% in memory.** The id stream is
+the largest rung at 36% of the loop, and halving its bytes moved nothing at all —
+because that rung is not bandwidth. It is sequential, prefetched, and what it
+costs is the loop: the iteration, the index, the load. Retained memory is the
+other story: **3.05 MB → 2.11 MB**, and the array is still exact for any corpus of
+65,536 choices or fewer.
+
+**An `Int32` accumulator is worth 1.05–1.68x.** The ladder says exactly where it
+comes from — the `+ accumulator update` rung, and it does not shrink, it
+_vanishes_:
+
+| rung                     | `Float64` |     `Int32` |
+| ------------------------ | --------: | ----------: |
+| + posting scan, ids only |   +0.0510 |     +0.0506 |
+| **+ accumulator update** |   +0.0650 | **−0.0039** |
+| + count load and min     |   +0.0192 |     +0.0271 |
+
+A random read-modify-write on a `Float64Array` is an int-to-double conversion, a
+double add, a double store and eight bytes; on an `Int32Array` it is an integer
+add on four, and it disappears into the loop that was already streaming ids. It
+is not a cache-size effect: at 100k on `zipf-words`, where the accumulator is
+800 KB against 400 KB and neither is close to fitting, it still measures
+1.05–1.44x.
+
+**They do not compose, because there is nothing to compose with** — `D ≈ C` on
+every class, since `B ≈ A`. Both are kept anyway: the ids for the 31% of memory,
+the accumulator for the time.
+
+Dice only. Cosine's dot product is bounded by `queryGrams × choiceGrams` rather
+than by the query alone, so a long query against a long choice can carry it past
+32 bits; an index built narrow refuses Cosine rather than wrapping into a wrong
+score. Dice's own condition — `query.gramCount ≤ 0x7fff_ffff` — is checked rather
+than assumed, because its failure mode is a wrong answer, not a thrown error.
 
 ### Skipping the unmodified candidates: measured, and it does not pay
 
@@ -666,12 +717,10 @@ Everything below stays deliberately unbuilt:
    0.0055 ms.
 3. **Delta-encoded ids.** Postings are sorted, so the gaps are small — but it
    costs the binary search, so only after the cheaper layout wins are banked.
-   The ladder makes the id stream the largest single rung, 36% of the loop, so
-   the two remaining credible layout experiments are both there: **`Uint16` ids
-   when `choiceCount ≤ 65536`**, halving 234 KB of sequential reads, and an
-   **`Int32` Dice accumulator**, halving 80 KB of random ones. Both are
-   width changes, both attack per-posting-entry traffic, and neither is worth
-   starting before the one above it is measured alone.
+   Both width experiments the ladder pointed at have now been run — see above.
+   The one that paid was the random stream, not the sequential one, which is the
+   reason to expect little here: delta coding shrinks a stream that halving did
+   nothing for.
 4. **`best()` bootstrap** — score the rarest gram's candidates first and use that
    as a cutoff, to get the early exit the exhaustive path has.
 5. **Cosine has no prefix filtering**; its threshold does not become a
