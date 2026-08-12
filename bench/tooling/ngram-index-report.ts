@@ -16,7 +16,7 @@ import { similarity as cosineMetric } from '../../src/algorithms/cosine/index.js
 import { similarity as diceMetric } from '../../src/algorithms/dice/index.js'
 import { buildProfile, NGramProfile } from '../../src/algorithms/shared/ngram.js'
 import { createMatcher, createScorer } from '../../src/index.js'
-import { NGramIndex, type Scored } from './ngramIndex.js'
+import { NGramIndex, type IndexCounters, type Scored } from './ngramIndex.js'
 
 type Metric = 'dice' | 'cosine'
 
@@ -316,6 +316,42 @@ function checkCase(each: ParityCase): void {
     )
   }
 
+  // The prefix-filtered path is held to the same standard as the full one: it
+  // skips posting lists, so the only thing that says it skipped the right ones
+  // is that the result is unchanged.
+  if (metric === 'dice') {
+    const filtered = index.dicePrefixSearch(profile, threshold, limit)
+    const sameFiltered =
+      expectedSearch.length === filtered.length &&
+      expectedSearch.every(
+        (entry, at) =>
+          entry.key === filtered[at].id && entry.score === filtered[at].score,
+      )
+    if (!sameFiltered) {
+      throw new Error(
+        `${label(each, 'search')} [prefix]\n  exhaustive: ${JSON.stringify(
+          expectedSearch.map((entry) => [entry.key, entry.score]),
+        )}\n  filtered:   ${JSON.stringify(filtered.map((entry) => [entry.id, entry.score]))}`,
+      )
+    }
+    const filteredBest = index.dicePrefixBest(profile, threshold)
+    const sameFilteredBest =
+      expectedBest === undefined
+        ? filteredBest === undefined
+        : filteredBest !== undefined &&
+          filteredBest.id === expectedBest.key &&
+          filteredBest.score === expectedBest.score
+    if (!sameFilteredBest) {
+      throw new Error(
+        `${label(each, 'best')} [prefix]\n  exhaustive: ${JSON.stringify(
+          expectedBest === undefined ? null : [expectedBest.key, expectedBest.score],
+        )}\n  filtered:   ${JSON.stringify(
+          filteredBest === undefined ? null : [filteredBest.id, filteredBest.score],
+        )}`,
+      )
+    }
+  }
+
   // The invariant every zero-fill rule rests on: with a query that has grams, a
   // positive score and a posting-list hit are the same event.
   if (profile.gramCount > 0) {
@@ -488,12 +524,17 @@ interface CounterRow {
   readonly candidatesQualified: number
   readonly indexedMs: number
   readonly exhaustiveMs: number | null
+  /** The prefix-filtered Dice path, where it applies; null for Cosine. */
+  readonly filteredMs: number | null
+  readonly filteredPostings: number | null
+  readonly filteredVerifyProbes: number | null
+  readonly filteredVerified: number | null
   readonly indexBuildMs: number
   readonly matcherBuildMs: number | null
   readonly gramVariety: number
 }
 
-const COUNTER_THRESHOLD = 0.5
+let counterThreshold = 0.5
 const COUNTER_LIMIT = 5
 /** Above this, a Matcher's profiles no longer fit beside the index. */
 const EXHAUSTIVE_LIMIT = 100_000
@@ -532,7 +573,7 @@ function counterRows(
         index,
         metric,
         buildProfile(query, gramSize),
-        COUNTER_THRESHOLD,
+        counterThreshold,
         COUNTER_LIMIT,
       )
       const counters = { ...index.counters }
@@ -541,7 +582,7 @@ function counterRows(
           index,
           metric,
           buildProfile(query, gramSize),
-          COUNTER_THRESHOLD,
+          counterThreshold,
           COUNTER_LIMIT,
         ),
       )
@@ -550,8 +591,25 @@ function counterRows(
         held === null
           ? null
           : timeMedian(runs, () =>
-              held.search(query, { limit: COUNTER_LIMIT, threshold: COUNTER_THRESHOLD }),
+              held.search(query, { limit: COUNTER_LIMIT, threshold: counterThreshold }),
             )
+      let filteredMs: number | null = null
+      let filteredCounters: IndexCounters | null = null
+      if (metric === 'dice') {
+        index.dicePrefixSearch(
+          buildProfile(query, gramSize),
+          counterThreshold,
+          COUNTER_LIMIT,
+        )
+        filteredCounters = { ...index.counters }
+        filteredMs = timeMedian(runs, () =>
+          index.dicePrefixSearch(
+            buildProfile(query, gramSize),
+            counterThreshold,
+            COUNTER_LIMIT,
+          ),
+        )
+      }
       rows.push({
         kind: 'counters',
         n,
@@ -572,6 +630,13 @@ function counterRows(
         candidatesQualified: counters.candidatesQualified,
         indexedMs,
         exhaustiveMs,
+        filteredMs,
+        filteredPostings:
+          filteredCounters === null ? null : filteredCounters.postingEntriesTouched,
+        filteredVerifyProbes:
+          filteredCounters === null ? null : filteredCounters.verifyProbes,
+        filteredVerified:
+          filteredCounters === null ? null : filteredCounters.verifiedCandidates,
         indexBuildMs: built.buildMs,
         matcherBuildMs,
         gramVariety: index.gramVariety(),
@@ -658,6 +723,7 @@ interface Options {
   readonly corpus: CorpusClass | null
   readonly gramSize: number | null
   readonly arm: Arm | null
+  readonly threshold: number
 }
 
 function corpusClassOf(value: string): CorpusClass {
@@ -687,6 +753,7 @@ function parseOptions(): Options {
   let corpus: CorpusClass | null = null
   let gramSize: number | null = null
   let arm: Arm | null = null
+  let threshold = 0.5
   for (const argument of process.argv.slice(2)) {
     if (argument === '--parity') mode = 'parity'
     else if (argument === '--counters') mode = 'counters'
@@ -695,13 +762,18 @@ function parseOptions(): Options {
     else if (argument.startsWith('--runs=')) runs = numberOf(argument, '--runs=')
     else if (argument.startsWith('--n=')) n = numberOf(argument, '--n=')
     else if (argument.startsWith('--gram=')) gramSize = numberOf(argument, '--gram=')
-    else if (argument.startsWith('--corpus=')) {
+    else if (argument.startsWith('--threshold=')) {
+      threshold = Number(argument.slice('--threshold='.length))
+      if (!(threshold > 0 && threshold <= 1)) {
+        throw new RangeError('--threshold must be inside (0, 1]')
+      }
+    } else if (argument.startsWith('--corpus=')) {
       corpus = corpusClassOf(argument.slice('--corpus='.length))
     } else if (argument.startsWith('--arm=')) {
       arm = armOf(argument.slice('--arm='.length))
     } else throw new Error(`unknown argument ${argument}`)
   }
-  return { mode, max, runs, n, corpus, gramSize, arm }
+  return { mode, max, runs, n, corpus, gramSize, arm, threshold }
 }
 
 /**
@@ -714,6 +786,7 @@ function gramSizesFor(n: number): readonly number[] {
 }
 
 const options = parseOptions()
+counterThreshold = options.threshold
 
 if (options.mode === 'parity') {
   await parity(options.runs)

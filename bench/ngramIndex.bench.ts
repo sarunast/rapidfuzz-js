@@ -170,6 +170,38 @@ describe('dice search, 10000 sentences', () => {
   })
 })
 
+// Prefix filtering walks only the query grams needed to prove a candidate could
+// reach the threshold, so what it saves grows with the threshold. Paired against
+// full accumulation on the same index, and against the exhaustive path, at the
+// two thresholds where the difference is worth seeing.
+describe('dice prefix filtering, 10000 choices', () => {
+  measure('full, 100 hits, threshold 0.8', () => {
+    for (const query of mediumQueries) {
+      mediumIndex.diceSearch(buildProfile(query, GRAM_SIZE), 0.8, 5)
+    }
+  })
+  measure('prefix, 100 hits, threshold 0.8', () => {
+    for (const query of mediumQueries) {
+      mediumIndex.dicePrefixSearch(buildProfile(query, GRAM_SIZE), 0.8, 5)
+    }
+  })
+  measure('exhaustive, 100 hits, threshold 0.8', () => {
+    for (const query of mediumQueries) {
+      mediumMatcher.search(query, { limit: 5, threshold: 0.8 })
+    }
+  })
+  measure('full, 100 sentences, threshold 0.8', () => {
+    for (const query of phraseQueries) {
+      phraseIndex.diceSearch(buildProfile(query, GRAM_SIZE), 0.8, 5)
+    }
+  })
+  measure('prefix, 100 sentences, threshold 0.8', () => {
+    for (const query of phraseQueries) {
+      phraseIndex.dicePrefixSearch(buildProfile(query, GRAM_SIZE), 0.8, 5)
+    }
+  })
+})
+
 // One query, not a hundred: the exhaustive arm is tens of milliseconds per
 // query at this size, and a hundred of them would make one sample longer than
 // the whole rest of the file.
@@ -179,6 +211,12 @@ describe('dice search, 100000 choices', () => {
   )
   measure('exhaustive, 1 query, threshold 0.5', () =>
     largeMatcher.search(oneQuery, { limit: 5, threshold: 0.5 }),
+  )
+  measure('full, 1 query, threshold 0.8', () =>
+    largeIndex.diceSearch(buildProfile(oneQuery, GRAM_SIZE), 0.8, 5),
+  )
+  measure('prefix, 1 query, threshold 0.8', () =>
+    largeIndex.dicePrefixSearch(buildProfile(oneQuery, GRAM_SIZE), 0.8, 5),
   )
 })
 
