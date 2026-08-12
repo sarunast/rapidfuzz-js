@@ -1074,7 +1074,7 @@ export class NGramIndex {
     if (query.gramCount === 0) return this.gramlessBest(query, threshold)
     flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
     this.diceAccumulate()
-    const found = this.selectBest((id) => this.diceScore(query, id), threshold)
+    const found = this.diceBestOf(query, threshold)
     this.reset()
     return found
   }
@@ -1089,7 +1089,10 @@ export class NGramIndex {
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
     flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
     this.diceAccumulate()
-    const found = this.select((id) => this.diceScore(query, id), threshold, limit)
+    const found =
+      limit === null
+        ? this.select(this.diceScorer(query), threshold, limit)
+        : this.fillZeroes(this.diceTop(query, threshold, limit), threshold, limit)
     this.reset()
     return found
   }
@@ -1158,7 +1161,7 @@ export class NGramIndex {
     if (query.gramCount === 0) return this.gramlessBest(query, threshold)
     flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
     this.cosineAccumulate()
-    const found = this.selectBest((id) => this.cosineScore(query, id), threshold)
+    const found = this.cosineBestOf(query, threshold)
     this.reset()
     return found
   }
@@ -1173,7 +1176,10 @@ export class NGramIndex {
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
     flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
     this.cosineAccumulate()
-    const found = this.select((id) => this.cosineScore(query, id), threshold, limit)
+    const found =
+      limit === null
+        ? this.select(this.cosineScorer(query), threshold, limit)
+        : this.fillZeroes(this.cosineTop(query, threshold, limit), threshold, limit)
     this.reset()
     return found
   }
@@ -1693,71 +1699,52 @@ export class NGramIndex {
   }
 
   /**
-   * A choice with no grams shares none with a query that has them, whatever the
-   * dense base says — and only these two functions can see that, because a
-   * gramless choice is in no posting list and the sparse representation
-   * therefore never reached one. Scanning every candidate does.
+   * The same arithmetic over locals rather than over `this`, built once per
+   * query and handed to selection.
+   *
+   * Four property loads per candidate is nothing while selection runs once per
+   * *touched* candidate. A dense list made it run once per candidate in the
+   * corpus, and then it measured 0.0447 ms against 0.0259 ms for the same loop
+   * with the score inlined — 1.7x of a stage that is 40% of the query. Closing
+   * over the fields recovers nearly all of that and keeps one scoring loop
+   * rather than one per metric.
+   *
+   * **Built after accumulation, never before**: `base` is a value here, not a
+   * field read, so a scorer made too early would carry a zero base and score
+   * every candidate as though no dense list had contributed.
    */
-  private diceScore(query: NGramProfile, id: number): number {
-    const grams = this.gramCount[id]
-    if (grams === 0) return 0
-    return (2 * (this.base + this.accumulator[id])) / (query.gramCount + grams)
+  private diceScorer(query: NGramProfile): (id: number) => number {
+    const base = this.base
+    const accumulator = this.accumulator
+    const gramCount = this.gramCount
+    const queryGrams = query.gramCount
+    return (id) => {
+      const grams = gramCount[id]
+      if (grams === 0) return 0
+      return (2 * (base + accumulator[id])) / (queryGrams + grams)
+    }
   }
 
   /**
+   * {@link diceScorer} for Cosine, built after accumulation for the same reason.
+   *
    * One square root of the product, then a clamp — the arithmetic
-   * `profileSimilarity` uses and for its reason: `Math.sqrt(3) * Math.sqrt(3)`
-   * is 3.0000000000000004, which would leave a profile scored against itself
-   * just short of 1.
+   * `profileSimilarity` uses and for its reason: `Math.sqrt(3) * Math.sqrt(3)` is
+   * 3.0000000000000004, which would leave a profile scored against itself just
+   * short of 1. A zero norm would divide to the infinity that clamp turns into a
+   * perfect score, which is exactly what a gramless choice used to get.
    */
-  private cosineScore(query: NGramProfile, id: number): number {
-    const norm = this.squaredNorm[id]
-    // Zero would divide to an infinity the clamp below turns into a perfect 1.
-    if (norm === 0) return 0
-    const similarity =
-      (this.base + this.accumulator[id]) / Math.sqrt(query.squaredNorm * norm)
-    return similarity < 1 ? similarity : 1
-  }
-
-  /**
-   * `scoreOf` is a callback where the accumulators are literal loops, and the
-   * asymmetry is the point: this runs once per *touched* candidate, which is the
-   * quantity the index exists to keep small, while an accumulator runs once per
-   * posting entry.
-   */
-  private selectBest(
-    scoreOf: (id: number) => number,
-    threshold: number | null,
-  ): Scored | undefined {
-    const touched = this.touched
-    // A dense list gives every candidate a base score, so the candidate set is
-    // the corpus; without one it is exactly what the posting lists touched.
-    const everyCandidate = this.scannedAll
-    const length = everyCandidate ? this.choiceCount : touched.length
-    let bestId = -1
-    let bestScore = 0
-    let qualified = 0
-    for (let index = 0; index < length; index++) {
-      const id = everyCandidate ? index : touched[index]
-      const score = scoreOf(id)
-      if (threshold !== null && score < threshold) continue
-      qualified++
-      if (bestId === -1 || score > bestScore || (score === bestScore && id < bestId)) {
-        bestId = id
-        bestScore = score
-      }
+  private cosineScorer(query: NGramProfile): (id: number) => number {
+    const base = this.base
+    const accumulator = this.accumulator
+    const squaredNorm = this.squaredNorm
+    const queryNorm = query.squaredNorm
+    return (id) => {
+      const norm = squaredNorm[id]
+      if (norm === 0) return 0
+      const similarity = (base + accumulator[id]) / Math.sqrt(queryNorm * norm)
+      return similarity < 1 ? similarity : 1
     }
-    this.counters.candidatesQualified = qualified
-    if (bestId !== -1) return { id: bestId, score: bestScore }
-    // Nothing was touched — a touched candidate shares a gram, so it scores
-    // above zero and cannot have failed a threshold this branch is reached
-    // under. So every choice scores 0, and `bestSimilarity` takes the first
-    // item unconditionally rather than answering `undefined`.
-    if (this.zeroesQualify(threshold) && this.choiceCount > 0) {
-      this.counters.zeroFillCandidates = 1
-      return { id: 0, score: 0 }
-    }
-    return undefined
   }
 
   /**
@@ -1862,7 +1849,18 @@ export class NGramIndex {
     // Outside it no accumulator read is needed and no division is either.
     const lowest = Math.ceil((threshold * queryGrams) / (2 - threshold))
     const highest = Math.floor((queryGrams * (2 - threshold)) / threshold)
-    const scoreOf = (id: number): number => this.diceScore(query, id)
+    // Reaching through `this` on purpose: the point of this variant is to
+    // measure the property loads the hoisted one below does not make.
+    const scoreOf = (id: number): number => {
+      const grams = this.gramCount[id]
+      if (grams === 0) return 0
+      return (2 * (this.base + this.accumulator[id])) / (query.gramCount + grams)
+    }
+    const hoisted = (id: number): number => {
+      const grams = gramCount[id]
+      if (grams === 0) return 0
+      return (2 * (base + accumulator[id])) / (queryGrams + grams)
+    }
     const variants: { name: string; body: () => number }[] = [
       {
         name: 'loop only',
@@ -1944,6 +1942,30 @@ export class NGramIndex {
           for (let index = 0; index < length; index++) {
             const id = everyCandidate ? index : touched[index]
             const score = scoreOf(id)
+            if (score < threshold) continue
+            qualified++
+            let at = top.length
+            if (at === 5) {
+              if (!outranks(score, id, top[4])) continue
+              at = 4
+            }
+            while (at > 0 && outranks(score, id, top[at - 1])) {
+              top[at] = top[at - 1]
+              at--
+            }
+            top[at] = { id, score }
+          }
+          return qualified
+        },
+      },
+      {
+        name: 'hoisted callback + top-5 insertion',
+        body: () => {
+          const top: Scored[] = []
+          let qualified = 0
+          for (let index = 0; index < length; index++) {
+            const id = everyCandidate ? index : touched[index]
+            const score = hoisted(id)
             if (score < threshold) continue
             qualified++
             let at = top.length
@@ -2044,6 +2066,20 @@ export class NGramIndex {
       limit === null
         ? this.selectAll(scoreOf, threshold)
         : this.selectTop(scoreOf, threshold, limit)
+    return this.fillZeroes(found, threshold, limit)
+  }
+
+  /**
+   * The candidates no posting list named, at the score they all share. Shared by
+   * the generic path and the specialised kernels rather than copied into both:
+   * it runs once per query, not once per candidate, so it is the one part of
+   * selection an abstraction costs nothing.
+   */
+  private fillZeroes(
+    found: Scored[],
+    threshold: number | null,
+    limit: number | null,
+  ): Scored[] {
     if (!this.zeroesQualify(threshold)) return found
     // Every candidate was already scored and offered, so there is nothing left
     // to fill in — walking for `accumulator[id] === 0` here would re-add
@@ -2059,6 +2095,177 @@ export class NGramIndex {
     }
     this.counters.zeroFillCandidates = filled
     return found
+  }
+
+  /**
+   * Top-k with Dice's arithmetic in the loop rather than behind a callback.
+   *
+   * The callback was a good trade while selection ran once per *touched*
+   * candidate. A dense list makes it run once per candidate in the corpus, and
+   * measured against the same loop inlined it cost 0.0447 ms to 0.0259 ms — 1.7x
+   * of a stage that is 40% of the query. Closing the scorer over locals
+   * recovered 1.10–1.18x of that; the rest is the call boundary itself, which
+   * only duplication removes.
+   *
+   * Two literal kernels rather than one parameterised loop, for the reason
+   * `bestDistance` and `bestSimilarity` are two loops in `search/`: this is the
+   * innermost frame, and the metric is known before it starts.
+   */
+  private diceTop(
+    query: NGramProfile,
+    threshold: number | null,
+    limit: number,
+  ): Scored[] {
+    const touched = this.touched
+    const accumulator = this.accumulator
+    const gramCount = this.gramCount
+    const base = this.base
+    const queryGrams = query.gramCount
+    const everyCandidate = this.scannedAll
+    const length = everyCandidate ? this.choiceCount : touched.length
+    const top: Scored[] = []
+    let qualified = 0
+    for (let index = 0; index < length; index++) {
+      const id = everyCandidate ? index : touched[index]
+      const grams = gramCount[id]
+      if (grams === 0) continue
+      const score = (2 * (base + accumulator[id])) / (queryGrams + grams)
+      if (threshold !== null && score < threshold) continue
+      qualified++
+      let at = top.length
+      if (at === limit) {
+        if (!outranks(score, id, top[limit - 1])) continue
+        at = limit - 1
+      }
+      while (at > 0 && outranks(score, id, top[at - 1])) {
+        top[at] = top[at - 1]
+        at--
+      }
+      top[at] = { id, score }
+    }
+    this.counters.candidatesQualified = qualified
+    return top
+  }
+
+  /** {@link diceTop} for Cosine. */
+  private cosineTop(
+    query: NGramProfile,
+    threshold: number | null,
+    limit: number,
+  ): Scored[] {
+    const touched = this.touched
+    const accumulator = this.accumulator
+    const squaredNorm = this.squaredNorm
+    const base = this.base
+    const queryNorm = query.squaredNorm
+    const everyCandidate = this.scannedAll
+    const length = everyCandidate ? this.choiceCount : touched.length
+    const top: Scored[] = []
+    let qualified = 0
+    for (let index = 0; index < length; index++) {
+      const id = everyCandidate ? index : touched[index]
+      const norm = squaredNorm[id]
+      if (norm === 0) continue
+      const raw = (base + accumulator[id]) / Math.sqrt(queryNorm * norm)
+      const score = raw < 1 ? raw : 1
+      if (threshold !== null && score < threshold) continue
+      qualified++
+      let at = top.length
+      if (at === limit) {
+        if (!outranks(score, id, top[limit - 1])) continue
+        at = limit - 1
+      }
+      while (at > 0 && outranks(score, id, top[at - 1])) {
+        top[at] = top[at - 1]
+        at--
+      }
+      top[at] = { id, score }
+    }
+    this.counters.candidatesQualified = qualified
+    return top
+  }
+
+  /** {@link diceTop}'s single-winner kernel: no insertion, no result array. */
+  private diceBestOf(query: NGramProfile, threshold: number | null): Scored | undefined {
+    const touched = this.touched
+    const accumulator = this.accumulator
+    const gramCount = this.gramCount
+    const base = this.base
+    const queryGrams = query.gramCount
+    const everyCandidate = this.scannedAll
+    const length = everyCandidate ? this.choiceCount : touched.length
+    let bestId = -1
+    let bestScore = 0
+    let qualified = 0
+    for (let index = 0; index < length; index++) {
+      const id = everyCandidate ? index : touched[index]
+      const grams = gramCount[id]
+      if (grams === 0) continue
+      const score = (2 * (base + accumulator[id])) / (queryGrams + grams)
+      if (threshold !== null && score < threshold) continue
+      qualified++
+      if (bestId === -1 || score > bestScore || (score === bestScore && id < bestId)) {
+        bestId = id
+        bestScore = score
+      }
+    }
+    return this.bestOrZero(bestId, bestScore, qualified, threshold)
+  }
+
+  /** {@link diceBestOf} for Cosine. */
+  private cosineBestOf(
+    query: NGramProfile,
+    threshold: number | null,
+  ): Scored | undefined {
+    const touched = this.touched
+    const accumulator = this.accumulator
+    const squaredNorm = this.squaredNorm
+    const base = this.base
+    const queryNorm = query.squaredNorm
+    const everyCandidate = this.scannedAll
+    const length = everyCandidate ? this.choiceCount : touched.length
+    let bestId = -1
+    let bestScore = 0
+    let qualified = 0
+    for (let index = 0; index < length; index++) {
+      const id = everyCandidate ? index : touched[index]
+      const norm = squaredNorm[id]
+      if (norm === 0) continue
+      const raw = (base + accumulator[id]) / Math.sqrt(queryNorm * norm)
+      const score = raw < 1 ? raw : 1
+      if (threshold !== null && score < threshold) continue
+      qualified++
+      if (bestId === -1 || score > bestScore || (score === bestScore && id < bestId)) {
+        bestId = id
+        bestScore = score
+      }
+    }
+    return this.bestOrZero(bestId, bestScore, qualified, threshold)
+  }
+
+  /**
+   * A tie goes to the lower id, and the test for it is load-bearing rather than
+   * decoration. Dropping it looked safe — the dense scan counts upward, and each
+   * posting list is sorted — but `touched` is filled across *several* lists, so
+   * a gram matching id 9 before another matches id 2 leaves it out of order.
+   * Parity caught it on a two-choice corpus.
+   */
+  private bestOrZero(
+    bestId: number,
+    bestScore: number,
+    qualified: number,
+    threshold: number | null,
+  ): Scored | undefined {
+    this.counters.candidatesQualified = qualified
+    if (bestId !== -1) return { id: bestId, score: bestScore }
+    // Nothing qualified, and nothing touched could have: a touched candidate
+    // shares a gram, so it scores above zero. So every choice scores 0, and
+    // `bestSimilarity` takes the first item rather than answering `undefined`.
+    if (this.zeroesQualify(threshold) && this.choiceCount > 0) {
+      this.counters.zeroFillCandidates = 1
+      return { id: 0, score: 0 }
+    }
+    return undefined
   }
 
   private selectAll(scoreOf: (id: number) => number, threshold: number | null): Scored[] {
