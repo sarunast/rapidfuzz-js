@@ -23,6 +23,7 @@ import { similarity as diceMetric } from '../../src/algorithms/dice/index.js'
 import { buildProfile, NGramProfile } from '../../src/algorithms/shared/ngram.js'
 import { createMatcher, createScorer } from '../../src/index.js'
 import {
+  DENSE_CUTOFF,
   feasibleRadices,
   NGramIndex,
   type IndexCounters,
@@ -437,6 +438,11 @@ type KeyMode = 'auto' | 'bmp' | 'full' | 'string'
 interface ExperimentConfig {
   readonly buildMode: BuildMode
   readonly keyMode: KeyMode
+  /**
+   * The share of the corpus a posting list covers before it is stored inverted,
+   * or `null` for the all-sparse representation this is measured against.
+   */
+  readonly denseCutoff: number | null
 }
 
 const START_RADIX: Readonly<Record<KeyMode, number | null>> = {
@@ -471,6 +477,7 @@ function indexFor(
     choiceCount,
     config.keyMode !== 'string',
     START_RADIX[config.keyMode],
+    config.denseCutoff,
   )
 }
 
@@ -537,8 +544,12 @@ const KEY_MODES = ['auto', 'bmp', 'full', 'string'] as const
  * restarts through recursion, so the same pinned rung exercises different code
  * on each. `supports` drops the pairs a gram size cannot hold.
  */
+const DENSE_CUTOFFS: readonly (number | null)[] = [null, DENSE_CUTOFF]
+
 const CONFIGS: readonly ExperimentConfig[] = BUILD_MODES.flatMap((buildMode) =>
-  KEY_MODES.map((keyMode) => ({ buildMode, keyMode })),
+  KEY_MODES.flatMap((keyMode) =>
+    DENSE_CUTOFFS.map((denseCutoff) => ({ buildMode, keyMode, denseCutoff })),
+  ),
 )
 
 function label(each: ParityCase, call: 'search' | 'best'): string {
@@ -627,11 +638,16 @@ function checkCase(each: ParityCase): void {
   }
 
   // The invariant every zero-fill rule rests on: with a query that has grams, a
-  // positive score and a posting-list hit are the same event.
+  // positive score and a posting-list hit are the same event. A dense list
+  // suspends it by design — it hands every candidate a base frequency, so no
+  // candidate is untouched and the equivalence has nothing left to say.
   if (profile.gramCount > 0) {
     const all = indexedSearch(index, metric, profile, null, null)
     const positives = all.filter((entry) => entry.score > 0).length
-    if (positives !== index.counters.candidatesTouched) {
+    if (
+      !index.counters.scannedAllCandidates &&
+      positives !== index.counters.candidatesTouched
+    ) {
       throw new Error(
         `${label(each, 'search')}\n  ${positives} positive scores against ` +
           `${index.counters.candidatesTouched} touched candidates`,
@@ -838,6 +854,7 @@ interface CounterRow {
   readonly separatesFrequency: boolean
   readonly buildMode: BuildMode
   readonly keyMode: KeyMode
+  readonly denseCutoff: number | null
   readonly threshold: number
   readonly limit: number
   readonly queryVariants: number
@@ -965,6 +982,7 @@ function counterRows(
         separatesFrequency: corpus.separatesFrequency,
         buildMode: config.buildMode,
         keyMode: config.keyMode,
+        denseCutoff: config.denseCutoff,
         threshold,
         limit: COUNTER_LIMIT,
         queryVariants: variants.length,
@@ -1027,6 +1045,7 @@ interface MemoryRow {
   readonly arm: Arm
   readonly buildMode: BuildMode
   readonly keyMode: KeyMode
+  readonly denseCutoff: number | null
   readonly bytes: number
   readonly bytesPerChoice: number
 }
@@ -1087,6 +1106,7 @@ function measureArm(
     arm,
     buildMode: config.buildMode,
     keyMode: config.keyMode,
+    denseCutoff: config.denseCutoff,
     bytes: held,
     bytesPerChoice: held / n,
   }
@@ -1099,6 +1119,7 @@ interface PeakRow {
   readonly gramSize: number
   readonly buildMode: BuildMode
   readonly keyMode: KeyMode
+  readonly denseCutoff: number | null
   /**
    * Everything held before the build starts: the corpus, plus the runtime and
    * module heap under it. Not the corpus's size — nothing here measures that.
@@ -1177,6 +1198,7 @@ function measurePeak(
     gramSize,
     buildMode: config.buildMode,
     keyMode: config.keyMode,
+    denseCutoff: config.denseCutoff,
     baselineBytes: baseline,
     peakHeapBytes: peakHeap,
     peakArrayBufferBytes: peakBuffers,
@@ -1185,6 +1207,60 @@ function measurePeak(
     peakBuildBytes: peakRetained - baseline,
     retainedBytes: retained - baseline,
     buildMs,
+  }
+}
+
+/**
+ * Would a dense "default frequency 1, store the exceptions" posting pay?
+ *
+ * A probe before an implementation. The idea attacks the one shape where the
+ * index barely beats the Matcher — a gram almost every choice has — by storing
+ * the choices that *lack* it. Whether that is worth building depends entirely on
+ * how much of the work a query actually does lands in lists dense enough to
+ * invert, and nothing measured so far reports that.
+ */
+function probeDense(
+  n: number,
+  corpusClass: CorpusClass,
+  gramSize: number,
+  config: ExperimentConfig,
+): void {
+  const corpus = corpusOf(corpusClass, n, gramSize)
+  // Built all-sparse whatever was asked for: the probe compares the current
+  // representation against the one it would become, so it has to start from the
+  // current one.
+  const sparse: ExperimentConfig = { ...config, denseCutoff: null }
+  const index = buildIndex(corpus.choices, gramSize, sparse).index
+  const stats = index.postingStatistics()
+  const outlook = index.denseOutlook(DENSE_CUTOFF)
+  const hybrid = outlook.hybridEntries
+  const denseLists = outlook.denseLists
+  const share = (value: number): string => `${(value * 100).toFixed(1)}%`
+  process.stdout.write(
+    `\n  ${corpusClass}, n=${n.toLocaleString()}, gram size ${gramSize}\n` +
+      `    posting entries        ${stats.documentEntries.toLocaleString().padStart(12)}\n` +
+      `    as a hybrid            ${hybrid.toLocaleString().padStart(12)}` +
+      `   (${share(hybrid / Math.max(1, stats.documentEntries))} of it)\n` +
+      `    lists worth inverting  ${denseLists.toLocaleString().padStart(12)}` +
+      `   of ${stats.distinctGrams.toLocaleString()}\n` +
+      `\n    query              grams   dense   sparse work   hybrid work   ratio   touched\n`,
+  )
+  for (const queryClass of QUERY_CLASSES) {
+    const variants = corpus.queries.get(queryClass)
+    if (variants === undefined || variants.length === 0) {
+      throw new Error(`missing query class ${queryClass}`)
+    }
+    const probe = index.denseProbe(buildProfile(variants[0], gramSize), DENSE_CUTOFF)
+    const ratio =
+      probe.hybridWork === 0 ? 1 : probe.sparseWork / Math.max(1, probe.hybridWork)
+    process.stdout.write(
+      `    ${queryClass.padEnd(17)}${String(probe.queryGrams).padStart(6)}` +
+        `${String(probe.denseGrams).padStart(8)}` +
+        `${probe.sparseWork.toLocaleString().padStart(14)}` +
+        `${probe.hybridWork.toLocaleString().padStart(14)}` +
+        `${`${ratio.toFixed(2)}x`.padStart(8)}` +
+        `${probe.touched.toLocaleString().padStart(10)}\n`,
+    )
   }
 }
 
@@ -1210,7 +1286,9 @@ function summarise(
       `${config.buildMode} build, ${config.keyMode} keys\n` +
       `    choices                ${n.toLocaleString().padStart(12)}\n` +
       `    distinct grams         ${stats.distinctGrams.toLocaleString().padStart(12)}\n` +
-      `    posting entries        ${stats.totalEntries.toLocaleString().padStart(12)}\n` +
+      `    posting entries        ${stats.documentEntries.toLocaleString().padStart(12)}\n` +
+      `    stored entries         ${stats.storedEntries.toLocaleString().padStart(12)}\n` +
+      `    dense lists            ${stats.denseLists.toLocaleString().padStart(12)}\n` +
       `    counts width           ${`${stats.countsWidthBytes} byte`.padStart(12)}\n` +
       `    max count              ${String(stats.maxCount).padStart(12)}\n` +
       `    entries with count 1   ${percent(stats.singletonEntryShare).padStart(12)}\n` +
@@ -1241,7 +1319,7 @@ function summarise(
 
 const SIZES: readonly number[] = [100, 1_000, 10_000, 100_000, 1_000_000]
 
-type Mode = 'parity' | 'counters' | 'memory' | 'peak' | 'summary'
+type Mode = 'parity' | 'counters' | 'memory' | 'peak' | 'summary' | 'dense'
 
 interface Options {
   readonly mode: Mode
@@ -1307,17 +1385,28 @@ function parseOptions(): Options {
   let sweep = false
   let keyMode: KeyMode = 'auto'
   let buildMode: BuildMode = 'profile'
+  let denseCutoff: number | null = DENSE_CUTOFF
   for (const argument of process.argv.slice(2)) {
     if (argument === '--parity') mode = 'parity'
     else if (argument === '--counters') mode = 'counters'
     else if (argument === '--memory') mode = 'memory'
     else if (argument === '--peak') mode = 'peak'
     else if (argument === '--summary') mode = 'summary'
+    else if (argument === '--dense') mode = 'dense'
     else if (argument === '--sweep') sweep = true
     else if (argument.startsWith('--build=')) {
       buildMode = buildModeOf(argument.slice('--build='.length))
     } else if (argument.startsWith('--keys=')) {
       keyMode = keyModeOf(argument.slice('--keys='.length))
+    } else if (argument.startsWith('--dense-cutoff=')) {
+      const value = argument.slice('--dense-cutoff='.length)
+      if (value === 'off') denseCutoff = null
+      else {
+        denseCutoff = Number(value)
+        if (!(denseCutoff > 0 && denseCutoff <= 1)) {
+          throw new RangeError('--dense-cutoff must be inside (0, 1] or "off"')
+        }
+      }
     } else if (argument.startsWith('--max=')) max = numberOf(argument, '--max=')
     else if (argument.startsWith('--runs=')) runs = numberOf(argument, '--runs=')
     else if (argument.startsWith('--n=')) n = numberOf(argument, '--n=')
@@ -1347,7 +1436,7 @@ function parseOptions(): Options {
     arm,
     threshold,
     sweep,
-    config: { buildMode, keyMode },
+    config: { buildMode, keyMode, denseCutoff },
   }
 }
 
@@ -1420,6 +1509,10 @@ if (options.mode === 'parity') {
         produced++
         if (options.mode === 'summary') {
           summarise(n, corpusClass, gramSize, options.threshold, options.config)
+          continue
+        }
+        if (options.mode === 'dense') {
+          probeDense(n, corpusClass, gramSize, options.config)
           continue
         }
         const corpus = corpusOf(corpusClass, n, gramSize)

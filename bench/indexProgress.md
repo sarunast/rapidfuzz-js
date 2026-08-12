@@ -15,7 +15,9 @@ whether this is an option flag or a different corpus representation.
 
 ## Where it stands
 
-**Stage B is answered. The prototype is frozen.**
+**Stage B is answered.** The prototype was frozen and then reopened once, for
+dense postings — see below — because the real corpus showed the remaining weak
+case was a representation problem rather than a constant factor.
 
 > A corpus-wide inverted n-gram representation can replace per-choice prepared
 > profiles for integer/code-point Dice and Cosine search while preserving exact
@@ -60,7 +62,9 @@ node bench/comparison/ngram-index.mjs
 ```
 
 Flags that matter: `--build=direct|profile`, `--keys=auto|bmp|full|string`,
-`--threshold=`, `--sweep`, `--arm=index|profiles|matcher`, `--corpus=`, `--n=`.
+`--dense-cutoff=<share>|off`, `--threshold=`, `--sweep`,
+`--arm=index|profiles|matcher`, `--corpus=`, `--n=`. `--dense` runs the probe
+that decided dense postings were worth building.
 
 Every row records `buildMode`, `keyMode`, `threshold` and `limit`. Two runs
 differing only in `--keys` used to emit byte-identical rows, which made a
@@ -82,6 +86,85 @@ directory of JSON output unattributable after the fact.
 | CSR postings: one `offsets`/`ids`/`counts` triple, not two typed arrays per gram            | **1.29–2.00x less memory**; query 0.99–1.12x; build unchanged                               |
 | Count words narrowed to the width that holds the largest frequency                          | included above — `Uint8` on every corpus measured, so 4 bytes per entry became 1            |
 | Zero-limit guard, and choices checked to arrive in id order on the way in                   | `limit: 0` indexed `top[-1]` and crashed                                                    |
+
+## Dense postings — store who does _not_ have the gram
+
+The real corpus exposed the case the CSR layout was not built for. `node_modules`
+is in almost every path, so its trigrams' posting lists name nearly the whole
+corpus, and `common substring` — the query made of exactly those — was the one
+shape where the index barely beat the Matcher at 2x.
+
+For a list covering most of the corpus the natural representation is the
+complement. A **dense** list stores exceptions to a default frequency of 1: an
+absence at count `0`, a repeat at `2` or more. Dice takes `min(q, 1)` for the
+whole corpus in one addition and then walks only the exceptions; Cosine takes
+`q`, and an exception contributes `q × (count − 1)`. Both stay exact.
+
+**Probed before it was built**, because the whole idea rests on a number nothing
+had measured: what share of the work a query does lands in lists dense enough to
+invert. On the file-path corpus, **17 lists of 11,189** — 0.15% of them — and
+they carry a third of the traffic:
+
+| query            | sparse work | hybrid work | ratio |
+| ---------------- | ----------: | ----------: | ----: |
+| exact hit        |     288,791 |      86,841 | 3.33x |
+| common substring |     142,143 |      17,296 | 8.22x |
+| rare substring   |       7,238 |       7,238 | 1.00x |
+
+Both sides carry their selection scan, and they are not the same scan: the sparse
+path visits what it touched, a dense list forces every candidate. Charging that
+to the hybrid alone made a corpus where `touched` is already `N` look like a
+regression when it is a small win.
+
+Measured after, `--dense-cutoff=off` against the default, same process:
+
+| corpus, query                | sparse |  dense |      ratio |
+| ---------------------------- | -----: | -----: | ---------: |
+| file-paths, exact hit (dice) | 0.8418 | 0.4384 |      1.92x |
+| file-paths, 2 typos (dice)   | 0.8295 | 0.3891 |      2.13x |
+| file-paths, 2 typos (cosine) | 0.8316 | 0.3613 |      2.30x |
+| file-paths, common substring | 0.1070 | 0.1042 |      1.03x |
+| file-paths, rare substring   | 0.0903 | 0.0926 |      0.98x |
+| alphabet-2 100k, all classes |      — |      — | 1.08–1.24x |
+
+**1.83–2.30x on the classes that dominate**, 1.08–1.24x on the adverse
+two-letter corpus, and exactly neutral where no list qualifies — `zipf-words` and
+`alphabet-26` produce none at all, so the flag array is `null` and nothing reads
+it. Retained memory **4.77 MB → 3.81 MB, 20% less**. Build costs 6% more
+(103 ms → 109 ms) for the merge that computes each complement.
+
+**The most useful number is the one that did not move.** `common substring` shed
+30x its posting traffic — 129,218 entries to 4,349 — and came out 1.03x. Its cost
+was never accumulation; it is the corpus-wide selection scan, which that query
+was already paying because it touched 12,925 of 12,947 candidates. Posting
+traffic is not the only budget, and this is where the next win has to come from.
+
+**The cutoff is 2/3, not 1/2.** Inverting costs a second thing: any query
+touching a dense list has to score every candidate. A dense gram changes
+accumulation by `N − 2·length + exceptions` and selection by at most `N − length`,
+and the sum only turns negative above `2N/3`. At exactly one half the storage
+saving is zero and the scan is pure loss.
+
+Prefix filtering **falls back to full accumulation** when a query reaches a dense
+list. Its bound is stated over lists that name who _has_ a gram, so a dense list
+inverts the meaning of every step — and a dense list is the cheapest thing in the
+index, one addition plus its exceptions, so there was never anything to gain by
+skipping one.
+
+Three bugs, all caught by parity, none by inspection:
+
+- **The invariant broke, correctly.** "Score `> 0` ⇔ touched" is a property of
+  the sparse representation; a dense list hands every candidate a base frequency,
+  so nothing is untouched. The check now reads a `scannedAllCandidates` counter
+  instead of assuming.
+- **Duplicate results.** The first version materialised `touched` as every id,
+  and the sparse loops then pushed ids that were already there. Removing the
+  materialisation fixed it and was faster anyway — a million pushes cost more
+  than the loop-invariant branch selection pays instead.
+- **A gramless choice scored 1 under Cosine.** It is in no posting list, so the
+  sparse path never reached one; scanning every candidate does, and `0/0` clamped
+  to a perfect score. Both score functions now answer `0` for a choice with no
+  grams.
 
 ## Measured and _not_ adopted
 
@@ -273,7 +356,7 @@ implemented: it trades a second corpus traversal for a problem nothing has yet.
 ## Correctness
 
 Parity compares against `matcher.search`/`.best` on **key, score and order**:
-**40,320 fixed cases across the whole build × key product**, generated rather
+**80,640 fixed cases across the whole build × key × dense product**, generated rather
 than listed — a hand-written list claimed to be the product while missing
 `profile + bmp` and `direct + full` — plus randomised corpora that draw their
 configuration too. Covers gram sizes 2 and 3, thresholds
