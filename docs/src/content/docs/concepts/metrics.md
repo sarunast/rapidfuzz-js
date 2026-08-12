@@ -74,6 +74,7 @@ to mean:
 | Fuzz similarities           | `0–100`      | Percent-like                 |
 | `normalized*` edit measures | `0–1`        | Fraction of the longer input |
 | Jaro and Jaro-Winkler       | `0–1`        | Its own formula              |
+| Dice and Cosine             | `0–1`        | Shared n-grams               |
 | `distance` and `similarity` | Native units | Edit counts, usually         |
 
 Practical consequence: a `threshold` is always in the scorer's own scale.
@@ -91,6 +92,8 @@ rapidfuzz-js/lcs                   longest common subsequence
 rapidfuzz-js/osa                   Levenshtein + adjacent swaps (restricted)
 rapidfuzz-js/damerau-levenshtein   Levenshtein + adjacent swaps (full)
 rapidfuzz-js/hamming               position-by-position differences
+rapidfuzz-js/dice                  shared n-grams, order ignored
+rapidfuzz-js/cosine                the same n-grams as frequency vectors
 rapidfuzz-js/jaro                  short-string similarity
 rapidfuzz-js/jaro-winkler          Jaro with a shared-prefix bonus
 rapidfuzz-js/prefix                common prefix length

@@ -92,6 +92,13 @@ their handles; treat a configured or custom scorer as owning the handles it
 made. Anything else throws — a handle from the wrong scorer is refused as
 incompatible, a value that never was a handle as invalid.
 
+[Dice](/algorithms/dice/) and [Cosine](/algorithms/cosine/) are the one place
+where writing the default out still shares: their preparation depends only on
+`gramSize`, so a default scorer and one written as `{ gramSize: 2 }` accept
+each other's handles, and any other depth does not. Levenshtein's `weights`
+are not like that — spelling out the default costs the sharing, because the
+handle records the scorer rather than the values.
+
 Most of those mistakes never reach runtime: a handle's type carries which
 metric made it, so a Levenshtein handle doesn't typecheck where a Jaro
 scorer's is expected. Name a stored handle's type with

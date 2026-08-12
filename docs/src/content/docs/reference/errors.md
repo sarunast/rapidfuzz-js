@@ -117,11 +117,14 @@ exclude `0` would make the library violate its own check.
 
 ## Algorithm-specific
 
-| Message                                          | Type         | Cause                                         |
-| ------------------------------------------------ | ------------ | --------------------------------------------- |
-| `Sequences are not the same length.`             | `Error`      | Hamming with `pad: false` and unequal lengths |
-| `prefix_weight has to be in the range 0.0 - 1.0` | `RangeError` | Jaro-Winkler `prefixWeight` outside `[0, 1]`  |
+| Message                                           | Type         | Cause                                            |
+| ------------------------------------------------- | ------------ | ------------------------------------------------ |
+| `Sequences are not the same length.`              | `Error`      | Hamming with `pad: false` and unequal lengths    |
+| `prefix_weight has to be in the range 0.0 - 1.0`  | `RangeError` | Jaro-Winkler `prefixWeight` outside `[0, 1]`     |
+| `gramSize has to be a safe integer of at least 1` | `RangeError` | Dice or Cosine `gramSize` below 1, or fractional |
 
-These two keep RapidFuzz's own wording, including the trailing full stop and
-the `snake_case` parameter name, so a message searched for in a Python
-codebase's issue tracker still finds the same explanation.
+The first two keep RapidFuzz's own wording, including the trailing full stop
+and the `snake_case` parameter name, so a message searched for in a Python
+codebase's issue tracker still finds the same explanation. Dice and Cosine
+have no upstream counterpart, so `gramSize` reads as the option a caller
+actually wrote.

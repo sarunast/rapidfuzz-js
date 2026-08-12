@@ -46,6 +46,7 @@ goes wrong:
 | Word order (`"Smith, John"`)             | fuzz `tokenSortSimilarity`                  |
 | One contains the other                   | fuzz `partialSimilarity`                    |
 | Extra words on one side                  | fuzz `tokenSetSimilarity`                   |
+| Shuffled or missing words, short text    | [`dice`](/algorithms/dice/)                 |
 | They're names of people or places        | [`jaro-winkler`](/algorithms/jaro-winkler/) |
 | A bit of everything / not sure yet       | fuzz `weightedSimilarity`                   |
 
