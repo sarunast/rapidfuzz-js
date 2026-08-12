@@ -18,25 +18,20 @@ permissions:
   contents: read
 
 jobs:
-  # The whole gate: typecheck, lint, format:check, test, build, check:exports,
-  # check:pkg. Runs on one Node because the build is the only part that cares
-  # which — tsdown loads tsdown.config.ts through Node's native TypeScript
-  # stripping, so building needs Node 22+ even though the library does not.
+  # The whole gate, in one job: typecheck, lint, format:check, test, build,
+  # check:exports, check:pkg, coverage, and finally the tests again on the
+  # oldest Node the package claims to support.
+  #
+  # The build is the only part that cares which Node it runs on — tsdown loads
+  # tsdown.config.ts through Node's native TypeScript stripping, so building
+  # needs 22+ even though the library does not — which is why the gate runs on
+  # one version and only the tests are repeated on the other.
   check:
     name: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      # Reads the version from package.json's packageManager field.
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       # The token is for the build inside `pnpm check`: tsdown carries the
       # Codecov plugin, which measures the bundle and uploads it. Without a
@@ -88,20 +83,21 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
-  # package.json declares engines.node >=22, so prove the source tests still
-  # pass on the minimum supported runtime. The full check job above validates
-  # the build and package exports on Node 24.
-  compatibility:
-    name: compatibility (node 22)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-
+      # package.json declares engines.node >=22, so prove the source tests still
+      # pass on the minimum supported runtime. Everything above validated the
+      # build and the package exports on 24.
+      #
+      # Switching Node inside the job rather than running a second one: this is
+      # a `pnpm test` against a tree that is already checked out and installed,
+      # and a separate job would spend a whole runner re-doing both to reach it.
+      # The install is reused as-is — no dependency here builds against a Node
+      # ABI, so the modules resolved under 24 are the same ones 22 loads.
+      #
+      # No `cache: pnpm` on this one. The cache was already restored and saved
+      # by the setup above, and asking a second time only races it.
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+      - name: Tests on the oldest supported Node
+        run: pnpm test

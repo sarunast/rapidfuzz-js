@@ -40,29 +40,23 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # The docs project builds its API reference from ../src, and TypeDoc
-      # writes a "Defined in" link per symbol from the *tracked* path — so the
-      # working tree it reads has to be a real checkout, not a tarball.
-      - uses: pnpm/action-setup@v6
-
-      # docs/ has no packageManager field of its own; the action above reads the
-      # root package.json and pins the same pnpm the library uses. Adding one to
-      # docs/package.json looks tidier and is not: it makes pnpm re-verify the
-      # lockfile against its supply-chain policy before every script, so a
+      # The docs project builds its API reference from ../src, and TypeDoc writes
+      # a "Defined in" link per symbol from the *tracked* path — so the working
+      # tree it reads has to be a real checkout, not a tarball.
+      #
+      # docs/ is its own pnpm project with its own lockfile, which is what the
+      # two directory inputs are for; it is not a workspace member of the
+      # library. It also builds without the root's node_modules or dist:
+      # `rapidfuzz-js` is a `link:..` dependency, and tsconfig.typedoc.json
+      # resolves every public subpath to ../src rather than to the built
+      # declarations. So there is nothing to install or build at the root, and
+      # adding it would only be a slower way to reach the same artifact.
+      #
+      # docs/package.json deliberately has no packageManager field of its own —
+      # the shared action reads the root one and pins the same pnpm the library
+      # uses. Adding one here looks tidier and is not: it makes pnpm re-verify
+      # the lockfile against its supply-chain policy before every script, so a
       # dependency published in the last day fails `pnpm build` outright.
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: docs/pnpm-lock.yaml
-
-      # docs/ is its own pnpm project with its own lockfile — it is not a
-      # workspace member of the library. It also builds without the root's
-      # node_modules or dist: `rapidfuzz-js` is a `link:..` dependency, and
-      # tsconfig.typedoc.json resolves every public subpath to ../src rather
-      # than to the built declarations. So there is nothing to install or build
-      # at the root, and adding it would only be a slower way to reach the same
-      # artifact.
       #
       # If this step fails with ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION, read the
       # publish timestamp in the message before touching anything. pnpm 11
@@ -73,9 +67,10 @@ jobs:
       # what makes this worth writing down: usually neither is true, and the fix
       # is to re-run the job later rather than to relax the policy or pin the
       # dependency back. It applies to the library's own CI equally.
-      - name: Install
-        run: pnpm install --frozen-lockfile
-        working-directory: docs
+      - uses: ./.github/actions/setup
+        with:
+          working-directory: docs
+          cache-dependency-path: docs/pnpm-lock.yaml
 
       - name: Build
         run: pnpm build

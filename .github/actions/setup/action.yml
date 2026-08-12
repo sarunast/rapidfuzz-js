@@ -1,0 +1,36 @@
+name: Set up pnpm and install
+description: Pins pnpm, installs Node with a warm pnpm cache, and installs dependencies from the lockfile.
+
+# The three steps every job here starts with, shared by the library's gate and
+# the docs deploy. Checkout stays in the caller: a local action cannot run until
+# the workspace holding it exists.
+#
+# Node is fixed at 24 rather than an input because both callers want it. CI does
+# run the tests on 22 as well, but that is a second `setup-node` partway through
+# an already-installed job, not another full setup.
+
+inputs:
+  working-directory:
+    description: Directory holding the package.json and lockfile to install.
+    default: '.'
+  cache-dependency-path:
+    description: Lockfile the Node cache key is derived from.
+    default: pnpm-lock.yaml
+
+runs:
+  using: composite
+  steps:
+    # Reads the version from package.json's packageManager field.
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version: '24'
+        cache: pnpm
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    # Frozen, so a lockfile that disagrees with package.json fails the job
+    # instead of being quietly resolved into something no one has run.
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
