@@ -63,11 +63,16 @@ export interface IndexCounters {
  * data. It also scatters the walk across that many allocations, where this
  * streams one array.
  *
- * `counts` is `null` when every frequency in the index is 1, which is the
- * common case for n-grams over natural text: a gram usually occurs once in a
- * given choice. When it is not null it is the narrowest width that holds the
- * largest frequency, because a 32-bit word for a number that is nearly always 1
- * is most of the payload.
+ * `counts` is the narrowest word that holds the largest frequency in the index,
+ * which measured one byte on every corpus here — a 32-bit word for a number
+ * that is almost always 1 was most of the payload.
+ *
+ * It is `null` only when *no* frequency anywhere exceeds 1, which sounds like
+ * the common case and is not: 99.9% of entries are 1 on 26-letter trigrams and
+ * 95.0% on Zipf text, but a maximum of 3 and 4 respectively disables the
+ * shortcut for the whole corpus. What is true per list — 93.5% and 59.8% of
+ * lists are all-ones — is where a sparse representation would go, if the byte
+ * word ever stops being enough.
  */
 interface Postings {
   readonly ordinals: Map<string | number, number>
@@ -86,21 +91,13 @@ interface GramlessChoice {
   readonly elements: readonly unknown[]
 }
 
-interface FlatQuery {
-  readonly keys: (string | number)[]
-  readonly counts: number[]
+/** Carries the offending element, so the index knows which rung it needs. */
+class OutOfRadix extends Error {
+  constructor(readonly element: number) {
+    super('gram element does not fit the packed key radix')
+  }
 }
 
-/**
- * Grams are keyed by their elements joined with a separator no component can
- * contain, rather than by `String.fromCodePoint(...gram)`.
- *
- * That encoding collides between grams of the same length, because it accepts
- * lone surrogates: `[0x1f600, 0xd83d, 0xde01]` and `[0xd83d, 0xde00, 0x1f601]`
- * both serialize to the units `D83D DE00 D83D DE01`. Decimal integers cannot
- * collide that way. `-0` stringifies as `0`, which matches the `Map` the profile
- * trie keys by SameValueZero.
- */
 function integerElement(element: unknown): number {
   if (typeof element !== 'number' || !Number.isInteger(element)) {
     throw new TypeError('the ngram index prototype accepts integer gram elements only')
@@ -112,19 +109,32 @@ function integerElement(element: unknown): number {
  * Whether a gram of this depth fits one JavaScript number, so the posting map
  * can be keyed by an integer instead of a joined string.
  *
- * Code points run to `0x10FFFF`, which is 21 bits: two of them are 42 bits and
- * always fit inside 53, three are 63 and never do. Three fit only while every
- * element stays inside the BMP, at 16 bits each — which ordinary text does, and
- * which is why the packed path is worth having at all rather than being a
- * curiosity for bigrams.
+/**
+ * The rungs a packed gram key can sit on, narrowest first: a byte for Latin-1,
+ * a BMP word, and the full code-point range. An index starts on the narrowest
+ * its depth allows and widens when an element does not fit.
  */
-const CODE_POINT_LIMIT = 0x11_0000
-const BMP_LIMIT = 0x1_0000
+const RADIX_LADDER: readonly number[] = [0x100, 0x1_0000, 0x11_0000]
 
-function packedRadix(gramSize: number, bmpOnly: boolean): number | null {
-  if (gramSize === 1) return CODE_POINT_LIMIT
-  if (gramSize === 2) return CODE_POINT_LIMIT
-  if (gramSize === 3 && bmpOnly) return BMP_LIMIT
+/**
+ * The radices that hold a gram of this depth inside one safe integer, smallest
+ * first. Latin-1 text needs 8 bits per element, so `'abc'` packs into 24 —
+ * `0x616263` — where a BMP radix spends 48 on the same three letters. Small
+ * integer keys are the ones V8 handles best, and the ladder is what lets a
+ * corpus use the smallest one its content allows.
+ *
+ * Depth decides how far the ladder reaches: a byte radix holds six elements,
+ * a BMP radix three, a full code-point radix two.
+ */
+function feasibleRadices(gramSize: number): readonly number[] {
+  return RADIX_LADDER.filter(
+    (radix) => Math.pow(radix, gramSize) <= Number.MAX_SAFE_INTEGER,
+  )
+}
+
+/** The smallest feasible radix that can hold `element`, or `null` for strings. */
+function radixFor(gramSize: number, element: number): number | null {
+  for (const radix of feasibleRadices(gramSize)) if (element < radix) return radix
   return null
 }
 
@@ -201,7 +211,7 @@ function eachGram(
             // matches nothing and skipping it is the answer. On a build it means
             // the whole index has to change key scheme.
             if (lenient) continue
-            throw new RangeError('gram element does not fit the packed key radix')
+            throw new OutOfRadix(value)
           }
           visit(partial * radix + value, count)
         }
@@ -214,7 +224,7 @@ function eachGram(
       const value = integerElement(element)
       if (value < 0 || value >= radix) {
         if (lenient) continue
-        throw new RangeError('gram element does not fit the packed key radix')
+        throw new OutOfRadix(value)
       }
       nodes[top] = child
       partials[top] = partial * radix + value
@@ -225,30 +235,49 @@ function eachGram(
 }
 
 /**
- * The key a packed gram would have had, spelled the way the string scheme
- * spells it. Packing is positional and therefore reversible, which is what lets
- * an index that has already ingested a million choices change scheme without
- * revisiting one of them.
+ * The same gram, re-spelled for a wider radix or for the string scheme. Packing
+ * is positional and therefore reversible, which is what lets an index that has
+ * already ingested a million choices change key scheme without revisiting one
+ * of them.
  */
-function unpackKey(key: string | number, radix: number, gramSize: number): string {
+function repackKey(
+  key: string | number,
+  from: number,
+  to: number | null,
+  gramSize: number,
+): string | number {
   if (typeof key === 'string') return key
   const elements: number[] = new Array<number>(gramSize)
   let rest = key
   for (let position = gramSize - 1; position >= 0; position--) {
-    elements[position] = rest % radix
-    rest = Math.floor(rest / radix)
+    elements[position] = rest % from
+    rest = Math.floor(rest / from)
   }
-  return elements.join(',')
+  if (to === null) return elements.join(',')
+  let packed = 0
+  for (const element of elements) packed = packed * to + element
+  return packed
 }
 
-function flattenQuery(query: NGramProfile, radix: number | null): FlatQuery {
-  const keys: (string | number)[] = []
-  const counts: number[] = []
+/**
+ * Flatten into arrays the index owns rather than fresh ones per query.
+ *
+ * The prefix path needs a collection because it sorts; full accumulation does
+ * not, and paid two arrays and an object per call for the privilege of sharing
+ * one code path. Reused arrays keep the single path and drop the allocation.
+ */
+function flattenQueryInto(
+  query: NGramProfile,
+  radix: number | null,
+  keys: (string | number)[],
+  counts: number[],
+): void {
+  keys.length = 0
+  counts.length = 0
   eachGram(query, radix, true, (key, count) => {
     keys.push(key)
     counts.push(count)
   })
-  return { keys, counts }
 }
 
 /**
@@ -288,13 +317,18 @@ function outranks(score: number, id: number, other: Scored): boolean {
 }
 
 /**
- * `matcher.search` answers a zero limit with no results and refuses a negative
- * one, so this does too — the insertion-sorted top-k would otherwise index
- * `top[-1]` on the first candidate it saw.
+ * `resultLimit` in `search/snapshot.ts` accepts null or a non-negative safe
+ * integer and refuses everything else, so this does too: `0.5`, `NaN` and
+ * `Infinity` would otherwise reach the insertion-sorted top-k, where a limit
+ * that is never reached by `top.length` silently becomes "unlimited" and `NaN`
+ * compares false against everything.
  */
-function emptyLimit(limit: number): Scored[] {
-  if (limit < 0) throw new RangeError('limit must be null or a non-negative integer')
-  return []
+function validLimit(limit: number | null): number | null {
+  if (limit === null) return null
+  if (!Number.isSafeInteger(limit) || limit < 0) {
+    throw new RangeError('limit must be null or a non-negative safe integer')
+  }
+  return limit
 }
 
 /** One choice's frequency for a gram, or 0. The posting list is sorted by id. */
@@ -359,8 +393,8 @@ export class NGramIndex {
   private builder: Map<string | number, PostingBuilder> | null = new Map()
   private postings: Postings | null = null
   private radix: number | null
-  /** Whether an out-of-range element forced the key scheme to change. */
-  downgraded = false
+  /** How many times an out-of-range element forced the key scheme to widen. */
+  rekeyed = 0
   /**
    * Choices must arrive in id order, because that is what leaves every posting
    * list sorted and lets `frequencyOf` binary-search it. Checked on the way in
@@ -381,6 +415,9 @@ export class NGramIndex {
   private readonly touched: number[] = []
   /** Candidates that outlived the cheap prunes, reused across queries. */
   private readonly survivors: number[] = []
+  /** The flattened query, reused across queries for the same reason. */
+  private readonly queryKeys: (string | number)[] = []
+  private readonly queryCounts: number[] = []
 
   readonly counters: IndexCounters = {
     postingEntriesTouched: 0,
@@ -405,9 +442,10 @@ export class NGramIndex {
      * seeing both key types in one process would measure the mixture.
      */
     packedKeys = true,
-    bmpOnly = true,
+    /** Pin the starting rung, so the ladder's rungs can be compared. */
+    startRadix: number | null = null,
   ) {
-    this.radix = packedKeys ? packedRadix(gramSize, bmpOnly) : null
+    this.radix = packedKeys ? (startRadix ?? feasibleRadices(gramSize)[0] ?? null) : null
     this.gramCount = new Uint32Array(choiceCount)
     this.squaredNorm = new Float64Array(choiceCount)
     this.accumulator = new Float64Array(choiceCount)
@@ -433,14 +471,21 @@ export class NGramIndex {
       })
       return
     }
-    if (this.radix !== null) {
+    // A loop, not one attempt and a fallback: a single choice can need more than
+    // one rung. `'\ud800😀'` is a lone surrogate followed by an astral
+    // character, so the first element pushes a byte radix up to BMP and the
+    // second pushes that one up again. Each rung is strictly wider than the
+    // element that forced it, so this cannot cycle.
+    while (this.radix !== null) {
+      const before = this.radix
       try {
         this.insert(builder, choiceId, profile)
         return
       } catch (error) {
-        if (!(error instanceof RangeError)) throw error
-        this.downgrade(builder, choiceId)
+        if (!(error instanceof OutOfRadix)) throw error
+        this.rekey(builder, choiceId, radixFor(this.gramSize, error.element))
       }
+      if (this.radix === before) throw new Error('key scheme failed to widen')
     }
     this.insert(builder, choiceId, profile)
   }
@@ -454,9 +499,15 @@ export class NGramIndex {
    * the converted elements into one flat count map, which is the same
    * information with none of the nodes.
    *
-   * Integer elements only, so it cannot be the general path: a sequence holding
-   * `NaN` needs the unmatchable rule the trie applies for free, and one holding
-   * objects has no packed key at all. Both still go through {@link add}.
+   * Integer elements only — but so is {@link add}, which reaches
+   * `integerElement` just the same. That is the honest scope of this whole
+   * experiment: *can an integer/code-point n-gram index replace prepared
+   * profiles for ordinary text*. The metric itself is more general — its trie is
+   * keyed by `unknown` and treats `NaN` as unmatchable — and an index for that
+   * would intern arbitrary elements to integer symbols first. Not Stage B.
+   *
+   * What this skips is the profile: `add` builds a trie per choice and throws it
+   * away, where the index needs each gram once.
    */
   addSequence(choiceId: number, sequence: string): void {
     const builder = this.builder
@@ -487,9 +538,9 @@ export class NGramIndex {
         for (let offset = 0; offset < gramSize; offset++) {
           const value = integerElement(elements[start + offset])
           if (value < 0 || value >= radix) {
-            // Rare enough to pay for: re-key everything and start this choice
-            // again with joined strings.
-            this.downgrade(builder, choiceId)
+            // Rare enough to pay for: widen the whole index one rung and start
+            // this choice again.
+            this.rekey(builder, choiceId, radixFor(this.gramSize, value))
             this.nextChoiceId--
             this.addSequence(choiceId, sequence)
             return
@@ -554,12 +605,13 @@ export class NGramIndex {
    * already knows whether a string held a surrogate pair. This is the fallback
    * for when it turns out to be wrong.
    */
-  private downgrade(
+  private rekey(
     builder: Map<string | number, PostingBuilder>,
     choiceId: number,
+    to: number | null,
   ): void {
     const radix = this.radix
-    if (radix === null) return
+    if (radix === null || radix === to) return
     const rekeyed = new Map<string | number, PostingBuilder>()
     for (const [key, posting] of builder) {
       const ids = posting.ids
@@ -568,17 +620,26 @@ export class NGramIndex {
         posting.counts.pop()
       }
       if (ids.length === 0) continue
-      rekeyed.set(unpackKey(key, radix, this.gramSize), posting)
+      rekeyed.set(repackKey(key, radix, to, this.gramSize), posting)
     }
     builder.clear()
     for (const [key, posting] of rekeyed) builder.set(key, posting)
-    this.radix = null
-    this.downgraded = true
+    this.radix = to
+    this.rekeyed++
   }
 
   compact(): void {
     const builder = this.builder
     if (builder === null) throw new TypeError('the index is already compacted')
+    // Ids are contiguous by construction, so a short build would leave the tail
+    // of the corpus indistinguishable from choices that score zero — and
+    // `selectBest` would answer `{ id: 0, score: 0 }` for an index that never
+    // saw choice 0. Completing the invariant is the point of having it.
+    if (this.nextChoiceId !== this.choiceCount) {
+      throw new Error(
+        `expected ${this.choiceCount} choices, received ${this.nextChoiceId}`,
+      )
+    }
     let total = 0
     let widest = 0
     for (const posting of builder.values()) {
@@ -620,16 +681,6 @@ export class NGramIndex {
     this.builder = null
   }
 
-  /**
-   * Bytes per stored frequency, or 0 when every frequency is 1 and the counts
-   * array is absent entirely. Diagnostic: it is what says whether the implicit
-   * count path is actually firing on a given corpus.
-   */
-  countsWidth(): number {
-    const counts = this.requirePostings().counts
-    return counts === null ? 0 : counts.BYTES_PER_ELEMENT
-  }
-
   /** Distinct grams in the compacted index. */
   gramVariety(): number {
     return this.requirePostings().ordinals.size
@@ -658,6 +709,10 @@ export class NGramIndex {
     meanShare: number
     weightedShare: number
     termWeightedShare: number
+    countsWidthBytes: number
+    maxCount: number
+    singletonEntryShare: number
+    singletonListShare: number
   } {
     const postings = this.requirePostings()
     const offsets = postings.offsets
@@ -681,6 +736,29 @@ export class NGramIndex {
       termTotal += termFrequency
       termWeighted += termFrequency * documentFrequency
     }
+    // What the corpus-wide `counts === null` shortcut would have needed, against
+    // what it actually gets: one repeated gram anywhere disables it, so the
+    // share of entries that *are* 1 is the number worth reporting.
+    let singletonEntries = 0
+    let singletonLists = 0
+    let maxCount = counts === null ? 1 : 0
+    for (let ordinal = 0; ordinal < distinctGrams; ordinal++) {
+      const from = offsets[ordinal]
+      const upto = offsets[ordinal + 1]
+      if (counts === null) {
+        singletonEntries += upto - from
+        singletonLists++
+        continue
+      }
+      let allOne = true
+      for (let at = from; at < upto; at++) {
+        const count = counts[at]
+        if (count === 1) singletonEntries++
+        else allOne = false
+        if (count > maxCount) maxCount = count
+      }
+      if (allOne) singletonLists++
+    }
     return {
       distinctGrams,
       totalEntries,
@@ -689,13 +767,18 @@ export class NGramIndex {
       weightedShare: totalEntries === 0 ? 0 : squared / totalEntries / this.choiceCount,
       termWeightedShare:
         termTotal === 0 ? 0 : termWeighted / termTotal / this.choiceCount,
+      countsWidthBytes: counts === null ? 0 : counts.BYTES_PER_ELEMENT,
+      maxCount,
+      singletonEntryShare: totalEntries === 0 ? 0 : singletonEntries / totalEntries,
+      singletonListShare: distinctGrams === 0 ? 0 : singletonLists / distinctGrams,
     }
   }
 
   diceBest(query: NGramProfile, threshold: number | null): Scored | undefined {
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessBest(query, threshold)
-    this.diceAccumulate(flattenQuery(query, this.radix))
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    this.diceAccumulate()
     const found = this.selectBest((id) => this.diceScore(query, id), threshold)
     this.reset()
     return found
@@ -706,10 +789,11 @@ export class NGramIndex {
     threshold: number | null,
     limit: number | null,
   ): Scored[] {
-    if (limit !== null && limit <= 0) return emptyLimit(limit)
     this.beginQuery(query)
+    if (validLimit(limit) === 0) return []
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
-    this.diceAccumulate(flattenQuery(query, this.radix))
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    this.diceAccumulate()
     const found = this.select((id) => this.diceScore(query, id), threshold, limit)
     this.reset()
     return found
@@ -737,10 +821,10 @@ export class NGramIndex {
     threshold: number | null,
     limit: number | null,
   ): Scored[] {
-    if (limit !== null && limit <= 0) return emptyLimit(limit)
+    this.beginQuery(query)
+    if (validLimit(limit) === 0) return []
     if (threshold === null || threshold <= 0)
       return this.diceSearch(query, threshold, limit)
-    this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
     const plan = this.prefixScan(query, threshold)
     const found = this.verifyTop(query, plan, threshold, limit)
@@ -757,7 +841,8 @@ export class NGramIndex {
   cosineBest(query: NGramProfile, threshold: number | null): Scored | undefined {
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessBest(query, threshold)
-    this.cosineAccumulate(flattenQuery(query, this.radix))
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    this.cosineAccumulate()
     const found = this.selectBest((id) => this.cosineScore(query, id), threshold)
     this.reset()
     return found
@@ -768,10 +853,11 @@ export class NGramIndex {
     threshold: number | null,
     limit: number | null,
   ): Scored[] {
-    if (limit !== null && limit <= 0) return emptyLimit(limit)
     this.beginQuery(query)
+    if (validLimit(limit) === 0) return []
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
-    this.cosineAccumulate(flattenQuery(query, this.radix))
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    this.cosineAccumulate()
     const found = this.select((id) => this.cosineScore(query, id), threshold, limit)
     this.reset()
     return found
@@ -787,7 +873,9 @@ export class NGramIndex {
    */
   private prefixScan(query: NGramProfile, threshold: number): PrefixPlan {
     const postings = this.requirePostings()
-    const { keys, counts } = flattenQuery(query, this.radix)
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    const keys = this.queryKeys
+    const counts = this.queryCounts
     const lengths: number[] = new Array<number>(keys.length)
     const order: number[] = new Array<number>(keys.length)
     for (let index = 0; index < keys.length; index++) {
@@ -1073,12 +1161,12 @@ export class NGramIndex {
    * callback in it is the one thing that would make every measurement here a
    * measurement of megamorphic dispatch.
    */
-  private diceAccumulate(query: FlatQuery): void {
+  private diceAccumulate(): void {
     const postings = this.requirePostings()
     const accumulator = this.accumulator
     const touched = this.touched
-    const keys = query.keys
-    const queryCounts = query.counts
+    const keys = this.queryKeys
+    const queryCounts = this.queryCounts
     let entries = 0
     const ids = postings.ids
     const postingCounts = postings.counts
@@ -1114,12 +1202,12 @@ export class NGramIndex {
     this.counters.candidatesTouched = touched.length
   }
 
-  private cosineAccumulate(query: FlatQuery): void {
+  private cosineAccumulate(): void {
     const postings = this.requirePostings()
     const accumulator = this.accumulator
     const touched = this.touched
-    const keys = query.keys
-    const queryCounts = query.counts
+    const keys = this.queryKeys
+    const queryCounts = this.queryCounts
     let entries = 0
     const ids = postings.ids
     const postingCounts = postings.counts

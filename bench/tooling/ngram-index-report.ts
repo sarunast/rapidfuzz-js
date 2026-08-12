@@ -247,11 +247,12 @@ interface BuiltIndex {
  * question and answer it flatteringly.
  */
 let packedKeys = true
+let startRadix: number | null = null
 let directBuild = false
 
 function buildIndex(choices: readonly string[], gramSize: number): BuiltIndex {
   const started = process.hrtime.bigint()
-  const index = new NGramIndex(gramSize, choices.length, packedKeys)
+  const index = new NGramIndex(gramSize, choices.length, packedKeys, startRadix)
   if (directBuild) {
     for (let id = 0; id < choices.length; id++) index.addSequence(id, choices[id])
   } else {
@@ -746,11 +747,51 @@ function measureArm(
   }
 }
 
+/**
+ * One corpus, described the way it needs to be read: what the index is, and
+ * what one query of each class costs against it, beside the number of
+ * candidates the exhaustive Matcher would have scored.
+ */
+function summarise(n: number, corpusClass: CorpusClass, gramSize: number): void {
+  const corpus = corpusOf(corpusClass, n, gramSize)
+  const built = buildIndex(corpus.choices, gramSize)
+  const index = built.index
+  const stats = index.postingStatistics()
+  const percent = (value: number): string => `${(value * 100).toFixed(1)}%`
+  process.stdout.write(
+    `\n  ${corpusClass}, gram size ${gramSize}\n` +
+      `    choices                ${n.toLocaleString().padStart(12)}\n` +
+      `    distinct grams         ${stats.distinctGrams.toLocaleString().padStart(12)}\n` +
+      `    posting entries        ${stats.totalEntries.toLocaleString().padStart(12)}\n` +
+      `    counts width           ${`${stats.countsWidthBytes} byte`.padStart(12)}\n` +
+      `    max count              ${String(stats.maxCount).padStart(12)}\n` +
+      `    entries with count 1   ${percent(stats.singletonEntryShare).padStart(12)}\n` +
+      `    lists all count 1      ${percent(stats.singletonListShare).padStart(12)}\n` +
+      `    mean posting share     ${stats.meanShare.toFixed(5).padStart(12)}\n` +
+      `    weighted share         ${stats.weightedShare.toFixed(5).padStart(12)}\n` +
+      `    term-weighted share    ${stats.termWeightedShare.toFixed(5).padStart(12)}\n` +
+      `    index build            ${`${built.buildMs.toFixed(0)} ms`.padStart(12)}\n` +
+      `\n    query              postings   candidates   verified   scored by Matcher\n`,
+  )
+  for (const queryClass of QUERY_CLASSES) {
+    const query = corpus.queries.get(queryClass)
+    if (query === undefined) throw new Error(`missing query class ${queryClass}`)
+    index.dicePrefixSearch(buildProfile(query, gramSize), 0.8, 5)
+    const counters = { ...index.counters }
+    process.stdout.write(
+      `    ${queryClass.padEnd(17)}${counters.postingEntriesTouched.toLocaleString().padStart(9)}` +
+        `${counters.candidatesTouched.toLocaleString().padStart(13)}` +
+        `${counters.verifiedCandidates.toLocaleString().padStart(11)}` +
+        `${n.toLocaleString().padStart(20)}\n`,
+    )
+  }
+}
+
 // ---------------------------------------------------------------- entry point
 
 const SIZES: readonly number[] = [100, 1_000, 10_000, 100_000, 1_000_000]
 
-type Mode = 'parity' | 'counters' | 'memory'
+type Mode = 'parity' | 'counters' | 'memory' | 'summary'
 
 interface Options {
   readonly mode: Mode
@@ -763,6 +804,7 @@ interface Options {
   readonly threshold: number
   readonly sweep: boolean
   readonly packedKeys: boolean
+  readonly startRadix: number | null
   readonly directBuild: boolean
 }
 
@@ -798,16 +840,19 @@ function parseOptions(): Options {
   let threshold = 0.5
   let sweep = false
   let packedKeys = true
+  let startRadix: number | null = null
   let directBuild = false
   for (const argument of process.argv.slice(2)) {
     if (argument === '--parity') mode = 'parity'
     else if (argument === '--counters') mode = 'counters'
     else if (argument === '--memory') mode = 'memory'
+    else if (argument === '--summary') mode = 'summary'
     else if (argument === '--sweep') sweep = true
     else if (argument === '--build=direct') directBuild = true
     else if (argument === '--build=profile') directBuild = false
     else if (argument === '--keys=string') packedKeys = false
     else if (argument === '--keys=packed') packedKeys = true
+    else if (argument === '--keys=bmp') startRadix = 0x1_0000
     else if (argument.startsWith('--max=')) max = numberOf(argument, '--max=')
     else if (argument.startsWith('--runs=')) runs = numberOf(argument, '--runs=')
     else if (argument.startsWith('--n=')) n = numberOf(argument, '--n=')
@@ -834,6 +879,7 @@ function parseOptions(): Options {
     threshold,
     sweep,
     packedKeys,
+    startRadix,
     directBuild,
   }
 }
@@ -850,6 +896,7 @@ function gramSizesFor(n: number): readonly number[] {
 const options = parseOptions()
 counterThreshold = options.threshold
 packedKeys = options.packedKeys
+startRadix = options.startRadix
 directBuild = options.directBuild
 
 if (options.mode === 'parity') {
@@ -860,6 +907,18 @@ if (options.mode === 'parity') {
     throw new Error('--memory needs --n, --corpus, --gram and --arm')
   }
   process.stdout.write(`${JSON.stringify(measureArm(n, corpus, gramSize, arm))}\n`)
+} else if (options.mode === 'summary') {
+  for (const n of SIZES) {
+    if (n > options.max) continue
+    if (options.n !== null && n !== options.n) continue
+    for (const corpusClass of options.sweep ? SWEEP_CLASSES : CORPUS_CLASSES) {
+      if (options.corpus !== null && corpusClass !== options.corpus) continue
+      for (const gramSize of gramSizesFor(n)) {
+        if (options.gramSize !== null && gramSize !== options.gramSize) continue
+        summarise(n, corpusClass, gramSize)
+      }
+    }
+  }
 } else {
   for (const n of SIZES) {
     if (n > options.max) continue
