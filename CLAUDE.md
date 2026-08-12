@@ -203,7 +203,7 @@ metric brand in the declarations a consumer compiles against, and is checked
 at runtime for scorer compatibility — `pnpm check:consumer` guards the second
 of those, which source-level type tests cannot see.
 
-Any type the public API can *infer* into a consumer's exported signature must
+Any type the public API can _infer_ into a consumer's exported signature must
 be nameable without importing our internals: exported from a public
 entrypoint, or built from language-native constructs — the metric brand is
 the id literal itself for exactly this reason. A type that fails this rule
