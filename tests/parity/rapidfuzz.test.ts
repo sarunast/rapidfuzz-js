@@ -215,8 +215,8 @@ function fuzzScore(name: string, left: string, right: string): number {
       return fuzz.partialTokenSetSimilarity(left, right)
     case 'partialTokenSimilarity':
       return fuzz.partialTokenSimilarity(left, right)
-    case 'fuzzySimilarity':
-      return fuzz.fuzzySimilarity(left, right)
+    case 'weightedSimilarity':
+      return fuzz.weightedSimilarity(left, right)
     default:
       throw new TypeError(`unknown fuzz oracle ${name}`)
   }

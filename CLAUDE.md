@@ -19,7 +19,7 @@ canonical lowercase algorithm subpaths, no legacy aggregate namespaces.
   regression tests named after upstream issue numbers — the number is the reason
   the test exists.
 - **Naming is camelCase and describes this API**: `similarity`,
-  `partialSimilarity`, `fuzzySimilarity`, `createScorer`, `createMatcher`. Never
+  `partialSimilarity`, `weightedSimilarity`, `createScorer`, `createMatcher`. Never
   restore `WRatio`, `QRatio`, or `extractOne`.
 - **Correctness before speed.** A straightforward DP matching a bit-parallel or
   SIMD upstream kernel is acceptable; optimise later, behind the ported tests.

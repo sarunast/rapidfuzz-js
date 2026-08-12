@@ -5,7 +5,7 @@ import {
   similarity as levenshteinSimilarity,
 } from '../src/algorithms/levenshtein/index.js'
 import {
-  fuzzySimilarity,
+  weightedSimilarity,
   similarity as fuzzSimilarity,
   tokenSortSimilarity,
 } from '../src/fuzz/index.js'
@@ -31,7 +31,7 @@ const titleQueries = sentences(30, 5, 0x1122_3344)
 const titleQuery = 'alpha bravo charlie delta echo'
 
 const fuzzy = createScorer(fuzzSimilarity)
-const adaptive = createScorer(fuzzySimilarity)
+const adaptive = createScorer(weightedSimilarity)
 const tokenSort = createScorer(tokenSortSimilarity)
 const rawDistance = createScorer(levenshteinDistance)
 const rawSimilarity = createScorer(levenshteinSimilarity)

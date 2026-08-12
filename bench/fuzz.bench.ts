@@ -1,9 +1,9 @@
-import { wRatio } from '../src/fuzz/fuzzy.js'
 import { partialRatio } from '../src/fuzz/partial.js'
 import { partialTokenSetRatio } from '../src/fuzz/partialTokenSet.js'
 import { ratio } from '../src/fuzz/similarity.js'
 import { tokenSetRatio } from '../src/fuzz/tokenSet.js'
 import { tokenSortRatio } from '../src/fuzz/tokenSort.js'
+import { wRatio } from '../src/fuzz/weighted.js'
 import { pairs, sentences, similarPairs } from './tooling/corpus.js'
 import { describe, measure } from './tooling/harness.js'
 

@@ -152,5 +152,5 @@ export function wRatio_impl(
 export const wRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(wRatio_impl, FUZZ_FLAGS, prepareFuzz('wRatio'))
 
-export const fuzzySimilarity: BuiltInMetric<'fuzz.fuzzySimilarity', 'similarity'> =
+export const weightedSimilarity: BuiltInMetric<'fuzz.weightedSimilarity', 'similarity'> =
   /* @__PURE__ */ fuzzMetric(wRatio)

@@ -186,7 +186,7 @@ fuzz_scorers = {
     "partialTokenSortSimilarity": fuzz.partial_token_sort_ratio,
     "partialTokenSetSimilarity": fuzz.partial_token_set_ratio,
     "partialTokenSimilarity": fuzz.partial_token_ratio,
-    "fuzzySimilarity": fuzz.WRatio,
+    "weightedSimilarity": fuzz.WRatio,
 }
 fuzz_inputs = [
     ["", ""],

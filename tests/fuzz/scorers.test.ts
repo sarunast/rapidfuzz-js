@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest'
 
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
-import { wRatio } from '../../src/fuzz/fuzzy.js'
 import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partial.js'
 import { partialTokenRatio } from '../../src/fuzz/partialToken.js'
 import { partialTokenSetRatio } from '../../src/fuzz/partialTokenSet.js'
@@ -12,6 +11,7 @@ import { tokenRatio } from '../../src/fuzz/token.js'
 import { tokenSetRatio } from '../../src/fuzz/tokenSet.js'
 import { tokenSortRatio } from '../../src/fuzz/tokenSort.js'
 import type { FuzzInput, FuzzOptions } from '../../src/fuzz/types.js'
+import { wRatio } from '../../src/fuzz/weighted.js'
 import { callUntyped } from '../support/common.js'
 
 /**

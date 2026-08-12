@@ -157,7 +157,6 @@ describe('dependency direction', () => {
   it('keeps fuzz families physically and directionally isolated', () => {
     const directory = join(source, 'fuzz')
     expect(readdirSync(directory).sort()).toEqual([
-      'fuzzy.ts',
       'index.ts',
       'internal',
       'partial.ts',
@@ -169,12 +168,13 @@ describe('dependency direction', () => {
       'tokenSet.ts',
       'tokenSort.ts',
       'types.ts',
+      'weighted.ts',
     ])
     expect(readFileSync(join(directory, 'similarity.ts'), 'utf8')).not.toMatch(
-      /from ['"]\.\/(fuzzy|partial|partialToken|partialTokenSet|partialTokenSort|token|tokenSet|tokenSort)\.js/,
+      /from ['"]\.\/(weighted|partial|partialToken|partialTokenSet|partialTokenSort|token|tokenSet|tokenSort)\.js/,
     )
     expect(readFileSync(join(directory, 'partial.ts'), 'utf8')).not.toMatch(
-      /from ['"]\.\/(fuzzy|partialToken|partialTokenSet|partialTokenSort|token|tokenSet|tokenSort)\.js/,
+      /from ['"]\.\/(weighted|partialToken|partialTokenSet|partialTokenSort|token|tokenSet|tokenSort)\.js/,
     )
     for (const name of [
       'partialToken.ts',
@@ -185,7 +185,7 @@ describe('dependency direction', () => {
       'tokenSort.ts',
     ]) {
       expect(readFileSync(join(directory, name), 'utf8')).not.toMatch(
-        /from ['"][^'"]*fuzzy/,
+        /from ['"][^'"]*weighted/,
       )
     }
   })
