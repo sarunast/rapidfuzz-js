@@ -394,12 +394,16 @@ Distance scorers always throw on missing operands. Empty sequences are valid.
 Numbers (including `NaN`), booleans, and objects without a valid array-like
 `length` are invalid.
 
-Empty and whitespace-only inputs are where the fuzz scorers disagree with each
-other, and deliberately so — `tokenSetSimilarity`, `partialTokenSetSimilarity`
-and `weightedSimilarity` answer `0` where `similarity` and the sort-based
-scorers answer `100`. A side with no tokens has no set to intersect;
-FuzzyWuzzy returns `0` there and RapidFuzz keeps it (issue 110), so this port
-does too.
+Empty inputs are where the fuzz scorers disagree with each other, and
+deliberately so — `tokenSetSimilarity`, `partialTokenSetSimilarity` and
+`weightedSimilarity` answer `0` for two empty inputs where `similarity` and the
+sort-based scorers answer `100`. FuzzyWuzzy returns `0` there and RapidFuzz
+keeps it (issue 110), so this port does too.
+
+Whitespace-only inputs split the three: the two token-set scorers still answer
+`0`, because a side that tokenizes to nothing has no set to intersect, while
+`weightedSimilarity` sees two non-empty strings and scores identical whitespace
+`100`.
 
 Options objects — for searches, Matcher methods, `scoreMatrix`, `scorePairs`,
 and `prepareChoice` — reject unknown keys:

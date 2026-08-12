@@ -270,6 +270,9 @@ it('carries the empty-input split through to the public scorers', () => {
   ]) {
     expect(createScorer(metric).score('    ', '    ')).toBe(0)
   }
+  // Whitespace splits the three: `weightedSimilarity`'s zero is for an empty
+  // side, and whitespace is not one — RapidFuzz answers 100 here too.
+  expect(createScorer(publicFuzz.weightedSimilarity).score('    ', '    ')).toBe(100)
 })
 
 describe('invalid input throws', () => {
