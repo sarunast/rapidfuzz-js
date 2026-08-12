@@ -28,9 +28,9 @@ describe('the profile at every depth', () => {
     expect(cosineSimilarity('aaaa', 'aaa')).toBe(1)
   })
 
-  it('specializes unigrams and bigrams without changing the answer', () => {
-    // gramSize 1 and 2 take literal loops; 3 and up take the explicit stack.
-    // The three paths have to agree wherever they overlap.
+  it('specializes gram sizes 1 to 3 without changing the answer', () => {
+    // gramSize 1, 2 and 3 take literal loops; 4 and up take the explicit stack.
+    // The four paths have to agree wherever they overlap.
     for (const gramSize of [1, 2, 3, 4, 9]) {
       const a = buildProfile('abcabcab', gramSize)
       const b = buildProfile('abcabc', gramSize)
@@ -40,6 +40,22 @@ describe('the profile at every depth', () => {
     expect(sharedFrequency(buildProfile('aba', 1), buildProfile('ab', 1))).toBe(2)
     expect(sharedFrequency(buildProfile('aba', 2), buildProfile('ab', 2))).toBe(1)
     expect(sharedFrequency(buildProfile('abcd', 3), buildProfile('abc', 3))).toBe(1)
+  })
+
+  it('leaves a trigram unmatched at whichever level first diverges', () => {
+    // The literal trigram loop misses at two levels, and each has its own exit:
+    // an absent first element never reaches the second, and an absent second
+    // never reaches the counts.
+    const abc = buildProfile('abc', 3)
+    for (const other of ['xbc', 'axc']) {
+      const diverging = buildProfile(other, 3)
+      expect(sharedFrequency(abc, diverging), other).toBe(0)
+      expect(dotProduct(abc, diverging), other).toBe(0)
+    }
+    // Both levels match and only the last element differs, which is where the
+    // counts of two reachable leaves are compared.
+    expect(sharedFrequency(abc, buildProfile('abx', 3))).toBe(0)
+    expect(dotProduct(buildProfile('abcabc', 3), buildProfile('abcab', 3))).toBe(4)
   })
 
   it('has nothing to intersect when a profile has no grams', () => {
@@ -96,6 +112,23 @@ describe('element equality', () => {
     const trailing = buildProfile(['a', 'b', 'c', Number.NaN], 2)
     expect(trailing.gramCount).toBe(3)
     expect(sharedFrequency(trailing, buildProfile(['a', 'b', 'c'], 2))).toBe(2)
+  })
+
+  it('reaches back a whole window for a leading NaN at depth 3', () => {
+    // The depth-3 builder unrolls the scan of the elements before the first
+    // window, so which of the two it finds — and that a later one wins — is
+    // worth pinning: an off-by-one here is a wrong `squaredNorm`, not a crash.
+    const second = buildProfile(['a', Number.NaN, 'c', 'd', 'e'], 3)
+    expect(second.gramCount).toBe(3)
+    // Two windows reach the NaN and count only toward the norm; `cde` is the
+    // one gram inserted.
+    expect(second.squaredNorm).toBe(3)
+    expect(sharedFrequency(second, buildProfile(['x', 'y', 'c', 'd', 'e'], 3))).toBe(1)
+
+    const first = buildProfile([Number.NaN, 'b', 'c', 'd'], 3)
+    expect(first.gramCount).toBe(2)
+    expect(first.squaredNorm).toBe(2)
+    expect(sharedFrequency(first, buildProfile(['b', 'c', 'd'], 3))).toBe(1)
   })
 
   it('matches negative zero to positive zero', () => {

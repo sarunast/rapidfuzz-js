@@ -245,6 +245,33 @@ describe('thresholds', () => {
     ).toBeUndefined()
   })
 
+  it('gives the walk up early without moving a qualifying score', () => {
+    // The prepared kernel stops once the query's remaining frequency cannot
+    // reach the cutoff and returns a count below it, so a threshold has to
+    // agree with the full walk everywhere — the exact boundary included, which
+    // is what the slack in `relaxedShared` is for.
+    const query = 'abcdefabc'
+    const candidates = ['abcdefabc', 'abcdefxyz', 'xyzabcdef', 'uvwxyzuvw']
+    for (const gramSize of [1, 2, 3]) {
+      const scorer = createScorer(diceMetric, { gramSize })
+      for (const candidate of candidates) {
+        const exact = scorer.score(query, candidate)
+        const matcher = createMatcher([candidate], { scorer })
+        const label = `gramSize ${gramSize}, ${candidate}`
+        expect(matcher.best(query)?.score, label).toBeCloseTo(exact, 12)
+        expect(matcher.best(query, { threshold: exact })?.score, label).toBeCloseTo(
+          exact,
+          12,
+        )
+        expect(matcher.best(query, { threshold: exact + 1e-9 }), label).toBeUndefined()
+        // High enough that the walk gives up on the unrelated candidates part
+        // way through rather than at the last group.
+        const strict = matcher.best(query, { threshold: 0.9 })
+        expect(strict === undefined || strict.score >= 0.9, label).toBe(true)
+      }
+    }
+  })
+
   it('applies a threshold to sequences that have no grams', () => {
     const scorer = createScorer(diceMetric)
     expect(scorer.score('a', 'b', { threshold: 0.5 })).toBeUndefined()
