@@ -41,17 +41,19 @@ import type {
  * matcher.search('src/algorthms/dice.ts', { limit: 5, threshold: 0.5 })
  * ```
  *
- * On 10,000 file paths that measured **70–120x faster** per query than the
- * exhaustive matcher, retaining **207 bytes a choice against roughly 19,300**.
+ * On 10,000 `node_modules` file paths at `gramSize: 3`, searching for a path
+ * that exists or one with a typo in it: **45–63x faster** per query, retaining
+ * **235 bytes a choice against 18,049** — 77x less. Construction is **faster
+ * too**, about 0.6x, because the index reads each choice's grams once instead
+ * of building a profile per choice and keeping it.
  *
- * Three things to weigh before reaching for it:
+ * Two things to weigh before reaching for it:
  *
- * - **It is not always faster.** The win comes from a query's grams naming few
- *   choices. A query built from grams that nearly every choice shares — a
- *   common substring in a corpus of similar strings — falls to about 3x, and a
- *   two-letter alphabet loses outright.
- * - **Construction costs more**, roughly 1.4x, because the representation is
- *   built in two passes. It is a rebuild-only structure, as a Matcher is.
+ * - **It is not uniformly faster, and can be slower.** The win comes from a
+ *   query's grams naming few choices. On that same corpus a query of
+ *   `'node_modules/'` — grams nearly every choice shares — measured **1x** for
+ *   Dice, and a two-letter alphabet loses outright. Cosine keeps its lead there
+ *   because its exhaustive path has no length bound to prune with.
  * - **`searchIter` settles the whole result before yielding**, where
  *   `createMatcher` scores lazily. Same values, same order; a caller who breaks
  *   out early saves nothing.

@@ -98,3 +98,59 @@ query, or preparation is worth keeping _across_ rebuilds — prepare each
 candidate yourself and hand the handles to a one-shot search (or to
 `createMatcher` via `getPrepared`, which then resolves them once instead of
 preparing at all): [Prepared choices](/guides/prepared-choices/).
+
+## Indexed Matchers, for Dice and Cosine
+
+`createIndexedMatcher` builds the **same Matcher over a different
+representation**. Instead of preparing every choice and scoring them one at a
+time, it turns the whole collection into a single inverted n-gram index that
+answers a query without visiting choices that share nothing with it.
+
+```ts
+import { createIndexedMatcher, createScorer } from 'rapidfuzz-js'
+import { similarity as diceSimilarity } from 'rapidfuzz-js/dice'
+
+const matcher = createIndexedMatcher(files, {
+  scorer: createScorer(diceSimilarity, { gramSize: 3 }),
+  getText: (file) => file.path,
+})
+matcher.search('src/algorthms/dice.ts', { limit: 5, threshold: 0.5 })
+```
+
+Everything after construction is identical — `best`, `search`, `searchIter`,
+`size`, `scorer`, the same `Match` objects, the same order and the same tie
+breaks — so swapping the constructor is the whole change at a call site. The
+results are exact, not approximate: it returns what scoring every choice would
+have returned, to the bit.
+
+On 10,000 `node_modules` file paths at `gramSize: 3`:
+
+| Query                     | Indexed |  Matcher |     |
+| ------------------------- | ------: | -------: | --: |
+| a path that exists        | 0.21 ms | 12.20 ms | 57x |
+| the same path with a typo | 0.21 ms | 12.89 ms | 61x |
+| `'node_modules/'`         | 0.17 ms |  0.14 ms |  1x |
+| a rare fragment           | 0.06 ms |  0.14 ms |  2x |
+
+Retained memory is **235 bytes a choice against 18,049** — 77x less — and
+construction is about **0.6x**, because the index reads each choice's grams once
+rather than building a profile per choice and keeping it. It is less of both,
+which is not the usual index trade.
+
+### When not to reach for it
+
+- **Only `dice.similarity` and `cosine.similarity` have one.** Any other scorer
+  throws at construction, and a distance scorer is a compile error.
+- **The win is selectivity, not size.** It comes from a query's grams naming few
+  choices. The `'node_modules/'` row above is the adverse case in miniature: a
+  query made of grams nearly every choice shares reaches everything anyway, and
+  Dice's exhaustive path prunes it with a length bound the index has no use for.
+  A two-letter alphabet loses outright. Cosine keeps its lead on that row only
+  because its exhaustive path has no such bound to prune with.
+- **`searchIter` is no longer lazy.** It yields the same values in the same
+  collection order, but accumulation is the work an index does, so it settles the
+  whole result before the first one. A caller who breaks out early saves nothing.
+- **Choices must be text, or sequences of integers.** Code points qualify;
+  an array of objects does not, and is refused at construction.
+- **`getPrepared` is not an option.** A prepared handle is the per-choice
+  representation an index replaces.
