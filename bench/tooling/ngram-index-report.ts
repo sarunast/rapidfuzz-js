@@ -309,14 +309,7 @@ function filePathCorpus(count: number, gramSize: number): Corpus {
       `the file-path corpus holds ${paths.length} entries, short of ${count}`,
     )
   }
-  // Strided rather than sliced. The list is sorted, so its first thousand
-  // entries are one or two packages' worth of near-identical paths — a subset far
-  // more self-similar than the tree it came from, which would be a fake corpus
-  // wearing a real one's name. A stride samples the whole tree at any size, and
-  // is the identity when the whole corpus is asked for.
-  const stride = Math.max(1, Math.floor(paths.length / count))
-  const choices: string[] = new Array<string>(count)
-  for (let at = 0; at < count; at++) choices[at] = paths[at * stride]
+  const choices = sampleEvenly(paths, count)
   const next = rng(0x0c0f_fee1)
   const hits = spread(choices, 'index.js')
   const segments = new Map<string, number>()
@@ -349,6 +342,23 @@ function filePathCorpus(count: number, gramSize: number): Corpus {
     ]),
     separatesFrequency: true,
   }
+}
+
+/**
+ * `count` entries spread proportionally across the whole of `source`.
+ *
+ * An integer stride does not do this: at 10,000 of 12,947 the stride floors to
+ * 1, which is the sorted prefix the striding was there to avoid, and at 1,000 it
+ * is 12, leaving the last 958 paths unreachable. Proportional positions cover
+ * the range at every size, and are the identity when the whole corpus is asked
+ * for. Same rule as `spread`.
+ */
+function sampleEvenly(source: readonly string[], count: number): string[] {
+  const picked: string[] = new Array<string>(count)
+  for (let at = 0; at < count; at++) {
+    picked[at] = source[Math.floor((source.length * (at + 0.5)) / count)]
+  }
+  return picked
 }
 
 let cachedPaths: readonly string[] | null = null
@@ -517,20 +527,19 @@ interface ParityCase {
   readonly config: ExperimentConfig
 }
 
+const BUILD_MODES = ['profile', 'direct'] as const
+const KEY_MODES = ['auto', 'bmp', 'full', 'string'] as const
+
 /**
- * `addSequence` and `add` are two separate builders, and each key scheme is a
- * separate keying path, so parity has to cover the product rather than whichever
- * configuration the last flag happened to select. `bmp` and `full` pin rungs the
- * ladder would otherwise only reach when a wide element forces it.
+ * The whole product, generated rather than listed — a hand-written list said it
+ * covered the product while missing `profile + bmp` and `direct + full`, and the
+ * two builders are not interchangeable: `add` widens in a loop, `addSequence`
+ * restarts through recursion, so the same pinned rung exercises different code
+ * on each. `supports` drops the pairs a gram size cannot hold.
  */
-const CONFIGS: readonly ExperimentConfig[] = [
-  { buildMode: 'profile', keyMode: 'auto' },
-  { buildMode: 'profile', keyMode: 'string' },
-  { buildMode: 'direct', keyMode: 'auto' },
-  { buildMode: 'direct', keyMode: 'string' },
-  { buildMode: 'direct', keyMode: 'bmp' },
-  { buildMode: 'profile', keyMode: 'full' },
-]
+const CONFIGS: readonly ExperimentConfig[] = BUILD_MODES.flatMap((buildMode) =>
+  KEY_MODES.map((keyMode) => ({ buildMode, keyMode })),
+)
 
 function label(each: ParityCase, call: 'search' | 'best'): string {
   return `${call} ${JSON.stringify(each)}`
@@ -773,10 +782,20 @@ function quantile(sorted: readonly number[], fraction: number): number {
   return sorted[at]
 }
 
+/**
+ * `p95` is `null` below `P95_MINIMUM_RUNS`, and that is the honest reading. With
+ * 5 samples `sorted[floor(0.95 * 5)]` is `sorted[4]` — the maximum, reported
+ * under a percentile's name; with 15 it is still the maximum. A tail number for
+ * the large corpora belongs to `bench/ngramIndex.bench.ts`, where adaptive
+ * sampling takes hundreds of samples per case, not to a script whose exhaustive
+ * arm costs tens of milliseconds a call.
+ */
 interface Latency {
   readonly p50: number
-  readonly p95: number
+  readonly p95: number | null
 }
+
+const P95_MINIMUM_RUNS = 40
 
 /** Where every timed body's result goes, so V8 cannot delete the work. */
 const sink: { value: unknown } = { value: undefined }
@@ -803,7 +822,10 @@ function timeQuantiles(runs: number, body: (run: number) => unknown): Latency {
     samples.push(Number(process.hrtime.bigint() - started) / 1e6)
   }
   samples.sort((left, right) => left - right)
-  return { p50: quantile(samples, 0.5), p95: quantile(samples, 0.95) }
+  return {
+    p50: quantile(samples, 0.5),
+    p95: samples.length >= P95_MINIMUM_RUNS ? quantile(samples, 0.95) : null,
+  }
 }
 
 interface CounterRow {
@@ -827,7 +849,8 @@ interface CounterRow {
   readonly candidatesTouchedRatio: number
   readonly candidatesQualified: number
   readonly indexedMs: number
-  readonly indexedP95Ms: number
+  /** Null below `P95_MINIMUM_RUNS` samples — see {@link Latency}. */
+  readonly indexedP95Ms: number | null
   readonly exhaustiveMs: number | null
   readonly exhaustiveP95Ms: number | null
   /** The prefix-filtered Dice path, where it applies; null for Cosine. */
@@ -849,13 +872,15 @@ const COUNTER_LIMIT = 5
 const EXHAUSTIVE_LIMIT = 100_000
 
 /**
- * Enough samples for a p95 to mean something, without letting the exhaustive arm
- * at 100k — tens of milliseconds a query — set the length of the whole pass.
+ * Below 10k a query is cheap enough to sample past `P95_MINIMUM_RUNS`, so those
+ * rows carry a real tail. Above it the exhaustive arm is tens of milliseconds a
+ * call and would set the length of the whole pass; those rows report `p50` and a
+ * null `p95` rather than a maximum pretending to be one.
  */
 function counterRuns(n: number): number {
   if (n >= 100_000) return 5
   if (n >= 10_000) return 15
-  return 31
+  return 41
 }
 
 function counterRows(
@@ -1074,14 +1099,19 @@ interface PeakRow {
   readonly gramSize: number
   readonly buildMode: BuildMode
   readonly keyMode: KeyMode
-  /** The corpus itself, held before the build starts and after it ends. */
-  readonly corpusBytes: number
+  /**
+   * Everything held before the build starts: the corpus, plus the runtime and
+   * module heap under it. Not the corpus's size — nothing here measures that.
+   */
+  readonly baselineBytes: number
   readonly peakHeapBytes: number
   readonly peakArrayBufferBytes: number
   readonly peakRssBytes: number
-  /** Peak heap over the corpus baseline: what the build itself needed. */
+  /** `heapUsed + arrayBuffers` at its highest, the same sum `--memory` reports. */
+  readonly peakRetainedBytes: number
+  /** Peak retained over the baseline: what the build itself needed. */
   readonly peakBuildBytes: number
-  /** Retained over the corpus baseline, matching what `--memory` reports. */
+  /** Retained over the baseline, matching what `--memory` reports. */
   readonly retainedBytes: number
   readonly buildMs: number
 }
@@ -1112,8 +1142,15 @@ function measurePeak(
   let peakHeap = 0
   let peakBuffers = 0
   let peakRss = 0
+  // Tracked as one sum per sample, not as two independent maxima. Subtracting a
+  // `heapUsed + arrayBuffers` baseline from a `heapUsed` peak is not the build's
+  // peak of anything — it undercounts by whatever the corpus already held in
+  // buffers, and the two maxima need not occur at the same instant either.
+  let peakRetained = baseline
   const sample = (): void => {
     const usage = process.memoryUsage()
+    const retained = usage.heapUsed + usage.arrayBuffers
+    if (retained > peakRetained) peakRetained = retained
     if (usage.heapUsed > peakHeap) peakHeap = usage.heapUsed
     if (usage.arrayBuffers > peakBuffers) peakBuffers = usage.arrayBuffers
     if (usage.rss > peakRss) peakRss = usage.rss
@@ -1140,11 +1177,12 @@ function measurePeak(
     gramSize,
     buildMode: config.buildMode,
     keyMode: config.keyMode,
-    corpusBytes: baseline,
+    baselineBytes: baseline,
     peakHeapBytes: peakHeap,
     peakArrayBufferBytes: peakBuffers,
     peakRssBytes: peakRss,
-    peakBuildBytes: peakHeap - baseline,
+    peakRetainedBytes: peakRetained,
+    peakBuildBytes: peakRetained - baseline,
     retainedBytes: retained - baseline,
     buildMs,
   }
@@ -1346,6 +1384,17 @@ function depthsFor(chosen: Options, n: number): readonly number[] {
   )
 }
 
+// Before every mode that measures rather than validates, including the memory
+// ones: they are not scoring benchmarks, but they build through a specific
+// builder and key scheme, and a byte count for a representation that answers
+// wrong is no better than a timing for one.
+if (options.mode !== 'parity') {
+  const smoke = smokeParity(options.config)
+  process.stdout.write(
+    `${JSON.stringify({ kind: 'parity', mode: 'smoke', cases: smoke, ...options.config })}\n`,
+  )
+}
+
 if (options.mode === 'parity') {
   await parity(options.runs)
 } else if (options.mode === 'memory') {
@@ -1363,13 +1412,6 @@ if (options.mode === 'parity') {
   }
   process.stdout.write(`${JSON.stringify(measurePeak(n, corpus, gramSize, config))}\n`)
 } else {
-  // Under the configuration about to be measured, not whichever one the last
-  // flag happened to select: `addSequence` and each key scheme are separate
-  // implementations, and a timing for a wrong answer is worth nothing.
-  const smoke = smokeParity(options.config)
-  process.stdout.write(
-    `${JSON.stringify({ kind: 'parity', mode: 'smoke', cases: smoke, ...options.config })}\n`,
-  )
   let produced = 0
   for (const n of sizesFor(options)) {
     for (const corpusClass of classesFor(options)) {
