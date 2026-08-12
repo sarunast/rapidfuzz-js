@@ -1218,6 +1218,7 @@ export class NGramIndex {
   }
 
   cosineBest(query: NGramProfile, threshold: number | null): Scored | undefined {
+    this.requireWideAccumulator()
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessBest(query, threshold)
     flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
@@ -1232,6 +1233,7 @@ export class NGramIndex {
     threshold: number | null,
     limit: number | null,
   ): Scored[] {
+    this.requireWideAccumulator()
     this.beginQuery(query)
     if (validLimit(limit) === 0) return []
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
@@ -1678,13 +1680,20 @@ export class NGramIndex {
 
   /**
    * Cosine's dot product is bounded by `queryGrams × choiceGrams`, not by the
-   * query alone, so the narrow accumulator is not safe for it and this refuses
-   * rather than wrapping into a wrong score.
+   * query alone, so the narrow accumulator is not safe for it.
+   *
+   * On the entry points rather than in `cosineAccumulate`, because a gramless
+   * query is answered before accumulation is reached: guarding the loop alone
+   * let `cosineSearch('')` succeed on an index that refused every other query,
+   * which is a contract that holds for all inputs or for none.
    */
-  private cosineAccumulate(): void {
+  private requireWideAccumulator(): void {
     if (this.narrowAccumulator) {
       throw new TypeError('a narrow accumulator holds Dice only')
     }
+  }
+
+  private cosineAccumulate(): void {
     const postings = this.requirePostings()
     const accumulator = this.accumulator
     const touched = this.touched
