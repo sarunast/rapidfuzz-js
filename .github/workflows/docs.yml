@@ -63,6 +63,16 @@ jobs:
       # than to the built declarations. So there is nothing to install or build
       # at the root, and adding it would only be a slower way to reach the same
       # artifact.
+      #
+      # If this step fails with ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION, read the
+      # publish timestamp in the message before touching anything. pnpm 11
+      # rejects any lockfile entry published in the last 24 hours — a default,
+      # not a setting in this repository — so a dependency bumped today fails
+      # here until it ages out, and the same run passes unchanged afterwards.
+      # The message suggests a stale lockfile or a bypassed policy, which is
+      # what makes this worth writing down: usually neither is true, and the fix
+      # is to re-run the job later rather than to relax the policy or pin the
+      # dependency back. It applies to the library's own CI equally.
       - name: Install
         run: pnpm install --frozen-lockfile
         working-directory: docs
