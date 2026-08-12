@@ -8,7 +8,7 @@ in the wrong order. [Levenshtein](/algorithms/levenshtein/) charges that as
 **two** edits (two replacements), which overstates how wrong it is: to a
 human it's one slip of the fingers.
 
-OSA — *optimal string alignment* — adds the missing operation: swapping two
+OSA — _optimal string alignment_ — adds the missing operation: swapping two
 adjacent characters costs **one** edit.
 
 ```ts
@@ -19,7 +19,7 @@ levenshtein('recieve', 'receive') // 2 — two replacements
 distance('recieve', 'receive') // 1 — one swap
 ```
 
-`similarity` reports the same view on 0–1.
+`normalizedSimilarity` reports the same view on 0–1.
 
 ## The restriction (and when it bites)
 

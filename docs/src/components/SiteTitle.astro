@@ -1,0 +1,51 @@
+---
+// Starlight has no built-in version indicator, so the site title is overridden
+// to carry one. `LIBRARY_VERSION` is defined by `astro.config.ts`, which reads
+// it from the published package's own `package.json` — there is no second place
+// to bump when a release goes out.
+import Default from '@astrojs/starlight/components/SiteTitle.astro'
+
+const version = LIBRARY_VERSION
+---
+
+<div class="site-title-with-version">
+  <Default><slot /></Default>
+  <a
+    class="version-badge"
+    href="https://www.npmjs.com/package/rapidfuzz-js"
+    title={`rapidfuzz-js ${version} on npm`}
+  >
+    v{version}
+  </a>
+</div>
+
+<style>
+  .site-title-with-version {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    /* The title itself must stay shrinkable so the badge is never pushed out
+       of a narrow header. */
+    overflow: hidden;
+  }
+
+  .version-badge {
+    flex-shrink: 0;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 999px;
+    padding: 0.05em 0.5em;
+    font-size: var(--sl-text-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .version-badge:hover,
+  .version-badge:focus-visible {
+    color: var(--sl-color-white);
+    border-color: var(--sl-color-gray-3);
+  }
+</style>

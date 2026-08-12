@@ -43,16 +43,16 @@ This is the "did you mean?" pattern. Wrap a metric in a scorer, then ask:
 
 ```ts
 import { bestMatch, createScorer } from 'rapidfuzz-js'
-import { fuzzySimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(fuzzySimilarity)
+const scorer = createScorer(weightedSimilarity)
 const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 bestMatch('new york jet', teams, { scorer })
 // { item: 'New York Jets', key: 1, score: ... }
 ```
 
-`fuzzySimilarity` is the "just make it work" metric — it tries several
+`weightedSimilarity` is the "just make it work" metric — it tries several
 strategies per pair and reports the best. Every result carries the matched
 `item`, its position (`key`), and its `score`.
 

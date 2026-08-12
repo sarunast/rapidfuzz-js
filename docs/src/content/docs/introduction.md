@@ -17,8 +17,8 @@ strings:
 
 A human sees four obvious matches. Search boxes, "did you mean?" suggestions,
 importing messy spreadsheets, deduplicating customer records — all of these
-need a computer to see what the human sees: *these strings are almost the
-same*.
+need a computer to see what the human sees: _these strings are almost the
+same_.
 
 **Fuzzy matching** replaces the yes/no of `===` with a score: instead of
 "equal or not", you get "94% similar" or "2 edits apart", and you decide how
@@ -35,11 +35,6 @@ decades of collective experience with these algorithms carries over directly.
 It runs in Node.js 22+, browsers, and edge runtimes, has no dependencies, and
 ships strict TypeScript types. Each algorithm lives on its own import path,
 so your bundle only contains what you actually use.
-
-:::note
-These pages track the unreleased 0.6.0 API. The latest version on npm is
-0.5.1, which has a different, pre-redesign API.
-:::
 
 ## Three building blocks
 
@@ -74,7 +69,7 @@ the Matcher and just scan a collection directly.
 
 ## Do I need to understand the algorithms?
 
-Not to get started. `fuzzySimilarity` from `rapidfuzz-js/fuzz` picks a
+Not to get started. `weightedSimilarity` from `rapidfuzz-js/fuzz` picks a
 sensible strategy automatically, and the
 [Getting started](/getting-started/) page will have you matching in a
 minute.

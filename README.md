@@ -13,8 +13,9 @@ Fast fuzzy matching for JavaScript and TypeScript, powered by the algorithms of
 - No runtime dependencies
 - Tree-shakeable algorithm subpaths
 
-This file is the tour. [API.md](./API.md) is the per-export reference: every
-signature, option, scale, and error message.
+This file is the tour. The [documentation site](./docs) is the reference:
+guides, per-algorithm pages, the error reference, and an API section
+generated from the source.
 
 ## Install
 

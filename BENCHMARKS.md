@@ -111,9 +111,11 @@ handle the caller has to manage:
 - A `Matcher` prepares every choice when it is constructed and reuses those
   preparations for every later `best`, `search` and `searchIter` call.
 
-Public prepared-operand handles were removed in 0.6. A collection is held by
-constructing a `Matcher`; a query is held for the length of the call that uses
-it.
+A collection is held by constructing a `Matcher`, and a query is held for the
+length of the call that uses it, so neither needs a handle the caller manages.
+`scorer.prepareChoice` is the one public handle: it holds a single choice for
+callers who keep the collection themselves, and the figures below do not
+measure it.
 
 ### How much work is avoided
 

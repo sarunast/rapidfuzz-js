@@ -8,10 +8,10 @@ Hamming is the simplest comparison here: walk both sequences in lockstep and
 position 3 compares with position 3, full stop.
 
 ```ts
-import { distance, similarity } from 'rapidfuzz-js/hamming'
+import { distance, normalizedSimilarity } from 'rapidfuzz-js/hamming'
 
 distance('karolin', 'kathrin') // 3 — positions 2, 3, 4 differ
-similarity('karolin', 'kathrin') // 0.571 (0–1)
+normalizedSimilarity('karolin', 'kathrin') // 0.571 (0–1)
 ```
 
 That rigidity is the point — and the trap. Insert one character near the
@@ -22,16 +22,25 @@ meaning** and inputs can't shift.
 
 ## Unequal lengths
 
-Since position-wise comparison needs equal lengths, unequal inputs throw by
-default. If trailing overhang should simply count as differences, opt into
-padding through a [scorer](/concepts/scorers/):
+Position-wise comparison needs equal lengths, so by default the shorter
+input is treated as padded and the trailing overhang counts as differences:
+
+```ts
+import { distance } from 'rapidfuzz-js/hamming'
+
+distance('abc', 'abcd') // 1 — the unmatched 'd'
+```
+
+If unequal lengths mean your data is wrong rather than merely different,
+turn the padding off through a [scorer](/concepts/scorers/) and let it
+throw:
 
 ```ts
 import { createScorer } from 'rapidfuzz-js'
 import { distance } from 'rapidfuzz-js/hamming'
 
-const padded = createScorer(distance, { pad: true })
-padded.score('abc', 'abcd') // 1
+const strict = createScorer(distance, { pad: false })
+strict.score('abc', 'abcd') // throws — sequences are not the same length
 ```
 
 ## Seeing the differences

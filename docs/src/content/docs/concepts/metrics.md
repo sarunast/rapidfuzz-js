@@ -7,19 +7,19 @@ A metric is the measuring instrument: a function that takes two sequences and
 returns a number describing how alike they are.
 
 ```ts
-import { similarity as fuzzySimilarity } from 'rapidfuzz-js/fuzz'
+import { similarity as fuzzSimilarity } from 'rapidfuzz-js/fuzz'
 import {
   distance as levenshteinDistance,
-  similarity as levenshteinSimilarity,
+  normalizedSimilarity as levenshteinNormalizedSimilarity,
 } from 'rapidfuzz-js/levenshtein'
 
-fuzzySimilarity('this is a test', 'this is a test!')
+fuzzSimilarity('this is a test', 'this is a test!')
 // 96.55172413793103 (0–100)
 
 levenshteinDistance('lewenstein', 'levenshtein')
 // 2 (edits)
 
-levenshteinSimilarity('abc', 'axc')
+levenshteinNormalizedSimilarity('abc', 'axc')
 // 0.6666666666666667 (0–1)
 ```
 
@@ -32,14 +32,36 @@ matching" is really sequence matching.
 Every metric points one of two ways, and reading a score starts with knowing
 which:
 
-- A **similarity** answers *"how alike?"* — higher is better, and there's a
+- A **similarity** answers _"how alike?"_ — higher is better, and there's a
   maximum (identical strings).
-- A **distance** answers *"how far apart?"* — lower is better, `0` means
+- A **distance** answers _"how far apart?"_ — lower is better, `0` means
   identical, and for most algorithms there's no upper limit.
 
 The direction is part of the metric's TypeScript type, and everything built
-on top — thresholds, sorting, search — automatically respects it. Most
-algorithm subpaths export both a `distance` and a `similarity`.
+on top — thresholds, sorting, search — automatically respects it.
+
+## Raw or normalized: four names per algorithm
+
+Direction is only half the naming. The other half is whether the number
+counts something or scales to `0–1`, which is why the edit-distance subpaths
+export **four** metrics apiece:
+
+| Export                 | Direction  | Scale | `('kitten', 'sitting')` |
+| ---------------------- | ---------- | ----- | ----------------------- |
+| `distance`             | distance   | edits | `3`                     |
+| `similarity`           | similarity | edits | `4`                     |
+| `normalizedDistance`   | distance   | `0–1` | `0.4285…`               |
+| `normalizedSimilarity` | similarity | `0–1` | `0.5714…`               |
+
+The raw `similarity` is _not_ a percentage — it's the count of what the two
+inputs share, `maximum − distance` in the same units the distance uses. If
+you want a 0–1 score, the name you want is `normalizedSimilarity`. This is
+the single most common surprise in the library, and it's inherited from
+RapidFuzz, where the pairs are named the same way.
+
+Jaro and Jaro-Winkler are the exception: their scores are 0–1 by
+construction, so `similarity` and `normalizedSimilarity` are the same
+function.
 
 ## Scales: why the numbers differ
 
@@ -47,17 +69,17 @@ Different families report on different scales, and the library never
 converts between them — a score always means what its algorithm defined it
 to mean:
 
-| Family                       | Scale                  | Reading                    |
-| ---------------------------- | ---------------------- | -------------------------- |
-| Fuzz similarities            | `0–100`                | Percent-like               |
-| Normalized edit similarities | `0–1`                  | Fraction of the longer input |
-| Jaro and Jaro-Winkler        | `0–1`                  | Its own formula            |
-| Distances                    | Native units           | Edit counts, usually       |
+| Family                      | Scale        | Reading                      |
+| --------------------------- | ------------ | ---------------------------- |
+| Fuzz similarities           | `0–100`      | Percent-like                 |
+| `normalized*` edit measures | `0–1`        | Fraction of the longer input |
+| Jaro and Jaro-Winkler       | `0–1`        | Its own formula              |
+| `distance` and `similarity` | Native units | Edit counts, usually         |
 
 Practical consequence: a `threshold` is always in the scorer's own scale.
-`threshold: 70` makes sense for a fuzz metric; for Levenshtein similarity
-you'd write `threshold: 0.7`, and for Levenshtein distance `threshold: 3`
-("at most 3 edits").
+`threshold: 70` makes sense for a fuzz metric; for Levenshtein
+`normalizedSimilarity` you'd write `threshold: 0.7`, and for Levenshtein
+`distance` `threshold: 3` ("at most 3 edits").
 
 ## The available metrics
 
@@ -75,12 +97,12 @@ rapidfuzz-js/prefix                common prefix length
 rapidfuzz-js/postfix               common suffix length
 ```
 
-If you're unsure, start with `fuzzySimilarity` from `rapidfuzz-js/fuzz` and
+If you're unsure, start with `weightedSimilarity` from `rapidfuzz-js/fuzz` and
 only specialize when you can say what's wrong with its answers. The
 [Algorithms](/algorithms/levenshtein/) section gives each metric a plain
 explanation and a "when to use it".
 
-Levenshtein, Indel, LCS, and Hamming can also *show their work* — their
+Levenshtein, Indel, LCS, and Hamming can also _show their work_ — their
 `editops`/`opcodes` list the exact edits behind a score
 ([Comparing strings](/guides/comparing-strings/#recovering-the-edits)).
 
@@ -123,3 +145,17 @@ The declared metadata is a contract the library enforces: every result must
 be finite and inside the bounds, checked before any thresholding or ordering
 relies on it. A buggy custom metric fails loudly instead of quietly
 mis-ranking your results.
+
+All three fields are required. `missing` is accepted for a similarity and
+rejected for a distance, which always throws on a missing operand. Bounds
+must be an ordered numeric pair with a finite lower bound, and a
+`'compatible'` similarity's bounds have to include `0` — otherwise the `0`
+returned for a missing operand would itself be out of bounds.
+
+A custom scorer prepares choices like any other, and its handles belong to it
+alone: two scorers built from the _same function_ don't share handles,
+because nothing about a plain function proves they're interchangeable. A
+built-in scorer's handle holds a precomputed kernel representation; a custom
+one holds an owned snapshot of the sequence, since there's nothing else to
+precompute. Ownership, the compatibility check, and the opaque shape are
+identical either way.

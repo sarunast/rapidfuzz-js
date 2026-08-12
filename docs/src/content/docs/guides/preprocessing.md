@@ -9,7 +9,7 @@ Case, punctuation, and stray whitespace are the most common reason fuzzy
 scores come out mysteriously low.
 
 Preprocessing fixes this at the root: transform both strings into a clean,
-comparable form *before* scoring, so only meaningful differences count.
+comparable form _before_ scoring, so only meaningful differences count.
 
 ## The built-in: normalizeText
 
@@ -21,8 +21,14 @@ normalizeText('  Wireless-Mechanical KEYBOARD!! ')
 ```
 
 Precisely: every character that isn't a Unicode letter, number, or `_`
-becomes a space; the result is trimmed and lowercased. It accepts only
-strings and throws on anything else.
+becomes a space; the result is trimmed and lowercased. Runs of separators
+aren't collapsed — `'a---b'` becomes `'a   b'` — and no Unicode `NFC`/`NFKC`
+form is applied.
+
+Non-string sequences pass through untouched, which is what lets it stay the
+normalizer for a collection of array-like choices where no element is text
+to lowercase. Values that aren't sequences at all — numbers, booleans —
+throw a `TypeError`.
 
 This is the port of RapidFuzz's `utils.default_process`, and like upstream
 it's **opt-in** — nothing applies it unless you ask. Scoring exactly what
@@ -56,7 +62,7 @@ the two sides can't drift apart.
 
 ## Writing your own
 
-`normalizeText` is deliberately blunt — it erases *all* punctuation and
+`normalizeText` is deliberately blunt — it erases _all_ punctuation and
 case. When that's too much (or not enough — accents, unicode forms, domain
 noise like `"Ltd."`), a normalizer is just a function
 `(value) => cleaned value`:
@@ -89,7 +95,7 @@ const matcher = createMatcher(products, {
 ```
 
 Results always return your original items untouched — preprocessing changes
-what gets *scored*, never what you get *back*.
+what gets _scored_, never what you get _back_.
 
 ## Direct metric calls
 

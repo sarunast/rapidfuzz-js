@@ -8,10 +8,10 @@ you may **insert** and **delete**, but not replace. Fixing a wrong character
 takes two steps — delete the wrong one, insert the right one.
 
 ```ts
-import { distance, similarity } from 'rapidfuzz-js/indel'
+import { distance, normalizedSimilarity } from 'rapidfuzz-js/indel'
 
 distance('lewenstein', 'levenshtein') // 3
-similarity('abc', 'axc') // 0.667 — the b↔x swap costs 2 of 6
+normalizedSimilarity('abc', 'axc') // 0.667 — the b↔x swap costs 2 of 6
 ```
 
 Why remove an operation? Because what's left measures something specific:
@@ -24,9 +24,9 @@ distance(a, b) = len(a) + len(b) − 2 × lcs(a, b)
 ```
 
 That "shared content" view of similarity turns out to be the right basis for
-comparing *text* (as opposed to codes or identifiers), which is why the
+comparing _text_ (as opposed to codes or identifiers), which is why the
 whole [fuzz family](/algorithms/fuzz/) — `similarity`, the token metrics,
-`fuzzySimilarity` — is normalized Indel scaled to 0–100.
+`weightedSimilarity` — is normalized Indel scaled to 0–100.
 
 ## Seeing the edits
 

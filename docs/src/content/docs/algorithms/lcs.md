@@ -12,11 +12,15 @@ Instead of asking "how many edits apart?", LCS asks **"how much do they
 share?"** — the glass-half-full view of the same comparison.
 
 ```ts
-import { distance, similarity } from 'rapidfuzz-js/lcs'
+import { distance, normalizedSimilarity, similarity } from 'rapidfuzz-js/lcs'
 
 distance('ABCBDAB', 'BDCABA') // 3 — characters outside the shared subsequence
-similarity('ABCBDAB', 'BDCABA') // 0.571 — shared length over the longer input
+similarity('ABCBDAB', 'BDCABA') // 4 — the length of the common subsequence itself
+normalizedSimilarity('ABCBDAB', 'BDCABA') // 0.571 — that length over the longer input
 ```
+
+LCS is the one algorithm where the raw `similarity` is the headline number:
+it _is_ the length of the longest common subsequence.
 
 ## Seeing the alignment
 

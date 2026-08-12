@@ -3,8 +3,8 @@ title: Prepared choices
 description: Prepare candidates once, keep the collection yours — one-shot search speed without handing your data to a Matcher.
 ---
 
-A [Matcher](/concepts/matchers/) amortizes preparation by *owning the
-collection*: it snapshots one text field at construction, and from then on
+A [Matcher](/concepts/matchers/) amortizes preparation by _owning the
+collection_: it snapshots one text field at construction, and from then on
 you query what it remembers. That's the right trade for a search box — and
 the wrong one when the collection is really yours: rows you filter
 differently per query, records that carry more than one searchable field,
@@ -22,7 +22,7 @@ import { tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
 const scorer = createScorer(tokenSetSimilarity)
 const companies = records.map((record) => ({
   record,
-  prepared: scorer.prepareChoice(normalizeText(record.name)),
+  prepared: scorer.prepareChoice(record.name, { normalize: normalizeText }),
 }))
 
 // Your guards run before the scorer does — only survivors get scored.
@@ -47,34 +47,47 @@ the scoring pays nothing to prepare what it accepts. `bestMatch`, `search`,
 and `searchIter` all take `getPrepared`; so does `createMatcher`, which
 resolves every handle once at construction.
 
-## Normalize before preparing, and tell the search
+`searchIter` pulls lazily, so a generator's guards run only for candidates
+actually consumed — and filtering renumbers the `key` a match reports.
+[Matching records](/guides/matching-records/#guards-first-in-a-generator)
+covers both, with a worked multi-field example.
 
-A handle holds the text exactly as you prepared it. If you cleaned the
-choices first — and you usually should — the query has to be cleaned the
-same way, or the two sides are not being compared alike:
+## Normalizing: hand the function over, don't apply it yourself
+
+If you clean your choices — and you usually should — the query has to be
+cleaned the same way, or the two sides are not being compared alike. So
+`prepareChoice` takes the normalizer as an **option** rather than expecting
+already-clean text, and the search checks that it got the same one:
 
 ```ts
-prepared: scorer.prepareChoice(normalizeText(record.name)) // choices: at prepare time
-normalize: normalizeText // query: at search time
+prepared: scorer.prepareChoice(record.name, { normalize: normalizeText })
+normalize: normalizeText // the same function, at search time
 ```
 
-In prepared mode `normalize` applies to the **query only** — the choices
-were prepared before the search ever saw them. `getText` and `missingItems`
-don't apply either: a prepared row is either resolvable or an error, never a
-gap to skip.
+The check is by function identity, and it is strict in both directions: a
+handle prepared without a normalizer refuses a search that normalizes, a
+handle prepared with one refuses a search that doesn't, and two different
+cleaning functions are refused even if they'd agree on every input. Passing
+`prepareChoice(normalizeText(record.name))` — normalizing by hand and then
+telling the search to normalize too — throws for exactly this reason,
+because the handle would report itself as un-normalized.
+
+The other item options don't apply in prepared mode: `getText` has nothing
+to extract from, and `missingItems` has nothing to skip — a prepared row is
+either resolvable or an error, never a gap.
 
 ## Which scorers accept a handle
 
 Compatibility is decided conservatively, by identity rather than by proving
 two preparations equivalent:
 
-| Prepared by                                   | Accepted by                            |
-| --------------------------------------------- | -------------------------------------- |
-| a scorer using a metric's default preparation | any scorer of that metric using it too |
-| a scorer with configuration the metric records | that scorer alone                     |
-| a custom metric's scorer                      | that scorer alone                      |
+| Prepared by                                    | Accepted by                            |
+| ---------------------------------------------- | -------------------------------------- |
+| a scorer using a metric's default preparation  | any scorer of that metric using it too |
+| a scorer with configuration the metric records | that scorer alone                      |
+| a custom metric's scorer                       | that scorer alone                      |
 
-So two separately created `createScorer(fuzzySimilarity)` scorers share
+So two separately created `createScorer(weightedSimilarity)` scorers share
 their handles; treat a configured or custom scorer as owning the handles it
 made. Anything else throws — a handle from the wrong scorer is refused as
 incompatible, a value that never was a handle as invalid.
@@ -105,13 +118,17 @@ two modes never disagree about what they scored.
 
 ## When to reach for which
 
-| Workload                                        | Use                                    |
-| ----------------------------------------------- | -------------------------------------- |
-| One query, once                                 | `bestMatch` / `search`, text mode      |
-| Same collection, many queries, text is one field | `createMatcher`                       |
-| Many queries, but *you* own, filter, or grow the rows | `prepareChoice` + `getPrepared`  |
+| Workload                                              | Use                               |
+| ----------------------------------------------------- | --------------------------------- |
+| One query, once                                       | `bestMatch` / `search`, text mode |
+| Same collection, many queries, text is one field      | `createMatcher`                   |
+| Many queries, but _you_ own, filter, or grow the rows | `prepareChoice` + `getPrepared`   |
 
-Preparation pays for itself from the first query — the per-query cost of a
-prepared search measured **1.2–6× lower** than text mode, depending on the
-scorer. See [Performance](/guides/performance/) for where this sits among
-the other habits.
+What preparation is worth depends entirely on how much setup your scorer
+does: the recorded `Matcher` figures — which remove the same per-query work
+by the same means — range from **1.44×** on plain `similarity` to **6.63×**
+on `tokenSortSimilarity`, where tokenizing and sorting every choice is the
+bulk of the cost ([Benchmarks](/benchmarks/)). Expect the token scorers to
+gain most and the cheap character kernels least. See
+[Performance](/guides/performance/) for where this sits among the other
+habits.

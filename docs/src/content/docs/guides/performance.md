@@ -13,16 +13,17 @@ Before scoring, every algorithm builds internal structures from the text.
 One-shot calls rebuild them for the whole collection on every query; a
 [Matcher](/concepts/matchers/) builds them once at construction.
 
-| Workload                      | Use                               |
-| ----------------------------- | --------------------------------- |
-| One best result, once         | `bestMatch`                       |
-| Top N results, once           | `search` with `limit: N`          |
+| Workload                          | Use                                                     |
+| --------------------------------- | ------------------------------------------------------- |
+| One best result, once             | `bestMatch`                                             |
+| Top N results, once               | `search` with `limit: N`                                |
 | The same collection, many queries | `createMatcher`, then `matcher.best` / `matcher.search` |
 
-The [benchmarks](/benchmarks/) put numbers on it: prepared-input paths
-measured up to **7×** faster than re-preparing per call on token workloads.
-If you remember one thing from this page: *can you name a second query?
-Build a Matcher.*
+The [benchmarks](/benchmarks/) put numbers on it: over 30 queries against
+2,000 choices, a `Matcher` measured **6.63×** faster than the one-shot
+search it replaces on a `tokenSortSimilarity` workload, and **1.44×** on
+plain `similarity`. If you remember one thing from this page: _can you name
+a second query? Build a Matcher._
 
 When a Matcher can't own the collection — you filter it per query, grow it,
 or keep it in your own index — the same preparation is available piecemeal:
@@ -65,7 +66,7 @@ problem. The four habits above are the whole checklist.
 
 ---
 
-*For the curious: the release pipeline also enforces type checking, 100%
+_For the curious: the release pipeline also enforces type checking, 100%
 test coverage, export-map validation, and tarball inspection — performance
 claims are only trustworthy when the package is exactly what you think it
-is.*
+is._

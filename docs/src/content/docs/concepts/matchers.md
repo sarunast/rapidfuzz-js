@@ -13,9 +13,9 @@ every query after that only pays for itself.
 
 ```ts
 import { createMatcher, createScorer } from 'rapidfuzz-js'
-import { fuzzySimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(fuzzySimilarity)
+const scorer = createScorer(weightedSimilarity)
 const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 const matcher = createMatcher(teams, { scorer }) // preparation happens here
@@ -36,12 +36,12 @@ root take the same options and retain nothing
 Results are `{ item, key, score }` — the original item, its address in your
 collection, and its score. The `key` depends on what you passed in:
 
-| You pass      | `key` is          |
-| ------------- | ----------------- |
-| Array         | The index         |
-| Iterable      | The position      |
-| Map           | The map key       |
-| Plain object  | The property name |
+| You pass     | `key` is          |
+| ------------ | ----------------- |
+| Array        | The index         |
+| Iterable     | The position      |
+| Map          | The map key       |
+| Plain object | The property name |
 
 So a Matcher over a `Map<ProductId, Product>` hands back real product IDs,
 not positions you have to translate.
@@ -81,7 +81,7 @@ construction instead of quietly searching around the hole.
 
 ## What a Matcher remembers
 
-A Matcher snapshots *what it scores*, not *what it returns*:
+A Matcher snapshots _what it scores_, not _what it returns_:
 
 - Strings are kept as-is; non-string sequences are shallow-copied at
   construction. Pushing to the source array later does **not** change search
@@ -94,7 +94,7 @@ If the collection itself changes, build a new Matcher — construction is the
 cheap part compared to re-preparing on every query.
 
 When rebuilding doesn't fit — the collection is filtered differently per
-query, or preparation is worth keeping *across* rebuilds — prepare each
+query, or preparation is worth keeping _across_ rebuilds — prepare each
 candidate yourself and hand the handles to a one-shot search (or to
 `createMatcher` via `getPrepared`, which then resolves them once instead of
 preparing at all): [Prepared choices](/guides/prepared-choices/).
