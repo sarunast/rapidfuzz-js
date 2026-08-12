@@ -836,6 +836,56 @@ describe('the OSA kernel agrees with its dynamic program', () => {
     // forbids editing a substring twice, so this pair is 3 and not 2.
     expect(osaDistance('CA', 'ABC')).toBe(3)
   })
+
+  // A transposition whose two elements sit either side of a word boundary is
+  // the only thing the blocked kernel carries between words, and the kernel is
+  // reached directly here: `osaDistance` trims the common affix first, so a
+  // pair differing in one place is a two-element pair before it dispatches.
+  it.each([
+    [33, 31],
+    [64, 31],
+    [65, 63],
+    [96, 63],
+    [97, 95],
+    [128, 95],
+  ])(
+    'carries a transposition across a word boundary (%i elements, at %i)',
+    (length, at) => {
+      const pattern = Array.from({ length }, (_, i) => 97 + (i % 5))
+      const text = pattern.slice()
+      text[at] = pattern[at + 1]
+      text[at + 1] = pattern[at]
+
+      expect(osaManyWords(pattern, text)).toBe(1)
+      expect(osaManyWords(pattern, text)).toBe(osaReference(pattern, text))
+    },
+  )
+
+  // The property tests above draw their lengths at random, so which run crosses
+  // a word boundary changes with the seed. These widths are the boundaries
+  // themselves, held as a permanent oracle against the dynamic program.
+  it.each([31, 32, 33, 63, 64, 65, 97])(
+    'matches the dynamic program at %i elements, whatever the text length',
+    (length) => {
+      const build = (n: number, seed: number): number[] => {
+        let state = (seed * 2_654_435_761) >>> 0
+        const out: number[] = []
+        for (let i = 0; i < n; i++) {
+          state = (Math.imul(state, 0x0001_9660) + 0x3c6e_f35f) >>> 0
+          out.push(97 + ((state >>> 8) % 3))
+        }
+        return out
+      }
+
+      for (const textLength of [1, length - 1, length, length + 1, length + 7]) {
+        for (const seed of [1, 2, 3]) {
+          const pattern = build(length, seed * 31)
+          const text = build(textLength, seed * 17 + 1)
+          expect(osaManyWords(pattern, text)).toBe(osaReference(pattern, text))
+        }
+      }
+    },
+  )
 })
 
 describe('bounded kernels preserve unbounded results', () => {

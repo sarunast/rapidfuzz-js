@@ -36,7 +36,10 @@ import { levenshteinEditops } from '../../src/algorithms/levenshtein/editops.js'
 import { resetWeightedScratch } from '../../src/algorithms/levenshtein/internal/scratch.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../../src/algorithms/osa/implementation.js'
-import { resetOsaScratch } from '../../src/algorithms/osa/internal/kernel.js'
+import {
+  osaRetainedBytes,
+  resetOsaScratch,
+} from '../../src/algorithms/osa/internal/kernel.js'
 import {
   maskPoolOf,
   resetBitVectorScratch,
@@ -137,6 +140,40 @@ describe('benchmark scratch resets', () => {
     resetAll()
 
     expect(workload()).toStrictEqual(cold)
+  })
+})
+
+// The reset tests above compare answers, which cannot see a buffer that is
+// still allocated. OSA's scratch is reached through eight cached `subarray`
+// views, and a view keeps the whole backing buffer alive — so replacing the
+// scratch binding alone frees nothing until the next call rebuilds the views.
+describe('the OSA scratch after a reset', () => {
+  const pattern = Array.from({ length: 4096 }, (_, i) => 97 + (i % 5))
+  // Differing at both ends, so the affix trim leaves the full width for the
+  // blocked kernel, which is the only path that allocates the scratch.
+  const text = [90, ...pattern.slice(1, -1), 91]
+
+  it('holds a buffer while it is in use', () => {
+    resetOsaScratch()
+    osaDistance(pattern, text)
+
+    expect(osaRetainedBytes()).toBeGreaterThan(1024)
+  })
+
+  it('holds nothing afterwards, views included', () => {
+    osaDistance(pattern, text)
+    resetOsaScratch()
+
+    expect(osaRetainedBytes()).toBe(0)
+  })
+
+  it('still answers the same once the views have been dropped', () => {
+    resetOsaScratch()
+    const cold = osaDistance(pattern, text)
+
+    resetOsaScratch()
+    expect(osaDistance(pattern, text)).toBe(cold)
+    expect(cold).toBe(2)
   })
 })
 

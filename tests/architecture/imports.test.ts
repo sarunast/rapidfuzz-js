@@ -221,6 +221,27 @@ describe('metric identity', () => {
     expect([...new Set(ids)]).toHaveLength(ids.length)
   })
 
+  it('lets a known alias share an identity rather than mint one', () => {
+    // Jaro and Jaro-Winkler are normalized by construction, so their
+    // normalized exports are the same metrics. `typeof` is what says so, and
+    // an alias that named itself instead would appear below as an id.
+    const aliases = [
+      ...declarations.matchAll(/export const (\w+): typeof (\w+) = (\w+)/g),
+    ]
+    expect(aliases).toHaveLength(4)
+    for (const [, name, annotation, initializer] of aliases) {
+      expect(annotation).toBe(initializer)
+      expect(name).not.toBe(initializer)
+    }
+    const ids = [...declarations.matchAll(/BuiltInMetric<\s*'([\w.]+)'/g)].map(
+      (match) => match[1],
+    )
+    for (const family of ['jaro', 'jaroWinkler']) {
+      expect(ids).not.toContain(`${family}.normalizedDistance`)
+      expect(ids).not.toContain(`${family}.normalizedSimilarity`)
+    }
+  })
+
   it('leaves the mechanics of identity to the adapter', () => {
     expect(declarations).not.toMatch(/declare const \w+: unique symbol/)
   })

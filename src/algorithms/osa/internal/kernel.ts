@@ -306,7 +306,7 @@ export function osaPrepared(
       const matches = base < 0 ? 0 : masks[base + word]
 
       const transposed =
-        (((~d0 & matches) << 1) | ((~d0Last & matchesLastWord) >>> 31)) & previousMatches
+        ((~d0 & matches) << 1) & previousMatches
       const x = matches | hnCarry
       d0 = (((x & vp) + vp) ^ vp) | x | vn | transposed | 0
       let hp = vn | ~(d0 | vp)
@@ -349,5 +349,33 @@ export function osaPrepared(
 
 /** Benchmark/test seam that returns retained scratch to a deterministic baseline. */
 export function resetOsaScratch(): void {
-  osaScratch = new Int32Array(0)
+  // The eight views have to be dropped with it: a `subarray` keeps the whole
+  // backing buffer alive, so replacing `osaScratch` alone frees nothing until
+  // the next call rebuilds them.
+  const empty = new Int32Array(0)
+  osaScratch = empty
+  osaViewStride = 0
+  osaViewVp = empty
+  osaViewVn = empty
+  osaViewD0 = empty
+  osaViewPm = empty
+  osaViewVp2 = empty
+  osaViewVn2 = empty
+  osaViewD02 = empty
+  osaViewPm2 = empty
+}
+
+/** Test seam: the largest buffer any binding in this module still holds. */
+export function osaRetainedBytes(): number {
+  return Math.max(
+    osaScratch.buffer.byteLength,
+    osaViewVp.buffer.byteLength,
+    osaViewVn.buffer.byteLength,
+    osaViewD0.buffer.byteLength,
+    osaViewPm.buffer.byteLength,
+    osaViewVp2.buffer.byteLength,
+    osaViewVn2.buffer.byteLength,
+    osaViewD02.buffer.byteLength,
+    osaViewPm2.buffer.byteLength,
+  )
 }
