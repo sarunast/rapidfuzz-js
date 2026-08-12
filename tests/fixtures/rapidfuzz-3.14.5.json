@@ -985,13 +985,64 @@
     {
       "input": "",
       "output": ""
+    },
+    {
+      "input": "İstanbul",
+      "output": "istanbul"
+    },
+    {
+      "input": "DİYARBAKIR İZMİR",
+      "output": "diyarbakir izmir"
+    },
+    {
+      "input": "ΟΔΟΣ ΟΔΟΣ",
+      "output": "οδοσ οδοσ"
+    },
+    {
+      "input": "ΣΊΣΥΦΟΣ",
+      "output": "σίσυφοσ"
+    },
+    {
+      "input": "ΑΣ",
+      "output": "ασ"
+    },
+    {
+      "input": "ΑΣΑ",
+      "output": "ασα"
+    },
+    {
+      "input": "ΣΣΣ",
+      "output": "σσσ"
+    },
+    {
+      "input": "Grüße Welt",
+      "output": "grüße welt"
+    },
+    {
+      "input": "linebreak",
+      "output": "line break"
+    },
+    {
+      "input": "tab\tand\nnewline",
+      "output": "tab and newline"
+    },
+    {
+      "input": "a---b",
+      "output": "a   b"
+    },
+    {
+      "input": "  ",
+      "output": ""
     }
   ],
   "editopsCases": [
     {
       "family": "levenshtein",
+      "configuration": {},
       "left": "qabxcd",
       "right": "abycdf",
+      "srcLen": 6,
+      "destLen": 6,
       "editops": [
         {
           "tag": "delete",
@@ -1045,12 +1096,105 @@
           "destStart": 5,
           "destEnd": 6
         }
-      ]
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 1,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 4,
+          "destStart": 3,
+          "length": 2
+        },
+        {
+          "srcStart": 6,
+          "destStart": 6,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 1,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 4,
+          "destStart": 3,
+          "length": 2
+        },
+        {
+          "srcStart": 6,
+          "destStart": 6,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 3
+        },
+        {
+          "tag": "delete",
+          "srcPos": 5,
+          "destPos": 6
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 1
+        },
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 1,
+          "destEnd": 3
+        },
+        {
+          "tag": "replace",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 4
+        },
+        {
+          "tag": "equal",
+          "srcStart": 3,
+          "srcEnd": 5,
+          "destStart": 4,
+          "destEnd": 6
+        },
+        {
+          "tag": "delete",
+          "srcStart": 5,
+          "srcEnd": 6,
+          "destStart": 6,
+          "destEnd": 6
+        }
+      ],
+      "applied": "abycdf",
+      "opcodeApplied": "abycdf"
     },
     {
       "family": "levenshtein",
+      "configuration": {},
       "left": "😀ab",
       "right": "😀ac",
+      "srcLen": 3,
+      "destLen": 3,
       "editops": [
         {
           "tag": "replace",
@@ -1073,12 +1217,494 @@
           "destStart": 2,
           "destEnd": 3
         }
-      ]
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "replace",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 3
+        }
+      ],
+      "applied": "😀ac",
+      "opcodeApplied": "😀ac"
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "srcLen": 0,
+      "destLen": 0,
+      "editops": [],
+      "opcodes": [],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [],
+      "applied": "",
+      "opcodeApplied": ""
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "srcLen": 3,
+      "destLen": 3,
+      "editops": [],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "applied": "abc",
+      "opcodeApplied": "abc"
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "",
+      "right": "abc",
+      "srcLen": 0,
+      "destLen": 3,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 0
+        }
+      ],
+      "applied": "abc",
+      "opcodeApplied": "abc"
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "abc",
+      "right": "",
+      "srcLen": 3,
+      "destLen": 0,
+      "editops": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 0
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 3,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 3,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "applied": "",
+      "opcodeApplied": ""
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "aaa",
+      "right": "aaaa",
+      "srcLen": 3,
+      "destLen": 4,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 4
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 4,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 4,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 3,
+          "srcEnd": 4,
+          "destStart": 3,
+          "destEnd": 3
+        }
+      ],
+      "applied": "aaaa",
+      "opcodeApplied": "aaaa"
+    },
+    {
+      "family": "levenshtein",
+      "configuration": {},
+      "left": "ΣΊΣΥΦΟΣ",
+      "right": "σίσυφος",
+      "srcLen": 7,
+      "destLen": 7,
+      "editops": [
+        {
+          "tag": "replace",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 1
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "replace",
+          "srcPos": 4,
+          "destPos": 4
+        },
+        {
+          "tag": "replace",
+          "srcPos": 5,
+          "destPos": 5
+        },
+        {
+          "tag": "replace",
+          "srcPos": 6,
+          "destPos": 6
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "replace",
+          "srcStart": 0,
+          "srcEnd": 7,
+          "destStart": 0,
+          "destEnd": 7
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "replace",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 1
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "replace",
+          "srcPos": 4,
+          "destPos": 4
+        },
+        {
+          "tag": "replace",
+          "srcPos": 5,
+          "destPos": 5
+        },
+        {
+          "tag": "replace",
+          "srcPos": 6,
+          "destPos": 6
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "replace",
+          "srcStart": 0,
+          "srcEnd": 7,
+          "destStart": 0,
+          "destEnd": 7
+        }
+      ],
+      "applied": "σίσυφος",
+      "opcodeApplied": "σίσυφος"
     },
     {
       "family": "indel",
+      "configuration": {},
       "left": "qabxcd",
       "right": "abycdf",
+      "srcLen": 6,
+      "destLen": 6,
       "editops": [
         {
           "tag": "delete",
@@ -1144,12 +1770,117 @@
           "destStart": 5,
           "destEnd": 6
         }
-      ]
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 1,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 4,
+          "destStart": 3,
+          "length": 2
+        },
+        {
+          "srcStart": 6,
+          "destStart": 6,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 1,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 4,
+          "destStart": 3,
+          "length": 2
+        },
+        {
+          "srcStart": 6,
+          "destStart": 6,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 3
+        },
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "delete",
+          "srcPos": 5,
+          "destPos": 6
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 1
+        },
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 1,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 3
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 4
+        },
+        {
+          "tag": "equal",
+          "srcStart": 3,
+          "srcEnd": 5,
+          "destStart": 4,
+          "destEnd": 6
+        },
+        {
+          "tag": "delete",
+          "srcStart": 5,
+          "srcEnd": 6,
+          "destStart": 6,
+          "destEnd": 6
+        }
+      ],
+      "applied": "abycdf",
+      "opcodeApplied": "abycdf"
     },
     {
       "family": "indel",
+      "configuration": {},
       "left": "😀ab",
       "right": "😀ac",
+      "srcLen": 3,
+      "destLen": 3,
       "editops": [
         {
           "tag": "insert",
@@ -1184,12 +1915,590 @@
           "destStart": 3,
           "destEnd": 3
         }
-      ]
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 2
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "delete",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 2
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 3
+        }
+      ],
+      "applied": "😀ac",
+      "opcodeApplied": "😀ac"
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "srcLen": 0,
+      "destLen": 0,
+      "editops": [],
+      "opcodes": [],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [],
+      "applied": "",
+      "opcodeApplied": ""
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "srcLen": 3,
+      "destLen": 3,
+      "editops": [],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "applied": "abc",
+      "opcodeApplied": "abc"
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "",
+      "right": "abc",
+      "srcLen": 0,
+      "destLen": 3,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 0
+        }
+      ],
+      "applied": "abc",
+      "opcodeApplied": "abc"
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "abc",
+      "right": "",
+      "srcLen": 3,
+      "destLen": 0,
+      "editops": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 0
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 3,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 3,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "applied": "",
+      "opcodeApplied": ""
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "aaa",
+      "right": "aaaa",
+      "srcLen": 3,
+      "destLen": 4,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 4
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 4,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 4,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 3,
+          "srcEnd": 4,
+          "destStart": 3,
+          "destEnd": 3
+        }
+      ],
+      "applied": "aaaa",
+      "opcodeApplied": "aaaa"
+    },
+    {
+      "family": "indel",
+      "configuration": {},
+      "left": "ΣΊΣΥΦΟΣ",
+      "right": "σίσυφος",
+      "srcLen": 7,
+      "destLen": 7,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 3
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 4
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 5
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 6
+        },
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 4,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 5,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 6,
+          "destPos": 7
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 7
+        },
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 7,
+          "destStart": 7,
+          "destEnd": 7
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 4,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 5,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 6,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 2
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 3
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 4
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 5
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 6
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 7,
+          "destStart": 0,
+          "destEnd": 0
+        },
+        {
+          "tag": "insert",
+          "srcStart": 7,
+          "srcEnd": 7,
+          "destStart": 0,
+          "destEnd": 7
+        }
+      ],
+      "applied": "σίσυφος",
+      "opcodeApplied": "σίσυφος"
     },
     {
       "family": "lcs",
+      "configuration": {},
       "left": "qabxcd",
       "right": "abycdf",
+      "srcLen": 6,
+      "destLen": 6,
       "editops": [
         {
           "tag": "delete",
@@ -1255,12 +2564,117 @@
           "destStart": 5,
           "destEnd": 6
         }
-      ]
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 1,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 4,
+          "destStart": 3,
+          "length": 2
+        },
+        {
+          "srcStart": 6,
+          "destStart": 6,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 1,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 4,
+          "destStart": 3,
+          "length": 2
+        },
+        {
+          "srcStart": 6,
+          "destStart": 6,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 3
+        },
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "delete",
+          "srcPos": 5,
+          "destPos": 6
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 1
+        },
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 1,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 3
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 4
+        },
+        {
+          "tag": "equal",
+          "srcStart": 3,
+          "srcEnd": 5,
+          "destStart": 4,
+          "destEnd": 6
+        },
+        {
+          "tag": "delete",
+          "srcStart": 5,
+          "srcEnd": 6,
+          "destStart": 6,
+          "destEnd": 6
+        }
+      ],
+      "applied": "abycdf",
+      "opcodeApplied": "abycdf"
     },
     {
       "family": "lcs",
+      "configuration": {},
       "left": "😀ab",
       "right": "😀ac",
+      "srcLen": 3,
+      "destLen": 3,
       "editops": [
         {
           "tag": "insert",
@@ -1295,12 +2709,590 @@
           "destStart": 3,
           "destEnd": 3
         }
-      ]
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 2
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "delete",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 2
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 3
+        }
+      ],
+      "applied": "😀ac",
+      "opcodeApplied": "😀ac"
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "srcLen": 0,
+      "destLen": 0,
+      "editops": [],
+      "opcodes": [],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [],
+      "applied": "",
+      "opcodeApplied": ""
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "srcLen": 3,
+      "destLen": 3,
+      "editops": [],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "applied": "abc",
+      "opcodeApplied": "abc"
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "",
+      "right": "abc",
+      "srcLen": 0,
+      "destLen": 3,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 0
+        }
+      ],
+      "applied": "abc",
+      "opcodeApplied": "abc"
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "abc",
+      "right": "",
+      "srcLen": 3,
+      "destLen": 0,
+      "editops": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 0
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 3,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 3,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "applied": "",
+      "opcodeApplied": ""
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "aaa",
+      "right": "aaaa",
+      "srcLen": 3,
+      "destLen": 4,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 4
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 4,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 4,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 3,
+          "srcEnd": 4,
+          "destStart": 3,
+          "destEnd": 3
+        }
+      ],
+      "applied": "aaaa",
+      "opcodeApplied": "aaaa"
+    },
+    {
+      "family": "lcs",
+      "configuration": {},
+      "left": "ΣΊΣΥΦΟΣ",
+      "right": "σίσυφος",
+      "srcLen": 7,
+      "destLen": 7,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 3
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 4
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 5
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 6
+        },
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 4,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 5,
+          "destPos": 7
+        },
+        {
+          "tag": "delete",
+          "srcPos": 6,
+          "destPos": 7
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 7
+        },
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 7,
+          "destStart": 7,
+          "destEnd": 7
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 4,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 5,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 6,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 2
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 3
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 4
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 5
+        },
+        {
+          "tag": "insert",
+          "srcPos": 7,
+          "destPos": 6
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 7,
+          "destStart": 0,
+          "destEnd": 0
+        },
+        {
+          "tag": "insert",
+          "srcStart": 7,
+          "srcEnd": 7,
+          "destStart": 0,
+          "destEnd": 7
+        }
+      ],
+      "applied": "σίσυφος",
+      "opcodeApplied": "σίσυφος"
     },
     {
       "family": "hamming",
+      "configuration": {},
       "left": "qabxcd",
       "right": "abycdf",
+      "srcLen": 6,
+      "destLen": 6,
       "editops": [
         {
           "tag": "replace",
@@ -1341,12 +3333,72 @@
           "destStart": 0,
           "destEnd": 6
         }
-      ]
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 6,
+          "destStart": 6,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 6,
+          "destStart": 6,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "replace",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 1
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "replace",
+          "srcPos": 4,
+          "destPos": 4
+        },
+        {
+          "tag": "replace",
+          "srcPos": 5,
+          "destPos": 5
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "replace",
+          "srcStart": 0,
+          "srcEnd": 6,
+          "destStart": 0,
+          "destEnd": 6
+        }
+      ],
+      "applied": "abycdf",
+      "opcodeApplied": "abycdf"
     },
     {
       "family": "hamming",
+      "configuration": {},
       "left": "😀ab",
       "right": "😀ac",
+      "srcLen": 3,
+      "destLen": 3,
       "editops": [
         {
           "tag": "replace",
@@ -1369,7 +3421,1034 @@
           "destStart": 2,
           "destEnd": 3
         }
-      ]
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "replace",
+          "srcStart": 2,
+          "srcEnd": 3,
+          "destStart": 2,
+          "destEnd": 3
+        }
+      ],
+      "applied": "😀ac",
+      "opcodeApplied": "😀ac"
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "",
+      "right": "",
+      "srcLen": 0,
+      "destLen": 0,
+      "editops": [],
+      "opcodes": [],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [],
+      "applied": "",
+      "opcodeApplied": ""
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "abc",
+      "right": "abc",
+      "srcLen": 3,
+      "destLen": 3,
+      "editops": [],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "applied": "abc",
+      "opcodeApplied": "abc"
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "",
+      "right": "abc",
+      "srcLen": 0,
+      "destLen": 3,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 0
+        }
+      ],
+      "applied": "abc",
+      "opcodeApplied": "abc"
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "abc",
+      "right": "",
+      "srcLen": 3,
+      "destLen": 0,
+      "editops": [
+        {
+          "tag": "delete",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 1,
+          "destPos": 0
+        },
+        {
+          "tag": "delete",
+          "srcPos": 2,
+          "destPos": 0
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "delete",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 0
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 3,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 3,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 1
+        },
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 2
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "insert",
+          "srcStart": 0,
+          "srcEnd": 0,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "applied": "",
+      "opcodeApplied": ""
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "aaa",
+      "right": "aaaa",
+      "srcLen": 3,
+      "destLen": 4,
+      "editops": [
+        {
+          "tag": "insert",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        },
+        {
+          "tag": "insert",
+          "srcStart": 3,
+          "srcEnd": 3,
+          "destStart": 3,
+          "destEnd": 4
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 4,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 4,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        },
+        {
+          "tag": "delete",
+          "srcStart": 3,
+          "srcEnd": 4,
+          "destStart": 3,
+          "destEnd": 3
+        }
+      ],
+      "applied": "aaaa",
+      "opcodeApplied": "aaaa"
+    },
+    {
+      "family": "hamming",
+      "configuration": {},
+      "left": "ΣΊΣΥΦΟΣ",
+      "right": "σίσυφος",
+      "srcLen": 7,
+      "destLen": 7,
+      "editops": [
+        {
+          "tag": "replace",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 1
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "replace",
+          "srcPos": 4,
+          "destPos": 4
+        },
+        {
+          "tag": "replace",
+          "srcPos": 5,
+          "destPos": 5
+        },
+        {
+          "tag": "replace",
+          "srcPos": 6,
+          "destPos": 6
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "replace",
+          "srcStart": 0,
+          "srcEnd": 7,
+          "destStart": 0,
+          "destEnd": 7
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "replace",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 1
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "replace",
+          "srcPos": 4,
+          "destPos": 4
+        },
+        {
+          "tag": "replace",
+          "srcPos": 5,
+          "destPos": 5
+        },
+        {
+          "tag": "replace",
+          "srcPos": 6,
+          "destPos": 6
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "replace",
+          "srcStart": 0,
+          "srcEnd": 7,
+          "destStart": 0,
+          "destEnd": 7
+        }
+      ],
+      "applied": "σίσυφος",
+      "opcodeApplied": "σίσυφος"
+    }
+  ],
+  "hammingEditopsCases": [
+    {
+      "family": "hamming",
+      "configuration": {
+        "pad": false
+      },
+      "left": "karolin",
+      "right": "kathrin",
+      "srcLen": 7,
+      "destLen": 7,
+      "editops": [
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "replace",
+          "srcPos": 4,
+          "destPos": 4
+        }
+      ],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "replace",
+          "srcStart": 2,
+          "srcEnd": 5,
+          "destStart": 2,
+          "destEnd": 5
+        },
+        {
+          "tag": "equal",
+          "srcStart": 5,
+          "srcEnd": 7,
+          "destStart": 5,
+          "destEnd": 7
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 5,
+          "destStart": 5,
+          "length": 2
+        },
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 2
+        },
+        {
+          "srcStart": 5,
+          "destStart": 5,
+          "length": 2
+        },
+        {
+          "srcStart": 7,
+          "destStart": 7,
+          "length": 0
+        }
+      ],
+      "inverse": [
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        },
+        {
+          "tag": "replace",
+          "srcPos": 4,
+          "destPos": 4
+        }
+      ],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 2,
+          "destStart": 0,
+          "destEnd": 2
+        },
+        {
+          "tag": "replace",
+          "srcStart": 2,
+          "srcEnd": 5,
+          "destStart": 2,
+          "destEnd": 5
+        },
+        {
+          "tag": "equal",
+          "srcStart": 5,
+          "srcEnd": 7,
+          "destStart": 5,
+          "destEnd": 7
+        }
+      ],
+      "applied": "kathrin",
+      "opcodeApplied": "kathrin"
+    },
+    {
+      "family": "hamming",
+      "configuration": {
+        "pad": false
+      },
+      "left": "abc",
+      "right": "abc",
+      "srcLen": 3,
+      "destLen": 3,
+      "editops": [],
+      "opcodes": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 3
+        },
+        {
+          "srcStart": 3,
+          "destStart": 3,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [
+        {
+          "tag": "equal",
+          "srcStart": 0,
+          "srcEnd": 3,
+          "destStart": 0,
+          "destEnd": 3
+        }
+      ],
+      "applied": "abc",
+      "opcodeApplied": "abc"
+    },
+    {
+      "family": "hamming",
+      "configuration": {
+        "pad": false
+      },
+      "left": "",
+      "right": "",
+      "srcLen": 0,
+      "destLen": 0,
+      "editops": [],
+      "opcodes": [],
+      "matchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "opcodeMatchingBlocks": [
+        {
+          "srcStart": 0,
+          "destStart": 0,
+          "length": 0
+        }
+      ],
+      "inverse": [],
+      "opcodeInverse": [],
+      "applied": "",
+      "opcodeApplied": ""
+    }
+  ],
+  "hammingEditopsErrors": [
+    {
+      "left": "ab",
+      "right": "abc",
+      "configuration": {
+        "pad": false
+      },
+      "error": "Sequences are not the same length."
+    }
+  ],
+  "removeSubsequenceCases": [
+    {
+      "family": "levenshtein",
+      "source": "abcd",
+      "subset": "baac",
+      "target": "baaa",
+      "full": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 3
+        },
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 4
+        }
+      ],
+      "subsequence": [
+        {
+          "tag": "insert",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 2
+        },
+        {
+          "tag": "delete",
+          "srcPos": 3,
+          "destPos": 4
+        }
+      ],
+      "operations": [
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "srcLen": 4,
+      "destLen": 4
+    },
+    {
+      "family": "levenshtein",
+      "source": "abcd",
+      "subset": "aaaa",
+      "target": "bxaa",
+      "full": [
+        {
+          "tag": "replace",
+          "srcPos": 0,
+          "destPos": 0
+        },
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 1
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "subsequence": [
+        {
+          "tag": "replace",
+          "srcPos": 1,
+          "destPos": 1
+        },
+        {
+          "tag": "replace",
+          "srcPos": 2,
+          "destPos": 2
+        },
+        {
+          "tag": "replace",
+          "srcPos": 3,
+          "destPos": 3
+        }
+      ],
+      "operations": [
+        {
+          "tag": "replace",
+          "srcPos": 0,
+          "destPos": 0
+        }
+      ],
+      "srcLen": 4,
+      "destLen": 4
+    }
+  ],
+  "alignmentCases": [
+    {
+      "left": "",
+      "right": "",
+      "alignment": {
+        "score": 100.0,
+        "srcStart": 0,
+        "srcEnd": 0,
+        "destStart": 0,
+        "destEnd": 0
+      }
+    },
+    {
+      "left": "a",
+      "right": "",
+      "alignment": {
+        "score": 0.0,
+        "srcStart": 0,
+        "srcEnd": 0,
+        "destStart": 0,
+        "destEnd": 0
+      }
+    },
+    {
+      "left": "abc",
+      "right": "xyz",
+      "alignment": {
+        "score": 0.0,
+        "srcStart": 0,
+        "srcEnd": 3,
+        "destStart": 0,
+        "destEnd": 3
+      }
+    },
+    {
+      "left": "fuzzy was a bear",
+      "right": "fuzzy fuzzy was a bear",
+      "alignment": {
+        "score": 100.0,
+        "srcStart": 0,
+        "srcEnd": 16,
+        "destStart": 6,
+        "destEnd": 22
+      }
+    },
+    {
+      "left": "new york mets",
+      "right": "the new york mets played",
+      "alignment": {
+        "score": 100.0,
+        "srcStart": 0,
+        "srcEnd": 13,
+        "destStart": 4,
+        "destEnd": 17
+      }
+    },
+    {
+      "left": "😀 alpha",
+      "right": "alpha 😀",
+      "alignment": {
+        "score": 83.33333333333334,
+        "srcStart": 0,
+        "srcEnd": 7,
+        "destStart": 0,
+        "destEnd": 5
+      }
+    }
+  ],
+  "divergences": [
+    {
+      "id": "token-split-u0085",
+      "surface": "fuzz.tokenSortSimilarity",
+      "cpp": 66.66666666666667,
+      "py": 100.0,
+      "correct": "py",
+      "defect": "self-contradiction",
+      "reason": "U+0085 NEL is str.isspace() and Zs/Cc, and `_py` splits on it everywhere. C++ splits on it in a wide string and in its list path but not in a latin-1 string, and splits on U+202F — equally non-breaking — in every case. The trigger is CPython's storage width, not the character's meaning, so there is no reading on which the latin-1 answer is the deliberate one.",
+      "evidence": [
+        {
+          "note": "the same text with one token widened past latin-1",
+          "left": "ba zz 一",
+          "right": "ab zz 一",
+          "cpp": 100.0,
+          "py": 100.0
+        },
+        {
+          "note": "the same text as code points, which is what a list input is",
+          "left": [98, 133, 97, 32, 122, 122],
+          "right": [97, 133, 98, 32, 122, 122],
+          "cpp": 100.0,
+          "py": 100.0
+        },
+        {
+          "note": "U+202F, also a non-breaking space and also Zs, but too wide for latin-1",
+          "left": "b a zz",
+          "right": "a b zz",
+          "cpp": 100.0,
+          "py": 100.0
+        }
+      ],
+      "left": "ba zz",
+      "right": "ab zz"
+    },
+    {
+      "id": "token-split-u00a0",
+      "surface": "fuzz.tokenSortSimilarity",
+      "cpp": 66.66666666666667,
+      "py": 100.0,
+      "correct": "py",
+      "defect": "self-contradiction",
+      "reason": "U+00A0 NBSP is str.isspace() and Zs/Cc, and `_py` splits on it everywhere. C++ splits on it in a wide string and in its list path but not in a latin-1 string, and splits on U+202F — equally non-breaking — in every case. The trigger is CPython's storage width, not the character's meaning, so there is no reading on which the latin-1 answer is the deliberate one.",
+      "evidence": [
+        {
+          "note": "the same text with one token widened past latin-1",
+          "left": "b a zz 一",
+          "right": "a b zz 一",
+          "cpp": 100.0,
+          "py": 100.0
+        },
+        {
+          "note": "the same text as code points, which is what a list input is",
+          "left": [98, 160, 97, 32, 122, 122],
+          "right": [97, 160, 98, 32, 122, 122],
+          "cpp": 100.0,
+          "py": 100.0
+        },
+        {
+          "note": "U+202F, also a non-breaking space and also Zs, but too wide for latin-1",
+          "left": "b a zz",
+          "right": "a b zz",
+          "cpp": 100.0,
+          "py": 100.0
+        }
+      ],
+      "left": "b a zz",
+      "right": "a b zz"
+    },
+    {
+      "id": "jaro-winkler-bounded-ulp",
+      "surface": "jaroWinkler.similarity",
+      "cpp": 0.0,
+      "py": 0.99,
+      "correct": "py",
+      "defect": "self-contradiction",
+      "reason": "score_cutoff promises the score back when score >= cutoff. The score is exactly 0.99 and the cutoff is exactly 0.99, so it has to be returned. C++ returns 0.99 unbounded and 0.0 bounded by that same value, because its bounded Jaro bails one ULP early.",
+      "evidence": [
+        {
+          "note": "C++ contradicting itself: the same pair, no cutoff",
+          "cpp": 0.99,
+          "py": 0.99
+        }
+      ],
+      "left": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "right": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+      "threshold": 0.99
+    },
+    {
+      "id": "fractional-raw-threshold",
+      "surface": "scorePairs(levenshtein.distance)",
+      "cpp": [2.0],
+      "py": [2.9],
+      "correct": "cpp",
+      "defect": "out-of-domain-value",
+      "reason": "A rejected pair is stored as a value that beats the cutoff. `_py` stores 2.9, which no raw edit distance can ever be — upstream truncates its weights, so the metric is integer-valued — and which no integral `into` kind can hold. C++'s 2 is in-domain and unambiguous, since a real distance of 2 is itself rejected at a cutoff of 1.9. Accept/reject is identical either way.",
+      "evidence": [
+        {
+          "note": "C++ truncates fractional weights, so a raw distance is always integral",
+          "weights": [1, 1, 2],
+          "cpp": 5
+        },
+        {
+          "note": "C++ truncates fractional weights, so a raw distance is always integral",
+          "weights": [1, 1, 1.5],
+          "cpp": 3
+        },
+        {
+          "note": "C++ truncates fractional weights, so a raw distance is always integral",
+          "weights": [0.5, 0.5, 1],
+          "cpp": 0
+        }
+      ],
+      "queries": ["kitten"],
+      "choices": ["sitting"],
+      "threshold": 1.9
+    },
+    {
+      "id": "multi-character-element",
+      "surface": "fuzz.tokenSortSimilarity",
+      "cpp": 33.333333333333336,
+      "py": null,
+      "correct": "ours",
+      "defect": "both-defective",
+      "reason": "`_py` raises out of chr() — an internal detail, not a decision. C++ answers, but splits this same whitespace when it is one element and when it is a code point, and declines only when it is two characters. Both agree on the equivalent spellings below, and that shared answer is the consistent one.",
+      "evidence": [
+        {
+          "note": "the same comparison with a single-character element",
+          "left": ["b", " ", "a"],
+          "right": ["a", " ", "b"],
+          "cpp": 100.0,
+          "py": 100.0
+        },
+        {
+          "note": "the same comparison as code points",
+          "left": [98, 32, 97],
+          "right": [97, 32, 98],
+          "cpp": 100.0,
+          "py": 100.0
+        }
+      ],
+      "left": ["b", "  ", "a"],
+      "right": ["a", "  ", "b"],
+      "pyError": "ValueError: chr() arg not in range(0x110000)"
     }
   ],
   "search": {
@@ -1419,6 +4498,124 @@
         "item": "new york jets",
         "score": 92.3076923076923,
         "key": 1
+      }
+    ],
+    "record": {
+      "choices": {
+        "mets": "new york mets",
+        "jets": "new york jets",
+        "braves": "atlanta braves"
+      },
+      "top": [
+        {
+          "item": "new york mets",
+          "score": 100.0,
+          "key": "mets"
+        },
+        {
+          "item": "new york jets",
+          "score": 92.3076923076923,
+          "key": "jets"
+        }
+      ]
+    },
+    "normalized": {
+      "query": "New YORK Mets",
+      "choices": ["NEW YORK METS!!!", "new_york_jets", "  Atlanta Braves  "],
+      "threshold": 60,
+      "best": {
+        "item": "NEW YORK METS!!!",
+        "score": 100.0,
+        "key": 0
+      },
+      "top": [
+        {
+          "item": "NEW YORK METS!!!",
+          "score": 100.0,
+          "key": 0
+        },
+        {
+          "item": "new_york_jets",
+          "score": 92.3076923076923,
+          "key": 1
+        }
+      ]
+    }
+  },
+  "batchDtypes": {
+    "queries": ["abcdefgh", "kitten", "abc"],
+    "choices": ["abcdefgx", "sitting", "abc"],
+    "kinds": [
+      {
+        "into": "f64",
+        "scoreMultiplier": 1,
+        "pairs": [0.875, 0.5714285714285714, 1.0]
+      },
+      {
+        "into": "f32",
+        "scoreMultiplier": 1,
+        "pairs": [0.875, 0.5714285969734192, 1.0]
+      },
+      {
+        "into": "i32",
+        "scoreMultiplier": 100,
+        "pairs": [88, 57, 100]
+      },
+      {
+        "into": "i16",
+        "scoreMultiplier": 100,
+        "pairs": [88, 57, 100]
+      },
+      {
+        "into": "i8",
+        "scoreMultiplier": 100,
+        "pairs": [88, 57, 100]
+      },
+      {
+        "into": "u32",
+        "scoreMultiplier": 100,
+        "pairs": [88, 57, 100]
+      },
+      {
+        "into": "u16",
+        "scoreMultiplier": 100,
+        "pairs": [88, 57, 100]
+      },
+      {
+        "into": "u8",
+        "scoreMultiplier": 100,
+        "pairs": [88, 57, 100]
+      },
+      {
+        "into": "u8c",
+        "scoreMultiplier": 100,
+        "pairs": [88, 57, 100]
+      }
+    ]
+  },
+  "batchRejections": {
+    "queries": ["abcdefgh", "kitten", "abc"],
+    "choices": ["abcdefgx", "sitting", "abc"],
+    "cases": [
+      {
+        "metric": "levenshtein.distance",
+        "threshold": 2,
+        "pairs": [1.0, 3.0, 0.0]
+      },
+      {
+        "metric": "levenshtein.distance",
+        "threshold": 0,
+        "pairs": [1.0, 1.0, 0.0]
+      },
+      {
+        "metric": "levenshtein.normalizedSimilarity",
+        "threshold": 0.9,
+        "pairs": [0.0, 0.0, 1.0]
+      },
+      {
+        "metric": "fuzz.similarity",
+        "threshold": 90,
+        "pairs": [0.0, 0.0, 100.0]
       }
     ]
   },
