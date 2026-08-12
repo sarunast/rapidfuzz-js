@@ -1,4 +1,5 @@
 import { isBuiltInMetric, type Metric } from './metric.js'
+import { createPreparedChoice, type AnyBrand, type PreparedChoice } from './prepared.js'
 import { COMPILE, type MetricCompilation } from './protocol.js'
 import { validatePair, validateSequence } from './sequence.js'
 import {
@@ -13,13 +14,17 @@ export interface ThresholdOptions {
   readonly threshold: number
 }
 
-export interface Scorer<D extends Direction = Direction> {
+export interface Scorer<D extends Direction = Direction, Brand = AnyBrand> {
   readonly direction: D
   readonly bounds: readonly [number, number]
   readonly symmetric: boolean
   score(a: MaybeSequence, b: MaybeSequence): number
   score(a: MaybeSequence, b: MaybeSequence, options: ThresholdOptions): number | undefined
+  prepareChoice(choice: Sequence): PreparedChoice<Brand>
 }
+
+export type PreparedChoiceOf<S extends { prepareChoice: (choice: never) => unknown }> =
+  ReturnType<S['prepareChoice']>
 
 export interface CustomScorerConfiguration<D extends Direction> {
   readonly direction: D
@@ -30,13 +35,13 @@ export interface CustomScorerConfiguration<D extends Direction> {
 
 const compilations = new WeakMap<object, MetricCompilation<Direction>>()
 
-function customCompilation<D extends Direction>(
+function customCompilation<D extends Direction, B>(
   metric: (a: MaybeSequence, b: MaybeSequence) => number,
   direction: D,
   bounds: readonly [number, number],
   symmetric: boolean,
   missing: MissingPolicy,
-): MetricCompilation<D> {
+): MetricCompilation<D, B> {
   const rawScore = (a: Sequence, b: Sequence): number => {
     const result = metric(a, b)
     if (!Number.isFinite(result) || result < bounds[0] || result > bounds[1]) {
@@ -59,6 +64,9 @@ function customCompilation<D extends Direction>(
     rawScore,
     prepareQuery: (query) => (choice) => rawScore(query, validatePreparedChoice(choice)),
     prepareChoice: (choice) => choice,
+    // Fresh per call: a custom metric is whatever the caller passed, so two
+    // scorers built from one function still prepare choices for themselves.
+    preparedChoiceKey: Object.freeze({}),
   }
 }
 
@@ -68,7 +76,7 @@ function validatePreparedChoice(value: unknown): Sequence {
 
 function createScoreMethod<D extends Direction>(
   compilation: MetricCompilation<D>,
-): Scorer<D>['score'] {
+): Scorer<D, never>['score'] {
   function score(a: MaybeSequence, b: MaybeSequence): number
   function score(
     a: MaybeSequence,
@@ -98,21 +106,33 @@ function createScoreMethod<D extends Direction>(
   return score
 }
 
-function fromCompilation<D extends Direction>(
-  compilation: MetricCompilation<D>,
-): Scorer<D> {
-  const scorer: Scorer<D> = {
+function fromCompilation<D extends Direction, B>(
+  compilation: MetricCompilation<D, B>,
+): Scorer<D, B> {
+  const scorer: Scorer<D, B> = {
     direction: compilation.direction,
     bounds: Object.freeze([compilation.bounds[0], compilation.bounds[1]]),
     symmetric: compilation.symmetric,
     score: createScoreMethod(compilation),
+    prepareChoice: (choice) =>
+      createPreparedChoice(
+        compilation.preparedChoiceKey,
+        compilation.prepareChoice(validateSequence(choice)),
+      ),
   }
   compilations.set(scorer, compilation)
   return Object.freeze(scorer)
 }
 
+export function createScorer<D extends Direction, Config extends object, B>(
+  metric: Metric<D, Config, B>,
+  configuration?: Config,
+): Scorer<D, B>
+// A metric whose brand cannot be pinned — a union of several, as a loop over
+// an array of them produces — still compiles a scorer; what it gives up is the
+// compile-time half of the prepared-choice check.
 export function createScorer<D extends Direction, Config extends object>(
-  metric: Metric<D, Config>,
+  metric: Metric<D, Config, AnyBrand>,
   configuration?: Config,
 ): Scorer<D>
 export function createScorer<D extends Direction>(
@@ -123,14 +143,14 @@ export function createScorer<D extends Direction>(
 // compile hook is contravariant, so `object` would demand a hook accepting any
 // object and no built-in would be assignable. The overloads keep the real
 // `Config`; this line only has to admit them all.
-export function createScorer<D extends Direction>(
-  metric: Metric<D, never> | ((a: MaybeSequence, b: MaybeSequence) => number),
+export function createScorer<D extends Direction, B>(
+  metric: Metric<D, never, B> | ((a: MaybeSequence, b: MaybeSequence) => number),
   configuration?: object,
-): Scorer<D> {
+): Scorer<D, B> {
   // The direction is named rather than inferred: the guard reads `unknown`, so
   // there is no argument left to infer `D` from, and a bare call would widen the
   // result to `Scorer<Direction>`.
-  if (isBuiltInMetric<D, object>(metric)) {
+  if (isBuiltInMetric<D, object, B>(metric)) {
     return fromCompilation(metric[COMPILE](configuration))
   }
   // The guard above answers `false` for a non-callable rather than throwing, so
@@ -167,7 +187,7 @@ export function createScorer<D extends Direction>(
     configuration.bounds[1],
   ])
   return fromCompilation(
-    customCompilation(
+    customCompilation<D, B>(
       metric,
       configuration.direction,
       bounds,
@@ -249,6 +269,9 @@ export function withPublicScoreObserver(
       observer()
       return scorer.score
     },
+    // Copied plainly: the observer reports public `score` calls, and preparing
+    // a choice is not one.
+    prepareChoice: (choice) => scorer.prepareChoice(choice),
   }
   compilations.set(observed, compilation)
   return Object.freeze(observed)

@@ -1,3 +1,4 @@
+import type { AnyBrand, PreparedChoice } from '../core/prepared.js'
 import type { Scorer } from '../core/scorer.js'
 import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
 import type { Match } from './results.js'
@@ -17,7 +18,24 @@ export interface MatcherOptions<T, D extends Direction = Direction> {
   readonly getText?: ((item: T) => MaybeSequence) | undefined
   readonly normalize?: Normalizer | undefined
   readonly missingItems?: MissingItemsPolicy | undefined
+  readonly getPrepared?: undefined
 }
+
+export interface PreparedMatcherOptions<
+  T,
+  D extends Direction = Direction,
+  B = AnyBrand,
+> {
+  readonly scorer: Scorer<D, B>
+  readonly getPrepared: (item: T) => PreparedChoice<NoInfer<B>>
+  readonly normalize?: Normalizer | undefined
+  readonly getText?: undefined
+  readonly missingItems?: undefined
+}
+
+export type AnyMatcherOptions<T, D extends Direction = Direction, B = AnyBrand> =
+  | MatcherOptions<T, D>
+  | PreparedMatcherOptions<T, D, B>
 
 export interface BestOptions {
   readonly threshold?: number | undefined

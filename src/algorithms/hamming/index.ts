@@ -1,6 +1,7 @@
 import type { Metric } from '../../core/metric.js'
-import type { SimilarityConfiguration } from '../../core/types.js'
-import { builtInMetric } from '../shared/metricAdapter.js'
+import type { Direction, SimilarityConfiguration } from '../../core/types.js'
+import { builtInMetric, type BuiltInMetric } from '../shared/metricAdapter.js'
+import type { MaybeSequenceMetricImplementation } from '../shared/scorerSupport.js'
 import {
   hammingDistance,
   hammingEditops,
@@ -8,6 +9,7 @@ import {
   hammingNormalizedSimilarity,
   hammingOpcodes,
   hammingSimilarity,
+  type HammingOptions,
 } from './implementation.js'
 
 export interface HammingDistanceConfiguration {
@@ -16,36 +18,46 @@ export interface HammingDistanceConfiguration {
 export interface HammingSimilarityConfiguration
   extends HammingDistanceConfiguration, SimilarityConfiguration {}
 
-export const distance: Metric<'distance', HammingDistanceConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: hammingDistance,
-    directImplementation: hammingDistance,
-    direction: 'distance',
-    bounds: [0, Number.POSITIVE_INFINITY],
-    configurationKeys: ['pad'],
+const PAD: readonly string[] = ['pad']
+
+function hammingMetric<D extends Direction, Config extends object, Brand>(
+  implementation: MaybeSequenceMetricImplementation<HammingOptions>,
+  direction: D,
+  bounds: readonly [number, number],
+): Metric<D, Config, Brand> {
+  return builtInMetric({
+    implementation,
+    directImplementation: implementation,
+    direction,
+    bounds,
+    configurationKeys: PAD,
   })
-export const similarity: Metric<'similarity', HammingSimilarityConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: hammingSimilarity,
-    directImplementation: hammingSimilarity,
-    direction: 'similarity',
-    bounds: [0, Number.POSITIVE_INFINITY],
-    configurationKeys: ['pad'],
-  })
-export const normalizedDistance: Metric<'distance', HammingDistanceConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: hammingNormalizedDistance,
-    directImplementation: hammingNormalizedDistance,
-    direction: 'distance',
-    bounds: [0, 1],
-    configurationKeys: ['pad'],
-  })
-export const normalizedSimilarity: Metric<'similarity', HammingSimilarityConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: hammingNormalizedSimilarity,
-    directImplementation: hammingNormalizedSimilarity,
-    direction: 'similarity',
-    bounds: [0, 1],
-    configurationKeys: ['pad'],
-  })
+}
+
+export const distance: BuiltInMetric<
+  'hamming.distance',
+  'distance',
+  HammingDistanceConfiguration
+> = /* @__PURE__ */ hammingMetric(hammingDistance, 'distance', [
+  0,
+  Number.POSITIVE_INFINITY,
+])
+export const similarity: BuiltInMetric<
+  'hamming.similarity',
+  'similarity',
+  HammingDistanceConfiguration
+> = /* @__PURE__ */ hammingMetric(hammingSimilarity, 'similarity', [
+  0,
+  Number.POSITIVE_INFINITY,
+])
+export const normalizedDistance: BuiltInMetric<
+  'hamming.normalizedDistance',
+  'distance',
+  HammingDistanceConfiguration
+> = /* @__PURE__ */ hammingMetric(hammingNormalizedDistance, 'distance', [0, 1])
+export const normalizedSimilarity: BuiltInMetric<
+  'hamming.normalizedSimilarity',
+  'similarity',
+  HammingDistanceConfiguration
+> = /* @__PURE__ */ hammingMetric(hammingNormalizedSimilarity, 'similarity', [0, 1])
 export { hammingEditops as editops, hammingOpcodes as opcodes }

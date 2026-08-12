@@ -1,4 +1,4 @@
-import { builtInMetric } from '../algorithms/shared/metricAdapter.js'
+import type { BuiltInMetric } from '../algorithms/shared/metricAdapter.js'
 /**
  * `wRatio` picks a strategy rather than defining a new comparison algorithm.
  *
@@ -22,7 +22,7 @@ import {
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
-import type { Metric } from '../core/metric.js'
+import { fuzzMetric } from './internal/metric.js'
 import { partialRatioConverted, ratioConverted } from './internal/partialWindow.js'
 import { prepareFuzz } from './internal/prepared.js'
 import {
@@ -31,7 +31,7 @@ import {
   tokenForm,
 } from './internal/tokens.js'
 import { partialTokenRatioConverted, tokenRatioConverted } from './internal/tokenSet.js'
-import type { FuzzConfiguration, FuzzInput, FuzzOptions } from './types.js'
+import type { FuzzInput, FuzzOptions } from './types.js'
 
 /**
  * Weighted combination of the other scorers, picking a strategy from the length
@@ -149,14 +149,8 @@ export function wRatio_impl(
   )
 }
 
-const BOUNDS: readonly [number, number] = [0, 100]
-
 export const wRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(wRatio_impl, FUZZ_FLAGS, prepareFuzz('wRatio'))
 
-export const fuzzySimilarity: Metric<'similarity', FuzzConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: wRatio,
-    direction: 'similarity',
-    bounds: BOUNDS,
-  })
+export const fuzzySimilarity: BuiltInMetric<'fuzz.fuzzySimilarity', 'similarity'> =
+  /* @__PURE__ */ fuzzMetric(wRatio)

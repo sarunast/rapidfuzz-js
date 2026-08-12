@@ -2,10 +2,12 @@ import { describe, expect, test } from 'vitest'
 
 import {
   isSequence,
+  normalizeSequence,
   snapshotSequence,
   validatePair,
   validateSequence,
 } from '../../src/core/sequence.js'
+import type { Sequence } from '../../src/core/types.js'
 
 describe('the sequence boundary', () => {
   test('accepts strings and array-likes with a representable length', () => {
@@ -86,5 +88,27 @@ describe('the sequence boundary', () => {
     // observed.
     const growing = { length: 2, 0: 'a', 1: 'b', 2: 'c' }
     expect(snapshotSequence(growing)).toEqual(['a', 'b'])
+  })
+
+  test('holds a normalizer to returning a usable sequence', () => {
+    const calls: Sequence[] = []
+    const upper = (value: Sequence): Sequence => {
+      calls.push(value)
+      return String(value).toUpperCase()
+    }
+    expect(normalizeSequence('abc', upper)).toBe('ABC')
+    // Once per sequence: the callers that skip normalization skip the call,
+    // and the ones that normalize do not normalize twice.
+    expect(calls).toEqual(['abc'])
+
+    for (const missing of [null, undefined]) {
+      expect(() => normalizeSequence('abc', () => missing)).toThrow(
+        'normalize returned a missing value',
+      )
+    }
+    // From JavaScript, where the normalizer's return type proves nothing.
+    expect(() => Reflect.apply(normalizeSequence, undefined, ['abc', () => 42])).toThrow(
+      'expected a string or an array-like sequence',
+    )
   })
 })

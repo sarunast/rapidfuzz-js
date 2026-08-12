@@ -1,3 +1,4 @@
+import type { AnyBrand } from './prepared.js'
 import { COMPILE, type MetricCompilation } from './protocol.js'
 import type { Direction, MaybeSequence } from './types.js'
 
@@ -21,9 +22,13 @@ export type NoConfiguration = Readonly<Record<string, never>>
  * `(a, b) => number` handed to `createScorer` with a configuration describing
  * it; the overload for that takes a bare function and never looks for a hook.
  */
-export interface Metric<D extends Direction, Config extends object = NoConfiguration> {
+export interface Metric<
+  D extends Direction,
+  Config extends object = NoConfiguration,
+  Brand = AnyBrand,
+> {
   (a: MaybeSequence, b: MaybeSequence): number
-  readonly [COMPILE]: (configuration: Config | undefined) => MetricCompilation<D>
+  readonly [COMPILE]: (configuration: Config | undefined) => MetricCompilation<D, Brand>
 }
 
 /**
@@ -36,9 +41,9 @@ export interface Metric<D extends Direction, Config extends object = NoConfigura
  * installed on the metric function itself, so an inherited hook is not a metric
  * this package made — it is something that borrowed a prototype from one.
  */
-export function isBuiltInMetric<D extends Direction, Config extends object>(
+export function isBuiltInMetric<D extends Direction, Config extends object, Brand>(
   value: unknown,
-): value is Metric<D, Config> {
+): value is Metric<D, Config, Brand> {
   if (typeof value !== 'function' || !Object.hasOwn(value, COMPILE)) return false
   const compile: unknown = Reflect.get(value, COMPILE)
   return typeof compile === 'function'

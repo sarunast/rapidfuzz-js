@@ -207,3 +207,21 @@ describe('removed architecture', () => {
     expect(existsSync(join(source, 'distance'))).toBe(false)
   })
 })
+
+describe('metric identity', () => {
+  const declarations = [contents('algorithms'), contents('fuzz')].join('\n')
+
+  it('gives every built-in metric a name of its own', () => {
+    const ids = [...declarations.matchAll(/BuiltInMetric<\s*'([\w.]+)'/g)].map(
+      (match) => match[1],
+    )
+    // A copy-pasted name would silently make two metrics accept each other's
+    // prepared choices, which is the one mistake the type cannot catch.
+    expect(ids.length).toBeGreaterThan(40)
+    expect([...new Set(ids)]).toHaveLength(ids.length)
+  })
+
+  it('leaves the mechanics of identity to the adapter', () => {
+    expect(declarations).not.toMatch(/declare const \w+: unique symbol/)
+  })
+})

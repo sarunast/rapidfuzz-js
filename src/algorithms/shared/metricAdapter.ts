@@ -1,4 +1,5 @@
-import { type Metric } from '../../core/metric.js'
+import { type Metric, type NoConfiguration } from '../../core/metric.js'
+import type { MetricBrand } from '../../core/prepared.js'
 import { COMPILE, type MetricCompilation } from '../../core/protocol.js'
 import { validatePair, validateSequence } from '../../core/sequence.js'
 import type {
@@ -6,6 +7,7 @@ import type {
   MaybeSequence,
   MissingPolicy,
   Sequence,
+  SimilarityConfiguration,
 } from '../../core/types.js'
 import {
   configurationSymmetryOf,
@@ -15,6 +17,29 @@ import {
   type PreparedCapability,
   type ScorerOptions,
 } from './scorerSupport.js'
+
+/**
+ * The type of a metric this package built, named by `Id`.
+ *
+ * The name is the whole of the metric's identity: `MetricBrand<Id>` is what
+ * makes a prepared choice belong to one metric and not another, so an
+ * algorithm module writes the name and infrastructure derives the rest.
+ * `Options` is what the metric itself configures — the direction decides the
+ * rest, since `missing` is accepted by a similarity and refused by a distance.
+ */
+export type BuiltInMetric<
+  Id extends string,
+  D extends Direction,
+  Options extends object = NoConfiguration,
+> = Metric<
+  D,
+  D extends 'similarity'
+    ? Options extends NoConfiguration
+      ? SimilarityConfiguration
+      : Options & SimilarityConfiguration
+    : Options,
+  MetricBrand<Id>
+>
 
 interface BuiltInMetricOptions<D extends Direction> {
   readonly implementation: ErasedMetricImplementation & PreparedCapability
@@ -68,9 +93,13 @@ function configurationRecord<D extends Direction>(
   return { record, missing }
 }
 
-export function builtInMetric<D extends Direction, Config extends object>(
+export function builtInMetric<D extends Direction, Config extends object, Brand>(
   options: BuiltInMetricOptions<D>,
-): Metric<D, Config> {
+): Metric<D, Config, Brand> {
+  // One per metric, shared by every scorer it compiles with default
+  // configuration, so choices prepared by one such scorer are accepted by
+  // another. A configured scorer gets its own below.
+  const defaultPreparedChoiceKey = Object.freeze({})
   // Keep this as a normal direct call: `Reflect.apply` measured 5-7% slower
   // over short-string comparisons.
   const implementation = options.implementation
@@ -88,7 +117,7 @@ export function builtInMetric<D extends Direction, Config extends object>(
       if (typeof b !== 'string') validateSequence(b)
       return implementation(a, b)
     })
-  const compile = (given: Config | undefined): MetricCompilation<D> => {
+  const compile = (given: Config | undefined): MetricCompilation<D, Brand> => {
     const { record: initial, missing } = configurationRecord(
       configurationObject(given),
       options.direction,
@@ -135,6 +164,7 @@ export function builtInMetric<D extends Direction, Config extends object>(
       rawScore,
       prepareQuery: preparation.prepareQuery,
       prepareChoice: preparation.prepareChoice,
+      preparedChoiceKey: configured ? Object.freeze({}) : defaultPreparedChoiceKey,
     }
   }
   return Object.assign(direct, {

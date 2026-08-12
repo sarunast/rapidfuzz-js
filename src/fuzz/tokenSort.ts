@@ -1,18 +1,18 @@
 import { prepareLcsPattern } from '../algorithms/lcs/implementation.js'
 import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
-import { builtInMetric } from '../algorithms/shared/metricAdapter.js'
+import type { BuiltInMetric } from '../algorithms/shared/metricAdapter.js'
 import {
   type PreparationFactory,
   FUZZ_FLAGS,
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
-import type { Metric } from '../core/metric.js'
 import type { PreparedKernel } from '../core/protocol.js'
 import type { Sequence } from '../core/types.js'
+import { fuzzMetric } from './internal/metric.js'
 import { preparedTokenChoice, sortedOf, tokenChoicePreparer } from './internal/tokens.js'
 import { tokenSortRatio_impl, tokenSortRatioConverted } from './internal/tokenSort.js'
-import type { FuzzConfiguration, FuzzOptions } from './types.js'
+import type { FuzzOptions } from './types.js'
 
 /** Narrow prepared-query implementation for token-sort similarity. */
 export function prepareTokenSort(): PreparationFactory {
@@ -46,14 +46,10 @@ export function prepareTokenSort(): PreparationFactory {
   return () => ({ prepareQuery, prepareChoice: choicePreparer })
 }
 
-const BOUNDS: readonly [number, number] = [0, 100]
-
 export const tokenSortRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(tokenSortRatio_impl, FUZZ_FLAGS, prepareTokenSort())
 
-export const tokenSortSimilarity: Metric<'similarity', FuzzConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: tokenSortRatio,
-    direction: 'similarity',
-    bounds: BOUNDS,
-  })
+export const tokenSortSimilarity: BuiltInMetric<
+  'fuzz.tokenSortSimilarity',
+  'similarity'
+> = /* @__PURE__ */ fuzzMetric(tokenSortRatio)

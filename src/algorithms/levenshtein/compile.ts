@@ -1,6 +1,7 @@
 import type { Metric } from '../../core/metric.js'
-import type { SimilarityConfiguration } from '../../core/types.js'
-import { builtInMetric } from '../shared/metricAdapter.js'
+import type { Direction, SimilarityConfiguration } from '../../core/types.js'
+import { builtInMetric, type BuiltInMetric } from '../shared/metricAdapter.js'
+import type { MetricImplementation } from '../shared/scorerSupport.js'
 import {
   levenshteinDistance,
   levenshteinNormalizedDistance,
@@ -8,6 +9,7 @@ import {
   levenshteinSimilarity,
   type LevenshteinWeightsInput,
 } from './metric.js'
+import type { LevenshteinOptions } from './types.js'
 
 export interface LevenshteinDistanceConfiguration {
   readonly weights?: LevenshteinWeightsInput | undefined
@@ -16,36 +18,48 @@ export interface LevenshteinDistanceConfiguration {
 export interface LevenshteinSimilarityConfiguration
   extends LevenshteinDistanceConfiguration, SimilarityConfiguration {}
 
-export const distance: Metric<'distance', LevenshteinDistanceConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: levenshteinDistance,
-    direction: 'distance',
-    bounds: [0, Number.POSITIVE_INFINITY],
-    configurationKeys: ['weights'],
-  })
+const WEIGHTS: readonly string[] = ['weights']
 
-export const similarity: Metric<'similarity', LevenshteinSimilarityConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: levenshteinSimilarity,
-    direction: 'similarity',
-    bounds: [0, Number.POSITIVE_INFINITY],
-    configurationKeys: ['weights'],
+function levenshteinMetric<D extends Direction, Config extends object, Brand>(
+  implementation: MetricImplementation<LevenshteinOptions>,
+  direction: D,
+  bounds: readonly [number, number],
+): Metric<D, Config, Brand> {
+  return builtInMetric({
+    implementation,
+    direction,
+    bounds,
+    configurationKeys: WEIGHTS,
   })
+}
 
-export const normalizedDistance: Metric<'distance', LevenshteinDistanceConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: levenshteinNormalizedDistance,
-    direction: 'distance',
-    bounds: [0, 1],
-    configurationKeys: ['weights'],
-  })
-
-export const normalizedSimilarity: Metric<
+export const distance: BuiltInMetric<
+  'levenshtein.distance',
+  'distance',
+  LevenshteinDistanceConfiguration
+> = /* @__PURE__ */ levenshteinMetric(levenshteinDistance, 'distance', [
+  0,
+  Number.POSITIVE_INFINITY,
+])
+export const similarity: BuiltInMetric<
+  'levenshtein.similarity',
   'similarity',
-  LevenshteinSimilarityConfiguration
-> = /* @__PURE__ */ builtInMetric({
-  implementation: levenshteinNormalizedSimilarity,
-  direction: 'similarity',
-  bounds: [0, 1],
-  configurationKeys: ['weights'],
-})
+  LevenshteinDistanceConfiguration
+> = /* @__PURE__ */ levenshteinMetric(levenshteinSimilarity, 'similarity', [
+  0,
+  Number.POSITIVE_INFINITY,
+])
+export const normalizedDistance: BuiltInMetric<
+  'levenshtein.normalizedDistance',
+  'distance',
+  LevenshteinDistanceConfiguration
+> = /* @__PURE__ */ levenshteinMetric(levenshteinNormalizedDistance, 'distance', [0, 1])
+export const normalizedSimilarity: BuiltInMetric<
+  'levenshtein.normalizedSimilarity',
+  'similarity',
+  LevenshteinDistanceConfiguration
+> = /* @__PURE__ */ levenshteinMetric(
+  levenshteinNormalizedSimilarity,
+  'similarity',
+  [0, 1],
+)

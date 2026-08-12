@@ -106,10 +106,11 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check:exports": "node scripts/check-exports.mjs",
+    "check:consumer": "node scripts/check-consumer.mjs",
     "check:bundles": "node scripts/check-bundles.mjs",
     "check:tarball": "node scripts/check-tarball.mjs",
     "check:pkg": "publint && attw --pack . --profile esm-only",
-    "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run check:exports && npm run check:bundles && npm run check:tarball && npm run check:pkg",
+    "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run check:exports && npm run check:consumer && npm run check:bundles && npm run check:tarball && npm run check:pkg",
     "prepublishOnly": "npm run check"
   },
   "devDependencies": {

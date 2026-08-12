@@ -1,15 +1,13 @@
-import { builtInMetric } from '../algorithms/shared/metricAdapter.js'
+import type { BuiltInMetric } from '../algorithms/shared/metricAdapter.js'
 import {
   FUZZ_FLAGS,
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
-import type { Metric } from '../core/metric.js'
+import { fuzzMetric } from './internal/metric.js'
 import { prepareFuzz } from './internal/prepared.js'
 import { partialTokenSortRatio_impl } from './internal/tokenSet.js'
-import type { FuzzConfiguration, FuzzOptions } from './types.js'
-
-const BOUNDS: readonly [number, number] = [0, 100]
+import type { FuzzOptions } from './types.js'
 
 export const partialTokenSortRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(
@@ -18,9 +16,7 @@ export const partialTokenSortRatio: MaybeSequenceMetricImplementation<FuzzOption
     prepareFuzz('partialTokenSortRatio'),
   )
 
-export const partialTokenSortSimilarity: Metric<'similarity', FuzzConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: partialTokenSortRatio,
-    direction: 'similarity',
-    bounds: BOUNDS,
-  })
+export const partialTokenSortSimilarity: BuiltInMetric<
+  'fuzz.partialTokenSortSimilarity',
+  'similarity'
+> = /* @__PURE__ */ fuzzMetric(partialTokenSortRatio)

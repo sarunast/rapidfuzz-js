@@ -6,17 +6,17 @@ import { assertCollection, collectionEntries } from './collection.js'
 import { pushHeap, replaceHeapRoot } from './internal/heap.js'
 import type { Match, ScoredEntry } from './results.js'
 import {
+  choiceReader,
   normalizeQuery,
   optionalThreshold,
   resultLimit,
-  sequenceReader,
-  type SequenceReader,
+  type ChoiceReader,
 } from './snapshot.js'
 import type {
   BestOptions,
   ItemIterable,
   Items,
-  MatcherOptions,
+  AnyMatcherOptions,
   SearchOptions,
 } from './types.js'
 
@@ -67,45 +67,50 @@ function arrayItemsOf<T>(items: Items<T>): readonly T[] | null {
 // finish is a different question than this one.
 const STREAM_PREPARE_AFTER = 8
 
-export function bestMatch<T, D extends Direction>(
+export function bestMatch<T, D extends Direction, B>(
   query: MaybeSequence,
   items: readonly T[],
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): Match<T, number> | undefined
-export function bestMatch<K, T, D extends Direction>(
+export function bestMatch<K, T, D extends Direction, B>(
   query: MaybeSequence,
   items: ReadonlyMap<K, T>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): Match<T, K> | undefined
-export function bestMatch<T, D extends Direction>(
+export function bestMatch<T, D extends Direction, B>(
   query: MaybeSequence,
   items: ItemIterable<T>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): Match<T, number> | undefined
-export function bestMatch<T, D extends Direction>(
+export function bestMatch<T, D extends Direction, B>(
   query: MaybeSequence,
   items: Readonly<Record<string, T>>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): Match<T, string> | undefined
-export function bestMatch<T, D extends Direction>(
+export function bestMatch<T, D extends Direction, B>(
   query: MaybeSequence,
   items: Items<T>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): Match<T, unknown> | undefined
-export function bestMatch<T, D extends Direction>(
+export function bestMatch<T, D extends Direction, B>(
   query: MaybeSequence,
   items: Items<T>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): Match<T, unknown> | undefined {
   // Argument shape is checked before any semantic exit: an impossible
   // threshold must not turn an invalid collection into an empty result.
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
   const compilation = scorerCompilation(options.scorer)
-  const stableOptions: MatcherOptions<T, Direction> = options
+  const stableOptions: AnyMatcherOptions<T, Direction, B> = options
   // Before the query is normalized, so `search` at any limit refuses a wrong
   // option in the same order — `limit: 1` delegates here.
-  const readSequence = sequenceReader(stableOptions, false)
+  const choices = choiceReader(
+    stableOptions,
+    compilation.prepareChoice,
+    compilation.preparedChoiceKey,
+    false,
+  )
   const normalized = normalizeQuery(query, options.normalize)
   const arrayItems = arrayItemsOf(items)
 
@@ -115,14 +120,14 @@ export function bestMatch<T, D extends Direction>(
     if (arrayItems !== null) {
       for (let key = 0; key < arrayItems.length; key++) {
         const item = arrayItems[key]
-        if (readSequence(item) !== null) {
+        if (choices.present(item)) {
           return { item, key, score }
         }
       }
       return undefined
     }
     for (const entry of collectionEntries(items)) {
-      if (readSequence(entry.item) !== null) {
+      if (choices.present(entry.item)) {
         return { item: entry.item, key: entry.key, score }
       }
     }
@@ -151,9 +156,9 @@ export function bestMatch<T, D extends Direction>(
   if (arrayItems !== null) {
     for (let key = 0; key < arrayItems.length; key++) {
       const item = arrayItems[key]
-      const sequence = readSequence(item)
-      if (sequence === null) continue
-      const score = prepared(compilation.prepareChoice(sequence), cutoff)
+      const choice = choices.read(item)
+      if (choice === null) continue
+      const score = prepared(choice, cutoff)
       if (!qualifies(compilation.direction, score, activeThreshold)) continue
       if (found === undefined || better(compilation.direction, score, found.score)) {
         found = { item, key, score }
@@ -165,9 +170,9 @@ export function bestMatch<T, D extends Direction>(
   }
 
   for (const entry of collectionEntries(items)) {
-    const sequence = readSequence(entry.item)
-    if (sequence === null) continue
-    const score = prepared(compilation.prepareChoice(sequence), cutoff)
+    const choice = choices.read(entry.item)
+    if (choice === null) continue
+    const score = prepared(choice, cutoff)
     if (!qualifies(compilation.direction, score, activeThreshold)) continue
     if (found === undefined || better(compilation.direction, score, found.score)) {
       found = { item: entry.item, key: entry.key, score }
@@ -178,30 +183,30 @@ export function bestMatch<T, D extends Direction>(
   return found
 }
 
-export function search<T, D extends Direction>(
+export function search<T, D extends Direction, B>(
   query: MaybeSequence,
   items: readonly T[],
-  options: MatcherOptions<T, D> & SearchOptions,
+  options: AnyMatcherOptions<T, D, B> & SearchOptions,
 ): readonly Match<T, number>[]
-export function search<K, T, D extends Direction>(
+export function search<K, T, D extends Direction, B>(
   query: MaybeSequence,
   items: ReadonlyMap<K, T>,
-  options: MatcherOptions<T, D> & SearchOptions,
+  options: AnyMatcherOptions<T, D, B> & SearchOptions,
 ): readonly Match<T, K>[]
-export function search<T, D extends Direction>(
+export function search<T, D extends Direction, B>(
   query: MaybeSequence,
   items: ItemIterable<T>,
-  options: MatcherOptions<T, D> & SearchOptions,
+  options: AnyMatcherOptions<T, D, B> & SearchOptions,
 ): readonly Match<T, number>[]
-export function search<T, D extends Direction>(
+export function search<T, D extends Direction, B>(
   query: MaybeSequence,
   items: Readonly<Record<string, T>>,
-  options: MatcherOptions<T, D> & SearchOptions,
+  options: AnyMatcherOptions<T, D, B> & SearchOptions,
 ): readonly Match<T, string>[]
-export function search<T, D extends Direction>(
+export function search<T, D extends Direction, B>(
   query: MaybeSequence,
   items: Items<T>,
-  options: MatcherOptions<T, D> & SearchOptions,
+  options: AnyMatcherOptions<T, D, B> & SearchOptions,
 ): readonly Match<T, unknown>[] {
   // Argument shape is checked before any semantic exit: `limit: 0` must not
   // excuse an invalid collection or a non-finite threshold.
@@ -213,8 +218,13 @@ export function search<T, D extends Direction>(
     return match === undefined ? [] : [match]
   }
   const compilation = scorerCompilation(options.scorer)
-  const stableOptions: MatcherOptions<T, Direction> = options
-  const readSequence = sequenceReader(stableOptions, false)
+  const stableOptions: AnyMatcherOptions<T, Direction, B> = options
+  const choices = choiceReader(
+    stableOptions,
+    compilation.prepareChoice,
+    compilation.preparedChoiceKey,
+    false,
+  )
   // Every option is read before the exit, so `limit: 0` refuses a foreign
   // scorer and an unknown `missingItems` the way every other limit does. What
   // it still skips is the work: no query normalization, no traversal.
@@ -229,7 +239,7 @@ export function search<T, D extends Direction>(
     if (arrayItems !== null) {
       for (let key = 0; key < arrayItems.length; key++) {
         const item = arrayItems[key]
-        if (readSequence(item) !== null) {
+        if (choices.present(item)) {
           results.push({ item, key, score })
           if (limit !== null && results.length === limit) break
         }
@@ -237,7 +247,7 @@ export function search<T, D extends Direction>(
       return results
     }
     for (const entry of collectionEntries(items)) {
-      if (readSequence(entry.item) !== null) {
+      if (choices.present(entry.item)) {
         results.push({ item: entry.item, key: entry.key, score })
         if (limit !== null && results.length === limit) break
       }
@@ -274,9 +284,9 @@ export function search<T, D extends Direction>(
     // the counter the generic branch keeps is one the array branch can read.
     for (let key = 0; key < arrayItems.length; key++) {
       const item = arrayItems[key]
-      const sequence = readSequence(item)
-      if (sequence === null) continue
-      const score = prepared(compilation.prepareChoice(sequence), cutoff)
+      const choice = choices.read(item)
+      if (choice === null) continue
+      const score = prepared(choice, cutoff)
       if (qualifies(compilation.direction, score, activeThreshold)) {
         if (limit === null) {
           results.push({ item, key, score, order: key })
@@ -296,9 +306,9 @@ export function search<T, D extends Direction>(
   } else {
     let order = 0
     for (const entry of collectionEntries(items)) {
-      const sequence = readSequence(entry.item)
-      if (sequence === null) continue
-      const score = prepared(compilation.prepareChoice(sequence), cutoff)
+      const choice = choices.read(entry.item)
+      if (choice === null) continue
+      const score = prepared(choice, cutoff)
       if (qualifies(compilation.direction, score, activeThreshold)) {
         if (limit === null) {
           results.push({ item: entry.item, key: entry.key, score, order })
@@ -324,35 +334,35 @@ export function search<T, D extends Direction>(
   return orderedResults(compilation.direction, results)
 }
 
-export function searchIter<T, D extends Direction>(
+export function searchIter<T, D extends Direction, B>(
   query: MaybeSequence,
   items: readonly T[],
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): IterableIterator<Match<T, number>>
-export function searchIter<K, T, D extends Direction>(
+export function searchIter<K, T, D extends Direction, B>(
   query: MaybeSequence,
   items: ReadonlyMap<K, T>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): IterableIterator<Match<T, K>>
-export function searchIter<T, D extends Direction>(
+export function searchIter<T, D extends Direction, B>(
   query: MaybeSequence,
   items: ItemIterable<T>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): IterableIterator<Match<T, number>>
-export function searchIter<T, D extends Direction>(
+export function searchIter<T, D extends Direction, B>(
   query: MaybeSequence,
   items: Readonly<Record<string, T>>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): IterableIterator<Match<T, string>>
-export function searchIter<T, D extends Direction>(
+export function searchIter<T, D extends Direction, B>(
   query: MaybeSequence,
   items: Items<T>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): IterableIterator<Match<T, unknown>>
-export function searchIter<T, D extends Direction>(
+export function searchIter<T, D extends Direction, B>(
   query: MaybeSequence,
   items: Items<T>,
-  options: MatcherOptions<T, D> & BestOptions,
+  options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): IterableIterator<Match<T, unknown>> {
   // Call options and collection shape are read and checked here, so a caller
   // who mutates their options object before iterating cannot change a search
@@ -362,12 +372,18 @@ export function searchIter<T, D extends Direction>(
   // iterator is for, so an invalid query still throws from `next()`.
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
-  const stableOptions: MatcherOptions<T, Direction> = options
+  const stableOptions: AnyMatcherOptions<T, Direction, B> = options
+  const compilation = scorerCompilation(options.scorer)
   return iterateMatches(
     query,
     items,
-    scorerCompilation(options.scorer),
-    sequenceReader(stableOptions, false),
+    compilation,
+    choiceReader(
+      stableOptions,
+      compilation.prepareChoice,
+      compilation.preparedChoiceKey,
+      false,
+    ),
     options.normalize,
     threshold,
   )
@@ -377,7 +393,7 @@ function* iterateMatches<T>(
   query: MaybeSequence,
   items: Items<T>,
   compilation: MetricCompilation<Direction>,
-  readSequence: SequenceReader<T>,
+  choices: ChoiceReader<T>,
   normalize: Normalizer | undefined,
   threshold: number | null,
 ): IterableIterator<Match<T, unknown>> {
@@ -390,12 +406,12 @@ function* iterateMatches<T>(
     if (arrayItems !== null) {
       for (let key = 0; key < arrayItems.length; key++) {
         const item = arrayItems[key]
-        if (readSequence(item) !== null) yield { item, key, score }
+        if (choices.present(item)) yield { item, key, score }
       }
       return
     }
     for (const entry of collectionEntries(items)) {
-      if (readSequence(entry.item) !== null) {
+      if (choices.present(entry.item)) {
         yield { item: entry.item, key: entry.key, score }
       }
     }
@@ -411,12 +427,16 @@ function* iterateMatches<T>(
   const activeThreshold = compilation.trusted
     ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
     : threshold
-  if (arrayItems !== null) {
+  const sequences = choices.sequences
+  // The raw-score window scores sequences directly, so it belongs to text mode
+  // alone: a prepared choice is not one, and prepared mode has a held
+  // representation to amortize from the first candidate anyway.
+  if (arrayItems !== null && sequences !== null) {
     let key = 0
     let scored = 0
     for (; key < arrayItems.length && scored < STREAM_PREPARE_AFTER; key++) {
       const item = arrayItems[key]
-      const sequence = readSequence(item)
+      const sequence = sequences(item)
       if (sequence === null) continue
       scored++
       const score = compilation.rawScore(normalized, sequence, activeThreshold)
@@ -428,7 +448,7 @@ function* iterateMatches<T>(
     const prepared = compilation.prepareQuery(normalized)
     for (; key < arrayItems.length; key++) {
       const item = arrayItems[key]
-      const sequence = readSequence(item)
+      const sequence = sequences(item)
       if (sequence === null) continue
       const score = prepared(compilation.prepareChoice(sequence), activeThreshold)
       if (qualifies(compilation.direction, score, threshold)) {
@@ -439,10 +459,24 @@ function* iterateMatches<T>(
   }
 
   const prepared: PreparedKernel = compilation.prepareQuery(normalized)
+  // Only prepared mode reaches this array loop — text mode took the window
+  // above — and a prepared choice is never skipped: a missing or foreign one
+  // throws where it is read.
+  if (arrayItems !== null) {
+    for (let key = 0; key < arrayItems.length; key++) {
+      const item = arrayItems[key]
+      const choice = choices.read(item)
+      const score = prepared(choice, activeThreshold)
+      if (qualifies(compilation.direction, score, threshold)) {
+        yield { item, key, score }
+      }
+    }
+    return
+  }
   for (const entry of collectionEntries(items)) {
-    const sequence = readSequence(entry.item)
-    if (sequence === null) continue
-    const score = prepared(compilation.prepareChoice(sequence), activeThreshold)
+    const choice = choices.read(entry.item)
+    if (choice === null) continue
+    const score = prepared(choice, activeThreshold)
     if (qualifies(compilation.direction, score, threshold)) {
       yield { item: entry.item, key: entry.key, score }
     }

@@ -411,4 +411,50 @@ describe('Metric and Scorer contracts', () => {
     expect(isMatch(normalized, 'abc', 'xyz', { threshold: 0.5 })).toBe(false)
     expect(() => Reflect.apply(scorerCompilation, undefined, [{}])).toThrow(TypeError)
   })
+
+  test('prepareChoice validates its argument and hides what it holds', () => {
+    const scorer = createScorer(fuzz.tokenSetSimilarity)
+    const handle = scorer.prepareChoice('new york mets')
+    expect(Object.isFrozen(scorer)).toBe(true)
+    expect(Object.keys(handle)).toEqual([])
+    expect(JSON.stringify(handle)).toBe('{}')
+    for (const invalid of [null, undefined, 1, true, Number.NaN, {}]) {
+      expect(() => Reflect.apply(scorer.prepareChoice, scorer, [invalid])).toThrow(
+        TypeError,
+      )
+    }
+    expect(
+      bestMatch('new york mets', [{ handle }], {
+        scorer,
+        getPrepared: (row) => row.handle,
+      })?.score,
+    ).toBe(100)
+  })
+
+  test('a custom metric prepares choices through its own protocol', () => {
+    let calls = 0
+    const custom = createScorer(
+      (a, b) => {
+        calls++
+        return a === b ? 1 : 0
+      },
+      { direction: 'similarity', bounds: [0, 1], symmetric: true },
+    )
+    const rows = [{ handle: custom.prepareChoice('beta') }]
+    expect(
+      bestMatch('beta', rows, { scorer: custom, getPrepared: (row) => row.handle })
+        ?.score,
+    ).toBe(1)
+    expect(calls).toBe(1)
+    // A second custom scorer over the same function still owns its own
+    // preparation: nothing about a caller's plain function is shareable.
+    const other = createScorer(() => 1, {
+      direction: 'similarity',
+      bounds: [0, 1],
+      symmetric: true,
+    })
+    expect(() =>
+      bestMatch('beta', rows, { scorer: other, getPrepared: (row) => row.handle }),
+    ).toThrow(TypeError)
+  })
 })

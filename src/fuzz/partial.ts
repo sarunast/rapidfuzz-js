@@ -1,20 +1,13 @@
-import { builtInMetric } from '../algorithms/shared/metricAdapter.js'
+import type { BuiltInMetric } from '../algorithms/shared/metricAdapter.js'
 import {
   FUZZ_FLAGS,
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
-import type { Metric } from '../core/metric.js'
+import { fuzzMetric } from './internal/metric.js'
 import { partialRatioAlignment, partialRatio_impl } from './internal/partialWindow.js'
 import { prepareFuzz } from './internal/prepared.js'
-import type {
-  FuzzConfiguration,
-  FuzzInput,
-  FuzzOptions,
-  ScoreAlignment,
-} from './types.js'
-
-const BOUNDS: readonly [number, number] = [0, 100]
+import type { FuzzInput, FuzzOptions, ScoreAlignment } from './types.js'
 
 export const partialRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(
@@ -23,12 +16,8 @@ export const partialRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
     prepareFuzz('partialRatio'),
   )
 
-export const partialSimilarity: Metric<'similarity', FuzzConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: partialRatio,
-    direction: 'similarity',
-    bounds: BOUNDS,
-  })
+export const partialSimilarity: BuiltInMetric<'fuzz.partialSimilarity', 'similarity'> =
+  /* @__PURE__ */ fuzzMetric(partialRatio)
 
 export function partialSimilarityAlignment(
   a: FuzzInput,

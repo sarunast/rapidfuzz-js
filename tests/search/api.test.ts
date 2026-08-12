@@ -20,7 +20,8 @@ import {
   search,
   searchIter,
 } from '../../src/index.js'
-import type { Match, Sequence } from '../../src/index.js'
+import type { Match, PreparedChoiceOf, Scorer, Sequence } from '../../src/index.js'
+import type { AnyMatcherOptions } from '../../src/search/types.js'
 import type { ItemIterable } from '../../src/search/types.js'
 
 describe('one-shot search and Matcher', () => {
@@ -653,6 +654,310 @@ describe('one-shot search and Matcher', () => {
     expect(accesses).toBe(0)
     expect(observed.score('alpha', 'alpha')).toBe(100)
     expect(accesses).toBe(1)
+  })
+
+  test('prepared choices score exactly as the text they were prepared from', () => {
+    const titles = ['new york mets', 'the wonderful new york mets', 'mets new york', '']
+    const rows = titles.map((title) => ({ title, prepared: scorer.prepareChoice(title) }))
+    const asText = { scorer, getText: (row: (typeof rows)[number]) => row.title }
+    const asPrepared = {
+      scorer,
+      getPrepared: (row: (typeof rows)[number]) => row.prepared,
+    }
+    const query = 'new york mets'
+
+    expect(bestMatch(query, rows, asPrepared)).toEqual(bestMatch(query, rows, asText))
+    expect(search(query, rows, asPrepared)).toEqual(search(query, rows, asText))
+    expect(search(query, rows, { ...asPrepared, limit: 2 })).toEqual(
+      search(query, rows, { ...asText, limit: 2 }),
+    )
+    expect(search(query, rows, { ...asPrepared, limit: null })).toEqual(
+      search(query, rows, { ...asText, limit: null }),
+    )
+    expect([...searchIter(query, rows, asPrepared)]).toEqual([
+      ...searchIter(query, rows, asText),
+    ])
+
+    // The array `searchIter` scores its first eight candidates without a
+    // prepared query; prepared mode has no sequence to score that way, so both
+    // sides of that window have to agree.
+    const many = Array.from({ length: 20 }, (_, index) => `mets ${index}`)
+    const manyRows = many.map((title) => ({
+      title,
+      prepared: scorer.prepareChoice(title),
+    }))
+    expect([
+      ...searchIter(query, manyRows, {
+        scorer,
+        getPrepared: (row: (typeof manyRows)[number]) => row.prepared,
+      }),
+    ]).toEqual([
+      ...searchIter(query, manyRows, {
+        scorer,
+        getText: (row: (typeof manyRows)[number]) => row.title,
+      }),
+    ])
+
+    const keyed = new Map(rows.map((row, index) => [index, row]))
+    expect(bestMatch(query, keyed, asPrepared)).toEqual(bestMatch(query, keyed, asText))
+    expect(search(query, keyed, asPrepared)).toEqual(search(query, keyed, asText))
+    expect([...searchIter(query, keyed, asPrepared)]).toEqual([
+      ...searchIter(query, keyed, asText),
+    ])
+
+    const preparedMatcher = createMatcher(rows, asPrepared)
+    const textMatcher = createMatcher(rows, asText)
+    expect(preparedMatcher.size).toBe(textMatcher.size)
+    expect(preparedMatcher.best(query)).toEqual(textMatcher.best(query))
+    expect(preparedMatcher.search(query, { limit: null })).toEqual(
+      textMatcher.search(query, { limit: null }),
+    )
+    expect([...preparedMatcher.searchIter(query)]).toEqual([
+      ...textMatcher.searchIter(query),
+    ])
+    const keyedMatcher = createMatcher(keyed, asPrepared)
+    expect(keyedMatcher.best(query)).toEqual(createMatcher(keyed, asText).best(query))
+  })
+
+  test('a prepared choice is accepted by any scorer that prepares it the same way', () => {
+    const rows = [{ prepared: createScorer(fuzz.similarity).prepareChoice('alpha') }]
+    const read = (row: (typeof rows)[number]) => row.prepared
+    // A second default scorer of the same metric compiles to the same
+    // preparation, so it accepts the first one's choices.
+    expect(bestMatch('alpha', rows, { scorer, getPrepared: read })?.score).toBe(100)
+    let accesses = 0
+    const observed = withPublicScoreObserver(scorer, () => {
+      accesses++
+    })
+    expect(bestMatch('alpha', rows, { scorer: observed, getPrepared: read })?.score).toBe(
+      100,
+    )
+    // The clone prepares through the scorer it observes, so its handles are
+    // the same scorer's handles.
+    expect(
+      bestMatch('alpha', [{ prepared: observed.prepareChoice('alpha') }], {
+        scorer,
+        getPrepared: (row) => row.prepared,
+      })?.score,
+    ).toBe(100)
+    expect(accesses).toBe(0)
+
+    // `missing` never reaches preparation, so it does not fork the key; a
+    // weighting does, and its choices belong to that scorer alone.
+    expect(
+      bestMatch('alpha', rows, {
+        scorer: createScorer(fuzz.similarity, { missing: 'throw' }),
+        getPrepared: read,
+      })?.score,
+    ).toBe(100)
+    const weighted = createScorer(levenshtein.distance, { weights: [1, 2, 1] })
+    const weightedRows = [{ prepared: weighted.prepareChoice('alpha') }]
+    expect(
+      bestMatch('alpha', weightedRows, {
+        scorer: weighted,
+        getPrepared: (row) => row.prepared,
+      })?.score,
+    ).toBe(0)
+    expect(() =>
+      bestMatch('alpha', weightedRows, {
+        scorer: createScorer(levenshtein.distance),
+        getPrepared: (row) => row.prepared,
+      }),
+    ).toThrow('prepared choice is incompatible with this scorer')
+    const configured = weighted
+    expect(() =>
+      Reflect.apply(bestMatch, undefined, [
+        'alpha',
+        rows,
+        { scorer: configured, getPrepared: read },
+      ]),
+    ).toThrow('prepared choice is incompatible with this scorer')
+    const otherMetric = createScorer(fuzz.tokenSetSimilarity)
+    expect(
+      () =>
+        bestMatch('alpha', rows, {
+          scorer: otherMetric,
+          getPrepared: () => otherMetric.prepareChoice('alpha'),
+        })?.score,
+    ).not.toThrow()
+    expect(() =>
+      Reflect.apply(bestMatch, undefined, [
+        'alpha',
+        rows,
+        { scorer: otherMetric, getPrepared: read },
+      ]),
+    ).toThrow('prepared choice is incompatible with this scorer')
+    // Two scorers configured the same way still prepare for themselves: a
+    // configuration is read once, per scorer, and never interned.
+    const twin = createScorer(levenshtein.distance, { weights: [1, 2, 1] })
+    expect(() =>
+      bestMatch('alpha', [{ prepared: configured.prepareChoice('alpha') }], {
+        scorer: twin,
+        getPrepared: (row) => row.prepared,
+      }),
+    ).toThrow(TypeError)
+  })
+
+  test('getPrepared refuses anything that is not a prepared choice', () => {
+    const handle = scorer.prepareChoice('alpha')
+    const forged = Object.create(Object.getPrototypeOf(handle))
+    for (const value of ['abc', null, undefined, 42, {}, forged, { ...handle }]) {
+      const options = { scorer, getPrepared: () => value }
+      expect(() => Reflect.apply(bestMatch, undefined, ['a', ['x'], options])).toThrow(
+        'getPrepared returned an invalid prepared choice',
+      )
+      expect(() => Reflect.apply(search, undefined, ['a', ['x'], options])).toThrow(
+        'getPrepared returned an invalid prepared choice',
+      )
+      expect(() => Reflect.apply(createMatcher, undefined, [['x'], options])).toThrow(
+        'getPrepared returned an invalid prepared choice',
+      )
+      // The iterator reports it where it scores, not where it was asked for.
+      const stream = Reflect.apply(searchIter, undefined, ['a', ['x'], options])
+      expect(() => stream.next()).toThrow(
+        'getPrepared returned an invalid prepared choice',
+      )
+    }
+  })
+
+  test('getPrepared cannot be combined with the text-side options', () => {
+    const handle = scorer.prepareChoice('alpha')
+    for (const extra of [{ getText: () => 'alpha' }, { missingItems: 'skip' }]) {
+      const options = { scorer, getPrepared: () => handle, ...extra }
+      for (const entry of [bestMatch, search, searchIter, createMatcher]) {
+        const args = entry === createMatcher ? [['x'], options] : ['a', ['x'], options]
+        expect(() => Reflect.apply(entry, undefined, args)).toThrow(
+          'getPrepared cannot be combined with getText or missingItems',
+        )
+      }
+      expect(() =>
+        Reflect.apply(search, undefined, ['a', ['x'], { ...options, limit: 0 }]),
+      ).toThrow('getPrepared cannot be combined with getText or missingItems')
+    }
+    // An option named but left undefined is the shape the types admit, so the
+    // runtime accepts it too.
+    expect(
+      bestMatch('alpha', [{ handle }], {
+        scorer,
+        getPrepared: (row) => row.handle,
+        getText: undefined,
+        missingItems: undefined,
+      })?.score,
+    ).toBe(100)
+  })
+
+  test('a prepared search normalizes the query alone', () => {
+    const rows = [{ prepared: scorer.prepareChoice('New York Mets!') }]
+    const read = (row: (typeof rows)[number]) => row.prepared
+    // The choice was prepared from unnormalized text and stays that way, so a
+    // normalized query only matches what the caller normalized themselves.
+    const raw = bestMatch('new york mets', rows, {
+      scorer,
+      getPrepared: read,
+      normalize: normalizeText,
+    })
+    expect(raw?.score).toBeLessThan(100)
+    const normalizedRows = [
+      { prepared: scorer.prepareChoice(normalizeText('New York Mets!')) },
+    ]
+    expect(
+      bestMatch('NEW YORK METS', normalizedRows, {
+        scorer,
+        getPrepared: (row) => row.prepared,
+        normalize: normalizeText,
+      })?.score,
+    ).toBe(100)
+  })
+
+  test('a missing query answers presence through the prepared reader', () => {
+    const rows = [{ prepared: scorer.prepareChoice('alpha') }]
+    const read = (row: (typeof rows)[number]) => row.prepared
+    const options = { scorer, getPrepared: read }
+    expect(bestMatch(null, rows, options)).toEqual({ item: rows[0], key: 0, score: 0 })
+    expect(search(null, rows, options)).toEqual([{ item: rows[0], key: 0, score: 0 }])
+    expect([...searchIter(null, rows, options)]).toEqual([
+      { item: rows[0], key: 0, score: 0 },
+    ])
+    const keyed = new Map([['only', rows[0]]])
+    expect(bestMatch(null, keyed, options)?.key).toBe('only')
+    expect(search(null, keyed, options)).toHaveLength(1)
+    expect([...searchIter(null, keyed, options)]).toHaveLength(1)
+    // Presence resolves the handle, so a misused one still reports itself.
+    const broken = { scorer, getPrepared: () => 'nonsense' }
+    expect(() => Reflect.apply(bestMatch, undefined, [null, ['x'], broken])).toThrow(
+      TypeError,
+    )
+    expect(() => Reflect.apply(search, undefined, [null, ['x'], broken])).toThrow(
+      TypeError,
+    )
+    expect(() =>
+      Reflect.apply(searchIter, undefined, [null, ['x'], broken]).next(),
+    ).toThrow(TypeError)
+  })
+
+  test('a prepared Matcher resolves its handles once, at construction', () => {
+    let reads = 0
+    const rows = ['alpha', 'beta'].map((text) => ({
+      prepared: scorer.prepareChoice(text),
+    }))
+    let accesses = 0
+    const observed = withPublicScoreObserver(scorer, () => {
+      accesses++
+    })
+    const matcher = createMatcher(rows, {
+      scorer: observed,
+      getPrepared: (row) => {
+        reads++
+        return row.prepared
+      },
+    })
+    expect(reads).toBe(2)
+    expect(matcher.best('alpha')?.score).toBe(100)
+    expect(matcher.search('alpha', { limit: null })).toHaveLength(2)
+    expect([...matcher.searchIter('alpha')]).toHaveLength(2)
+    expect(reads).toBe(2)
+    expect(accesses).toBe(0)
+  })
+
+  test('prepared options infer their key, direction, and brand', () => {
+    const rows = [{ prepared: scorer.prepareChoice('alpha') }]
+    expectTypeOf(
+      bestMatch('a', rows, { scorer, getPrepared: (row) => row.prepared }),
+    ).toEqualTypeOf<Match<(typeof rows)[number], number> | undefined>()
+    expectTypeOf(
+      bestMatch('a', new Map([[Symbol('k'), rows[0]]]), {
+        scorer,
+        getPrepared: (row) => row.prepared,
+      })?.key,
+    ).toEqualTypeOf<symbol | undefined>()
+    expectTypeOf<PreparedChoiceOf<typeof scorer>>().toEqualTypeOf(
+      scorer.prepareChoice('alpha'),
+    )
+
+    // Two metrics' handles are different types, which is what stops one
+    // reaching the other's scorer. That the search functions refuse the
+    // crossing is checked against the built package by `pnpm check:consumer`,
+    // where generic inference is the thing under test.
+    const distance = createScorer(levenshtein.distance)
+    expectTypeOf(distance.prepareChoice('alpha')).not.toExtend<
+      PreparedChoiceOf<typeof scorer>
+    >()
+    expectTypeOf(scorer.prepareChoice('alpha')).not.toExtend<
+      PreparedChoiceOf<typeof distance>
+    >()
+    // Widening the scorer gives the brand up on purpose: the runtime key is
+    // what remains.
+    const widened: Scorer<'similarity'> = scorer
+    expectTypeOf(scorer.prepareChoice('alpha')).toExtend<
+      PreparedChoiceOf<typeof widened>
+    >()
+    // An options literal carrying both accessors satisfies neither member.
+    type Row = { prepared: PreparedChoiceOf<typeof scorer> }
+    expectTypeOf<{
+      scorer: typeof scorer
+      getPrepared: (row: Row) => PreparedChoiceOf<typeof scorer>
+      getText: (row: Row) => string
+    }>().not.toExtend<AnyMatcherOptions<Row, 'similarity'>>()
   })
 
   test('collection policies and call limits are validated', () => {

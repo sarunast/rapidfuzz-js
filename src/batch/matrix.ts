@@ -1,6 +1,6 @@
 import type { MetricCompilation } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
-import { validateSequence } from '../core/sequence.js'
+import { normalizeSequence, validateSequence } from '../core/sequence.js'
 import { qualifies } from '../core/threshold.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
 import { rejectedScore, resolveBatchOptions } from './options.js'
@@ -21,11 +21,7 @@ function normalizeInputs(
   normalize: Normalizer | undefined,
 ): readonly Sequence[] {
   if (normalize === undefined) return values.map((value) => validateSequence(value))
-  return values.map((value) => {
-    const normalized = normalize(validateSequence(value))
-    if (normalized == null) throw new TypeError('normalize returned a missing value')
-    return validateSequence(normalized)
-  })
+  return values.map((value) => normalizeSequence(validateSequence(value), normalize))
 }
 
 function fill(

@@ -9,17 +9,17 @@ import { topSimilarity } from './internal/topSimilarity.js'
 import type { StoredItem } from './internal/types.js'
 import type { Match } from './results.js'
 import {
+  choiceReader,
   normalizeQuery,
   optionalThreshold,
   resultLimit,
-  sequenceReader,
 } from './snapshot.js'
 import type {
+  AnyMatcherOptions,
   BestOptions,
   ItemIterable,
   Items,
   Matcher,
-  MatcherOptions,
   SearchOptions,
 } from './types.js'
 
@@ -53,25 +53,25 @@ function missingSimilarityTop<T, K>(
   return matches
 }
 
-export function createMatcher<T, D extends Direction>(
+export function createMatcher<T, D extends Direction, B>(
   items: readonly T[],
-  options: MatcherOptions<T, D>,
+  options: AnyMatcherOptions<T, D, B>,
 ): Matcher<T, number, D>
-export function createMatcher<K, T, D extends Direction>(
+export function createMatcher<K, T, D extends Direction, B>(
   items: ReadonlyMap<K, T>,
-  options: MatcherOptions<T, D>,
+  options: AnyMatcherOptions<T, D, B>,
 ): Matcher<T, K, D>
-export function createMatcher<T, D extends Direction>(
+export function createMatcher<T, D extends Direction, B>(
   items: ItemIterable<T>,
-  options: MatcherOptions<T, D>,
+  options: AnyMatcherOptions<T, D, B>,
 ): Matcher<T, number, D>
-export function createMatcher<T, D extends Direction>(
+export function createMatcher<T, D extends Direction, B>(
   items: Readonly<Record<string, T>>,
-  options: MatcherOptions<T, D>,
+  options: AnyMatcherOptions<T, D, B>,
 ): Matcher<T, string, D>
-export function createMatcher<T, D extends Direction>(
+export function createMatcher<T, D extends Direction, B>(
   items: Items<T>,
-  options: MatcherOptions<T, D>,
+  options: AnyMatcherOptions<T, D, B>,
 ): Matcher<T, unknown, D> {
   const scorer = options.scorer
   const normalize = options.normalize
@@ -91,31 +91,46 @@ export function createMatcher<T, D extends Direction>(
   // A copy, so a caller who mutates their options object afterwards cannot
   // change a matcher that has already read them. The properties are declared
   // as `| undefined`, so naming an absent one costs nothing.
-  const stableOptions: MatcherOptions<T, Direction> = {
-    scorer: options.scorer,
-    getText: options.getText,
-    normalize: options.normalize,
-    missingItems: options.missingItems,
-  }
+  const stableOptions: AnyMatcherOptions<T, Direction, B> =
+    options.getPrepared === undefined
+      ? {
+          scorer: options.scorer,
+          getText: options.getText,
+          normalize: options.normalize,
+          missingItems: options.missingItems,
+        }
+      : {
+          scorer: options.scorer,
+          getPrepared: options.getPrepared,
+          normalize: options.normalize,
+          // Copied although the type says they are absent, so a JavaScript
+          // caller who passed both kinds of accessor is refused here rather
+          // than quietly served the prepared one.
+          getText: options.getText,
+          missingItems: options.missingItems,
+        }
   const stored: StoredItem<T, unknown>[] = []
-  const readSequence = sequenceReader(stableOptions, true)
+  // Every handle is resolved here, once, so a query pays nothing for the mode
+  // it was built in — the drivers read `prepared` the same way either way.
+  const choices = choiceReader(
+    stableOptions,
+    compilation.prepareChoice,
+    compilation.preparedChoiceKey,
+    true,
+  )
   if (Array.isArray(items)) {
     for (let key = 0; key < items.length; key++) {
       const item = items[key]
-      const sequence = readSequence(item)
-      if (sequence !== null) {
-        stored.push({ item, key, prepared: compilation.prepareChoice(sequence) })
+      const prepared = choices.read(item)
+      if (prepared !== null) {
+        stored.push({ item, key, prepared })
       }
     }
   } else {
     for (const entry of collectionEntries(items)) {
-      const sequence = readSequence(entry.item)
-      if (sequence !== null) {
-        stored.push({
-          item: entry.item,
-          key: entry.key,
-          prepared: compilation.prepareChoice(sequence),
-        })
+      const prepared = choices.read(entry.item)
+      if (prepared !== null) {
+        stored.push({ item: entry.item, key: entry.key, prepared })
       }
     }
   }

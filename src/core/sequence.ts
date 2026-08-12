@@ -1,4 +1,10 @@
-import type { Direction, MaybeSequence, MissingPolicy, Sequence } from './types.js'
+import type {
+  Direction,
+  MaybeSequence,
+  MissingPolicy,
+  Normalizer,
+  Sequence,
+} from './types.js'
 
 /**
  * The longest array JavaScript can hold. Without it `{ length: 2 ** 53 - 1 }`
@@ -28,6 +34,19 @@ export function validateSequence(value: unknown): Sequence {
     throw new TypeError('expected a string or an array-like sequence')
   }
   return value
+}
+
+/**
+ * What a normalizer is allowed to return: a sequence, and not nothing.
+ *
+ * Takes an already-valid sequence and a normalizer that is known to be there,
+ * so the caller keeps the decision it has to make anyway — whether a
+ * normalizer exists at all — outside its loops.
+ */
+export function normalizeSequence(value: Sequence, normalize: Normalizer): Sequence {
+  const normalized = normalize(value)
+  if (normalized == null) throw new TypeError('normalize returned a missing value')
+  return validateSequence(normalized)
 }
 
 export function validatePair(

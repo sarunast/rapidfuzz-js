@@ -1,5 +1,5 @@
 import { scorerCompilation } from '../core/scorer.js'
-import { validateSequence } from '../core/sequence.js'
+import { normalizeSequence, validateSequence } from '../core/sequence.js'
 import { qualifies } from '../core/threshold.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
 import { rejectedScore, resolveBatchOptions } from './options.js'
@@ -16,12 +16,7 @@ function normalizeInputs(
   values: readonly Sequence[],
   normalize: Normalizer,
 ): readonly Sequence[] {
-  return values.map((value) => {
-    const sequence = validateSequence(value)
-    const normalized = normalize(sequence)
-    if (normalized == null) throw new TypeError('normalize returned a missing value')
-    return validateSequence(normalized)
-  })
+  return values.map((value) => normalizeSequence(validateSequence(value), normalize))
 }
 
 export function scorePairs<D extends Direction>(

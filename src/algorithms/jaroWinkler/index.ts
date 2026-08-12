@@ -1,6 +1,7 @@
 import type { Metric } from '../../core/metric.js'
-import type { SimilarityConfiguration } from '../../core/types.js'
-import { builtInMetric } from '../shared/metricAdapter.js'
+import type { Direction, SimilarityConfiguration } from '../../core/types.js'
+import { builtInMetric, type BuiltInMetric } from '../shared/metricAdapter.js'
+import type { MaybeSequenceMetricImplementation } from '../shared/scorerSupport.js'
 import { jaroWinklerDistance, jaroWinklerSimilarity } from './implementation.js'
 
 export interface JaroWinklerConfiguration extends SimilarityConfiguration {
@@ -11,25 +12,35 @@ export interface JaroWinklerDistanceConfiguration {
   readonly prefixWeight?: number | undefined
 }
 
-export const distance: Metric<'distance', JaroWinklerDistanceConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: jaroWinklerDistance,
-    directImplementation: jaroWinklerDistance,
-    direction: 'distance',
-    bounds: [0, 1],
-    configurationKeys: ['prefixWeight'],
-  })
+const PREFIX_WEIGHT: readonly string[] = ['prefixWeight']
 
-export const similarity: Metric<'similarity', JaroWinklerConfiguration> =
-  /* @__PURE__ */ builtInMetric({
-    implementation: jaroWinklerSimilarity,
-    directImplementation: jaroWinklerSimilarity,
-    direction: 'similarity',
+function jaroWinklerMetric<D extends Direction, Config extends object, Brand>(
+  implementation: MaybeSequenceMetricImplementation,
+  direction: D,
+): Metric<D, Config, Brand> {
+  return builtInMetric({
+    implementation,
+    directImplementation: implementation,
+    direction,
     bounds: [0, 1],
-    configurationKeys: ['prefixWeight'],
+    configurationKeys: PREFIX_WEIGHT,
   })
+}
 
-export const normalizedDistance: Metric<'distance', JaroWinklerDistanceConfiguration> =
-  distance
-export const normalizedSimilarity: Metric<'similarity', JaroWinklerConfiguration> =
-  similarity
+export const distance: BuiltInMetric<
+  'jaroWinkler.distance',
+  'distance',
+  JaroWinklerDistanceConfiguration
+> = /* @__PURE__ */ jaroWinklerMetric(jaroWinklerDistance, 'distance')
+export const similarity: BuiltInMetric<
+  'jaroWinkler.similarity',
+  'similarity',
+  JaroWinklerDistanceConfiguration
+> = /* @__PURE__ */ jaroWinklerMetric(jaroWinklerSimilarity, 'similarity')
+
+// Jaro-Winkler is normalized by construction, so these are the same metrics
+// under the names the other algorithms use. `typeof` carries the identity
+// across instead of restating it, which is what keeps their prepared choices
+// interchangeable.
+export const normalizedDistance: typeof distance = distance
+export const normalizedSimilarity: typeof similarity = similarity

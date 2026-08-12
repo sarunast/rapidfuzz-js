@@ -7,9 +7,11 @@ export { scoreMatrix, scorePairs } from './batch/index.js'
 export type { Metric } from './core/metric.js'
 export type {
   CustomScorerConfiguration,
+  PreparedChoiceOf,
   Scorer,
   ThresholdOptions,
 } from './core/scorer.js'
+export type { PreparedChoice } from './core/prepared.js'
 export type { Direction, MaybeSequence, Normalizer, Sequence } from './core/types.js'
 export type {
   BestOptions,
@@ -17,6 +19,7 @@ export type {
   Matcher,
   MatcherOptions,
   MissingItemsPolicy,
+  PreparedMatcherOptions,
   SearchOptions,
 } from './search/index.js'
 export type {

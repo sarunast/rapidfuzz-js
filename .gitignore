@@ -9,3 +9,4 @@ coverage/
 test-report.junit.xml
 plan.md
 .pnpm-store/
+.consumer-check-*/

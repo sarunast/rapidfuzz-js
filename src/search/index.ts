@@ -6,5 +6,6 @@ export type {
   Matcher,
   MatcherOptions,
   MissingItemsPolicy,
+  PreparedMatcherOptions,
   SearchOptions,
 } from './types.js'

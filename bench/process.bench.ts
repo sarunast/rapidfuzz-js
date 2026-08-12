@@ -46,6 +46,12 @@ const titleMatcher = createMatcher(titles, {
   scorer: tokenSort,
   normalize: normalizeText,
 })
+// What the prepared-choice cases measure against their Matcher siblings: the
+// same amortized preparation, held by the caller instead of by a snapshot.
+const preparedChoices = choices.map((text) => ({ prepared: fuzzy.prepareChoice(text) }))
+const preparedTitles = titles.map((text) => ({
+  prepared: tokenSort.prepareChoice(normalizeText(text)),
+}))
 
 describe('direct Metric and Scorer calls', () => {
   measure('2000 pairs, fuzzy metric', () => {
@@ -143,6 +149,14 @@ describe('repeated Matcher queries', () => {
   measure('30 x 2000, fuzzy bestMatch one-shot', () => {
     for (const value of titleQueries) bestMatch(value, choices, { scorer: fuzzy })
   })
+  measure('30 x 2000, fuzzy bestMatch prepared one-shot', () => {
+    for (const value of titleQueries) {
+      bestMatch(value, preparedChoices, {
+        scorer: fuzzy,
+        getPrepared: (row) => row.prepared,
+      })
+    }
+  })
   measure('30 x 2000, fuzzy Matcher best', () => {
     for (const value of titleQueries) fuzzyMatcher.best(value)
   })
@@ -152,6 +166,16 @@ describe('repeated Matcher queries', () => {
   measure('30 x 2000, token sort search one-shot', () => {
     for (const value of titleQueries) {
       search(value, titles, { scorer: tokenSort, normalize: normalizeText, limit: 5 })
+    }
+  })
+  measure('30 x 2000, token sort search prepared one-shot', () => {
+    for (const value of titleQueries) {
+      search(value, preparedTitles, {
+        scorer: tokenSort,
+        getPrepared: (row) => row.prepared,
+        normalize: normalizeText,
+        limit: 5,
+      })
     }
   })
   measure('30 x 2000, token sort Matcher search', () => {

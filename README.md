@@ -134,6 +134,72 @@ threshold uses the scorer's own scale and must be finite.
 `scoreIfMatch` provides the thresholded result as a standalone operation;
 `isMatch` returns only the boolean.
 
+### Reusable prepared choices
+
+`prepareChoice` returns an opaque handle holding one choice in the form the
+scorer's kernels want. Store it beside your own data and hand it back through
+`getPrepared`, and a search that would re-prepare every candidate on every
+query prepares nothing:
+
+```ts
+import { createScorer, normalizeText, searchIter } from 'rapidfuzz-js'
+import { tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
+
+const scorer = createScorer(tokenSetSimilarity)
+const companies = records.map((record) => ({
+  record,
+  prepared: scorer.prepareChoice(normalizeText(record.name)),
+}))
+
+// The guards run before the scorer does, and only survivors are scored.
+function* plausible(query: Query) {
+  for (const row of companies) {
+    if (row.record.country !== query.country) continue
+    if (!sharesADigit(row.record.postcode, query.postcode)) continue
+    yield row
+  }
+}
+
+for (const match of searchIter(query.name, plausible(query), {
+  scorer,
+  getPrepared: (row) => row.prepared,
+})) {
+  // scored against handles prepared once, however many queries run
+}
+```
+
+That ordering is the point: a generator decides what is worth scoring, and the
+scoring pays nothing to prepare what it accepts. `createMatcher` amortizes the
+same preparation but owns the collection — it snapshots one field up front, so
+there is no place to put a guard and no way to grow it. Here the collection
+stays yours. `createMatcher` accepts `getPrepared` too, and resolves every
+handle once at construction.
+
+Which scorers accept a handle is decided conservatively, by identity rather
+than by proving two preparations equivalent:
+
+| Prepared by                                    | Accepted by                            |
+| ---------------------------------------------- | -------------------------------------- |
+| a scorer using a metric's default preparation  | any scorer of that metric using it too |
+| a scorer with configuration the metric records | that scorer alone                      |
+| a custom metric's scorer                       | that scorer alone                      |
+
+So two separately created `createScorer(fuzz.similarity)` scorers share their
+handles; treat a configured or custom scorer as owning the handles it made.
+
+Anything else throws: a handle a scorer does not accept is refused as
+incompatible, and a value that is not a handle at all is refused as invalid.
+Built-in metrics also carry their identity in the type, so most of those
+mistakes are compile errors first — spell a stored handle's type with
+`PreparedChoiceOf<typeof scorer>`.
+Widening a scorer to `Scorer<'similarity'>` gives that up deliberately: the
+type no longer names a metric, so only the runtime check remains.
+
+Prepared mode is strict. There is nothing to skip, so `missingItems` is not
+accepted, and neither is `getText` beside it. `normalize` still applies to the
+query, but never to a choice — the choice was prepared before the search saw
+it, so normalize it yourself when you prepare it.
+
 ## One query or many
 
 One-shot search streams its input and does not retain the collection:
@@ -216,20 +282,21 @@ scoreMatrix(['cat'], ['cats'], {
 The API preserves RapidFuzz's mathematical operations while using
 JavaScript-native orchestration:
 
-| RapidFuzz                    | rapidfuzz-js                          |
-| ---------------------------- | ------------------------------------- |
-| `process.extractOne`         | `bestMatch`                           |
-| `process.extract`            | `search`                              |
-| `process.extract_iter`       | `searchIter`                          |
-| `process.cdist` / `cpdist`   | `scoreMatrix` / `scorePairs`          |
-| `score_cutoff`               | `threshold`                           |
-| `score_multiplier`           | `scoreMultiplier`                     |
-| `scorer_kwargs`              | `createScorer(metric, configuration)` |
-| repeated prepared extraction | `createMatcher`                       |
+| RapidFuzz                    | rapidfuzz-js                                                  |
+| ---------------------------- | ------------------------------------------------------------- |
+| `process.extractOne`         | `bestMatch`                                                   |
+| `process.extract`            | `search`                                                      |
+| `process.extract_iter`       | `searchIter`                                                  |
+| `process.cdist` / `cpdist`   | `scoreMatrix` / `scorePairs`                                  |
+| `score_cutoff`               | `threshold`                                                   |
+| `score_multiplier`           | `scoreMultiplier`                                             |
+| `scorer_kwargs`              | `createScorer(metric, configuration)`                         |
+| repeated prepared extraction | `createMatcher`, or `scorer.prepareChoice` with `getPrepared` |
 
-Public `processor`, `scoreHint`, worker, and prepared-handle APIs are omitted.
-Normalization belongs at search/batch boundaries, and preparation belongs to a
-Matcher. QRatio is intentionally omitted because it only changes ratio's
+Public `processor`, `scoreHint`, and worker APIs are omitted, as are raw
+prepared representations — `scorer.prepareChoice` hands back an opaque handle
+instead, which is the supported way to reuse preparation across queries.
+Normalization belongs at search/batch boundaries. QRatio is intentionally omitted because it only changes ratio's
 empty-input compatibility result; WRatio remains available as
 `fuzzySimilarity`.
 
@@ -262,17 +329,22 @@ const custom = createScorer((a, b) => (a === b ? 1 : 0), {
 Every custom result must be finite and inside its declared bounds. The result
 is validated before thresholding, ordering, or pruning.
 
+A custom scorer prepares choices like any other, and its handles belong to it
+alone: two scorers built from the same function still prepare for themselves,
+because nothing about a plain function says the two are interchangeable.
+
 ## Performance and package validation
 
 The benchmark vocabulary maps directly to the public API:
 
-| Workload                      | API                              |
-| ----------------------------- | -------------------------------- |
-| One best result               | `bestMatch`                      |
-| Top N results                 | `search` with `limit: N`         |
-| Lazy qualifying results       | `searchIter`                     |
-| Prepare a reusable collection | `createMatcher` construction     |
-| Repeated prepared query       | `matcher.best/search/searchIter` |
+| Workload                            | API                                |
+| ----------------------------------- | ---------------------------------- |
+| One best result                     | `bestMatch`                        |
+| Top N results                       | `search` with `limit: N`           |
+| Lazy qualifying results             | `searchIter`                       |
+| Prepare a reusable collection       | `createMatcher` construction       |
+| Repeated prepared query             | `matcher.best/search/searchIter`   |
+| Repeated query, caller's collection | one-shot search with `getPrepared` |
 
 The release check runs type checking, linting, formatting, all functional
 tests, the build, export-map validation, package validation, and tarball

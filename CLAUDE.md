@@ -193,9 +193,30 @@ Source ownership follows dependency direction:
 - Tests mirror these domains, with import direction and public reachability
   guarded in `tests/architecture/`.
 
-Do not add compatibility aliases, aggregate namespaces, public prepared
-handles, or a horizontal `common`/`preparation` subsystem. Delete unused code;
-do not keep it for a removed API.
+Do not add compatibility aliases, aggregate namespaces, raw prepared
+representations, or a horizontal `common`/`preparation` subsystem. Delete
+unused code; do not keep it for a removed API.
+
+The opaque `PreparedChoice` from `scorer.prepareChoice` is the sanctioned form
+of a public prepared handle, and the only one. It stays opaque, keeps its
+metric brand in the declarations a consumer compiles against, and is checked
+at runtime for scorer compatibility — `pnpm check:consumer` guards the second
+of those, which source-level type tests cannot see.
+
+Prepared search must not add a per-candidate cost to the text search path.
+`bench/process.bench.ts` is where that is noticed.
+
+Shared infrastructure owns policy and metadata; an algorithm module declares
+algorithm facts and nothing else. A metric names itself once, as
+`BuiltInMetric<'levenshtein.distance', 'distance'>`. The name derives the
+compile-time brand and nothing else — the adapter owns preparation identity,
+configuration and the missing-value policy, which follow from the direction
+and the metric's own options. Those names are compile-time discriminators:
+nothing exposes one at runtime and no API accepts one, so they may appear in a
+diagnostic but never in a call. The
+converse also holds: a driver may duplicate mechanics deliberately where that
+is what keeps a hot loop monomorphic, which is why `bestDistance` and
+`bestSimilarity` are two literal loops and not one comparator.
 
 ## Benchmarks
 
