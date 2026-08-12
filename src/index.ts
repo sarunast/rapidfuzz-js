@@ -7,6 +7,7 @@ export { scoreMatrix, scorePairs } from './batch/index.js'
 export type { Metric } from './core/metric.js'
 export type {
   CustomScorerConfiguration,
+  PrepareChoiceOptions,
   PreparedChoiceOf,
   Scorer,
   ScorerOf,

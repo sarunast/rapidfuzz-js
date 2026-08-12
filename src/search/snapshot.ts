@@ -51,9 +51,15 @@ export function choiceReader<T, B>(
     throw new TypeError('getPrepared cannot be combined with getText or missingItems')
   }
   const getPrepared = requireFunction(options.getPrepared, 'getPrepared')
-  if (options.normalize !== undefined) requireFunction(options.normalize, 'normalize')
+  // The same normalizer the query goes through: a handle prepared under a
+  // different one — or none — is refused rather than scored against a query it
+  // was never comparable to.
+  const normalize =
+    options.normalize === undefined
+      ? undefined
+      : requireFunction(options.normalize, 'normalize')
   const read = (item: T): unknown =>
-    resolvePreparedChoice(preparedChoiceKey, getPrepared(item))
+    resolvePreparedChoice(preparedChoiceKey, getPrepared(item), normalize)
   return {
     // Prepared mode has nothing to skip, so presence is the resolution itself:
     // a missing or foreign handle throws here as it does anywhere else.

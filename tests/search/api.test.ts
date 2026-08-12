@@ -26,6 +26,9 @@ import type { ItemIterable } from '../../src/search/types.js'
 
 describe('one-shot search and Matcher', () => {
   const scorer = createScorer(fuzz.similarity)
+  // One object, so preparation and search name the same function: the handle
+  // check compares normalizers by identity.
+  const normalizing = { normalize: normalizeText }
 
   test('Matcher snapshots non-string sequences and retains original items and keys', () => {
     const text = ['a', 'b', 'c']
@@ -872,27 +875,92 @@ describe('one-shot search and Matcher', () => {
     ).toBe(100)
   })
 
-  test('a prepared search normalizes the query alone', () => {
-    const rows = [{ prepared: scorer.prepareChoice('New York Mets!') }]
+  test('a prepared search scores handles normalized as its query is', () => {
+    const rows = [{ prepared: scorer.prepareChoice('New York Mets!', normalizing) }]
     const read = (row: (typeof rows)[number]) => row.prepared
-    // The choice was prepared from unnormalized text and stays that way, so a
-    // normalized query only matches what the caller normalized themselves.
-    const raw = bestMatch('new york mets', rows, {
-      scorer,
-      getPrepared: read,
-      normalize: normalizeText,
-    })
-    expect(raw?.score).toBeLessThan(100)
-    const normalizedRows = [
-      { prepared: scorer.prepareChoice(normalizeText('New York Mets!')) },
-    ]
+    // Both sides through the same normalizer, so a query the choice never saw
+    // in that spelling still matches it exactly.
     expect(
-      bestMatch('NEW YORK METS', normalizedRows, {
+      bestMatch('NEW YORK METS', rows, { scorer, getPrepared: read, ...normalizing })
+        ?.score,
+    ).toBe(100)
+    expect(
+      createMatcher(rows, { scorer, getPrepared: read, ...normalizing }).best(
+        'NEW YORK METS',
+      )?.score,
+    ).toBe(100)
+  })
+
+  test('a prepared search refuses a handle normalized unlike its query', () => {
+    const plain = [{ prepared: scorer.prepareChoice('New York Mets!') }]
+    const normalized = [{ prepared: scorer.prepareChoice('New York Mets!', normalizing) }]
+    const read = (row: { prepared: PreparedChoiceOf<typeof scorer> }) => row.prepared
+    // The mistake the check exists for: text prepared raw, scored against a
+    // query that was normalized, which used to answer a plausible 0.
+    expect(() =>
+      bestMatch('new york mets', plain, { scorer, getPrepared: read, ...normalizing }),
+    ).toThrow('this search normalizes, the prepared choice was not')
+    expect(() =>
+      bestMatch('new york mets', normalized, { scorer, getPrepared: read }),
+    ).toThrow('prepared choice was normalized, this search is not')
+    // Identity, not equivalence: a normalizer that does the same thing is
+    // still a different function.
+    expect(() =>
+      bestMatch('new york mets', normalized, {
+        scorer,
+        getPrepared: read,
+        normalize: (value) => normalizeText(value),
+      }),
+    ).toThrow('prepared choice was normalized by a different function than this search')
+    // Every entry point resolves through the same reader.
+    for (const entry of [bestMatch, search, createMatcher]) {
+      const options = { scorer, getPrepared: read, ...normalizing }
+      const args = entry === createMatcher ? [plain, options] : ['a', plain, options]
+      expect(() => Reflect.apply(entry, undefined, args)).toThrow(TypeError)
+    }
+    expect(() =>
+      searchIter('a', plain, { scorer, getPrepared: read, ...normalizing }).next(),
+    ).toThrow(TypeError)
+  })
+
+  test('a caller who preprocesses both sides names no normalizer at all', () => {
+    // The other supported arrangement: preparation and query are the caller's,
+    // the search normalizes nothing, and the two sides still agree.
+    const rows = [{ prepared: scorer.prepareChoice(normalizeText('New York Mets!')) }]
+    expect(
+      bestMatch(normalizeText('NEW YORK METS'), rows, {
         scorer,
         getPrepared: (row) => row.prepared,
-        normalize: normalizeText,
       })?.score,
     ).toBe(100)
+  })
+
+  test('a candidate a guard rejects is never read or checked', () => {
+    // A generator decides what is worth scoring, so a handle prepared under
+    // another normalizer — or none — costs nothing until it is yielded.
+    let reads = 0
+    const rows = [
+      { keep: false, prepared: scorer.prepareChoice('alpha') },
+      { keep: true, prepared: scorer.prepareChoice('Alpha!', normalizing) },
+    ]
+    function* plausible(): Generator<(typeof rows)[number]> {
+      for (const row of rows) {
+        if (!row.keep) continue
+        yield row
+      }
+    }
+    const matches = [
+      ...searchIter('ALPHA', plausible(), {
+        scorer,
+        getPrepared: (row) => {
+          reads++
+          return row.prepared
+        },
+        ...normalizing,
+      }),
+    ]
+    expect(matches.map((match) => match.score)).toEqual([100])
+    expect(reads).toBe(1)
   })
 
   test('a missing query answers presence through the prepared reader', () => {

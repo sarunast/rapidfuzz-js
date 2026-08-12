@@ -1,3 +1,5 @@
+import type { Normalizer } from './types.js'
+
 /**
  * Assigned from inside the class body because its constructor is private.
  * These are runtime exports for `core/scorer` and `search/` alone: no package
@@ -6,9 +8,14 @@
 export let createPreparedChoice: <Brand>(
   owner: object,
   value: unknown,
+  normalize: Normalizer | undefined,
 ) => PreparedChoice<Brand>
 
-export let resolvePreparedChoice: (owner: object, handle: unknown) => unknown
+export let resolvePreparedChoice: (
+  owner: object,
+  handle: unknown,
+  normalize: Normalizer | undefined,
+) => unknown
 
 /**
  * The brand of a handle whose metric its type does not fix.
@@ -46,16 +53,24 @@ export class PreparedChoice<Brand = AnyBrand> {
 
   readonly #owner: object
   readonly #value: unknown
+  // The normalizer the choice went through, so a search can refuse a handle
+  // whose text was made differently to the query it is about to be scored
+  // against. Nothing else can see it: the value is already normalized.
+  readonly #normalize: Normalizer | undefined
 
-  private constructor(owner: object, value: unknown) {
+  private constructor(owner: object, value: unknown, normalize: Normalizer | undefined) {
     this.#owner = owner
     this.#value = value
+    this.#normalize = normalize
   }
 
   static {
-    createPreparedChoice = <Brand>(owner: object, value: unknown) =>
-      new PreparedChoice<Brand>(owner, value)
-    resolvePreparedChoice = (owner, handle) => {
+    createPreparedChoice = <Brand>(
+      owner: object,
+      value: unknown,
+      normalize: Normalizer | undefined,
+    ) => new PreparedChoice<Brand>(owner, value, normalize)
+    resolvePreparedChoice = (owner, handle, normalize) => {
       // `#owner in handle` refuses anything the private constructor did not
       // build, including `Object.create(PreparedChoice.prototype)` forgeries
       // and spread clones.
@@ -65,7 +80,25 @@ export class PreparedChoice<Brand = AnyBrand> {
       if (handle.#owner !== owner) {
         throw new TypeError('prepared choice is incompatible with this scorer')
       }
+      // By identity, not by equivalence: two normalizers cannot be compared any
+      // other way, and the alternative is scoring two sides made differently.
+      if (handle.#normalize !== normalize) {
+        throw new TypeError(normalizerMismatch(handle.#normalize, normalize))
+      }
       return handle.#value
     }
   }
+}
+
+function normalizerMismatch(
+  prepared: Normalizer | undefined,
+  search: Normalizer | undefined,
+): string {
+  if (search === undefined) {
+    return 'prepared choice was normalized, this search is not'
+  }
+  if (prepared === undefined) {
+    return 'this search normalizes, the prepared choice was not'
+  }
+  return 'prepared choice was normalized by a different function than this search'
 }

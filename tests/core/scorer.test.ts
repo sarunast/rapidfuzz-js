@@ -18,6 +18,7 @@ import {
   createMatcher,
   createScorer,
   isMatch,
+  normalizeText,
   scoreIfMatch,
 } from '../../src/index.js'
 
@@ -429,6 +430,43 @@ describe('Metric and Scorer contracts', () => {
         getPrepared: (row) => row.handle,
       })?.score,
     ).toBe(100)
+  })
+
+  test('prepareChoice normalizes what it prepares, and records that it did', () => {
+    const scorer = createScorer(fuzz.tokenSetSimilarity)
+    const normalizing = { normalize: normalizeText }
+    const handle = scorer.prepareChoice('New York Mets!', normalizing)
+    // Normalized where it was prepared, so the handle holds the same text a
+    // pre-normalized argument would have produced — and knows which function
+    // produced it, which a caller doing that themselves could not record.
+    expect(
+      bestMatch('new york mets', [{ handle }], {
+        scorer,
+        getPrepared: (row) => row.handle,
+        ...normalizing,
+      })?.score,
+    ).toBe(100)
+    // Named but absent is the shape the type admits, and prepares nothing.
+    expect(
+      bestMatch('New York Mets!', [{ handle: scorer.prepareChoice('New York Mets!') }], {
+        scorer,
+        getPrepared: (row) => row.handle,
+        normalize: undefined,
+      })?.score,
+    ).toBe(100)
+    for (const invalid of [null, 1, 'nope', {}]) {
+      expect(() =>
+        Reflect.apply(scorer.prepareChoice, scorer, ['alpha', { normalize: invalid }]),
+      ).toThrow('normalize must be a function')
+    }
+    expect(() => scorer.prepareChoice('alpha', { normalize: () => null })).toThrow(
+      'normalize returned a missing value',
+    )
+    // The option bag itself is read with `?.`, so a caller who passes nothing
+    // where one is expected prepares an unnormalized handle rather than throwing.
+    expect(() =>
+      Reflect.apply(scorer.prepareChoice, scorer, ['alpha', null]),
+    ).not.toThrow()
   })
 
   test('a handle owns its sequence, whatever the scorer prepares from', () => {

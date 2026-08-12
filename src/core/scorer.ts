@@ -1,17 +1,32 @@
 import { isBuiltInMetric, type Metric } from './metric.js'
 import { createPreparedChoice, type AnyBrand, type PreparedChoice } from './prepared.js'
 import { COMPILE, type MetricCompilation } from './protocol.js'
-import { snapshotSequence, validatePair, validateSequence } from './sequence.js'
+import {
+  normalizeSequence,
+  snapshotSequence,
+  validatePair,
+  validateSequence,
+} from './sequence.js'
 import {
   impossibleTrustedThreshold,
   qualifies,
   trustedKernelThreshold,
   validateThreshold,
 } from './threshold.js'
-import type { Direction, MaybeSequence, MissingPolicy, Sequence } from './types.js'
+import type {
+  Direction,
+  MaybeSequence,
+  MissingPolicy,
+  Normalizer,
+  Sequence,
+} from './types.js'
 
 export interface ThresholdOptions {
   readonly threshold: number
+}
+
+export interface PrepareChoiceOptions {
+  readonly normalize?: Normalizer | undefined
 }
 
 export interface Scorer<D extends Direction = Direction, Brand = AnyBrand> {
@@ -20,7 +35,7 @@ export interface Scorer<D extends Direction = Direction, Brand = AnyBrand> {
   readonly symmetric: boolean
   score(a: MaybeSequence, b: MaybeSequence): number
   score(a: MaybeSequence, b: MaybeSequence, options: ThresholdOptions): number | undefined
-  prepareChoice(choice: Sequence): PreparedChoice<Brand>
+  prepareChoice(choice: Sequence, options?: PrepareChoiceOptions): PreparedChoice<Brand>
 }
 
 export type PreparedChoiceOf<S extends { prepareChoice: (choice: never) => unknown }> =
@@ -127,11 +142,25 @@ function fromCompilation<D extends Direction, B>(
     // Owned, not borrowed: a handle outlives this call, so mutating the
     // sequence afterwards must not reach through it. `createMatcher` snapshots
     // for the same reason, and the two have to agree.
-    prepareChoice: (choice) =>
-      createPreparedChoice(
+    prepareChoice: (choice, options) => {
+      const valid = validateSequence(choice)
+      const normalize = options?.normalize
+      if (normalize === undefined) {
+        return createPreparedChoice(
+          compilation.preparedChoiceKey,
+          compilation.prepareOwnedChoice(valid),
+          undefined,
+        )
+      }
+      if (typeof normalize !== 'function') {
+        throw new TypeError('normalize must be a function')
+      }
+      return createPreparedChoice(
         compilation.preparedChoiceKey,
-        compilation.prepareOwnedChoice(validateSequence(choice)),
-      ),
+        compilation.prepareOwnedChoice(normalizeSequence(valid, normalize)),
+        normalize,
+      )
+    },
   }
   compilations.set(scorer, compilation)
   return Object.freeze(scorer)
@@ -291,7 +320,7 @@ export function withPublicScoreObserver(
     },
     // Copied plainly: the observer reports public `score` calls, and preparing
     // a choice is not one.
-    prepareChoice: (choice) => scorer.prepareChoice(choice),
+    prepareChoice: (choice, options) => scorer.prepareChoice(choice, options),
   }
   compilations.set(observed, compilation)
   return Object.freeze(observed)

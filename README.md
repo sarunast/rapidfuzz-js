@@ -148,7 +148,7 @@ import { tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
 const scorer = createScorer(tokenSetSimilarity)
 const companies = records.map((record) => ({
   record,
-  prepared: scorer.prepareChoice(normalizeText(record.name)),
+  prepared: scorer.prepareChoice(record.name, { normalize: normalizeText }),
 }))
 
 // The guards run before the scorer does, and only survivors are scored.
@@ -163,16 +163,42 @@ function* plausible(query: Query) {
 for (const match of searchIter(query.name, plausible(query), {
   scorer,
   getPrepared: (row) => row.prepared,
-  // The choices were normalized before they were prepared, so the query has
-  // to be normalized too, or the two sides are not being compared alike.
+  // The same normalizer the choices were prepared with. Naming a different one
+  // — or none — throws rather than comparing two sides made differently.
   normalize: normalizeText,
 })) {
   // scored against handles prepared once, however many queries run
 }
 ```
 
+Normalization is either the library's job on both sides or yours on both
+sides, and a handle records which. Pass `normalize` to `prepareChoice` and to
+the search, and the two are checked against each other; pass it to neither, and
+what you hand in is what gets scored:
+
+```ts
+// Library-managed: the handle records the normalizer, the search names the
+// same one, and the pair is verified.
+const prepared = scorer.prepareChoice(name, { normalize: normalizeText })
+searchIter(query, rows, { scorer, getPrepared, normalize: normalizeText })
+
+// Caller-managed: you normalize both sides yourself, and the search is told
+// about neither.
+const prepared = scorer.prepareChoice(normalizeText(name))
+searchIter(normalizeText(query), rows, { scorer, getPrepared })
+```
+
+Mixing them throws. `prepareChoice(normalizeText(name))` produces the same text
+as the first line but records nothing, so a search that normalizes its query
+cannot confirm the choice was normalized too and refuses the pair rather than
+comparing two sides made differently. The check is by function identity — two
+arrows that do the same thing are two normalizers — so name one function and
+pass it to both.
+
 That ordering is the point: a generator decides what is worth scoring, and the
-scoring pays nothing to prepare what it accepts. `createMatcher` amortizes the
+scoring pays nothing to prepare what it accepts. A handle is read only for the
+candidates a guard lets through, so the check costs nothing for the ones it
+rejects. `createMatcher` amortizes the
 same preparation but owns the collection — it snapshots one field up front, so
 there is no place to put a guard and no way to grow it. Here the collection
 stays yours. `createMatcher` accepts `getPrepared` too, and resolves every

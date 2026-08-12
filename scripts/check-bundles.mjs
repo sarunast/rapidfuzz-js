@@ -17,22 +17,22 @@ const output = mkdtempSync(join(tmpdir(), 'rapidfuzz-bundles-'))
  * the entry that failed leaves its siblings a byte from the same surprise.
  */
 const budgets = {
-  'direct-fuzz.js': 6_052,
-  'direct-token-sort.js': 6_124,
-  'compiled-fuzz.js': 6_913,
-  'compiled-token-sort.js': 6_964,
-  'direct-normalized-edit.js': 9_934,
-  'compiled-normalized-edit.js': 10_797,
-  'direct-raw-distance.js': 9_945,
-  'compiled-raw-distance.js': 10_801,
-  'one-shot.js': 7_936,
-  'one-shot-iter.js': 7_969,
-  'prepared-one-shot.js': 7_999,
-  'matcher-token-sort.js': 8_740,
-  'score-matrix.js': 11_836,
-  'score-pairs.js': 11_592,
-  'full-fuzz.js': 10_223,
-  'all-subpaths.js': 26_969,
+  'direct-fuzz.js': 6_094,
+  'direct-token-sort.js': 6_166,
+  'compiled-fuzz.js': 7_045,
+  'compiled-token-sort.js': 7_096,
+  'direct-normalized-edit.js': 9_992,
+  'compiled-normalized-edit.js': 10_931,
+  'direct-raw-distance.js': 9_992,
+  'compiled-raw-distance.js': 10_941,
+  'one-shot.js': 8_134,
+  'one-shot-iter.js': 8_179,
+  'prepared-one-shot.js': 8_212,
+  'matcher-token-sort.js': 8_929,
+  'score-matrix.js': 11_949,
+  'score-pairs.js': 11_712,
+  'full-fuzz.js': 10_241,
+  'all-subpaths.js': 27_047,
 }
 
 try {
