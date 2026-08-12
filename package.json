@@ -101,7 +101,10 @@
     "bench:confirm": "node bench/tooling/compare.ts --confirm",
     "bench:baseline": "node bench/tooling/compare.ts --record",
     "bench:libraries": "node bench/comparison/run.mjs",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.dev.json && tsc -p tsconfig.scripts.json",
+    "typecheck": "npm run typecheck:library && npm run typecheck:tooling && npm run typecheck:dev",
+    "typecheck:library": "tsc --noEmit",
+    "typecheck:tooling": "tsc -p tsconfig.scripts.json",
+    "typecheck:dev": "tsc -p tsconfig.dev.json",
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
@@ -109,7 +112,7 @@
     "check:consumer": "node scripts/check-consumer.mjs",
     "check:tarball": "node scripts/check-tarball.mjs",
     "check:pkg": "publint && attw --pack . --profile esm-only",
-    "check": "npm run build && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run check:exports && npm run check:consumer && npm run check:tarball && npm run check:pkg",
+    "check": "npm run typecheck:library && npm run test && npm run lint && npm run format:check && npm run typecheck:tooling && npm run build && npm run typecheck:dev && npm run check:exports && npm run check:consumer && npm run check:tarball && npm run check:pkg",
     "prepublishOnly": "npm run check"
   },
   "devDependencies": {

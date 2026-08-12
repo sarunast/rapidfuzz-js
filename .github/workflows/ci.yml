@@ -33,19 +33,28 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
-      # The token is for the build inside `pnpm check`: tsdown carries the
-      # Codecov plugin, which measures the bundle and uploads it. Without a
-      # token the plugin turns itself off, which is what a laptop and the
-      # release job both get — neither should depend on Codecov being up.
-      - run: pnpm check
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      # `pnpm check` chains all of this in one command for a laptop and for
+      # prepublishOnly. CI runs the same work as separate steps instead, in a
+      # different order: each one gets its own line, its own timing and its own
+      # red cross in the UI, and the ordering below puts the answers worth
+      # waiting for first.
+      #
+      # Ordered by what a failure tells you, not by what runs fastest. Types and
+      # tests are the two that mean the code is wrong; lint and formatting mean
+      # it is untidy; the packaging checks mean it would ship wrong. A formatting
+      # failure ahead of the tests would be a red run that says nothing about
+      # whether the change works.
+      #
+      # Keep this list in step with the `check` script. Nothing enforces that —
+      # a new check:* script added there and not here would simply never run on
+      # CI.
+      - name: Typecheck the library
+        run: pnpm typecheck:library
 
-      # `pnpm check` already ran the tests; this re-runs them instrumented, for
-      # the lcov.info and the JUnit results the uploads below want. The 100% gate is
-      # `--coverage.thresholds.100` inside the script, so a laptop fails the way
-      # CI does. Codecov is not the gate — advisory, late, and tokenless on a
-      # fork.
+      # Stands in for `pnpm test`: same tests, instrumented, plus the 100% gate
+      # as `--coverage.thresholds.100` inside the script — so a laptop fails the
+      # way CI does. Running both would run the suite twice for one signal.
+      # Codecov itself is not the gate: advisory, late, and tokenless on a fork.
       - name: Test coverage (fails below 100%)
         run: pnpm coverage
 
@@ -82,6 +91,46 @@ jobs:
           disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Typecheck the scripts
+        run: pnpm typecheck:tooling
+
+      # The build, and the line everything after it depends on. `typecheck:dev`
+      # covers tests, benches and config files, and `bench/tooling` imports the
+      # built package — which is why the type checking is split rather than run
+      # as one `pnpm typecheck` up front. `check:exports` likewise imports each
+      # public subpath by its specifier, resolved through the package's own
+      # exports map, and the three checks after it read or pack dist/.
+      #
+      # The token is for the build itself: tsdown carries the Codecov plugin,
+      # which measures the bundle and uploads it. Without a token the plugin
+      # turns itself off, which is what a laptop and the release job both get —
+      # neither should depend on Codecov being up.
+      - name: Build
+        run: pnpm build
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Typecheck the tests and benches
+        run: pnpm typecheck:dev
+
+      - name: Public exports
+        run: pnpm check:exports
+
+      - name: Consumer declaration emit
+        run: pnpm check:consumer
+
+      - name: Tarball contents
+        run: pnpm check:tarball
+
+      - name: Package manifest
+        run: pnpm check:pkg
 
       # package.json declares engines.node >=22, so prove the source tests still
       # pass on the minimum supported runtime. Everything above validated the
