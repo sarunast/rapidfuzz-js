@@ -12,6 +12,7 @@ import {
   type BoundedFrequencyKernel,
   type NGramProfile,
 } from '../shared/ngram.js'
+import { createDiceIndexBuilder } from '../shared/ngramIndex.js'
 import {
   asSequence,
   convPair,
@@ -180,7 +181,14 @@ function prepareDice(kind: PreparedDiceKind): PreparationFactory {
       }
     }
 
-    return { prepareQuery, prepareChoice }
+    // Only the similarity direction: an inverted index accumulates shared gram
+    // counts, and a top-k over a distance is a different driver that nothing has
+    // measured. The adapter carries `undefined` through, which is what an
+    // indexed search refuses on.
+    const indexChoices =
+      kind === 'similarity' ? () => createDiceIndexBuilder(gramSize) : undefined
+
+    return { prepareQuery, prepareChoice, indexChoices }
   }
 }
 
