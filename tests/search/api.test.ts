@@ -923,6 +923,35 @@ describe('one-shot search and Matcher', () => {
     ).toThrow(TypeError)
   })
 
+  test('normalize is read once, so an accessor cannot split the two sides', () => {
+    // The check compares the handle's normalizer to the search's, and both used
+    // to be read from the options object separately: an accessor answering a
+    // different function on a later read satisfied the check and then
+    // normalized the query some other way, scoring a pair made differently.
+    const identity = (value: Sequence): Sequence => value
+    const rows = [{ prepared: scorer.prepareChoice('ZURICH', normalizing) }]
+    let reads = 0
+    const options = {
+      scorer,
+      getPrepared: (row: (typeof rows)[number]) => row.prepared,
+      get normalize() {
+        reads++
+        return reads === 1 ? normalizeText : identity
+      },
+    }
+    for (const run of [
+      () => bestMatch('ZÜRICH!', rows, options)?.score,
+      () => search('ZÜRICH!', rows, options)[0]?.score,
+      () => [...searchIter('ZÜRICH!', rows, options)][0]?.score,
+      () => createMatcher(rows, options).best('ZÜRICH!')?.score,
+    ]) {
+      reads = 0
+      // The normalized score, not the 0 an unnormalized query would answer.
+      expect(run()).toBeCloseTo(83.333, 3)
+      expect(reads).toBe(1)
+    }
+  })
+
   test('a caller who preprocesses both sides names no normalizer at all', () => {
     // The other supported arrangement: preparation and query are the caller's,
     // the search normalizes nothing, and the two sides still agree.

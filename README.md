@@ -177,8 +177,8 @@ the search, and the two are checked against each other; pass it to neither, and
 what you hand in is what gets scored:
 
 ```ts
-// Library-managed: the handle records the normalizer, the search names the
-// same one, and the pair is verified.
+// Library-managed: the handle records the normalizer and the search names the
+// same one, so the two are checked against each other.
 const prepared = scorer.prepareChoice(name, { normalize: normalizeText })
 searchIter(query, rows, { scorer, getPrepared, normalize: normalizeText })
 
@@ -191,9 +191,16 @@ searchIter(normalizeText(query), rows, { scorer, getPrepared })
 Mixing them throws. `prepareChoice(normalizeText(name))` produces the same text
 as the first line but records nothing, so a search that normalizes its query
 cannot confirm the choice was normalized too and refuses the pair rather than
-comparing two sides made differently. The check is by function identity — two
-arrows that do the same thing are two normalizers — so name one function and
-pass it to both.
+comparing two sides made differently.
+
+The check is by function identity — two arrows that do the same thing are two
+normalizers — so name one function and pass it to both. Identity is the
+compatibility token, which makes stable behaviour part of the contract: a
+normalizer used with prepared choices must transform a given input the same way
+at preparation and at search. One that reads mutable state outside itself
+passes the check and still compares two sides made differently, and no check
+can see that. Build a configured normalizer as a new function rather than
+mutating what an existing one captured.
 
 That ordering is the point: a generator decides what is worth scoring, and the
 scoring pays nothing to prepare what it accepts. A handle is read only for the

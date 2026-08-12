@@ -17,8 +17,31 @@ import type {
   ItemIterable,
   Items,
   AnyMatcherOptions,
+  ResolvedMatcherOptions,
   SearchOptions,
 } from './types.js'
+
+/**
+ * Every option read exactly once, as `createMatcher` does it.
+ *
+ * The reader and the query have to be handed the same normalizer: an accessor
+ * that answers one function to each passes the prepared-choice check and then
+ * scores against a query normalized some other way, which is the silent
+ * mismatch that check exists to refuse.
+ */
+function stableOptionsOf<T, D extends Direction, B>(
+  options: AnyMatcherOptions<T, D, B>,
+  scorer: ResolvedMatcherOptions<T, Direction, B>['scorer'],
+  normalize: Normalizer | undefined,
+): ResolvedMatcherOptions<T, Direction, B> {
+  return {
+    scorer,
+    getText: options.getText,
+    getPrepared: options.getPrepared,
+    normalize,
+    missingItems: options.missingItems,
+  }
+}
 
 function better(direction: Direction, score: number, current: number): boolean {
   return direction === 'similarity' ? score > current : score < current
@@ -101,8 +124,10 @@ export function bestMatch<T, D extends Direction, B>(
   // threshold must not turn an invalid collection into an empty result.
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
-  const compilation = scorerCompilation(options.scorer)
-  const stableOptions: AnyMatcherOptions<T, Direction, B> = options
+  const scorer = options.scorer
+  const compilation = scorerCompilation(scorer)
+  const normalize = options.normalize
+  const stableOptions = stableOptionsOf(options, scorer, normalize)
   // Before the query is normalized, so `search` at any limit refuses a wrong
   // option in the same order — `limit: 1` delegates here.
   const choices = choiceReader(
@@ -111,7 +136,7 @@ export function bestMatch<T, D extends Direction, B>(
     compilation.preparedChoiceKey,
     false,
   )
-  const normalized = normalizeQuery(query, options.normalize)
+  const normalized = normalizeQuery(query, normalize)
   const arrayItems = arrayItemsOf(items)
 
   if (normalized === null) {
@@ -217,8 +242,10 @@ export function search<T, D extends Direction, B>(
     const match = bestMatch(query, items, options)
     return match === undefined ? [] : [match]
   }
-  const compilation = scorerCompilation(options.scorer)
-  const stableOptions: AnyMatcherOptions<T, Direction, B> = options
+  const scorer = options.scorer
+  const compilation = scorerCompilation(scorer)
+  const normalize = options.normalize
+  const stableOptions = stableOptionsOf(options, scorer, normalize)
   const choices = choiceReader(
     stableOptions,
     compilation.prepareChoice,
@@ -229,7 +256,7 @@ export function search<T, D extends Direction, B>(
   // scorer and an unknown `missingItems` the way every other limit does. What
   // it still skips is the work: no query normalization, no traversal.
   if (limit === 0) return []
-  const normalized = normalizeQuery(query, options.normalize)
+  const normalized = normalizeQuery(query, normalize)
   const arrayItems = arrayItemsOf(items)
 
   if (normalized === null) {
@@ -382,7 +409,7 @@ export function searchIter<T, D extends Direction, B>(
     items,
     compilation,
     choiceReader(
-      options,
+      stableOptionsOf(options, scorer, normalize),
       compilation.prepareChoice,
       compilation.preparedChoiceKey,
       false,
