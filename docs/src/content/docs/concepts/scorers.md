@@ -102,3 +102,10 @@ One boundary worth knowing: *missing* is lenient by default, *invalid* never
 is. Empty strings are valid (they're just empty). Numbers, booleans, and
 objects without an array-like `length` always throw — they're type errors in
 your data, not gaps in it.
+
+## One more thing a scorer can do
+
+A scorer can convert a candidate into its internal form ahead of time —
+`scorer.prepareChoice` returns an opaque handle you store beside your own
+data, so repeated searches stop re-preparing every candidate:
+[Prepared choices](/guides/prepared-choices/).

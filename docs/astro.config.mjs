@@ -60,6 +60,7 @@ export default defineConfig({
 						{ label: 'Comparing strings', slug: 'guides/comparing-strings' },
 						{ label: 'Finding the best match', slug: 'guides/finding-the-best-match' },
 						{ label: 'Searching collections', slug: 'guides/searching-collections' },
+						{ label: 'Prepared choices', slug: 'guides/prepared-choices' },
 						{ label: 'Preprocessing', slug: 'guides/preprocessing' },
 						{ label: 'Performance', slug: 'guides/performance' },
 					],
