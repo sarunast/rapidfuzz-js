@@ -13,7 +13,10 @@
  * rather than "can it replace them".
  */
 
+import process from 'node:process'
+
 import {
+  buildProfile,
   elementsEqual,
   type GramNode,
   type NGramProfile,
@@ -49,6 +52,12 @@ export interface IndexCounters {
   verifyProbes: number
   /** Posting entries the suffix walk read, when probing looked more expensive. */
   suffixWalked: number
+  /**
+   * Candidates an accumulation actually wrote to. Under a dense list every
+   * candidate is scored but only these differ from the default, so this is the
+   * size of the set a skip-the-defaults selection would have to look at.
+   */
+  modifiedCandidates: number
   /**
    * Whether a dense list put every candidate in play. It breaks the rule the
    * sparse representation runs on — a positive score and a posting-list hit are
@@ -359,18 +368,33 @@ function validLimit(limit: number | null): number | null {
 }
 
 /** One choice's frequency for a gram, or 0. The posting list is sorted by id. */
+/**
+ * A dense list inverts both answers, so the two spellings need saying out loud:
+ * in a sparse list a hit is the stored frequency and a miss is `0`, and in a
+ * dense one a hit is the stored *exception* — `0` for an absence — while a miss
+ * is the default frequency of `1`.
+ *
+ * Nothing reaches this with a dense ordinal today, because prefix filtering
+ * falls back to full accumulation the moment a query gram is dense. Written to
+ * be right anyway: a helper whose contract holds only because of where it
+ * happens to be called from is a trap set for the next change.
+ */
 function frequencyOf(postings: Postings, ordinal: number, id: number): number {
   const ids = postings.ids
+  const dense = postings.dense !== null && postings.dense[ordinal] === 1
   let low = postings.offsets[ordinal]
   let high = postings.offsets[ordinal + 1] - 1
   while (low <= high) {
     const middle = (low + high) >>> 1
     const found = ids[middle]
-    if (found === id) return postings.counts === null ? 1 : postings.counts[middle]
+    if (found === id) {
+      if (postings.counts !== null) return postings.counts[middle]
+      return dense ? 0 : 1
+    }
     if (found < id) low = middle + 1
     else high = middle - 1
   }
-  return 0
+  return dense ? 1 : 0
 }
 
 /**
@@ -456,6 +480,20 @@ export class NGramIndex {
   /** Set when a dense list has put every candidate into `touched`. */
   private scannedAll = false
 
+  /**
+   * Which candidates this query actually wrote to, marked by a per-query
+   * generation rather than by `accumulator[id] === 0`.
+   *
+   * Zero stopped meaning "never written" the moment dense lists arrived: an
+   * absence contributes `−1` and a sparse gram `+1`, so a candidate can be
+   * modified and land back on zero. It is also the number that decides whether
+   * the unmodified candidates — each scoring `2·base/(q + g)`, and so ordered by
+   * `gramCount` alone — could be skipped rather than scanned.
+   */
+  private readonly marks: Uint32Array
+
+  private generation = 0
+
   readonly counters: IndexCounters = {
     postingEntriesTouched: 0,
     distinctQueryGrams: 0,
@@ -468,6 +506,7 @@ export class NGramIndex {
     verifyProbes: 0,
     suffixWalked: 0,
     scannedAllCandidates: false,
+    modifiedCandidates: 0,
   }
 
   constructor(
@@ -500,6 +539,20 @@ export class NGramIndex {
     this.gramCount = new Uint32Array(choiceCount)
     this.squaredNorm = new Float64Array(choiceCount)
     this.accumulator = new Float64Array(choiceCount)
+    this.marks = new Uint32Array(choiceCount)
+  }
+
+  /**
+   * A new generation per query, so nothing has to be cleared between them. On
+   * the wrap — one query short of 4.3 billion — the marks go back to zero once
+   * and generation 1 starts again.
+   */
+  private nextGeneration(): void {
+    this.generation++
+    if (this.generation === 0xffff_ffff) {
+      this.marks.fill(0)
+      this.generation = 1
+    }
   }
 
   /**
@@ -939,7 +992,7 @@ export class NGramIndex {
    * The corpus-level companion to {@link denseProbe}.
    */
   denseOutlook(cutoff: number): { denseLists: number; hybridEntries: number } {
-    const postings = this.requirePostings()
+    const postings = this.requireSparseIndex()
     const offsets = postings.offsets
     const counts = postings.counts
     let denseLists = 0
@@ -974,7 +1027,7 @@ export class NGramIndex {
     touched: number
     choiceCount: number
   } {
-    const postings = this.requirePostings()
+    const postings = this.requireSparseIndex()
     flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
     const keys = this.queryKeys
     const offsets = postings.offsets
@@ -1398,6 +1451,20 @@ export class NGramIndex {
     this.base = 0
   }
 
+  /**
+   * Both dense diagnostics read a slice length as a document frequency, which is
+   * exactly what a dense list is not. They answer "what would inverting buy",
+   * so they only make sense before anything has been inverted — and since dense
+   * is now the default, asking on the wrong index is one flag away.
+   */
+  private requireSparseIndex(): Postings {
+    const postings = this.requirePostings()
+    if (postings.dense !== null) {
+      throw new TypeError('the dense diagnostics need an index built with no dense lists')
+    }
+    return postings
+  }
+
   private requirePostings(): Postings {
     const postings = this.postings
     if (postings === null) throw new TypeError('the index has not been compacted')
@@ -1421,6 +1488,8 @@ export class NGramIndex {
     counters.verifyProbes = 0
     counters.suffixWalked = 0
     counters.scannedAllCandidates = false
+    counters.modifiedCandidates = 0
+    this.nextGeneration()
   }
 
   /**
@@ -1441,11 +1510,17 @@ export class NGramIndex {
     const postingCounts = postings.counts
     const offsets = postings.offsets
     const dense = postings.dense
+    const marks = this.marks
+    const generation = this.generation
+    let modified = 0
     this.base = 0
     if (dense !== null && this.reachesDenseList(dense)) {
       this.scannedAll = true
       this.counters.scannedAllCandidates = true
     }
+    // A dense list already put every candidate into the scan, so `touched` is
+    // never read again and every push into it is waste.
+    const tracking = !this.scannedAll
     for (let index = 0; index < keys.length; index++) {
       const ordinal = postings.ordinals.get(keys[index])
       if (ordinal === undefined) continue
@@ -1460,12 +1535,24 @@ export class NGramIndex {
         // over every candidate, which is what a dense list forces.
         this.base += queryCount < 1 ? queryCount : 1
         if (postingCounts === null) {
-          for (let at = from; at < upto; at++) accumulator[ids[at]] -= 1
+          for (let at = from; at < upto; at++) {
+            const id = ids[at]
+            if (marks[id] !== generation) {
+              marks[id] = generation
+              modified++
+            }
+            accumulator[id] -= 1
+          }
           continue
         }
         for (let at = from; at < upto; at++) {
+          const id = ids[at]
+          if (marks[id] !== generation) {
+            marks[id] = generation
+            modified++
+          }
           const count = postingCounts[at]
-          accumulator[ids[at]] += (queryCount < count ? queryCount : count) - 1
+          accumulator[id] += (queryCount < count ? queryCount : count) - 1
         }
         continue
       }
@@ -1476,18 +1563,27 @@ export class NGramIndex {
         const capped = queryCount < 1 ? queryCount : 1
         for (let at = from; at < upto; at++) {
           const id = ids[at]
-          if (accumulator[id] === 0) touched.push(id)
+          if (marks[id] !== generation) {
+            marks[id] = generation
+            modified++
+            if (tracking) touched.push(id)
+          }
           accumulator[id] += capped
         }
         continue
       }
       for (let at = from; at < upto; at++) {
         const id = ids[at]
-        if (accumulator[id] === 0) touched.push(id)
+        if (marks[id] !== generation) {
+          marks[id] = generation
+          modified++
+          if (tracking) touched.push(id)
+        }
         const count = postingCounts[at]
         accumulator[id] += queryCount < count ? queryCount : count
       }
     }
+    this.counters.modifiedCandidates = modified
     this.counters.distinctQueryGrams = keys.length
     this.counters.postingEntriesTouched = entries
     this.counters.candidatesTouched = this.scannedAll ? this.choiceCount : touched.length
@@ -1524,11 +1620,17 @@ export class NGramIndex {
     const postingCounts = postings.counts
     const offsets = postings.offsets
     const dense = postings.dense
+    const marks = this.marks
+    const generation = this.generation
+    let modified = 0
     this.base = 0
     if (dense !== null && this.reachesDenseList(dense)) {
       this.scannedAll = true
       this.counters.scannedAllCandidates = true
     }
+    // A dense list already put every candidate into the scan, so `touched` is
+    // never read again and every push into it is waste.
+    const tracking = !this.scannedAll
     for (let index = 0; index < keys.length; index++) {
       const ordinal = postings.ordinals.get(keys[index])
       if (ordinal === undefined) continue
@@ -1542,28 +1644,49 @@ export class NGramIndex {
         // gram adds the extra `count − 1` copies.
         this.base += queryCount
         if (postingCounts === null) {
-          for (let at = from; at < upto; at++) accumulator[ids[at]] -= queryCount
+          for (let at = from; at < upto; at++) {
+            const id = ids[at]
+            if (marks[id] !== generation) {
+              marks[id] = generation
+              modified++
+            }
+            accumulator[id] -= queryCount
+          }
           continue
         }
         for (let at = from; at < upto; at++) {
-          accumulator[ids[at]] += queryCount * (postingCounts[at] - 1)
+          const id = ids[at]
+          if (marks[id] !== generation) {
+            marks[id] = generation
+            modified++
+          }
+          accumulator[id] += queryCount * (postingCounts[at] - 1)
         }
         continue
       }
       if (postingCounts === null) {
         for (let at = from; at < upto; at++) {
           const id = ids[at]
-          if (accumulator[id] === 0) touched.push(id)
+          if (marks[id] !== generation) {
+            marks[id] = generation
+            modified++
+            if (tracking) touched.push(id)
+          }
           accumulator[id] += queryCount
         }
         continue
       }
       for (let at = from; at < upto; at++) {
         const id = ids[at]
-        if (accumulator[id] === 0) touched.push(id)
+        if (marks[id] !== generation) {
+          marks[id] = generation
+          modified++
+          if (tracking) touched.push(id)
+        }
         accumulator[id] += queryCount * postingCounts[at]
       }
     }
+    this.counters.modifiedCandidates = modified
     this.counters.distinctQueryGrams = keys.length
     this.counters.postingEntriesTouched = entries
     this.counters.candidatesTouched = this.scannedAll ? this.choiceCount : touched.length
@@ -1635,6 +1758,281 @@ export class NGramIndex {
       return { id: 0, score: 0 }
     }
     return undefined
+  }
+
+  /**
+   * Where one query's time actually goes, stage by stage.
+   *
+   * Each stage is timed as a prefix of the whole call and the differences are
+   * read off, because timing a stage in isolation would measure it on state the
+   * previous stage never built. The minimum of many runs rather than the median:
+   * these are tens of microseconds on a machine that spikes, and the fastest run
+   * is the one least contaminated by something else.
+   */
+  profilePhases(
+    text: string,
+    threshold: number | null,
+    limit: number | null,
+    runs: number,
+  ): { name: string; ms: number }[] {
+    const gramSize = this.gramSize
+    const profile = buildProfile(text, gramSize)
+    const stages: { name: string; body: () => unknown }[] = [
+      { name: 'buildProfile', body: () => buildProfile(text, gramSize) },
+      {
+        name: '+ flatten',
+        body: () => {
+          const built = buildProfile(text, gramSize)
+          flattenQueryInto(built, this.radix, this.queryKeys, this.queryCounts)
+          return this.queryKeys.length
+        },
+      },
+      {
+        name: '+ accumulate',
+        body: () => {
+          const built = buildProfile(text, gramSize)
+          this.beginQuery(built)
+          flattenQueryInto(built, this.radix, this.queryKeys, this.queryCounts)
+          this.diceAccumulate()
+          const reached = this.counters.candidatesTouched
+          this.reset()
+          return reached
+        },
+      },
+      {
+        name: '+ select (whole query)',
+        body: () => this.diceSearch(buildProfile(text, gramSize), threshold, limit),
+      },
+      {
+        name: 'accumulate alone, prepared query',
+        body: () => {
+          this.beginQuery(profile)
+          flattenQueryInto(profile, this.radix, this.queryKeys, this.queryCounts)
+          this.diceAccumulate()
+          const reached = this.counters.candidatesTouched
+          this.reset()
+          return reached
+        },
+      },
+    ]
+    const sink: { value: unknown } = { value: undefined }
+    const results: { name: string; ms: number }[] = []
+    for (const stage of stages) {
+      for (let run = 0; run < runs; run++) sink.value = stage.body()
+      let best = Number.POSITIVE_INFINITY
+      for (let run = 0; run < runs; run++) {
+        const started = process.hrtime.bigint()
+        sink.value = stage.body()
+        const elapsed = Number(process.hrtime.bigint() - started) / 1e6
+        if (elapsed < best) best = elapsed
+      }
+      results.push({ name: stage.name, ms: best })
+    }
+    return results
+  }
+
+  /**
+   * Where the time goes once accumulation stops being the cost.
+   *
+   * Dense postings cut the traffic of the query made of common grams by 30x and
+   * moved its latency by 3%, which says the budget that binds it is this loop.
+   * Accumulation runs once here and every variant then scans the same state, so
+   * the differences are the loop's own and nothing else's.
+   *
+   * The variants climb from a floor: an empty pass, then the reads, then the
+   * arithmetic, then the two ways of not doing the arithmetic.
+   */
+  profileSelection(
+    query: NGramProfile,
+    threshold: number,
+    runs: number,
+  ): { name: string; ms: number; qualified: number }[] {
+    this.beginQuery(query)
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    this.diceAccumulate()
+    const accumulator = this.accumulator
+    const gramCount = this.gramCount
+    const touched = this.touched
+    const everyCandidate = this.scannedAll
+    const length = everyCandidate ? this.choiceCount : touched.length
+    const base = this.base
+    const queryGrams = query.gramCount
+    // The two gram counts alone cap Dice at `2·min / (q + g)`, so the candidates
+    // that can reach the threshold at all sit in one contiguous band of lengths.
+    // Outside it no accumulator read is needed and no division is either.
+    const lowest = Math.ceil((threshold * queryGrams) / (2 - threshold))
+    const highest = Math.floor((queryGrams * (2 - threshold)) / threshold)
+    const scoreOf = (id: number): number => this.diceScore(query, id)
+    const variants: { name: string; body: () => number }[] = [
+      {
+        name: 'loop only',
+        body: () => {
+          let sum = 0
+          for (let index = 0; index < length; index++) {
+            sum += everyCandidate ? index : touched[index]
+          }
+          return sum
+        },
+      },
+      {
+        name: '+ accumulator read',
+        body: () => {
+          let sum = 0
+          for (let index = 0; index < length; index++) {
+            sum += accumulator[everyCandidate ? index : touched[index]]
+          }
+          return sum
+        },
+      },
+      {
+        name: '+ gramCount read',
+        body: () => {
+          let sum = 0
+          for (let index = 0; index < length; index++) {
+            const id = everyCandidate ? index : touched[index]
+            sum += accumulator[id] + gramCount[id]
+          }
+          return sum
+        },
+      },
+      {
+        name: '+ divide, inline',
+        body: () => {
+          let qualified = 0
+          for (let index = 0; index < length; index++) {
+            const id = everyCandidate ? index : touched[index]
+            const grams = gramCount[id]
+            if (grams === 0) continue
+            const score = (2 * (base + accumulator[id])) / (queryGrams + grams)
+            if (score >= threshold) qualified++
+          }
+          return qualified
+        },
+      },
+      {
+        name: '+ divide, through the callback',
+        body: () => {
+          let qualified = 0
+          for (let index = 0; index < length; index++) {
+            const id = everyCandidate ? index : touched[index]
+            if (scoreOf(id) >= threshold) qualified++
+          }
+          return qualified
+        },
+      },
+      {
+        name: 'callback over hoisted locals',
+        body: () => {
+          const scorer = (id: number): number => {
+            const grams = gramCount[id]
+            if (grams === 0) return 0
+            return (2 * (base + accumulator[id])) / (queryGrams + grams)
+          }
+          let qualified = 0
+          for (let index = 0; index < length; index++) {
+            const id = everyCandidate ? index : touched[index]
+            if (scorer(id) >= threshold) qualified++
+          }
+          return qualified
+        },
+      },
+      {
+        name: 'callback + top-5 insertion',
+        body: () => {
+          const top: Scored[] = []
+          let qualified = 0
+          for (let index = 0; index < length; index++) {
+            const id = everyCandidate ? index : touched[index]
+            const score = scoreOf(id)
+            if (score < threshold) continue
+            qualified++
+            let at = top.length
+            if (at === 5) {
+              if (!outranks(score, id, top[4])) continue
+              at = 4
+            }
+            while (at > 0 && outranks(score, id, top[at - 1])) {
+              top[at] = top[at - 1]
+              at--
+            }
+            top[at] = { id, score }
+          }
+          return qualified
+        },
+      },
+      {
+        name: 'inline + top-5 insertion',
+        body: () => {
+          const top: Scored[] = []
+          let qualified = 0
+          for (let index = 0; index < length; index++) {
+            const id = everyCandidate ? index : touched[index]
+            const grams = gramCount[id]
+            if (grams === 0) continue
+            const score = (2 * (base + accumulator[id])) / (queryGrams + grams)
+            if (score < threshold) continue
+            qualified++
+            let at = top.length
+            if (at === 5) {
+              if (!outranks(score, id, top[4])) continue
+              at = 4
+            }
+            while (at > 0 && outranks(score, id, top[at - 1])) {
+              top[at] = top[at - 1]
+              at--
+            }
+            top[at] = { id, score }
+          }
+          return qualified
+        },
+      },
+      {
+        name: 'length band, then divide',
+        body: () => {
+          let qualified = 0
+          for (let index = 0; index < length; index++) {
+            const id = everyCandidate ? index : touched[index]
+            const grams = gramCount[id]
+            if (grams < lowest || grams > highest) continue
+            const score = (2 * (base + accumulator[id])) / (queryGrams + grams)
+            if (score >= threshold) qualified++
+          }
+          return qualified
+        },
+      },
+      {
+        name: 'band + integer test, then divide',
+        body: () => {
+          let qualified = 0
+          for (let index = 0; index < length; index++) {
+            const id = everyCandidate ? index : touched[index]
+            const grams = gramCount[id]
+            if (grams < lowest || grams > highest) continue
+            // `shared ≥ threshold·(q + g)/2` is the same test as the score
+            // against the threshold, with the division moved to the survivors.
+            const shared = base + accumulator[id]
+            if (2 * shared < threshold * (queryGrams + grams)) continue
+            qualified++
+          }
+          return qualified
+        },
+      },
+    ]
+    const results: { name: string; ms: number; qualified: number }[] = []
+    for (const variant of variants) {
+      let last = 0
+      for (let run = 0; run < runs; run++) last = variant.body()
+      const samples: number[] = []
+      for (let run = 0; run < runs; run++) {
+        const started = process.hrtime.bigint()
+        last = variant.body()
+        samples.push(Number(process.hrtime.bigint() - started) / 1e6)
+      }
+      samples.sort((left, right) => left - right)
+      results.push({ name: variant.name, ms: samples[0], qualified: last })
+    }
+    this.reset()
+    return results
   }
 
   private select(
