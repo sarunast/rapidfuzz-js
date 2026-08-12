@@ -414,4 +414,27 @@ describe('batch scoring', () => {
       }).toArray(),
     ).toEqual([[0, 5]])
   })
+
+  test('an option a batch call does not define is refused rather than ignored', () => {
+    const scorer = createScorer(levenshtein.normalizedSimilarity)
+    // Misspelled, so the threshold it names is silently not applied — the
+    // reason the keys are checked at all.
+    const misspelled = { scorer, thresold: 0.9 }
+    for (const [entry, label] of [
+      [scoreMatrix, 'scoreMatrix'],
+      [scorePairs, 'scorePairs'],
+    ] as const) {
+      expect(() => Reflect.apply(entry, undefined, [['a'], ['b'], misspelled])).toThrow(
+        `unknown ${label} option 'thresold'`,
+      )
+      expect(() => Reflect.apply(entry, undefined, [['a'], ['b'], null])).toThrow(
+        `${label} options must be an object`,
+      )
+    }
+    // Checked before the lengths, so a caller learns about the option they got
+    // wrong rather than about the arrays they did not.
+    expect(() =>
+      Reflect.apply(scorePairs, undefined, [['a'], ['a', 'b'], misspelled]),
+    ).toThrow("unknown scorePairs option 'thresold'")
+  })
 })

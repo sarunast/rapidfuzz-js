@@ -50,9 +50,9 @@ matcher.best('mechanical keybord', { threshold: 70 })
 // { item: products[0], key: 0, score: ... }
 ```
 
-Use `bestMatch` or `search` for one ranked query, `searchIter` for lazy
-source-order results, and a `Matcher` when the same collection will receive
-many queries.
+`bestMatch` answers one query with its best match, `search` with a ranked top
+few, and `searchIter` lazily yields every qualifying match in source order. Use
+a `Matcher` when the same collection will receive many queries.
 
 ## Metrics and score scales
 
@@ -202,6 +202,12 @@ passes the check and still compares two sides made differently, and no check
 can see that. Build a configured normalizer as a new function rather than
 mutating what an existing one captured.
 
+`normalizeText` is a normalizer of text: it lowercases, replaces every
+non-alphanumeric character with a space and trims, and returns any other
+sequence as it came. That is what lets it be the `Normalizer` for a collection
+whose choices are array-like, where nothing about an element is text to
+lowercase. Anything that is not a sequence at all is still refused.
+
 That ordering is the point: a generator decides what is worth scoring, and the
 scoring pays nothing to prepare what it accepts. A handle is read only for the
 candidates a guard lets through, so the check costs nothing for the ones it
@@ -241,6 +247,19 @@ query, but never to a choice — the choice was prepared before the search saw
 it, so normalize it yourself when you prepare it.
 
 ## One query or many
+
+Three operations, not one shape in three wrappers:
+
+|              |                                                           |
+| ------------ | --------------------------------------------------------- |
+| `bestMatch`  | the best single match                                     |
+| `search`     | ranked top matches, five by default, `null` for every one |
+| `searchIter` | lazily yields every qualifying match, in source order     |
+
+`search` ranks, so it holds what it has found; `searchIter` does not rank, so it
+holds nothing. Neither is the other with a different return type, and each takes
+the options it defines — a `limit` given to `bestMatch` or `searchIter` is
+refused rather than ignored.
 
 One-shot search streams its input and does not retain the collection:
 
@@ -354,6 +373,20 @@ Distance scorers always throw on missing operands. Empty sequences are valid.
 Numbers (including `NaN`), booleans, and objects without a valid array-like
 `length` are invalid.
 
+An options object carrying optional behaviour — a search, a Matcher method,
+`scoreMatrix`, `scorePairs`, `prepareChoice` — rejects a key it does not define:
+
+```ts
+search(query, choices, { scorer, thresold: 90 })
+// TypeError: unknown search option 'thresold'
+```
+
+A misspelling there would otherwise typecheck (TypeScript's excess-property
+check only sees a fresh object literal) and quietly return unthresholded
+results. The threshold argument to `score`, `isMatch` and `scoreIfMatch` is not
+enumerated: its one key is required, so a misspelling is already a
+`threshold must be finite`.
+
 ## Custom metrics
 
 Custom metrics must declare enough metadata for safe ordering and validation:
@@ -372,6 +405,14 @@ is validated before thresholding, ordering, or pruning.
 A custom scorer prepares choices like any other, and its handles belong to it
 alone: two scorers built from the same function still prepare for themselves,
 because nothing about a plain function says the two are interchangeable.
+
+What a handle holds differs by scorer. A built-in one may hold a representation
+its kernels want, computed once; a custom one holds an owned snapshot of the
+sequence, since a custom metric is handed the sequence itself and nothing about
+a plain function says what else to precompute. Both get the same ownership,
+the same scorer-compatibility check and the same opaque public shape — only the
+scorer-specific precomputation is missing, and how much that is worth is a
+question about the scorer and the workload rather than about preparation.
 
 ## Performance and package validation
 

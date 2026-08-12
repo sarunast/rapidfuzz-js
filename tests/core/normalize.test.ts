@@ -75,8 +75,23 @@ it('follows default_process on separators, runs, and case classes', () => {
   }
 })
 
-it('rejects non-string input', () => {
+it('returns a non-text sequence as it came', () => {
   // An array typechecks here on purpose: `normalizeText` is a `Normalizer`, and
-  // a `Normalizer` is handed whatever a choice turns out to be.
-  expect(() => defaultProcess(['a', 'b'])).toThrow('normalizeText expects a string')
+  // a `Normalizer` is handed whatever a choice turns out to be. Nothing about
+  // an element is text to lowercase, so the sequence itself comes back — `toBe`,
+  // because a copy would be a different answer to the same question.
+  const elements = ['a', 'b']
+  expect(defaultProcess(elements)).toBe(elements)
+  const arrayLike = { length: 1, 0: 'A' }
+  expect(defaultProcess(arrayLike)).toBe(arrayLike)
+})
+
+it('rejects what is not a sequence at all', () => {
+  // Through `Reflect.apply`, because the types refuse these and the project
+  // bans the casts that would silence them.
+  for (const invalid of [1, {}, null, undefined, true, () => 'a']) {
+    expect(() => Reflect.apply(defaultProcess, undefined, [invalid])).toThrow(
+      'expected a string or an array-like sequence',
+    )
+  }
 })

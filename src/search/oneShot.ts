@@ -1,3 +1,4 @@
+import { assertOptionKeys } from '../core/options.js'
 import type { MetricCompilation, PreparedKernel } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
@@ -6,6 +7,8 @@ import { assertCollection, collectionEntries } from './collection.js'
 import { pushHeap, replaceHeapRoot } from './internal/heap.js'
 import type { Match, ScoredEntry } from './results.js'
 import {
+  BEST_OPTION_KEYS,
+  SEARCH_OPTION_KEYS,
   choiceReader,
   normalizeQuery,
   optionalThreshold,
@@ -120,10 +123,28 @@ export function bestMatch<T, D extends Direction, B>(
   items: Items<T>,
   options: AnyMatcherOptions<T, D, B> & BestOptions,
 ): Match<T, unknown> | undefined {
+  assertOptionKeys(options, BEST_OPTION_KEYS, 'bestMatch')
   // Argument shape is checked before any semantic exit: an impossible
   // threshold must not turn an invalid collection into an empty result.
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
+  return bestOfCollection(query, items, options, threshold)
+}
+
+/**
+ * The scan itself, with its options already read.
+ *
+ * Separate from the public `bestMatch` so `search` can delegate to it at
+ * `limit: 1` without its own options being checked a second time — against a
+ * key list that does not include `limit`, which is the one key that call is
+ * certain to carry.
+ */
+function bestOfCollection<T, D extends Direction, B>(
+  query: MaybeSequence,
+  items: Items<T>,
+  options: AnyMatcherOptions<T, D, B>,
+  threshold: number | null,
+): Match<T, unknown> | undefined {
   const scorer = options.scorer
   const compilation = scorerCompilation(scorer)
   const normalize = options.normalize
@@ -233,13 +254,14 @@ export function search<T, D extends Direction, B>(
   items: Items<T>,
   options: AnyMatcherOptions<T, D, B> & SearchOptions,
 ): readonly Match<T, unknown>[] {
+  assertOptionKeys(options, SEARCH_OPTION_KEYS, 'search')
   // Argument shape is checked before any semantic exit: `limit: 0` must not
   // excuse an invalid collection or a non-finite threshold.
   const limit = resultLimit(options.limit)
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
   if (limit === 1) {
-    const match = bestMatch(query, items, options)
+    const match = bestOfCollection(query, items, options, threshold)
     return match === undefined ? [] : [match]
   }
   const scorer = options.scorer
@@ -397,6 +419,7 @@ export function searchIter<T, D extends Direction, B>(
   // `missingItems` is refused at the call rather than on the first `next()`.
   // The query is processed lazily with the scoring — that is what the
   // iterator is for, so an invalid query still throws from `next()`.
+  assertOptionKeys(options, BEST_OPTION_KEYS, 'searchIter')
   const threshold = optionalThreshold(options.threshold)
   // Read before the generator exists, each exactly once: what the iterator
   // scores with is settled at the call, not at the first `next()`.

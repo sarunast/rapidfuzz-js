@@ -462,11 +462,17 @@ describe('Metric and Scorer contracts', () => {
     expect(() => scorer.prepareChoice('alpha', { normalize: () => null })).toThrow(
       'normalize returned a missing value',
     )
-    // The option bag itself is read with `?.`, so a caller who passes nothing
-    // where one is expected prepares an unnormalized handle rather than throwing.
+    // `null` is not an absent option bag, and reading it with `?.` used to make
+    // it one — an unnormalized handle from a call that asked for normalization.
+    expect(() => Reflect.apply(scorer.prepareChoice, scorer, ['alpha', null])).toThrow(
+      'prepareChoice options must be an object',
+    )
     expect(() =>
-      Reflect.apply(scorer.prepareChoice, scorer, ['alpha', null]),
-    ).not.toThrow()
+      Reflect.apply(scorer.prepareChoice, scorer, [
+        'alpha',
+        { normalise: normalizeText },
+      ]),
+    ).toThrow("unknown prepareChoice option 'normalise'")
   })
 
   test('a handle owns its sequence, whatever the scorer prepares from', () => {

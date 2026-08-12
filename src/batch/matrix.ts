@@ -1,9 +1,10 @@
+import { assertOptionKeys } from '../core/options.js'
 import type { MetricCompilation } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { normalizeSequence, validateSequence } from '../core/sequence.js'
 import { qualifies } from '../core/threshold.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
-import { rejectedScore, resolveBatchOptions } from './options.js'
+import { BATCH_OPTION_KEYS, rejectedScore, resolveBatchOptions } from './options.js'
 import {
   buildScoreMatrix,
   roundHalfAwayFromZero,
@@ -86,6 +87,7 @@ export function scoreMatrix<D extends Direction>(
   choices: readonly Sequence[],
   options: BatchOptions<D, ScoreArrayKind>,
 ): ScoreMatrix<ScoreArray> {
+  assertOptionKeys(options, BATCH_OPTION_KEYS, 'scoreMatrix')
   // Configuration first, data second — the order `scorePairs` uses. Reaching
   // the scorer only inside `fill` meant a `normalize` with a side effect ran,
   // and a whole matrix was allocated, before a scorer this package did not

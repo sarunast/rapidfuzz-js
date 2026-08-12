@@ -49,8 +49,11 @@ const titleMatcher = createMatcher(titles, {
 // What the prepared-choice cases measure against their Matcher siblings: the
 // same amortized preparation, held by the caller instead of by a snapshot.
 const preparedChoices = choices.map((text) => ({ prepared: fuzzy.prepareChoice(text) }))
+// Library-managed normalization, because the search below names a normalizer:
+// a handle that normalized its own text records nothing, and the two sides are
+// refused rather than scored against each other.
 const preparedTitles = titles.map((text) => ({
-  prepared: tokenSort.prepareChoice(normalizeText(text)),
+  prepared: tokenSort.prepareChoice(text, { normalize: normalizeText }),
 }))
 
 describe('direct Metric and Scorer calls', () => {

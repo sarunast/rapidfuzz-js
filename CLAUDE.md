@@ -162,7 +162,7 @@ These are load-bearing for bundle size — see README.md for the full rationale:
 a blocker. Its budgets are `measured × 1.02`, so they drift under ordinary work,
 and a different toolchain gzips the same bundle 20-30 B apart — CI has failed an
 entry that passed locally. Never reshape code or drop a fix to win bytes back:
-re-record all fifteen entries in `scripts/check-bundles.mjs` together, or leave
+re-record all sixteen entries in `scripts/check-bundles.mjs` together, or leave
 it failing and say so. Re-recording only the entry that failed leaves its
 siblings a byte from the same surprise.
 

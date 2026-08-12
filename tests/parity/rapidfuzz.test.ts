@@ -387,17 +387,20 @@ describe(`RapidFuzz ${fixture.rapidfuzzVersion} parity`, () => {
 
   test('matches ranked results over a record of choices', () => {
     const { choices, top } = fixture.search.record
+    // `limit` belongs to `search` alone: each entry point takes the keys it
+    // defines, and one carrying a key another ignores is refused.
     const options = {
       scorer: createScorer(fuzz.similarity),
       threshold: fixture.search.threshold,
-      limit: null,
     }
-    expect(search(fixture.search.query, choices, options)).toEqual(top)
+    expect(search(fixture.search.query, choices, { ...options, limit: null })).toEqual(
+      top,
+    )
     expect(bestMatch(fixture.search.query, choices, options)).toEqual(top[0])
 
     // A Map keys by its own keys, so the same pairs give the same answer.
     const mapped = new Map(Object.entries(choices))
-    expect(search(fixture.search.query, mapped, options)).toEqual(top)
+    expect(search(fixture.search.query, mapped, { ...options, limit: null })).toEqual(top)
   })
 
   test('matches a search that normalizes text before scoring', () => {
@@ -406,9 +409,10 @@ describe(`RapidFuzz ${fixture.rapidfuzzVersion} parity`, () => {
       scorer: createScorer(fuzz.similarity),
       normalize: normalizeText,
       threshold: entry.threshold,
-      limit: null,
     }
-    expect(search(entry.query, entry.choices, options)).toEqual(entry.top)
+    expect(search(entry.query, entry.choices, { ...options, limit: null })).toEqual(
+      entry.top,
+    )
     expect(bestMatch(entry.query, entry.choices, options)).toEqual(entry.best)
   })
 
@@ -425,9 +429,13 @@ describe(`RapidFuzz ${fixture.rapidfuzzVersion} parity`, () => {
       Array.from(searchIter(fixture.search.query, fixture.search.choices, options)),
     ).toEqual(fixture.search.iter)
     const matcher = createMatcher(fixture.search.choices, { scorer })
-    expect(Array.from(matcher.searchIter(fixture.search.query, options))).toEqual(
-      fixture.search.iter,
-    )
+    // A Matcher method takes the threshold alone: the scorer is the one the
+    // Matcher was built with, and naming another here would change nothing.
+    expect(
+      Array.from(
+        matcher.searchIter(fixture.search.query, { threshold: fixture.search.threshold }),
+      ),
+    ).toEqual(fixture.search.iter)
   })
 
   test('matches cutoff, scaling, and integral batch output', () => {

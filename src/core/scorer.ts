@@ -1,4 +1,5 @@
 import { isBuiltInMetric, type Metric } from './metric.js'
+import { assertOptionKeys } from './options.js'
 import { createPreparedChoice, type AnyBrand, type PreparedChoice } from './prepared.js'
 import { COMPILE, type MetricCompilation } from './protocol.js'
 import {
@@ -28,6 +29,10 @@ export interface ThresholdOptions {
 export interface PrepareChoiceOptions {
   readonly normalize?: Normalizer | undefined
 }
+
+const PREPARE_CHOICE_OPTION_KEYS = [
+  'normalize',
+] as const satisfies readonly (keyof PrepareChoiceOptions)[]
 
 export interface Scorer<D extends Direction = Direction, Brand = AnyBrand> {
   readonly direction: D
@@ -143,6 +148,11 @@ function fromCompilation<D extends Direction, B>(
     // sequence afterwards must not reach through it. `createMatcher` snapshots
     // for the same reason, and the two have to agree.
     prepareChoice: (choice, options) => {
+      // Guarded rather than checked unconditionally: this runs once per choice,
+      // and the call that names no options has no keys to walk.
+      if (options !== undefined) {
+        assertOptionKeys(options, PREPARE_CHOICE_OPTION_KEYS, 'prepareChoice')
+      }
       const valid = validateSequence(choice)
       const normalize = options?.normalize
       if (normalize === undefined) {

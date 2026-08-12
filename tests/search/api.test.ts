@@ -1136,4 +1136,79 @@ describe('one-shot search and Matcher', () => {
     expect(() => createMatcher([], { scorer: distance }).best(null)).toThrow(TypeError)
     expect(() => bestMatch(null, [], { scorer: distance })).toThrow(TypeError)
   })
+
+  test('an option a call does not define is refused rather than ignored', () => {
+    // The defect this exists for: a misspelled optional key leaves the call
+    // typechecking — freshness is lost the moment the object is a variable —
+    // and silently turns the behaviour it names off.
+    const misspelled = { scorer, thresold: 90 }
+    for (const [entry, label] of [
+      [bestMatch, 'bestMatch'],
+      [search, 'search'],
+      [searchIter, 'searchIter'],
+      [createMatcher, 'createMatcher'],
+    ] as const) {
+      const args =
+        entry === createMatcher ? [['x'], misspelled] : ['a', ['x'], misspelled]
+      expect(() => Reflect.apply(entry, undefined, args)).toThrow(
+        `unknown ${label} option 'thresold'`,
+      )
+      // Refused where the call is made, not where it is iterated: the shape of
+      // the call is settled before any scoring.
+      const bad = entry === createMatcher ? [['x'], null] : ['a', ['x'], null]
+      expect(() => Reflect.apply(entry, undefined, bad)).toThrow(
+        `${label} options must be an object`,
+      )
+    }
+    // Each entry point takes the keys it defines. `limit` is `search`'s, so a
+    // bag carrying it is not shared with the two that would ignore it.
+    expect(() =>
+      Reflect.apply(bestMatch, undefined, ['a', ['x'], { scorer, limit: 1 }]),
+    ).toThrow("unknown bestMatch option 'limit'")
+    expect(() =>
+      Reflect.apply(searchIter, undefined, ['a', ['x'], { scorer, limit: 1 }]),
+    ).toThrow("unknown searchIter option 'limit'")
+    // Named but left undefined is still a misspelling, not an absent option.
+    expect(() =>
+      Reflect.apply(search, undefined, ['a', ['x'], { scorer, limti: undefined }]),
+    ).toThrow("unknown search option 'limti'")
+  })
+
+  test('a Matcher method takes the threshold and the limit, and no more', () => {
+    const matcher = createMatcher(['alpha'], { scorer })
+    // A scorer named here would be ignored — the Matcher scores with the one it
+    // was built from — so it is refused instead.
+    expect(() => Reflect.apply(matcher.best, matcher, ['alpha', { scorer }])).toThrow(
+      "unknown matcher.best option 'scorer'",
+    )
+    expect(() =>
+      Reflect.apply(matcher.searchIter, matcher, ['alpha', { threshold: 1, limit: 1 }]),
+    ).toThrow("unknown matcher.searchIter option 'limit'")
+    expect(() =>
+      Reflect.apply(matcher.search, matcher, ['alpha', { thresold: 1 }]),
+    ).toThrow("unknown matcher.search option 'thresold'")
+    for (const method of [matcher.best, matcher.search, matcher.searchIter]) {
+      expect(() => Reflect.apply(method, matcher, ['alpha', null])).toThrow(
+        'options must be an object',
+      )
+    }
+    // No options at all is the common call, and has no keys to walk.
+    expect(matcher.best('alpha')?.score).toBe(100)
+    expect(matcher.search('alpha', { limit: 1, threshold: 90 })).toHaveLength(1)
+    expect(Array.from(matcher.searchIter('alpha', { threshold: 90 }))).toHaveLength(1)
+  })
+
+  test('search at limit 1 keeps its own option list', () => {
+    // It answers through the same scan `bestMatch` runs, which must not mean
+    // being checked a second time against a list without `limit` in it.
+    expect(search('alpha', ['beta', 'alpha'], { scorer, limit: 1 })).toEqual([
+      { item: 'alpha', key: 1, score: 100 },
+    ])
+    const match = bestMatch('alpha', ['beta', 'alpha'], { scorer })
+    expect(search('alpha', ['beta', 'alpha'], { scorer, limit: 1 })[0]).toEqual(match)
+    // And the checks it delegates past still run in the same order.
+    expect(() =>
+      Reflect.apply(search, undefined, ['a', 'not a collection', { scorer, limit: 1 }]),
+    ).toThrow(TypeError)
+  })
 })

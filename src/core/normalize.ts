@@ -1,3 +1,4 @@
+import { validateSequence } from './sequence.js'
 import type { Sequence } from './types.js'
 
 const NON_ALNUM = /[^\p{L}\p{N}]/gu
@@ -23,12 +24,17 @@ const CAPITAL_SIGMA = 'Σ'
  * Follows RapidFuzz's `utils.default_process`: an underscore separates, runs
  * are not collapsed (`'a---b'` → `'a   b'`), and no `NFC`/`NFKC` is applied.
  *
- * Takes a {@link Sequence} though it accepts only strings, because it is the
- * package's `Normalizer` and a choice may be an array. Narrowing to `string`
- * makes it stop being assignable to the type it exists to satisfy.
+ * Normalizes text; any other sequence is returned as it came. That is what
+ * makes it the package's `Normalizer` for a collection of array-like choices,
+ * where nothing about an element is text to lowercase.
  */
-export function normalizeText(value: Sequence): string {
-  if (typeof value !== 'string') throw new TypeError('normalizeText expects a string')
+export function normalizeText(value: string): string
+export function normalizeText<T extends ArrayLike<unknown>>(value: T): T
+export function normalizeText(value: Sequence): Sequence {
+  // Returned through the guard rather than directly: this is a public entry
+  // point, and what it hands back has to be a sequence whether or not it had
+  // text to normalize. `validateSequence` answers the value it was given.
+  if (typeof value !== 'string') return validateSequence(value)
   const separated = value.replace(NON_ALNUM, ' ').trim()
   // One scan, so ordinary input pays no replacement pass at all.
   if (!FULL_CASE_DIVERGENT.test(separated)) return separated.toLowerCase()
