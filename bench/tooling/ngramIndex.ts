@@ -39,6 +39,15 @@ export interface IndexCounters {
   candidatesTouched: number
   candidatesQualified: number
   zeroFillCandidates: number
+  /** Grams the prefix scan walked, and the ones it left for verification. */
+  prefixGrams: number
+  suffixGrams: number
+  /** Candidates whose exact score the suffix had to be probed for. */
+  verifiedCandidates: number
+  /** Binary searches those verifications cost. */
+  verifyProbes: number
+  /** Posting entries the suffix walk read, when probing looked more expensive. */
+  suffixWalked: number
 }
 
 interface Posting {
@@ -171,6 +180,64 @@ function outranks(score: number, id: number, other: Scored): boolean {
   return score > other.score || (score === other.score && id < other.id)
 }
 
+/** One choice's frequency for a gram, or 0. The posting list is sorted by id. */
+function frequencyOf(posting: Posting, id: number): number {
+  const ids = posting.ids
+  let low = 0
+  let high = ids.length - 1
+  while (low <= high) {
+    const middle = (low + high) >>> 1
+    const found = ids[middle]
+    if (found === id) return posting.counts[middle]
+    if (found < id) low = middle + 1
+    else high = middle - 1
+  }
+  return 0
+}
+
+/**
+ * How much query frequency the prefix has to cover before the rest can be
+ * skipped: `A - t + 1`, where `t` is the fewest shared grams any candidate could
+ * qualify on.
+ *
+ * `t` rises with the candidate's gram count, so the binding case is the shortest
+ * candidate that could still reach the threshold — `2B/(A+B) >= threshold`. Both
+ * steps round *away* from the bound they need, because a `t` one too large
+ * shortens the prefix and a short prefix is the one error that loses a result.
+ * Costing a gram too many only costs a gram too many.
+ */
+function prefixTarget(gramCount: number, threshold: number): number {
+  const shortest = Math.max(1, Math.ceil((threshold * gramCount) / (2 - threshold)) - 1)
+  const needed = Math.max(1, Math.floor((threshold * (gramCount + shortest)) / 2))
+  return gramCount - needed + 1
+}
+
+interface PrefixPlan {
+  readonly suffixKeys: string[]
+  readonly suffixCounts: number[]
+  /** Query frequency still unaccounted for — the most any suffix can add. */
+  readonly remaining: number
+  /** Posting entries a suffix walk would read, against which probing is judged. */
+  readonly walkCost: number
+  readonly probeSteps: number
+}
+
+const EMPTY_SUFFIX: PrefixPlan = {
+  suffixKeys: [],
+  suffixCounts: [],
+  remaining: 0,
+  walkCost: 0,
+  probeSteps: 0,
+}
+
+/**
+ * A binary search is several times the cost of one sequential posting step —
+ * branchy, and it misses cache where the walk streams. Four is a guess with the
+ * right sign; what makes it safe is that both completions are exact, so the
+ * constant only ever picks the slower of two correct answers.
+ */
+const PROBE_WEIGHT = 4
+
 export class NGramIndex {
   private builder: Map<string, PostingBuilder> | null = new Map()
   private postings: Map<string, Posting> | null = null
@@ -185,6 +252,8 @@ export class NGramIndex {
    */
   private readonly accumulator: Float64Array
   private readonly touched: number[] = []
+  /** Candidates that outlived the cheap prunes, reused across queries. */
+  private readonly survivors: number[] = []
 
   readonly counters: IndexCounters = {
     postingEntriesTouched: 0,
@@ -192,6 +261,11 @@ export class NGramIndex {
     candidatesTouched: 0,
     candidatesQualified: 0,
     zeroFillCandidates: 0,
+    prefixGrams: 0,
+    suffixGrams: 0,
+    verifiedCandidates: 0,
+    verifyProbes: 0,
+    suffixWalked: 0,
   }
 
   constructor(
@@ -241,10 +315,14 @@ export class NGramIndex {
     if (builder === null) throw new TypeError('the index is already compacted')
     const postings = new Map<string, Posting>()
     for (const [key, posting] of builder) {
-      postings.set(key, {
-        ids: Uint32Array.from(posting.ids),
-        counts: Uint32Array.from(posting.counts),
-      })
+      const ids = Uint32Array.from(posting.ids)
+      // Ascending by construction, because choices arrive in id order — and
+      // `frequencyOf` binary-searches these, so it is worth saying out loud
+      // rather than leaving as a property someone could quietly break.
+      for (let at = 1; at < ids.length; at++) {
+        if (ids[at - 1] >= ids[at]) throw new Error('posting list is not sorted by id')
+      }
+      postings.set(key, { ids, counts: Uint32Array.from(posting.counts) })
     }
     this.postings = postings
     this.builder = null
@@ -277,6 +355,44 @@ export class NGramIndex {
     return found
   }
 
+  /**
+   * Dice search that walks only a prefix of the query's grams.
+   *
+   * If a candidate needs `t` shared grams to reach the threshold and the query
+   * holds `A` gram occurrences, a candidate sharing nothing with the query's
+   * first `A - t + 1` occurrences can reach at most `t - 1` and cannot qualify.
+   * Ordering the query's grams by posting length puts the common grams — the
+   * long lists — outside that prefix, where they are never walked. Survivors are
+   * then completed exactly against the skipped lists, so the result is the same
+   * one {@link diceSearch} produces.
+   *
+   * Only for a positive threshold: `t` is what buys the prefix, and without one
+   * there is nothing to be short of. Dice only, too — the argument needs a
+   * threshold on the shared *count*, and Cosine's does not translate into one
+   * without the norms, which is the same asymmetry that gives Dice a length
+   * bound and Cosine none.
+   */
+  dicePrefixSearch(
+    query: NGramProfile,
+    threshold: number | null,
+    limit: number | null,
+  ): Scored[] {
+    if (threshold === null || threshold <= 0)
+      return this.diceSearch(query, threshold, limit)
+    this.beginQuery(query)
+    if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
+    const plan = this.prefixScan(query, threshold)
+    const found = this.verifyTop(query, plan, threshold, limit)
+    this.reset()
+    return found
+  }
+
+  /** {@link dicePrefixSearch} with a limit of one. */
+  dicePrefixBest(query: NGramProfile, threshold: number | null): Scored | undefined {
+    const found = this.dicePrefixSearch(query, threshold, 1)
+    return found.length === 0 ? undefined : found[0]
+  }
+
   cosineBest(query: NGramProfile, threshold: number | null): Scored | undefined {
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessBest(query, threshold)
@@ -296,6 +412,226 @@ export class NGramIndex {
     this.cosineAccumulate(flattenQuery(query))
     const found = this.select((id) => this.cosineScore(query, id), threshold, limit)
     this.reset()
+    return found
+  }
+
+  /**
+   * Walks the query's grams cheapest-first until the prefix covers enough query
+   * frequency, and hands back what it skipped.
+   *
+   * Grams absent from the index sort first and cover their frequency for free:
+   * no candidate holds them, so including them in the prefix only strengthens
+   * the bound while costing no traversal at all.
+   */
+  private prefixScan(query: NGramProfile, threshold: number): PrefixPlan {
+    const postings = this.requirePostings()
+    const { keys, counts } = flattenQuery(query)
+    const lengths: number[] = new Array<number>(keys.length)
+    const order: number[] = new Array<number>(keys.length)
+    for (let index = 0; index < keys.length; index++) {
+      lengths[index] = postings.get(keys[index])?.ids.length ?? 0
+      order[index] = index
+    }
+    order.sort((left, right) => lengths[left] - lengths[right])
+
+    const target = prefixTarget(query.gramCount, threshold)
+    const accumulator = this.accumulator
+    const touched = this.touched
+    let covered = 0
+    let entries = 0
+    let index = 0
+    for (; index < order.length && covered < target; index++) {
+      const at = order[index]
+      const queryCount = counts[at]
+      covered += queryCount
+      const posting = postings.get(keys[at])
+      if (posting === undefined) continue
+      const ids = posting.ids
+      const postingCounts = posting.counts
+      entries += ids.length
+      for (let scan = 0; scan < ids.length; scan++) {
+        const id = ids[scan]
+        if (accumulator[id] === 0) touched.push(id)
+        const count = postingCounts[scan]
+        accumulator[id] += queryCount < count ? queryCount : count
+      }
+    }
+    const suffixKeys: string[] = []
+    const suffixCounts: number[] = []
+    let remaining = 0
+    let walkCost = 0
+    let probeSteps = 0
+    for (; index < order.length; index++) {
+      const at = order[index]
+      suffixKeys.push(keys[at])
+      suffixCounts.push(counts[at])
+      remaining += counts[at]
+      const length = lengths[at]
+      walkCost += length
+      probeSteps += Math.log2(length + 1)
+    }
+    const counters = this.counters
+    counters.distinctQueryGrams = keys.length
+    counters.postingEntriesTouched = entries
+    counters.candidatesTouched = touched.length
+    counters.prefixGrams = keys.length - suffixKeys.length
+    counters.suffixGrams = suffixKeys.length
+    return { suffixKeys, suffixCounts, remaining, walkCost, probeSteps }
+  }
+
+  /**
+   * Finishes the suffix by walking its posting lists instead of probing them,
+   * for the candidates the prefix already found.
+   *
+   * Chosen when many candidates survive: probing costs one binary search per
+   * survivor per suffix gram, and past a few thousand survivors that overtakes
+   * reading the lists straight through. Candidates the prefix never touched are
+   * skipped rather than accumulated — the prefix bound has already proved they
+   * cannot qualify, and admitting them here would only add work.
+   */
+  private completeSuffix(plan: PrefixPlan): void {
+    const postings = this.requirePostings()
+    const accumulator = this.accumulator
+    let entries = 0
+    for (let at = 0; at < plan.suffixKeys.length; at++) {
+      const posting = postings.get(plan.suffixKeys[at])
+      if (posting === undefined) continue
+      const ids = posting.ids
+      const counts = posting.counts
+      const queryCount = plan.suffixCounts[at]
+      entries += ids.length
+      for (let scan = 0; scan < ids.length; scan++) {
+        const id = ids[scan]
+        if (accumulator[id] === 0) continue
+        const count = counts[scan]
+        accumulator[id] += queryCount < count ? queryCount : count
+      }
+    }
+    this.counters.postingEntriesTouched += entries
+    this.counters.suffixWalked = entries
+  }
+
+  /**
+   * Completes each surviving candidate against the skipped grams and keeps the
+   * best `limit`.
+   *
+   * Three prunes before any probe, cheapest first: Dice's own length bound,
+   * which the index can apply because it kept every candidate's gram count; the
+   * partial overlap plus everything the suffix could still add; and, once the
+   * result set is full, the score of the one at the bottom of it. That last is
+   * the rising cutoff the exhaustive drivers get from their heap, and the thing
+   * full accumulation has no way to use.
+   */
+  private verifyTop(
+    query: NGramProfile,
+    plan: PrefixPlan,
+    threshold: number,
+    limit: number | null,
+  ): Scored[] {
+    // Survivors, not touched candidates, decide how the suffix is finished.
+    // Nearly every touched candidate dies here — to Dice's length bound, or to
+    // the partial overlap plus everything the suffix could still add — and both
+    // tests are arithmetic on numbers the index already holds. Counting them
+    // first is what makes the choice below reflect the work that remains rather
+    // than the work already done.
+    const survivors = this.survivors
+    survivors.length = 0
+    const gramCounts = this.gramCount
+    const accumulator = this.accumulator
+    const queryGrams = query.gramCount
+    for (let index = 0; index < this.touched.length; index++) {
+      const id = this.touched[index]
+      const denominator = queryGrams + gramCounts[id]
+      const smaller = queryGrams < gramCounts[id] ? queryGrams : gramCounts[id]
+      if ((2 * smaller) / denominator < threshold) continue
+      if ((2 * (accumulator[id] + plan.remaining)) / denominator < threshold) continue
+      survivors.push(id)
+    }
+    this.counters.verifiedCandidates = survivors.length
+
+    // Both completions produce the same overlap; this only picks the cheaper.
+    if (
+      plan.walkCost > 0 &&
+      plan.walkCost < survivors.length * plan.probeSteps * PROBE_WEIGHT
+    ) {
+      this.completeSuffix(plan)
+      return this.verifySuffix(query, EMPTY_SUFFIX, threshold, limit)
+    }
+    return this.verifySuffix(query, plan, threshold, limit)
+  }
+
+  private verifySuffix(
+    query: NGramProfile,
+    plan: PrefixPlan,
+    threshold: number,
+    limit: number | null,
+  ): Scored[] {
+    const postings = this.requirePostings()
+    const accumulator = this.accumulator
+    const gramCounts = this.gramCount
+    const survivors = this.survivors
+    const suffixKeys = plan.suffixKeys
+    const suffixCounts = plan.suffixCounts
+    const queryGrams = query.gramCount
+    const found: Scored[] = []
+    let cutoff = threshold
+    let qualified = 0
+    let probes = 0
+    for (let index = 0; index < survivors.length; index++) {
+      const id = survivors[index]
+      const choiceGrams = gramCounts[id]
+      const denominator = queryGrams + choiceGrams
+      const smaller = queryGrams < choiceGrams ? queryGrams : choiceGrams
+      if ((2 * smaller) / denominator < cutoff) continue
+      let shared = accumulator[id]
+      let remaining = plan.remaining
+      if ((2 * (shared + remaining)) / denominator < cutoff) continue
+      let alive = true
+      for (let at = 0; at < suffixKeys.length; at++) {
+        const posting = postings.get(suffixKeys[at])
+        const queryCount = suffixCounts[at]
+        remaining -= queryCount
+        if (posting !== undefined) {
+          probes++
+          const count = frequencyOf(posting, id)
+          if (count > 0) shared += queryCount < count ? queryCount : count
+        }
+        if ((2 * (shared + remaining)) / denominator < cutoff) {
+          alive = false
+          break
+        }
+      }
+      if (!alive) continue
+      const score = (2 * shared) / denominator
+      if (score < threshold) continue
+      qualified++
+      if (limit === null) {
+        found.push({ id, score })
+        continue
+      }
+      let at = found.length
+      if (at === limit) {
+        if (!outranks(score, id, found[limit - 1])) continue
+        at = limit - 1
+      }
+      while (at > 0 && outranks(score, id, found[at - 1])) {
+        found[at] = found[at - 1]
+        at--
+      }
+      found[at] = { id, score }
+      // Only ever upward, and only once the set is full: below that every
+      // candidate still has a place waiting for it.
+      if (found.length === limit) {
+        const last = found[limit - 1].score
+        if (last > cutoff) cutoff = last
+      }
+    }
+    const counters = this.counters
+    counters.candidatesQualified = qualified
+    counters.verifyProbes = probes
+    if (limit === null) {
+      found.sort((left, right) => right.score - left.score || left.id - right.id)
+    }
     return found
   }
 
@@ -328,6 +664,11 @@ export class NGramIndex {
     counters.candidatesTouched = 0
     counters.candidatesQualified = 0
     counters.zeroFillCandidates = 0
+    counters.prefixGrams = 0
+    counters.suffixGrams = 0
+    counters.verifiedCandidates = 0
+    counters.verifyProbes = 0
+    counters.suffixWalked = 0
   }
 
   /**
