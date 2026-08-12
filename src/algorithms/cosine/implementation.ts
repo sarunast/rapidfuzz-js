@@ -11,6 +11,7 @@ import {
   type FrequencyKernel,
   type NGramProfile,
 } from '../shared/ngram.js'
+import { createCosineIndexBuilder } from '../shared/ngramIndex.js'
 import {
   asSequence,
   convPair,
@@ -142,7 +143,12 @@ function prepareCosine(kind: PreparedCosineKind): PreparationFactory {
       }
     }
 
-    return { prepareQuery, prepareChoice }
+    // Similarity only, for the reason Dice's is: an inverted index accumulates
+    // a dot product and a top-k over a distance is a different driver.
+    const indexChoices =
+      kind === 'similarity' ? () => createCosineIndexBuilder(gramSize) : undefined
+
+    return { prepareQuery, prepareChoice, indexChoices }
   }
 }
 

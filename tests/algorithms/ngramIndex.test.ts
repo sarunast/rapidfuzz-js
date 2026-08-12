@@ -1,7 +1,10 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
-import { similarity as cosineSimilarity } from '../../src/algorithms/cosine/index.js'
+import {
+  distance as cosineDistance,
+  similarity as cosineSimilarity,
+} from '../../src/algorithms/cosine/index.js'
 import {
   distance as diceDistance,
   similarity as diceSimilarity,
@@ -496,17 +499,21 @@ describe('what an index refuses', () => {
 })
 
 describe('the capability a metric declares', () => {
-  it('is offered by Dice similarity and answers like the Matcher', () => {
+  it('is offered by both similarity metrics and answers like the Matcher', () => {
     const choices = ['abcd', 'abce', 'zzzz']
-    const scorer = createScorer(diceSimilarity, { gramSize: 3 })
-    const indexChoices = scorerCompilation(scorer).indexChoices
-    expect(indexChoices).toBeTypeOf('function')
-    if (indexChoices === undefined) return
-    const builder = indexChoices()
-    for (const choice of choices) builder.add(choice)
-    expect(pairs(builder.seal().select('abcd', 0.5, 3))).toEqual(
-      exhaustive('dice', 3, choices, 'abcd', 0.5, 3),
-    )
+    for (const metric of METRICS) {
+      const scorer = createScorer(metric === 'dice' ? diceSimilarity : cosineSimilarity, {
+        gramSize: 3,
+      })
+      const indexChoices = scorerCompilation(scorer).indexChoices
+      expect(indexChoices).toBeTypeOf('function')
+      if (indexChoices === undefined) throw new Error('no index capability')
+      const builder = indexChoices()
+      for (const choice of choices) builder.add(choice)
+      expect(pairs(builder.seal().select('abcd', 0.5, 3))).toEqual(
+        exhaustive(metric, 3, choices, 'abcd', 0.5, 3),
+      )
+    }
   })
 
   it('is offered at the gram size the scorer was configured with', () => {
@@ -526,6 +533,7 @@ describe('the capability a metric declares', () => {
 
   it('is absent on the distance direction', () => {
     expect(scorerCompilation(createScorer(diceDistance)).indexChoices).toBeUndefined()
+    expect(scorerCompilation(createScorer(cosineDistance)).indexChoices).toBeUndefined()
   })
 })
 
