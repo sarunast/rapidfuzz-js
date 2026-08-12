@@ -1,6 +1,6 @@
 {
   "name": "rapidfuzz-js",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Fast fuzzy string matching for Node.js and the browser",
   "keywords": [
     "damerau-levenshtein",
