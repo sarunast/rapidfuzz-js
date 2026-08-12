@@ -18,6 +18,7 @@ import {
   type GramNode,
   type NGramProfile,
 } from '../../src/algorithms/shared/ngram.js'
+import { convSequence } from '../../src/algorithms/shared/sequence.js'
 
 /** One choice id and its score, in the index's own id space. */
 export interface Scored {
@@ -66,7 +67,7 @@ interface GramlessChoice {
 }
 
 interface FlatQuery {
-  readonly keys: string[]
+  readonly keys: (string | number)[]
   readonly counts: number[]
 }
 
@@ -80,11 +81,31 @@ interface FlatQuery {
  * collide that way. `-0` stringifies as `0`, which matches the `Map` the profile
  * trie keys by SameValueZero.
  */
-function integerKey(element: unknown): string {
+function integerElement(element: unknown): number {
   if (typeof element !== 'number' || !Number.isInteger(element)) {
     throw new TypeError('the ngram index prototype accepts integer gram elements only')
   }
-  return String(element)
+  return element
+}
+
+/**
+ * Whether a gram of this depth fits one JavaScript number, so the posting map
+ * can be keyed by an integer instead of a joined string.
+ *
+ * Code points run to `0x10FFFF`, which is 21 bits: two of them are 42 bits and
+ * always fit inside 53, three are 63 and never do. Three fit only while every
+ * element stays inside the BMP, at 16 bits each — which ordinary text does, and
+ * which is why the packed path is worth having at all rather than being a
+ * curiosity for bigrams.
+ */
+const CODE_POINT_LIMIT = 0x11_0000
+const BMP_LIMIT = 0x1_0000
+
+function packedRadix(gramSize: number, bmpOnly: boolean): number | null {
+  if (gramSize === 1) return CODE_POINT_LIMIT
+  if (gramSize === 2) return CODE_POINT_LIMIT
+  if (gramSize === 3 && bmpOnly) return BMP_LIMIT
+  return null
 }
 
 /**
@@ -101,43 +122,109 @@ function integerKey(element: unknown): string {
  * The `NaN`-is-unmatchable rule needs no reimplementing here: such a gram is
  * never inserted into the trie, so this walk cannot see one, while `gramCount`
  * and `squaredNorm` still count it — and those two are copied off the profile.
+ *
+ * `radix` picks how a gram becomes a key: a positional integer when the depth
+ * and the element range allow one, and a joined string otherwise. The string
+ * form allocates once per gram *per choice*, which at 100k choices is millions
+ * of short-lived strings; the packed form allocates nothing.
  */
 function eachGram(
   profile: NGramProfile,
-  visit: (key: string, count: number) => void,
+  radix: number | null,
+  lenient: boolean,
+  visit: (key: string | number, count: number) => void,
 ): void {
   const last = profile.gramSize - 1
   const nodes: GramNode[] = [profile.root]
-  const prefixes: string[] = ['']
   const depths: number[] = [0]
   let top = 1
+  if (radix === null) {
+    const prefixes: string[] = ['']
+    while (top > 0) {
+      top--
+      const node = nodes[top]
+      const prefix = prefixes[top]
+      const depth = depths[top]
+      if (depth === last) {
+        const counts = node.counts
+        if (counts !== null) {
+          for (const [element, count] of counts) {
+            visit(prefix + integerElement(element), count)
+          }
+        }
+        continue
+      }
+      const children = node.children
+      if (children === null) continue
+      for (const [element, child] of children) {
+        nodes[top] = child
+        prefixes[top] = `${prefix}${integerElement(element)},`
+        depths[top] = depth + 1
+        top++
+      }
+    }
+    return
+  }
+  const partials: number[] = [0]
   while (top > 0) {
     top--
     const node = nodes[top]
-    const prefix = prefixes[top]
+    const partial = partials[top]
     const depth = depths[top]
     if (depth === last) {
       const counts = node.counts
       if (counts !== null) {
-        for (const [element, count] of counts) visit(prefix + integerKey(element), count)
+        for (const [element, count] of counts) {
+          const value = integerElement(element)
+          if (value < 0 || value >= radix) {
+            // On a query this gram simply cannot be in a packed index, so it
+            // matches nothing and skipping it is the answer. On a build it means
+            // the whole index has to change key scheme.
+            if (lenient) continue
+            throw new RangeError('gram element does not fit the packed key radix')
+          }
+          visit(partial * radix + value, count)
+        }
       }
       continue
     }
     const children = node.children
     if (children === null) continue
     for (const [element, child] of children) {
+      const value = integerElement(element)
+      if (value < 0 || value >= radix) {
+        if (lenient) continue
+        throw new RangeError('gram element does not fit the packed key radix')
+      }
       nodes[top] = child
-      prefixes[top] = `${prefix}${integerKey(element)},`
+      partials[top] = partial * radix + value
       depths[top] = depth + 1
       top++
     }
   }
 }
 
-function flattenQuery(query: NGramProfile): FlatQuery {
-  const keys: string[] = []
+/**
+ * The key a packed gram would have had, spelled the way the string scheme
+ * spells it. Packing is positional and therefore reversible, which is what lets
+ * an index that has already ingested a million choices change scheme without
+ * revisiting one of them.
+ */
+function unpackKey(key: string | number, radix: number, gramSize: number): string {
+  if (typeof key === 'string') return key
+  const elements: number[] = new Array<number>(gramSize)
+  let rest = key
+  for (let position = gramSize - 1; position >= 0; position--) {
+    elements[position] = rest % radix
+    rest = Math.floor(rest / radix)
+  }
+  return elements.join(',')
+}
+
+function flattenQuery(query: NGramProfile, radix: number | null): FlatQuery {
+  const keys: (string | number)[] = []
   const counts: number[] = []
-  eachGram(query, (key, count) => {
+  eachGram(query, radix, true, (key, count) => {
     keys.push(key)
     counts.push(count)
   })
@@ -213,7 +300,7 @@ function prefixTarget(gramCount: number, threshold: number): number {
 }
 
 interface PrefixPlan {
-  readonly suffixKeys: string[]
+  readonly suffixKeys: (string | number)[]
   readonly suffixCounts: number[]
   /** Query frequency still unaccounted for — the most any suffix can add. */
   readonly remaining: number
@@ -239,8 +326,11 @@ const EMPTY_SUFFIX: PrefixPlan = {
 const PROBE_WEIGHT = 4
 
 export class NGramIndex {
-  private builder: Map<string, PostingBuilder> | null = new Map()
-  private postings: Map<string, Posting> | null = null
+  private builder: Map<string | number, PostingBuilder> | null = new Map()
+  private postings: Map<string | number, Posting> | null = null
+  private radix: number | null
+  /** Whether an out-of-range element forced the key scheme to change. */
+  downgraded = false
   private readonly gramCount: Uint32Array
   private readonly squaredNorm: Float64Array
   private readonly gramless: GramlessChoice[] = []
@@ -271,7 +361,16 @@ export class NGramIndex {
   constructor(
     readonly gramSize: number,
     readonly choiceCount: number,
+    /**
+     * Packed integer keys where the depth allows them, which is the default.
+     * `false` keeps the joined-string keys, and exists so the two can be
+     * measured against each other in separate processes — one `Map.get` site
+     * seeing both key types in one process would measure the mixture.
+     */
+    packedKeys = true,
+    bmpOnly = true,
   ) {
+    this.radix = packedKeys ? packedRadix(gramSize, bmpOnly) : null
     this.gramCount = new Uint32Array(choiceCount)
     this.squaredNorm = new Float64Array(choiceCount)
     this.accumulator = new Float64Array(choiceCount)
@@ -299,7 +398,95 @@ export class NGramIndex {
       })
       return
     }
-    eachGram(profile, (key, count) => {
+    if (this.radix !== null) {
+      try {
+        this.insert(builder, choiceId, profile)
+        return
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error
+        this.downgrade(builder, choiceId)
+      }
+    }
+    this.insert(builder, choiceId, profile)
+  }
+
+  /**
+   * Ingest a choice without building a profile for it.
+   *
+   * `add` goes through `NGramProfile`, which is a trie of nested `Map`s built
+   * per choice and thrown away immediately — the index needs each gram once,
+   * not a structure that can be walked. This extracts the grams straight from
+   * the converted elements into one flat count map, which is the same
+   * information with none of the nodes.
+   *
+   * Integer elements only, so it cannot be the general path: a sequence holding
+   * `NaN` needs the unmatchable rule the trie applies for free, and one holding
+   * objects has no packed key at all. Both still go through {@link add}.
+   */
+  addSequence(choiceId: number, sequence: string): void {
+    const builder = this.builder
+    if (builder === null) throw new TypeError('the index is already compacted')
+    if (choiceId < 0 || choiceId >= this.choiceCount) {
+      throw new RangeError('choice id is outside the index')
+    }
+    const elements = convSequence(sequence)
+    const gramSize = this.gramSize
+    const gramCount = elements.length - gramSize + 1
+    if (gramCount <= 0) {
+      this.gramCount[choiceId] = 0
+      this.squaredNorm[choiceId] = 0
+      this.gramless.push({ id: choiceId, elements: copyElements(elements) })
+      return
+    }
+    const radix = this.radix
+    const counts = new Map<string | number, number>()
+    let squaredNorm = 0
+    for (let start = 0; start < gramCount; start++) {
+      let key: string | number
+      if (radix === null) {
+        let joined = String(integerElement(elements[start]))
+        for (let offset = 1; offset < gramSize; offset++) {
+          joined += `,${integerElement(elements[start + offset])}`
+        }
+        key = joined
+      } else {
+        let packed = 0
+        for (let offset = 0; offset < gramSize; offset++) {
+          const value = integerElement(elements[start + offset])
+          if (value < 0 || value >= radix) {
+            // Rare enough to pay for: re-key everything and start this choice
+            // again with joined strings.
+            this.downgrade(builder, choiceId)
+            this.addSequence(choiceId, sequence)
+            return
+          }
+          packed = packed * radix + value
+        }
+        key = packed
+      }
+      const previous = counts.get(key) ?? 0
+      squaredNorm += 2 * previous + 1
+      counts.set(key, previous + 1)
+    }
+    this.gramCount[choiceId] = gramCount
+    this.squaredNorm[choiceId] = squaredNorm
+    for (const [key, count] of counts) {
+      const posting = builder.get(key)
+      if (posting === undefined) {
+        builder.set(key, { ids: [choiceId], counts: [count] })
+        continue
+      }
+      posting.ids.push(choiceId)
+      posting.counts.push(count)
+    }
+  }
+
+  private insert(
+    builder: Map<string | number, PostingBuilder>,
+    choiceId: number,
+    profile: NGramProfile,
+  ): void {
+    eachGram(profile, this.radix, false, (key, count) => {
       const posting = builder.get(key)
       if (posting === undefined) {
         builder.set(key, { ids: [choiceId], counts: [count] })
@@ -310,10 +497,43 @@ export class NGramIndex {
     })
   }
 
+  /**
+   * Abandon packed keys for joined strings, once, when an element turns up that
+   * no packed radix holds — an astral character against a trigram index, in
+   * practice. Everything already ingested is re-keyed rather than re-read, and
+   * the choice that triggered it is rolled back first: its entries are the last
+   * in whichever lists it reached, because choices arrive in id order.
+   *
+   * A real implementation would rather decide up front, and could: `convSequence`
+   * already knows whether a string held a surrogate pair. This is the fallback
+   * for when it turns out to be wrong.
+   */
+  private downgrade(
+    builder: Map<string | number, PostingBuilder>,
+    choiceId: number,
+  ): void {
+    const radix = this.radix
+    if (radix === null) return
+    const rekeyed = new Map<string | number, PostingBuilder>()
+    for (const [key, posting] of builder) {
+      const ids = posting.ids
+      while (ids.length > 0 && ids[ids.length - 1] === choiceId) {
+        ids.pop()
+        posting.counts.pop()
+      }
+      if (ids.length === 0) continue
+      rekeyed.set(unpackKey(key, radix, this.gramSize), posting)
+    }
+    builder.clear()
+    for (const [key, posting] of rekeyed) builder.set(key, posting)
+    this.radix = null
+    this.downgraded = true
+  }
+
   compact(): void {
     const builder = this.builder
     if (builder === null) throw new TypeError('the index is already compacted')
-    const postings = new Map<string, Posting>()
+    const postings = new Map<string | number, Posting>()
     for (const [key, posting] of builder) {
       const ids = Uint32Array.from(posting.ids)
       // Ascending by construction, because choices arrive in id order — and
@@ -333,10 +553,51 @@ export class NGramIndex {
     return this.requirePostings().size
   }
 
+  /**
+   * What the index knows about itself at build time, and the reason it is worth
+   * knowing: these two numbers predict whether querying it will beat scoring
+   * every choice, without running a single query.
+   *
+   * `meanShare` is the fraction of the corpus an average gram's posting list
+   * covers — grams-per-choice over distinct-grams, near enough. It is the right
+   * predictor only when every gram is equally likely, which is true of random
+   * text and false of every real corpus.
+   *
+   * `weightedShare` is the fraction covered by the gram a *query* is likely to
+   * ask for, which is a different average: a gram appearing in half the corpus
+   * is drawn far more often than one appearing twice. `Σ len² / Σ len` is that
+   * expectation, and on skewed text it runs an order of magnitude above the
+   * mean. Below roughly 0.1 the index reads a tenth of the corpus per gram and
+   * wins; approaching 1 it reads everything and cannot.
+   */
+  postingStatistics(): {
+    distinctGrams: number
+    totalEntries: number
+    meanShare: number
+    weightedShare: number
+  } {
+    const postings = this.requirePostings()
+    let totalEntries = 0
+    let squared = 0
+    for (const posting of postings.values()) {
+      const length = posting.ids.length
+      totalEntries += length
+      squared += length * length
+    }
+    const distinctGrams = postings.size
+    return {
+      distinctGrams,
+      totalEntries,
+      meanShare:
+        distinctGrams === 0 ? 0 : totalEntries / distinctGrams / this.choiceCount,
+      weightedShare: totalEntries === 0 ? 0 : squared / totalEntries / this.choiceCount,
+    }
+  }
+
   diceBest(query: NGramProfile, threshold: number | null): Scored | undefined {
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessBest(query, threshold)
-    this.diceAccumulate(flattenQuery(query))
+    this.diceAccumulate(flattenQuery(query, this.radix))
     const found = this.selectBest((id) => this.diceScore(query, id), threshold)
     this.reset()
     return found
@@ -349,7 +610,7 @@ export class NGramIndex {
   ): Scored[] {
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
-    this.diceAccumulate(flattenQuery(query))
+    this.diceAccumulate(flattenQuery(query, this.radix))
     const found = this.select((id) => this.diceScore(query, id), threshold, limit)
     this.reset()
     return found
@@ -396,7 +657,7 @@ export class NGramIndex {
   cosineBest(query: NGramProfile, threshold: number | null): Scored | undefined {
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessBest(query, threshold)
-    this.cosineAccumulate(flattenQuery(query))
+    this.cosineAccumulate(flattenQuery(query, this.radix))
     const found = this.selectBest((id) => this.cosineScore(query, id), threshold)
     this.reset()
     return found
@@ -409,7 +670,7 @@ export class NGramIndex {
   ): Scored[] {
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
-    this.cosineAccumulate(flattenQuery(query))
+    this.cosineAccumulate(flattenQuery(query, this.radix))
     const found = this.select((id) => this.cosineScore(query, id), threshold, limit)
     this.reset()
     return found
@@ -425,7 +686,7 @@ export class NGramIndex {
    */
   private prefixScan(query: NGramProfile, threshold: number): PrefixPlan {
     const postings = this.requirePostings()
-    const { keys, counts } = flattenQuery(query)
+    const { keys, counts } = flattenQuery(query, this.radix)
     const lengths: number[] = new Array<number>(keys.length)
     const order: number[] = new Array<number>(keys.length)
     for (let index = 0; index < keys.length; index++) {
@@ -456,7 +717,7 @@ export class NGramIndex {
         accumulator[id] += queryCount < count ? queryCount : count
       }
     }
-    const suffixKeys: string[] = []
+    const suffixKeys: (string | number)[] = []
     const suffixCounts: number[] = []
     let remaining = 0
     let walkCost = 0
@@ -647,7 +908,7 @@ export class NGramIndex {
     touched.length = 0
   }
 
-  private requirePostings(): Map<string, Posting> {
+  private requirePostings(): Map<string | number, Posting> {
     const postings = this.postings
     if (postings === null) throw new TypeError('the index has not been compacted')
     return postings
