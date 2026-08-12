@@ -106,10 +106,6 @@ function integerElement(element: unknown): number {
 }
 
 /**
- * Whether a gram of this depth fits one JavaScript number, so the posting map
- * can be keyed by an integer instead of a joined string.
- *
-/**
  * The rungs a packed gram key can sit on, narrowest first: a byte for Latin-1,
  * a BMP word, and the full code-point range. An index starts on the narrowest
  * its depth allows and widens when an element does not fit.
@@ -126,14 +122,23 @@ const RADIX_LADDER: readonly number[] = [0x100, 0x1_0000, 0x11_0000]
  * Depth decides how far the ladder reaches: a byte radix holds six elements,
  * a BMP radix three, a full code-point radix two.
  */
-function feasibleRadices(gramSize: number): readonly number[] {
+export function feasibleRadices(gramSize: number): readonly number[] {
   return RADIX_LADDER.filter(
     (radix) => Math.pow(radix, gramSize) <= Number.MAX_SAFE_INTEGER,
   )
 }
 
-/** The smallest feasible radix that can hold `element`, or `null` for strings. */
+/**
+ * The smallest feasible radix that can hold `element`, or `null` for strings.
+ *
+ * A negative element goes straight to strings. Positional packing has no room
+ * below zero, so answering with a rung the element is merely *less than* would
+ * hand `rekey` a target no wider than the one that just failed — the ladder would
+ * report that it could not widen, on an element the joined-string scheme
+ * represents exactly.
+ */
 function radixFor(gramSize: number, element: number): number | null {
+  if (element < 0) return null
   for (const radix of feasibleRadices(gramSize)) if (element < radix) return radix
   return null
 }
@@ -445,6 +450,13 @@ export class NGramIndex {
     /** Pin the starting rung, so the ladder's rungs can be compared. */
     startRadix: number | null = null,
   ) {
+    // A rung too wide for this depth overflows the safe-integer range in
+    // `partial * radix + value`, and the loss of precision shows up as two grams
+    // sharing a key — a wrong score, not a thrown error. Refuse it here rather
+    // than let a pinned rung answer quietly.
+    if (startRadix !== null && !feasibleRadices(gramSize).includes(startRadix)) {
+      throw new RangeError(`radix ${startRadix} cannot hold ${gramSize} elements`)
+    }
     this.radix = packedKeys ? (startRadix ?? feasibleRadices(gramSize)[0] ?? null) : null
     this.gramCount = new Uint32Array(choiceCount)
     this.squaredNorm = new Float64Array(choiceCount)
@@ -595,11 +607,15 @@ export class NGramIndex {
   }
 
   /**
-   * Abandon packed keys for joined strings, once, when an element turns up that
-   * no packed radix holds — an astral character against a trigram index, in
-   * practice. Everything already ingested is re-keyed rather than re-read, and
+   * Widen the corpus-wide key representation one rung — to the narrowest radix
+   * that holds the element that did not fit, or to joined strings when no packed
+   * radix can. Everything already ingested is re-keyed rather than re-read, and
    * the choice that triggered it is rolled back first: its entries are the last
    * in whichever lists it reached, because choices arrive in id order.
+   *
+   * Called from a loop, because one choice can force more than one rung:
+   * `'\ud800😀'` pushes a byte radix to BMP on its first element and BMP to the
+   * full code-point range on its second.
    *
    * A real implementation would rather decide up front, and could: `convSequence`
    * already knows whether a string held a surrogate pair. This is the fallback
@@ -741,7 +757,9 @@ export class NGramIndex {
     // share of entries that *are* 1 is the number worth reporting.
     let singletonEntries = 0
     let singletonLists = 0
-    let maxCount = counts === null ? 1 : 0
+    // An empty index has no frequency at all, so it reports none: `counts ===
+    // null` means every entry is 1, which is vacuous when there are no entries.
+    let maxCount = totalEntries === 0 ? 0 : counts === null ? 1 : 0
     for (let ordinal = 0; ordinal < distinctGrams; ordinal++) {
       const from = offsets[ordinal]
       const upto = offsets[ordinal + 1]
