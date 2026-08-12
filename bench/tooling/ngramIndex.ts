@@ -49,6 +49,13 @@ export interface IndexCounters {
   verifyProbes: number
   /** Posting entries the suffix walk read, when probing looked more expensive. */
   suffixWalked: number
+  /**
+   * Whether a dense list put every candidate in play. It breaks the rule the
+   * sparse representation runs on — a positive score and a posting-list hit are
+   * the same event — because a default frequency applies to candidates no
+   * posting entry ever named.
+   */
+  scannedAllCandidates: boolean
 }
 
 /**
@@ -79,6 +86,18 @@ interface Postings {
   readonly offsets: Uint32Array
   readonly ids: Uint32Array
   readonly counts: Uint8Array | Uint16Array | Uint32Array | null
+  /**
+   * Which ordinals are stored inverted — `1` for a list whose slice holds the
+   * choices that *lack* the gram rather than the ones that have it. `null` when
+   * no list qualified, which is most corpora, and then nothing reads it.
+   *
+   * The two spellings share the slice layout, so only the meaning of an entry
+   * changes: a sparse entry is a choice with that gram at `counts[at]`, a dense
+   * entry is an exception to a default frequency of 1 — an absence at count `0`,
+   * or a repeat at `2` or more. With `counts === null` the corpus has no repeats
+   * at all, so a dense entry can only be an absence.
+   */
+  readonly dense: Uint8Array | null
 }
 
 interface PostingBuilder {
@@ -111,6 +130,9 @@ function integerElement(element: unknown): number {
  * its depth allows and widens when an element does not fit.
  */
 const RADIX_LADDER: readonly number[] = [0x100, 0x1_0000, 0x11_0000]
+
+/** See `qualifiesAsDense` for why this is two thirds and not one half. */
+export const DENSE_CUTOFF = 2 / 3
 
 /**
  * The radices that hold a gram of this depth inside one safe integer, smallest
@@ -424,6 +446,16 @@ export class NGramIndex {
   private readonly queryKeys: (string | number)[] = []
   private readonly queryCounts: number[] = []
 
+  /**
+   * What every candidate scores before its own accumulator entry is added — the
+   * sum of the dense lists' default contributions, and `0` whenever the query
+   * reached none.
+   */
+  private base = 0
+
+  /** Set when a dense list has put every candidate into `touched`. */
+  private scannedAll = false
+
   readonly counters: IndexCounters = {
     postingEntriesTouched: 0,
     distinctQueryGrams: 0,
@@ -435,6 +467,7 @@ export class NGramIndex {
     verifiedCandidates: 0,
     verifyProbes: 0,
     suffixWalked: 0,
+    scannedAllCandidates: false,
   }
 
   constructor(
@@ -449,6 +482,12 @@ export class NGramIndex {
     packedKeys = true,
     /** Pin the starting rung, so the ladder's rungs can be compared. */
     startRadix: number | null = null,
+    /**
+     * The share of the corpus a posting list has to cover before it is stored
+     * inverted. `null` keeps every list sparse, which is what the representation
+     * did before dense lists existed and what the A/B measures against.
+     */
+    private readonly denseCutoff: number | null = DENSE_CUTOFF,
   ) {
     // A rung too wide for this depth overflows the safe-integer range in
     // `partial * radix + value`, and the loss of precision shows up as two grams
@@ -662,39 +701,97 @@ export class NGramIndex {
       total += posting.ids.length
       for (const count of posting.counts) if (count > widest) widest = count
     }
+    // Which lists to invert, and how much room that takes, before anything is
+    // allocated — a dense list's slice is a different size from its sparse one,
+    // so the decision has to be made in a pass of its own.
+    const inverted = new Set<string | number>()
+    let hybridTotal = 0
+    for (const [key, posting] of builder) {
+      const length = posting.ids.length
+      let exceptions = this.choiceCount - length
+      for (const count of posting.counts) if (count !== 1) exceptions++
+      if (this.qualifiesAsDense(length, exceptions)) {
+        inverted.add(key)
+        hybridTotal += exceptions
+      } else {
+        hybridTotal += length
+      }
+    }
     const ordinals = new Map<string | number, number>()
     const offsets = new Uint32Array(builder.size + 1)
-    const ids = new Uint32Array(total)
+    const ids = new Uint32Array(hybridTotal)
     const counts =
       widest <= 1
         ? null
         : widest < 0x100
-          ? new Uint8Array(total)
+          ? new Uint8Array(hybridTotal)
           : widest < 0x1_0000
-            ? new Uint16Array(total)
-            : new Uint32Array(total)
+            ? new Uint16Array(hybridTotal)
+            : new Uint32Array(hybridTotal)
+    const dense = inverted.size === 0 ? null : new Uint8Array(builder.size)
     let ordinal = 0
     let at = 0
     for (const [key, posting] of builder) {
       ordinals.set(key, ordinal)
       offsets[ordinal] = at
       const sourceIds = posting.ids
-      for (let index = 0; index < sourceIds.length; index++) {
+      for (let index = 1; index < sourceIds.length; index++) {
         // Ascending by construction, because choices arrive in id order — and
         // `frequencyOf` binary-searches these, so it is worth saying out loud
-        // rather than leaving as a property someone could quietly break.
-        if (index > 0 && sourceIds[index - 1] >= sourceIds[index]) {
+        // rather than leaving as a property someone could quietly break. The
+        // inverted walk below depends on it too.
+        if (sourceIds[index - 1] >= sourceIds[index]) {
           throw new Error('posting list is not sorted by id')
         }
-        ids[at] = sourceIds[index]
-        if (counts !== null) counts[at] = posting.counts[index]
-        at++
+      }
+      if (dense !== null && inverted.has(key)) {
+        dense[ordinal] = 1
+        // One merge of the sorted list against every id: what is missing becomes
+        // an absence at count 0, what is present with a frequency other than 1
+        // becomes that frequency, and the overwhelmingly common present-once
+        // entry is stored nowhere at all.
+        let cursor = 0
+        for (let id = 0; id < this.choiceCount; id++) {
+          if (cursor < sourceIds.length && sourceIds[cursor] === id) {
+            const count = posting.counts[cursor]
+            cursor++
+            if (count === 1) continue
+            ids[at] = id
+            if (counts !== null) counts[at] = count
+            at++
+            continue
+          }
+          ids[at] = id
+          if (counts !== null) counts[at] = 0
+          at++
+        }
+      } else {
+        for (let index = 0; index < sourceIds.length; index++) {
+          ids[at] = sourceIds[index]
+          if (counts !== null) counts[at] = posting.counts[index]
+          at++
+        }
       }
       ordinal++
     }
     offsets[ordinal] = at
-    this.postings = { ordinals, offsets, ids, counts }
+    this.postings = { ordinals, offsets, ids, counts, dense }
     this.builder = null
+  }
+
+  /**
+   * A list covering enough of the corpus is cheaper stored inverted, and `2/3`
+   * rather than the obvious `1/2` is the cutoff because inverting costs a second
+   * thing: any query touching a dense list has to score every candidate, since a
+   * default frequency applies to all of them. Writing that out, a dense gram
+   * changes the work by `(N − 2·length + exceptions)` in accumulation and at most
+   * `(N − length)` in selection, and the sum only turns negative above `2N/3`.
+   * At exactly one half the storage saving is zero and the scan is pure loss.
+   */
+  private qualifiesAsDense(length: number, exceptions: number): boolean {
+    const cutoff = this.denseCutoff
+    if (cutoff === null || this.choiceCount === 0) return false
+    return length >= cutoff * this.choiceCount && exceptions < length
   }
 
   /** Distinct grams in the compacted index. */
@@ -721,7 +818,10 @@ export class NGramIndex {
    */
   postingStatistics(): {
     distinctGrams: number
-    totalEntries: number
+    /** Entries actually held, which a dense list makes smaller than its corpus share. */
+    storedEntries: number
+    /** `Σ` document frequency — the logical size, and what the shares divide by. */
+    documentEntries: number
     meanShare: number
     weightedShare: number
     termWeightedShare: number
@@ -729,66 +829,190 @@ export class NGramIndex {
     maxCount: number
     singletonEntryShare: number
     singletonListShare: number
+    denseLists: number
   } {
     const postings = this.requirePostings()
     const offsets = postings.offsets
     const counts = postings.counts
+    const denseFlags = postings.dense
     const distinctGrams = postings.ordinals.size
-    let totalEntries = 0
+    let storedEntries = 0
+    let documentEntries = 0
     let squared = 0
     let termTotal = 0
     let termWeighted = 0
-    for (let ordinal = 0; ordinal < distinctGrams; ordinal++) {
-      const from = offsets[ordinal]
-      const upto = offsets[ordinal + 1]
-      const documentFrequency = upto - from
-      totalEntries += documentFrequency
-      squared += documentFrequency * documentFrequency
-      let termFrequency = documentFrequency
-      if (counts !== null) {
-        termFrequency = 0
-        for (let at = from; at < upto; at++) termFrequency += counts[at]
-      }
-      termTotal += termFrequency
-      termWeighted += termFrequency * documentFrequency
-    }
     // What the corpus-wide `counts === null` shortcut would have needed, against
     // what it actually gets: one repeated gram anywhere disables it, so the
     // share of entries that *are* 1 is the number worth reporting.
     let singletonEntries = 0
     let singletonLists = 0
-    // An empty index has no frequency at all, so it reports none: `counts ===
-    // null` means every entry is 1, which is vacuous when there are no entries.
-    let maxCount = totalEntries === 0 ? 0 : counts === null ? 1 : 0
+    let denseLists = 0
+    let maxCount = 0
     for (let ordinal = 0; ordinal < distinctGrams; ordinal++) {
       const from = offsets[ordinal]
       const upto = offsets[ordinal + 1]
-      if (counts === null) {
-        singletonEntries += upto - from
-        singletonLists++
-        continue
+      const length = upto - from
+      storedEntries += length
+      let documentFrequency: number
+      let repeated = 0
+      let extra = 0
+      if (denseFlags !== null && denseFlags[ordinal] === 1) {
+        denseLists++
+        // A slice entry is an exception: absent at `0`, repeated above `1`. With
+        // no counts array at all, the corpus has no repeats, so every one of
+        // them is an absence.
+        let absent = length
+        if (counts !== null) {
+          absent = 0
+          for (let at = from; at < upto; at++) {
+            const count = counts[at]
+            if (count === 0) absent++
+            else {
+              repeated++
+              extra += count - 1
+              if (count > maxCount) maxCount = count
+            }
+          }
+        }
+        documentFrequency = this.choiceCount - absent
+      } else {
+        documentFrequency = length
+        if (counts !== null) {
+          for (let at = from; at < upto; at++) {
+            const count = counts[at]
+            if (count !== 1) {
+              repeated++
+              extra += count - 1
+            }
+            if (count > maxCount) maxCount = count
+          }
+        }
       }
-      let allOne = true
-      for (let at = from; at < upto; at++) {
-        const count = counts[at]
-        if (count === 1) singletonEntries++
-        else allOne = false
-        if (count > maxCount) maxCount = count
-      }
-      if (allOne) singletonLists++
+      documentEntries += documentFrequency
+      singletonEntries += documentFrequency - repeated
+      if (repeated === 0) singletonLists++
+      const termFrequency = documentFrequency + extra
+      squared += documentFrequency * documentFrequency
+      termTotal += termFrequency
+      termWeighted += termFrequency * documentFrequency
     }
+    // An empty index has no frequency at all, so it reports none.
+    if (maxCount === 0 && documentEntries > 0) maxCount = 1
     return {
       distinctGrams,
-      totalEntries,
+      storedEntries,
+      documentEntries,
       meanShare:
-        distinctGrams === 0 ? 0 : totalEntries / distinctGrams / this.choiceCount,
-      weightedShare: totalEntries === 0 ? 0 : squared / totalEntries / this.choiceCount,
+        distinctGrams === 0 ? 0 : documentEntries / distinctGrams / this.choiceCount,
+      weightedShare:
+        documentEntries === 0 ? 0 : squared / documentEntries / this.choiceCount,
       termWeightedShare:
         termTotal === 0 ? 0 : termWeighted / termTotal / this.choiceCount,
       countsWidthBytes: counts === null ? 0 : counts.BYTES_PER_ELEMENT,
       maxCount,
-      singletonEntryShare: totalEntries === 0 ? 0 : singletonEntries / totalEntries,
+      singletonEntryShare: documentEntries === 0 ? 0 : singletonEntries / documentEntries,
       singletonListShare: distinctGrams === 0 ? 0 : singletonLists / distinctGrams,
+      denseLists,
+    }
+  }
+
+  /**
+   * What a dense "default frequency 1, store the exceptions" posting would cost
+   * against what the sparse one costs, for one query. A probe, not an
+   * implementation: it walks the same lists the accumulator would and counts,
+   * and it touches nothing in the hot path, so building the real thing can wait
+   * on a number rather than on an argument.
+   *
+   * A list covering more than half the corpus is cheaper stored inverted — its
+   * absences plus the entries whose frequency is not 1. Per list the better of
+   * the two is what a hybrid would pick, so `hybridWork` is a lower bound on any
+   * such representation and `sparseWork` is what runs today.
+   *
+   * Both sides carry their selection scan, and they are not the same scan: the
+   * sparse path visits the candidates it touched, a dense list forces all of
+   * them, because once a base frequency applies to everyone nothing is untouched.
+   * Charging that to the hybrid alone made a corpus where `touched` is already
+   * `N` look like a regression when it is a small win.
+   */
+  /**
+   * What a dense build would store, measured on an index built without one.
+   * The corpus-level companion to {@link denseProbe}.
+   */
+  denseOutlook(cutoff: number): { denseLists: number; hybridEntries: number } {
+    const postings = this.requirePostings()
+    const offsets = postings.offsets
+    const counts = postings.counts
+    let denseLists = 0
+    let hybridEntries = 0
+    for (let ordinal = 0; ordinal < postings.ordinals.size; ordinal++) {
+      const from = offsets[ordinal]
+      const upto = offsets[ordinal + 1]
+      const length = upto - from
+      let notOne = 0
+      if (counts !== null) {
+        for (let at = from; at < upto; at++) if (counts[at] !== 1) notOne++
+      }
+      const inverted = this.choiceCount - length + notOne
+      if (length >= cutoff * this.choiceCount && inverted < length) {
+        denseLists++
+        hybridEntries += inverted
+      } else {
+        hybridEntries += length
+      }
+    }
+    return { denseLists, hybridEntries }
+  }
+
+  denseProbe(
+    query: NGramProfile,
+    cutoff: number,
+  ): {
+    queryGrams: number
+    denseGrams: number
+    sparseWork: number
+    hybridWork: number
+    touched: number
+    choiceCount: number
+  } {
+    const postings = this.requirePostings()
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    const keys = this.queryKeys
+    const offsets = postings.offsets
+    const counts = postings.counts
+    let sparseWork = 0
+    let hybridWork = 0
+    let denseGrams = 0
+    for (let index = 0; index < keys.length; index++) {
+      const ordinal = postings.ordinals.get(keys[index])
+      if (ordinal === undefined) continue
+      const from = offsets[ordinal]
+      const upto = offsets[ordinal + 1]
+      const length = upto - from
+      let notOne = 0
+      if (counts !== null) {
+        for (let at = from; at < upto; at++) if (counts[at] !== 1) notOne++
+      }
+      const inverted = this.choiceCount - length + notOne
+      sparseWork += length
+      if (length >= cutoff * this.choiceCount && inverted < length) {
+        denseGrams++
+        hybridWork += inverted
+      } else {
+        hybridWork += length
+      }
+    }
+    this.diceAccumulate()
+    const touched = this.counters.candidatesTouched
+    this.reset()
+    sparseWork += touched
+    hybridWork += denseGrams > 0 ? this.choiceCount : touched
+    return {
+      queryGrams: keys.length,
+      denseGrams,
+      sparseWork,
+      hybridWork,
+      touched,
+      choiceCount: this.choiceCount,
     }
   }
 
@@ -844,10 +1068,30 @@ export class NGramIndex {
     if (threshold === null || threshold <= 0)
       return this.diceSearch(query, threshold, limit)
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
+    // Prefix filtering skips lists a candidate cannot qualify through, and its
+    // bound is stated over lists that name who *has* a gram. A dense list names
+    // who does not, so it inverts the meaning of every step — and it is also the
+    // cheapest list there is, one addition plus its exceptions, so there was
+    // never anything to gain by skipping one. Full accumulation instead, which
+    // is exact and is what the dense representation is for.
+    if (this.usesDenseList(query)) return this.diceSearch(query, threshold, limit)
     const plan = this.prefixScan(query, threshold)
     const found = this.verifyTop(query, plan, threshold, limit)
     this.reset()
     return found
+  }
+
+  private usesDenseList(query: NGramProfile): boolean {
+    const postings = this.requirePostings()
+    const dense = postings.dense
+    if (dense === null) return false
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    const keys = this.queryKeys
+    for (let index = 0; index < keys.length; index++) {
+      const ordinal = postings.ordinals.get(keys[index])
+      if (ordinal !== undefined && dense[ordinal] === 1) return true
+    }
+    return false
   }
 
   /** {@link dicePrefixSearch} with a limit of one. */
@@ -1144,8 +1388,14 @@ export class NGramIndex {
   private reset(): void {
     const accumulator = this.accumulator
     const touched = this.touched
-    for (let index = 0; index < touched.length; index++) accumulator[touched[index]] = 0
+    // `fill` beats the walk once the walk is the whole corpus, and a dense list
+    // makes it exactly that.
+    if (this.scannedAll) accumulator.fill(0)
+    else
+      for (let index = 0; index < touched.length; index++) accumulator[touched[index]] = 0
     touched.length = 0
+    this.scannedAll = false
+    this.base = 0
   }
 
   private requirePostings(): Postings {
@@ -1170,6 +1420,7 @@ export class NGramIndex {
     counters.verifiedCandidates = 0
     counters.verifyProbes = 0
     counters.suffixWalked = 0
+    counters.scannedAllCandidates = false
   }
 
   /**
@@ -1189,6 +1440,12 @@ export class NGramIndex {
     const ids = postings.ids
     const postingCounts = postings.counts
     const offsets = postings.offsets
+    const dense = postings.dense
+    this.base = 0
+    if (dense !== null && this.reachesDenseList(dense)) {
+      this.scannedAll = true
+      this.counters.scannedAllCandidates = true
+    }
     for (let index = 0; index < keys.length; index++) {
       const ordinal = postings.ordinals.get(keys[index])
       if (ordinal === undefined) continue
@@ -1196,6 +1453,22 @@ export class NGramIndex {
       const from = offsets[ordinal]
       const upto = offsets[ordinal + 1]
       entries += upto - from
+      if (dense !== null && dense[ordinal] === 1) {
+        // Every candidate holds this gram once unless the slice says otherwise,
+        // so the whole corpus takes `min(queryCount, 1)` in one addition and the
+        // loop only walks the exceptions. No `touched` test: the scan is already
+        // over every candidate, which is what a dense list forces.
+        this.base += queryCount < 1 ? queryCount : 1
+        if (postingCounts === null) {
+          for (let at = from; at < upto; at++) accumulator[ids[at]] -= 1
+          continue
+        }
+        for (let at = from; at < upto; at++) {
+          const count = postingCounts[at]
+          accumulator[ids[at]] += (queryCount < count ? queryCount : count) - 1
+        }
+        continue
+      }
       // Split once per posting list rather than branching per entry: where
       // every frequency is 1 the whole counts array is absent, and the shared
       // minimum collapses to a constant.
@@ -1217,7 +1490,27 @@ export class NGramIndex {
     }
     this.counters.distinctQueryGrams = keys.length
     this.counters.postingEntriesTouched = entries
-    this.counters.candidatesTouched = touched.length
+    this.counters.candidatesTouched = this.scannedAll ? this.choiceCount : touched.length
+  }
+
+  /**
+   * Does this query reach a dense list? If it does, every candidate is in play —
+   * a default frequency applies to choices no posting entry names — so selection
+   * runs over the whole corpus instead of over `touched`.
+   *
+   * `touched` is deliberately *not* filled in with every id, which was the first
+   * shape of this and was wrong twice over: the sparse loops then pushed ids that
+   * were already there and the result carried duplicates, and a million pushes
+   * cost more than the branch the selection loops pay instead.
+   */
+  private reachesDenseList(dense: Uint8Array): boolean {
+    const postings = this.requirePostings()
+    const keys = this.queryKeys
+    for (let index = 0; index < keys.length; index++) {
+      const ordinal = postings.ordinals.get(keys[index])
+      if (ordinal !== undefined && dense[ordinal] === 1) return true
+    }
+    return false
   }
 
   private cosineAccumulate(): void {
@@ -1230,6 +1523,12 @@ export class NGramIndex {
     const ids = postings.ids
     const postingCounts = postings.counts
     const offsets = postings.offsets
+    const dense = postings.dense
+    this.base = 0
+    if (dense !== null && this.reachesDenseList(dense)) {
+      this.scannedAll = true
+      this.counters.scannedAllCandidates = true
+    }
     for (let index = 0; index < keys.length; index++) {
       const ordinal = postings.ordinals.get(keys[index])
       if (ordinal === undefined) continue
@@ -1237,6 +1536,20 @@ export class NGramIndex {
       const from = offsets[ordinal]
       const upto = offsets[ordinal + 1]
       entries += upto - from
+      if (dense !== null && dense[ordinal] === 1) {
+        // The dot product's default term is `queryCount × 1`, and an exception
+        // replaces it: an absent choice gives back the whole term, a repeated
+        // gram adds the extra `count − 1` copies.
+        this.base += queryCount
+        if (postingCounts === null) {
+          for (let at = from; at < upto; at++) accumulator[ids[at]] -= queryCount
+          continue
+        }
+        for (let at = from; at < upto; at++) {
+          accumulator[ids[at]] += queryCount * (postingCounts[at] - 1)
+        }
+        continue
+      }
       if (postingCounts === null) {
         for (let at = from; at < upto; at++) {
           const id = ids[at]
@@ -1253,11 +1566,19 @@ export class NGramIndex {
     }
     this.counters.distinctQueryGrams = keys.length
     this.counters.postingEntriesTouched = entries
-    this.counters.candidatesTouched = touched.length
+    this.counters.candidatesTouched = this.scannedAll ? this.choiceCount : touched.length
   }
 
+  /**
+   * A choice with no grams shares none with a query that has them, whatever the
+   * dense base says — and only these two functions can see that, because a
+   * gramless choice is in no posting list and the sparse representation
+   * therefore never reached one. Scanning every candidate does.
+   */
   private diceScore(query: NGramProfile, id: number): number {
-    return (2 * this.accumulator[id]) / (query.gramCount + this.gramCount[id])
+    const grams = this.gramCount[id]
+    if (grams === 0) return 0
+    return (2 * (this.base + this.accumulator[id])) / (query.gramCount + grams)
   }
 
   /**
@@ -1267,8 +1588,11 @@ export class NGramIndex {
    * just short of 1.
    */
   private cosineScore(query: NGramProfile, id: number): number {
+    const norm = this.squaredNorm[id]
+    // Zero would divide to an infinity the clamp below turns into a perfect 1.
+    if (norm === 0) return 0
     const similarity =
-      this.accumulator[id] / Math.sqrt(query.squaredNorm * this.squaredNorm[id])
+      (this.base + this.accumulator[id]) / Math.sqrt(query.squaredNorm * norm)
     return similarity < 1 ? similarity : 1
   }
 
@@ -1283,11 +1607,15 @@ export class NGramIndex {
     threshold: number | null,
   ): Scored | undefined {
     const touched = this.touched
+    // A dense list gives every candidate a base score, so the candidate set is
+    // the corpus; without one it is exactly what the posting lists touched.
+    const everyCandidate = this.scannedAll
+    const length = everyCandidate ? this.choiceCount : touched.length
     let bestId = -1
     let bestScore = 0
     let qualified = 0
-    for (let index = 0; index < touched.length; index++) {
-      const id = touched[index]
+    for (let index = 0; index < length; index++) {
+      const id = everyCandidate ? index : touched[index]
       const score = scoreOf(id)
       if (threshold !== null && score < threshold) continue
       qualified++
@@ -1319,6 +1647,10 @@ export class NGramIndex {
         ? this.selectAll(scoreOf, threshold)
         : this.selectTop(scoreOf, threshold, limit)
     if (!this.zeroesQualify(threshold)) return found
+    // Every candidate was already scored and offered, so there is nothing left
+    // to fill in — walking for `accumulator[id] === 0` here would re-add
+    // candidates that the dense base had already put in the result.
+    if (this.scannedAll) return found
     const accumulator = this.accumulator
     let filled = 0
     for (let id = 0; id < this.choiceCount; id++) {
@@ -1333,9 +1665,11 @@ export class NGramIndex {
 
   private selectAll(scoreOf: (id: number) => number, threshold: number | null): Scored[] {
     const touched = this.touched
+    const everyCandidate = this.scannedAll
+    const length = everyCandidate ? this.choiceCount : touched.length
     const found: Scored[] = []
-    for (let index = 0; index < touched.length; index++) {
-      const id = touched[index]
+    for (let index = 0; index < length; index++) {
+      const id = everyCandidate ? index : touched[index]
       const score = scoreOf(id)
       if (threshold !== null && score < threshold) continue
       found.push({ id, score })
@@ -1362,10 +1696,12 @@ export class NGramIndex {
     limit: number,
   ): Scored[] {
     const touched = this.touched
+    const everyCandidate = this.scannedAll
+    const length = everyCandidate ? this.choiceCount : touched.length
     const top: Scored[] = []
     let qualified = 0
-    for (let index = 0; index < touched.length; index++) {
-      const id = touched[index]
+    for (let index = 0; index < length; index++) {
+      const id = everyCandidate ? index : touched[index]
       const score = scoreOf(id)
       if (threshold !== null && score < threshold) continue
       qualified++
