@@ -479,6 +479,39 @@ describe('batch scoring', () => {
     expect([
       ...scorePairs(['a'], ['a'], { scorer: percent, into: 'f32', scoreMultiplier: 3 }),
     ]).toEqual([300])
+    // Up to `f32`'s own maximum, past which a finite score stores as `Infinity`
+    // — the one way a float destination loses a score outright, as against the
+    // precision it is chosen to lose.
+    expect([
+      ...scorePairs(['a'], ['a'], {
+        scorer: percent,
+        into: 'f32',
+        scoreMultiplier: 3e36,
+      }),
+    ]).toEqual([Math.fround(3e38)])
+    for (const [entry, label] of [
+      [scoreMatrix, 'scoreMatrix'],
+      [scorePairs, 'scorePairs'],
+    ] as const) {
+      expect(() =>
+        Reflect.apply(entry, undefined, [
+          ['a'],
+          ['a'],
+          { scorer: percent, into: 'f32', scoreMultiplier: 1e38 },
+        ]),
+      ).toThrow(`${label} produced the score 1e+40, which 'f32' cannot store`)
+      // The unproven path reaches the same refusal from an `Infinity` bound.
+      expect(() =>
+        Reflect.apply(entry, undefined, [
+          [''],
+          [long],
+          { scorer: unbounded, into: 'f32', scoreMultiplier: 1e38 },
+        ]),
+      ).toThrow(`which 'f32' cannot store`)
+    }
+    expect([...scorePairs([''], [long], { scorer: unbounded, into: 'f32' })]).toEqual([
+      300,
+    ])
   })
 
   test('an option a batch call does not define is refused rather than ignored', () => {

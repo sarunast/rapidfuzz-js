@@ -55,16 +55,27 @@ interface ScoreArrayFactory<TArray extends ScoreArray> {
   /**
    * The scores the store keeps as written, or `null` when every score is one.
    *
-   * `null` for the two float kinds, which hold any score a metric can produce,
-   * and for `u8c`: `Uint8ClampedArray` exists to saturate, so an out-of-range
-   * score there is the documented answer rather than a lost one. Every other
-   * kind wraps silently, which is what a bound turns into a `RangeError`.
+   * `null` for `f64`, which holds any score a JavaScript number can be, and for
+   * `u8c`: `Uint8ClampedArray` exists to saturate, so an out-of-range score
+   * there is the documented answer rather than a lost one. Every other kind
+   * loses a score it cannot hold — the integer kinds wrap, `f32` turns a
+   * finite score past its own maximum into `Infinity` — which is what a bound
+   * turns into a `RangeError`.
    */
   readonly range: readonly [number, number] | null
   readonly allocate: (length: number) => TArray
   /** A row, sharing the buffer rather than copying it. */
   readonly view: (data: TArray, start: number, end: number) => TArray
 }
+
+/**
+ * The largest finite `Float32Array` element, which the language does not name.
+ *
+ * Anything above it stores as `Infinity` rather than as a rounded neighbour,
+ * so it is a bound on what `f32` holds in the same sense `255` bounds `u8`.
+ * Precision below it is not: `f32` is chosen to lose digits.
+ */
+const FLOAT32_MAX = 3.4028234663852886e38
 
 /**
  * One concrete factory per kind.
@@ -89,7 +100,7 @@ const SCORE_ARRAYS: {
     view: (d, s, e) => d.subarray(s, e),
   },
   f32: {
-    range: null,
+    range: [-FLOAT32_MAX, FLOAT32_MAX],
     integral: false,
     allocate: (n) => new Float32Array(n),
     view: (d, s, e) => d.subarray(s, e),
@@ -226,14 +237,12 @@ export function scoreStoreRange(
   bounds: readonly [number, number],
   multiplier: number,
 ): readonly [number, number] | null {
-  const { range } = scoreArrayFactory(kind)
+  const { range, integral } = scoreArrayFactory(kind)
   if (range === null) return null
-  const low = roundHalfAwayFromZero(
-    Math.min(bounds[0] * multiplier, bounds[1] * multiplier),
-  )
-  const high = roundHalfAwayFromZero(
-    Math.max(bounds[0] * multiplier, bounds[1] * multiplier),
-  )
+  const scaledLow = Math.min(bounds[0] * multiplier, bounds[1] * multiplier)
+  const scaledHigh = Math.max(bounds[0] * multiplier, bounds[1] * multiplier)
+  const low = integral ? roundHalfAwayFromZero(scaledLow) : scaledLow
+  const high = integral ? roundHalfAwayFromZero(scaledHigh) : scaledHigh
   return low >= range[0] && high <= range[1] ? null : range
 }
 
