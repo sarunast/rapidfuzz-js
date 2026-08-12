@@ -1,5 +1,8 @@
 /**
- * Refuses a key the option bag does not define.
+ * Refuses an own enumerable key the option bag does not define — what a caller
+ * writes in an object literal, which is the misspelling worth catching. A
+ * non-enumerable or inherited one passes, and `Object.keys` is why: a key
+ * someone put on `Object.prototype` must not make every valid call throw.
  *
  * Only bags with optional behaviour are checked: a misspelled `threshold` or
  * `normalize` silently turns that behaviour off, where a bag whose keys are all

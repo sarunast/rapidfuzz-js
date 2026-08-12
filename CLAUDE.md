@@ -158,13 +158,16 @@ These are load-bearing for bundle size — see README.md for the full rationale:
 - Export standalone named functions, never namespace objects.
 - No runtime dependencies, and no Node built-ins in `src/`.
 
-`pnpm check:bundles` is **not** one of them, and a few bytes over budget is not
-a blocker. Its budgets are `measured × 1.02`, so they drift under ordinary work,
-and a different toolchain gzips the same bundle 20-30 B apart — CI has failed an
-entry that passed locally. Never reshape code or drop a fix to win bytes back:
-re-record all sixteen entries in `scripts/check-bundles.mjs` together, or leave
-it failing and say so. Re-recording only the entry that failed leaves its
-siblings a byte from the same surprise.
+`pnpm check:bundles` is **not** one of them: its budgets are `measured × 1.02`,
+so they drift under ordinary work, and a different toolchain gzips the same
+bundle 20-30 B apart — CI has failed an entry that passed locally. A few bytes
+over is a number to verify, never a reason to reshape code or drop a fix.
+
+It is still a gate. `pnpm check` runs it and `prepublishOnly` runs `pnpm check`,
+so an entry left failing is a red release check, not a footnote. Verify the
+growth was intentional, then re-record all sixteen entries in
+`scripts/check-bundles.mjs` together — recording only the entry that failed
+leaves its siblings a byte from the same surprise.
 
 ## Public API and dependency ownership
 
