@@ -53,11 +53,14 @@ export interface IndexCounters {
   /** Posting entries the suffix walk read, when probing looked more expensive. */
   suffixWalked: number
   /**
-   * Candidates an accumulation actually wrote to. Under a dense list every
-   * candidate is scored but only these differ from the default, so this is the
-   * size of the set a skip-the-defaults selection would have to look at.
+   * Candidates an accumulation actually wrote to, and `null` under a dense scan,
+   * which no longer counts them: the marks that answered this were 26% of the
+   * loop and their only other reader — `touched` — is unused there.
+   *
+   * It was measured while it existed, and the answer was 93% of the corpus on
+   * the classes that matter, which is what closed skip-the-defaults selection.
    */
-  modifiedCandidates: number
+  modifiedCandidates: number | null
   /**
    * Whether a dense list put every candidate in play. It breaks the rule the
    * sparse representation runs on — a positive score and a posting-list hit are
@@ -480,20 +483,6 @@ export class NGramIndex {
   /** Set when a dense list has put every candidate into `touched`. */
   private scannedAll = false
 
-  /**
-   * Which candidates this query actually wrote to, marked by a per-query
-   * generation rather than by `accumulator[id] === 0`.
-   *
-   * Zero stopped meaning "never written" the moment dense lists arrived: an
-   * absence contributes `−1` and a sparse gram `+1`, so a candidate can be
-   * modified and land back on zero. It is also the number that decides whether
-   * the unmodified candidates — each scoring `2·base/(q + g)`, and so ordered by
-   * `gramCount` alone — could be skipped rather than scanned.
-   */
-  private readonly marks: Uint32Array
-
-  private generation = 0
-
   readonly counters: IndexCounters = {
     postingEntriesTouched: 0,
     distinctQueryGrams: 0,
@@ -539,20 +528,6 @@ export class NGramIndex {
     this.gramCount = new Uint32Array(choiceCount)
     this.squaredNorm = new Float64Array(choiceCount)
     this.accumulator = new Float64Array(choiceCount)
-    this.marks = new Uint32Array(choiceCount)
-  }
-
-  /**
-   * A new generation per query, so nothing has to be cleared between them. On
-   * the wrap — one query short of 4.3 billion — the marks go back to zero once
-   * and generation 1 starts again.
-   */
-  private nextGeneration(): void {
-    this.generation++
-    if (this.generation === 0xffff_ffff) {
-      this.marks.fill(0)
-      this.generation = 1
-    }
   }
 
   /**
@@ -1014,6 +989,54 @@ export class NGramIndex {
       }
     }
     return { denseLists, hybridEntries }
+  }
+
+  /**
+   * Of the posting entries one query reads, how many sit in a list that needs no
+   * count at all — every sparse frequency `1`, or every dense exception an
+   * absence. Those are the entries a per-list implicit mode would relieve of the
+   * count load, and the ladder's count step times this share is what the whole
+   * idea can be worth.
+   *
+   * Asked before building it, because the flag array and the per-list dispatch
+   * *are* the implementation, and a share small enough is the cheaper answer.
+   */
+  implicitOutlook(query: NGramProfile): {
+    lists: number
+    implicitLists: number
+    entries: number
+    implicitEntries: number
+  } {
+    const postings = this.requirePostings()
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    const keys = this.queryKeys
+    const offsets = postings.offsets
+    const counts = postings.counts
+    const dense = postings.dense
+    let lists = 0
+    let implicitLists = 0
+    let entries = 0
+    let implicitEntries = 0
+    for (let index = 0; index < keys.length; index++) {
+      const ordinal = postings.ordinals.get(keys[index])
+      if (ordinal === undefined) continue
+      const from = offsets[ordinal]
+      const upto = offsets[ordinal + 1]
+      lists++
+      entries += upto - from
+      // A dense entry is an exception to a default of 1, so its implicit
+      // spelling is an absence — count `0` — where a sparse entry's is `1`.
+      const implied = dense !== null && dense[ordinal] === 1 ? 0 : 1
+      let differs = 0
+      if (counts !== null) {
+        for (let at = from; at < upto; at++) if (counts[at] !== implied) differs++
+      }
+      if (differs === 0) {
+        implicitLists++
+        implicitEntries += upto - from
+      }
+    }
+    return { lists, implicitLists, entries, implicitEntries }
   }
 
   denseProbe(
@@ -1495,7 +1518,6 @@ export class NGramIndex {
     counters.suffixWalked = 0
     counters.scannedAllCandidates = false
     counters.modifiedCandidates = 0
-    this.nextGeneration()
   }
 
   /**
@@ -1516,16 +1538,18 @@ export class NGramIndex {
     const postingCounts = postings.counts
     const offsets = postings.offsets
     const dense = postings.dense
-    const marks = this.marks
-    const generation = this.generation
-    let modified = 0
     this.base = 0
     if (dense !== null && this.reachesDenseList(dense)) {
       this.scannedAll = true
       this.counters.scannedAllCandidates = true
     }
     // A dense list already put every candidate into the scan, so `touched` is
-    // never read again and every push into it is waste.
+    // never read again and nothing has to be recorded at all. Where it is read,
+    // no dense list was reached, every contribution below is strictly positive,
+    // and `accumulator[id] === 0` is a first-touch test again — which is why the
+    // generation marks are gone from both kernels. The ladder priced them at 26%
+    // of this loop: a random read and a random write per posting entry, into a
+    // fourth array, for a set that is either unread or already implied.
     const tracking = !this.scannedAll
     for (let index = 0; index < keys.length; index++) {
       const ordinal = postings.ordinals.get(keys[index])
@@ -1537,59 +1561,51 @@ export class NGramIndex {
       if (dense !== null && dense[ordinal] === 1) {
         // Every candidate holds this gram once unless the slice says otherwise,
         // so the whole corpus takes `min(queryCount, 1)` in one addition and the
-        // loop only walks the exceptions. No `touched` test: the scan is already
-        // over every candidate, which is what a dense list forces.
+        // loop only walks the exceptions. A dense list can only be reached with
+        // `tracking` already false, so no marks here under any query.
         this.base += queryCount < 1 ? queryCount : 1
         if (postingCounts === null) {
-          for (let at = from; at < upto; at++) {
-            const id = ids[at]
-            if (marks[id] !== generation) {
-              marks[id] = generation
-              modified++
-            }
-            accumulator[id] -= 1
-          }
+          for (let at = from; at < upto; at++) accumulator[ids[at]] -= 1
           continue
         }
         for (let at = from; at < upto; at++) {
-          const id = ids[at]
-          if (marks[id] !== generation) {
-            marks[id] = generation
-            modified++
-          }
           const count = postingCounts[at]
-          accumulator[id] += (queryCount < count ? queryCount : count) - 1
+          accumulator[ids[at]] += (queryCount < count ? queryCount : count) - 1
         }
         continue
       }
       // Split once per posting list rather than branching per entry: where
       // every frequency is 1 the whole counts array is absent, and the shared
       // minimum collapses to a constant.
+      if (!tracking) {
+        if (postingCounts === null) {
+          const capped = queryCount < 1 ? queryCount : 1
+          for (let at = from; at < upto; at++) accumulator[ids[at]] += capped
+          continue
+        }
+        for (let at = from; at < upto; at++) {
+          const count = postingCounts[at]
+          accumulator[ids[at]] += queryCount < count ? queryCount : count
+        }
+        continue
+      }
       if (postingCounts === null) {
         const capped = queryCount < 1 ? queryCount : 1
         for (let at = from; at < upto; at++) {
           const id = ids[at]
-          if (marks[id] !== generation) {
-            marks[id] = generation
-            modified++
-            if (tracking) touched.push(id)
-          }
+          if (accumulator[id] === 0) touched.push(id)
           accumulator[id] += capped
         }
         continue
       }
       for (let at = from; at < upto; at++) {
         const id = ids[at]
-        if (marks[id] !== generation) {
-          marks[id] = generation
-          modified++
-          if (tracking) touched.push(id)
-        }
+        if (accumulator[id] === 0) touched.push(id)
         const count = postingCounts[at]
         accumulator[id] += queryCount < count ? queryCount : count
       }
     }
-    this.counters.modifiedCandidates = modified
+    this.counters.modifiedCandidates = tracking ? touched.length : null
     this.counters.distinctQueryGrams = keys.length
     this.counters.postingEntriesTouched = entries
     this.counters.candidatesTouched = this.scannedAll ? this.choiceCount : touched.length
@@ -1626,16 +1642,14 @@ export class NGramIndex {
     const postingCounts = postings.counts
     const offsets = postings.offsets
     const dense = postings.dense
-    const marks = this.marks
-    const generation = this.generation
-    let modified = 0
     this.base = 0
     if (dense !== null && this.reachesDenseList(dense)) {
       this.scannedAll = true
       this.counters.scannedAllCandidates = true
     }
-    // A dense list already put every candidate into the scan, so `touched` is
-    // never read again and every push into it is waste.
+    // See `diceAccumulate`: `touched` is unread under a dense scan, and a
+    // product of two positive frequencies cannot land on zero, so the sparse
+    // path can test the accumulator itself.
     const tracking = !this.scannedAll
     for (let index = 0; index < keys.length; index++) {
       const ordinal = postings.ordinals.get(keys[index])
@@ -1650,49 +1664,39 @@ export class NGramIndex {
         // gram adds the extra `count − 1` copies.
         this.base += queryCount
         if (postingCounts === null) {
-          for (let at = from; at < upto; at++) {
-            const id = ids[at]
-            if (marks[id] !== generation) {
-              marks[id] = generation
-              modified++
-            }
-            accumulator[id] -= queryCount
-          }
+          for (let at = from; at < upto; at++) accumulator[ids[at]] -= queryCount
           continue
         }
         for (let at = from; at < upto; at++) {
-          const id = ids[at]
-          if (marks[id] !== generation) {
-            marks[id] = generation
-            modified++
-          }
-          accumulator[id] += queryCount * (postingCounts[at] - 1)
+          accumulator[ids[at]] += queryCount * (postingCounts[at] - 1)
+        }
+        continue
+      }
+      if (!tracking) {
+        if (postingCounts === null) {
+          for (let at = from; at < upto; at++) accumulator[ids[at]] += queryCount
+          continue
+        }
+        for (let at = from; at < upto; at++) {
+          accumulator[ids[at]] += queryCount * postingCounts[at]
         }
         continue
       }
       if (postingCounts === null) {
         for (let at = from; at < upto; at++) {
           const id = ids[at]
-          if (marks[id] !== generation) {
-            marks[id] = generation
-            modified++
-            if (tracking) touched.push(id)
-          }
+          if (accumulator[id] === 0) touched.push(id)
           accumulator[id] += queryCount
         }
         continue
       }
       for (let at = from; at < upto; at++) {
         const id = ids[at]
-        if (marks[id] !== generation) {
-          marks[id] = generation
-          modified++
-          if (tracking) touched.push(id)
-        }
+        if (accumulator[id] === 0) touched.push(id)
         accumulator[id] += queryCount * postingCounts[at]
       }
     }
-    this.counters.modifiedCandidates = modified
+    this.counters.modifiedCandidates = tracking ? touched.length : null
     this.counters.distinctQueryGrams = keys.length
     this.counters.postingEntriesTouched = entries
     this.counters.candidatesTouched = this.scannedAll ? this.choiceCount : touched.length
@@ -1745,6 +1749,377 @@ export class NGramIndex {
       const similarity = (base + accumulator[id]) / Math.sqrt(queryNorm * norm)
       return similarity < 1 ? similarity : 1
     }
+  }
+
+  /**
+   * Where accumulation's time goes, one operation at a time.
+   *
+   * Selection turned out to cost a call boundary rather than arithmetic, so the
+   * same question is worth putting to the loop that now owns three quarters of a
+   * query. Each rung adds roughly one operation to the one below it — the
+   * `Map.get` per distinct gram, the offsets, the id load, the accumulator
+   * read-modify-write, the count load, the generation marks, the `touched` push.
+   *
+   * Read the steps as a **decomposition, not an isolation**. A rung changes what
+   * the loop accumulates as well as what it reads, and the dense test goes
+   * through a closure here where the real loop has it inline, so a step is the
+   * ceiling on what removing that operation could buy rather than its exact
+   * price. That is what they are used for: resolving ordinals once is capped by
+   * rung 1's step, per-list implicit counts by rung 5's, and dropping the marks
+   * by rung 6's.
+   *
+   * The ordering matters more than it should — a variant profiled after another
+   * measured 1.8x its own time, reproducibly, so `control:` re-runs an earlier
+   * rung last and any gap between the two is the ladder's own noise floor.
+   *
+   * Dice only — Cosine differs by one multiply where this differs by whole
+   * operations.
+   */
+  profileAccumulation(
+    query: NGramProfile,
+    runs: number,
+  ): { name: string; ms: number; check: number }[] {
+    this.beginQuery(query)
+    flattenQueryInto(query, this.radix, this.queryKeys, this.queryCounts)
+    const postings = this.requirePostings()
+    const accumulator = this.accumulator
+    const touched = this.touched
+    const keys = this.queryKeys
+    const queryCounts = this.queryCounts
+    const ids = postings.ids
+    const postingCounts = postings.counts
+    const offsets = postings.offsets
+    const dense = postings.dense
+    // The kernels no longer carry these; the ladder still has to be able to
+    // price what removing them bought, so it keeps its own copy.
+    const marks = new Uint32Array(this.choiceCount)
+    let generation = 0
+    const everyCandidate = dense !== null && this.reachesDenseList(dense)
+    const tracking = !everyCandidate
+    // What "resolve the query's ordinals once" would hand the loop, built
+    // outside the timing because that is exactly the claim: the resolution moves
+    // into preparation, it does not disappear.
+    const resolved = new Int32Array(keys.length)
+    for (let index = 0; index < keys.length; index++) {
+      const ordinal = postings.ordinals.get(keys[index])
+      resolved[index] = ordinal === undefined ? -1 : ordinal
+    }
+    const isDense = (ordinal: number): boolean => dense !== null && dense[ordinal] === 1
+    const variants: { name: string; body: () => number }[] = [
+      {
+        name: 'query gram loop',
+        body: () => {
+          let sum = 0
+          for (let index = 0; index < keys.length; index++) sum += queryCounts[index]
+          return sum
+        },
+      },
+      {
+        name: '+ ordinal Map.get',
+        body: () => {
+          let sum = 0
+          for (let index = 0; index < keys.length; index++) {
+            const ordinal = postings.ordinals.get(keys[index])
+            if (ordinal === undefined) continue
+            sum += ordinal
+          }
+          return sum
+        },
+      },
+      {
+        name: '+ offsets',
+        body: () => {
+          let sum = 0
+          for (let index = 0; index < keys.length; index++) {
+            const ordinal = postings.ordinals.get(keys[index])
+            if (ordinal === undefined) continue
+            sum += offsets[ordinal + 1] - offsets[ordinal]
+          }
+          return sum
+        },
+      },
+      {
+        name: '+ posting scan, ids only',
+        body: () => {
+          let sum = 0
+          for (let index = 0; index < keys.length; index++) {
+            const ordinal = postings.ordinals.get(keys[index])
+            if (ordinal === undefined) continue
+            const upto = offsets[ordinal + 1]
+            for (let at = offsets[ordinal]; at < upto; at++) sum += ids[at]
+          }
+          return sum
+        },
+      },
+      {
+        name: '+ accumulator update',
+        body: () => {
+          let base = 0
+          for (let index = 0; index < keys.length; index++) {
+            const ordinal = postings.ordinals.get(keys[index])
+            if (ordinal === undefined) continue
+            const queryCount = queryCounts[index]
+            const upto = offsets[ordinal + 1]
+            if (isDense(ordinal)) {
+              base += queryCount < 1 ? queryCount : 1
+              for (let at = offsets[ordinal]; at < upto; at++) accumulator[ids[at]] -= 1
+              continue
+            }
+            const capped = queryCount < 1 ? queryCount : 1
+            for (let at = offsets[ordinal]; at < upto; at++)
+              accumulator[ids[at]] += capped
+          }
+          return base
+        },
+      },
+      {
+        name: '+ count load and min',
+        body: () => {
+          let base = 0
+          for (let index = 0; index < keys.length; index++) {
+            const ordinal = postings.ordinals.get(keys[index])
+            if (ordinal === undefined) continue
+            const queryCount = queryCounts[index]
+            const from = offsets[ordinal]
+            const upto = offsets[ordinal + 1]
+            if (isDense(ordinal)) {
+              base += queryCount < 1 ? queryCount : 1
+              if (postingCounts === null) {
+                for (let at = from; at < upto; at++) accumulator[ids[at]] -= 1
+                continue
+              }
+              for (let at = from; at < upto; at++) {
+                const count = postingCounts[at]
+                accumulator[ids[at]] += (queryCount < count ? queryCount : count) - 1
+              }
+              continue
+            }
+            if (postingCounts === null) {
+              const capped = queryCount < 1 ? queryCount : 1
+              for (let at = from; at < upto; at++) accumulator[ids[at]] += capped
+              continue
+            }
+            for (let at = from; at < upto; at++) {
+              const count = postingCounts[at]
+              accumulator[ids[at]] += queryCount < count ? queryCount : count
+            }
+          }
+          return base
+        },
+      },
+      {
+        name: '+ generation marks',
+        body: () => {
+          generation++
+          let modified = 0
+          for (let index = 0; index < keys.length; index++) {
+            const ordinal = postings.ordinals.get(keys[index])
+            if (ordinal === undefined) continue
+            const queryCount = queryCounts[index]
+            const from = offsets[ordinal]
+            const upto = offsets[ordinal + 1]
+            const denseList = isDense(ordinal)
+            if (postingCounts === null) {
+              const step = denseList ? -1 : queryCount < 1 ? queryCount : 1
+              for (let at = from; at < upto; at++) {
+                const id = ids[at]
+                if (marks[id] !== generation) {
+                  marks[id] = generation
+                  modified++
+                }
+                accumulator[id] += step
+              }
+              continue
+            }
+            const offset = denseList ? -1 : 0
+            for (let at = from; at < upto; at++) {
+              const id = ids[at]
+              if (marks[id] !== generation) {
+                marks[id] = generation
+                modified++
+              }
+              const count = postingCounts[at]
+              accumulator[id] += (queryCount < count ? queryCount : count) + offset
+            }
+          }
+          return modified
+        },
+      },
+      {
+        name: '+ touched push',
+        body: () => {
+          generation++
+          touched.length = 0
+          let modified = 0
+          for (let index = 0; index < keys.length; index++) {
+            const ordinal = postings.ordinals.get(keys[index])
+            if (ordinal === undefined) continue
+            const queryCount = queryCounts[index]
+            const from = offsets[ordinal]
+            const upto = offsets[ordinal + 1]
+            const denseList = isDense(ordinal)
+            if (postingCounts === null) {
+              const step = denseList ? -1 : queryCount < 1 ? queryCount : 1
+              for (let at = from; at < upto; at++) {
+                const id = ids[at]
+                if (marks[id] !== generation) {
+                  marks[id] = generation
+                  modified++
+                  if (tracking) touched.push(id)
+                }
+                accumulator[id] += step
+              }
+              continue
+            }
+            const offset = denseList ? -1 : 0
+            for (let at = from; at < upto; at++) {
+              const id = ids[at]
+              if (marks[id] !== generation) {
+                marks[id] = generation
+                modified++
+                if (tracking) touched.push(id)
+              }
+              const count = postingCounts[at]
+              accumulator[id] += (queryCount < count ? queryCount : count) + offset
+            }
+          }
+          touched.length = 0
+          return modified
+        },
+      },
+      {
+        name: 'diceAccumulate',
+        body: () => {
+          this.diceAccumulate()
+          const entries = this.counters.postingEntriesTouched
+          touched.length = 0
+          this.scannedAll = false
+          this.base = 0
+          return entries
+        },
+      },
+      {
+        name: 'ordinals resolved once',
+        body: () => {
+          generation++
+          touched.length = 0
+          let modified = 0
+          for (let index = 0; index < resolved.length; index++) {
+            const ordinal = resolved[index]
+            if (ordinal < 0) continue
+            const queryCount = queryCounts[index]
+            const from = offsets[ordinal]
+            const upto = offsets[ordinal + 1]
+            const denseList = isDense(ordinal)
+            if (postingCounts === null) {
+              const step = denseList ? -1 : queryCount < 1 ? queryCount : 1
+              for (let at = from; at < upto; at++) {
+                const id = ids[at]
+                if (marks[id] !== generation) {
+                  marks[id] = generation
+                  modified++
+                  if (tracking) touched.push(id)
+                }
+                accumulator[id] += step
+              }
+              continue
+            }
+            const offset = denseList ? -1 : 0
+            for (let at = from; at < upto; at++) {
+              const id = ids[at]
+              if (marks[id] !== generation) {
+                marks[id] = generation
+                modified++
+                if (tracking) touched.push(id)
+              }
+              const count = postingCounts[at]
+              accumulator[id] += (queryCount < count ? queryCount : count) + offset
+            }
+          }
+          touched.length = 0
+          return modified
+        },
+      },
+      {
+        // A verbatim copy of the rung above but for the Map lookup, run last so
+        // that anything the ordering does to a variant shows up as a difference
+        // between two identical loops rather than as a finding about ordinals.
+        name: 'control: Map.get again, last',
+        body: () => {
+          generation++
+          touched.length = 0
+          let modified = 0
+          for (let index = 0; index < keys.length; index++) {
+            const ordinal = postings.ordinals.get(keys[index])
+            if (ordinal === undefined) continue
+            const queryCount = queryCounts[index]
+            const from = offsets[ordinal]
+            const upto = offsets[ordinal + 1]
+            const denseList = isDense(ordinal)
+            if (postingCounts === null) {
+              const step = denseList ? -1 : queryCount < 1 ? queryCount : 1
+              for (let at = from; at < upto; at++) {
+                const id = ids[at]
+                if (marks[id] !== generation) {
+                  marks[id] = generation
+                  modified++
+                  if (tracking) touched.push(id)
+                }
+                accumulator[id] += step
+              }
+              continue
+            }
+            const offset = denseList ? -1 : 0
+            for (let at = from; at < upto; at++) {
+              const id = ids[at]
+              if (marks[id] !== generation) {
+                marks[id] = generation
+                modified++
+                if (tracking) touched.push(id)
+              }
+              const count = postingCounts[at]
+              accumulator[id] += (queryCount < count ? queryCount : count) + offset
+            }
+          }
+          touched.length = 0
+          return modified
+        },
+      },
+      {
+        name: 'reset (what the query pays after)',
+        body: () => {
+          if (everyCandidate) accumulator.fill(0)
+          return everyCandidate ? this.choiceCount : 0
+        },
+      },
+    ]
+    const results: { name: string; ms: number; check: number }[] = []
+    try {
+      for (const variant of variants) {
+        let last = 0
+        for (let run = 0; run < runs; run++) last = variant.body()
+        let best = Number.POSITIVE_INFINITY
+        for (let run = 0; run < runs; run++) {
+          // Between rungs, never inside one: a rung that inherits the previous
+          // rung's numbers would be timing a different accumulator.
+          accumulator.fill(0)
+          const started = process.hrtime.bigint()
+          last = variant.body()
+          const elapsed = Number(process.hrtime.bigint() - started) / 1e6
+          if (elapsed < best) best = elapsed
+        }
+        results.push({ name: variant.name, ms: best, check: last })
+      }
+    } finally {
+      // `reset()` is not enough here and silently was not: it walks `touched`,
+      // which these variants empty themselves, so a sparse query would have left
+      // every accumulated value behind for the next real query to read.
+      accumulator.fill(0)
+      touched.length = 0
+      this.scannedAll = false
+      this.base = 0
+    }
+    return results
   }
 
   /**

@@ -130,6 +130,13 @@ const QUERY_CLASSES: readonly QueryClass[] = [
   'rare substring',
 ]
 
+function queryClassOf(value: string): QueryClass {
+  for (const queryClass of QUERY_CLASSES) {
+    if (queryClass === value) return queryClass
+  }
+  throw new RangeError(`--query must be one of ${QUERY_CLASSES.join(', ')}`)
+}
+
 /**
  * How many distinct queries each class carries. One query per class, timed in a
  * loop, touches exactly the same posting slices on every iteration — which the
@@ -864,8 +871,9 @@ interface CounterRow {
   readonly postingsPerChoicePerGram: number
   readonly candidatesTouched: number
   readonly candidatesTouchedRatio: number
-  /** Candidates the accumulation wrote to; the rest score the dense default. */
-  readonly modifiedCandidates: number
+  /** Candidates the accumulation wrote to; null under a dense scan, which no
+   * longer tracks them. */
+  readonly modifiedCandidates: number | null
   readonly candidatesQualified: number
   readonly indexedMs: number
   /** Null below `P95_MINIMUM_RUNS` samples — see {@link Latency}. */
@@ -1321,6 +1329,79 @@ function profileSelection(
 }
 
 /**
+ * Where the accumulation loop's time goes, per query class, with the posting
+ * shape it runs over printed above it — an all-one list share is what decides
+ * whether dropping the count load is worth anything.
+ */
+function profileAccumulation(
+  n: number,
+  corpusClass: CorpusClass,
+  gramSize: number,
+  config: ExperimentConfig,
+  only: QueryClass | null,
+): void {
+  const corpus = corpusOf(corpusClass, n, gramSize)
+  const index = buildIndex(corpus.choices, gramSize, config).index
+  const stats = index.postingStatistics()
+  const runs = n >= 100_000 ? 15 : 60
+  const percent = (value: number): string => `${(value * 100).toFixed(1)}%`
+  process.stdout.write(
+    `\n  ${corpusClass}, n=${n.toLocaleString()}, gram size ${gramSize}, ` +
+      `dense ${config.denseCutoff === null ? 'off' : 'on'}\n` +
+      `    counts width ${stats.countsWidthBytes} byte, ` +
+      `entries with count 1 ${percent(stats.singletonEntryShare)}, ` +
+      `lists all count 1 ${percent(stats.singletonListShare)}\n`,
+  )
+  // One class per process is the trustworthy way to read this: the variants are
+  // closures over one source each, so profiling a second class reuses whatever
+  // optimised code the first class's data shaped — which moved two rungs by
+  // 1.8x, reproducibly, on identical loops over identical posting counts.
+  for (const queryClass of only === null ? QUERY_CLASSES : [only]) {
+    const variants = corpus.queries.get(queryClass)
+    if (variants === undefined || variants.length === 0) {
+      throw new Error(`missing query class ${queryClass}`)
+    }
+    const query = buildProfile(variants[0], gramSize)
+    index.diceSearch(query, null, COUNTER_LIMIT)
+    const counters = { ...index.counters }
+    const outlook = index.implicitOutlook(query)
+    process.stdout.write(
+      `    ${queryClass} — ${counters.distinctQueryGrams} grams, ` +
+        `${counters.postingEntriesTouched.toLocaleString()} posting entries, ` +
+        `${counters.scannedAllCandidates ? 'dense scan' : 'sparse'}\n` +
+        `      count-free lists ${outlook.implicitLists}/${outlook.lists}, ` +
+        `entries ${outlook.implicitEntries.toLocaleString()}/${outlook.entries.toLocaleString()}` +
+        ` (${percent(outlook.entries === 0 ? 0 : outlook.implicitEntries / outlook.entries)})\n`,
+    )
+    const rows = index.profileAccumulation(query, runs)
+    // The rungs read as steps up from the floor; the two rows past the real
+    // method are alternatives to it, so they read against it instead.
+    let previous = 0
+    let full = 0
+    let climbing = true
+    for (const row of rows) {
+      if (climbing) {
+        const step = row.ms - previous
+        previous = row.ms
+        if (row.name === 'diceAccumulate') {
+          full = row.ms
+          climbing = false
+        }
+        process.stdout.write(
+          `      ${row.name.padEnd(34)}${row.ms.toFixed(4).padStart(9)} ms` +
+            `${`(${step >= 0 ? '+' : ''}${step.toFixed(4)})`.padStart(12)}\n`,
+        )
+        continue
+      }
+      process.stdout.write(
+        `      ${row.name.padEnd(34)}${row.ms.toFixed(4).padStart(9)} ms` +
+          `${`[${(row.ms - full >= 0 ? '+' : '') + (row.ms - full).toFixed(4)}]`.padStart(12)}\n`,
+      )
+    }
+  }
+}
+
+/**
  * One corpus, described the way it needs to be read: what the index is, and
  * what one query of each class costs against it, beside the number of
  * candidates the exhaustive Matcher would have scored.
@@ -1375,7 +1456,15 @@ function summarise(
 
 const SIZES: readonly number[] = [100, 1_000, 10_000, 100_000, 1_000_000]
 
-type Mode = 'parity' | 'counters' | 'memory' | 'peak' | 'summary' | 'dense' | 'select'
+type Mode =
+  | 'parity'
+  | 'counters'
+  | 'memory'
+  | 'peak'
+  | 'summary'
+  | 'dense'
+  | 'select'
+  | 'accumulate'
 
 interface Options {
   readonly mode: Mode
@@ -1387,6 +1476,7 @@ interface Options {
   readonly arm: Arm | null
   readonly threshold: number
   readonly sweep: boolean
+  readonly query: QueryClass | null
   readonly config: ExperimentConfig
 }
 
@@ -1439,6 +1529,7 @@ function parseOptions(): Options {
   let arm: Arm | null = null
   let threshold = 0.5
   let sweep = false
+  let query: QueryClass | null = null
   let keyMode: KeyMode = 'auto'
   let buildMode: BuildMode = 'profile'
   let denseCutoff: number | null = DENSE_CUTOFF
@@ -1450,6 +1541,7 @@ function parseOptions(): Options {
     else if (argument === '--summary') mode = 'summary'
     else if (argument === '--dense') mode = 'dense'
     else if (argument === '--select') mode = 'select'
+    else if (argument === '--accumulate') mode = 'accumulate'
     else if (argument === '--sweep') sweep = true
     else if (argument.startsWith('--build=')) {
       buildMode = buildModeOf(argument.slice('--build='.length))
@@ -1481,6 +1573,8 @@ function parseOptions(): Options {
       corpus = corpusClassOf(argument.slice('--corpus='.length))
     } else if (argument.startsWith('--arm=')) {
       arm = armOf(argument.slice('--arm='.length))
+    } else if (argument.startsWith('--query=')) {
+      query = queryClassOf(argument.slice('--query='.length))
     } else throw new Error(`unknown argument ${argument}`)
   }
   return {
@@ -1493,6 +1587,7 @@ function parseOptions(): Options {
     arm,
     threshold,
     sweep,
+    query,
     config: { buildMode, keyMode, denseCutoff },
   }
 }
@@ -1574,6 +1669,10 @@ if (options.mode === 'parity') {
         }
         if (options.mode === 'select') {
           profileSelection(n, corpusClass, gramSize, options.threshold, options.config)
+          continue
+        }
+        if (options.mode === 'accumulate') {
+          profileAccumulation(n, corpusClass, gramSize, options.config, options.query)
           continue
         }
         const corpus = corpusOf(corpusClass, n, gramSize)

@@ -64,7 +64,9 @@ node bench/comparison/ngram-index.mjs
 Flags that matter: `--build=direct|profile`, `--keys=auto|bmp|full|string`,
 `--dense-cutoff=<share>|off`, `--threshold=`, `--sweep`,
 `--arm=index|profiles|matcher`, `--corpus=`, `--n=`. `--dense` runs the probe
-that decided dense postings were worth building.
+that decided dense postings were worth building; `--select` and `--accumulate`
+profile the two halves of a query, the latter one class at a time via `--query=`
+because profiling a second class in the same process moves a rung by 1.8x.
 
 Every row records `buildMode`, `keyMode`, `threshold` and `limit`. Two runs
 differing only in `--keys` used to emit byte-identical rows, which made a
@@ -86,6 +88,9 @@ directory of JSON output unattributable after the fact.
 | CSR postings: one `offsets`/`ids`/`counts` triple, not two typed arrays per gram            | **1.29–2.00x less memory**; query 0.99–1.12x; build unchanged                               |
 | Count words narrowed to the width that holds the largest frequency                          | included above — `Uint8` on every corpus measured, so 4 bytes per entry became 1            |
 | Zero-limit guard, and choices checked to arrive in id order on the way in                   | `limit: 0` indexed `top[-1]` and crashed                                                    |
+| Dense postings — a list covering most of the corpus stores the exceptions                   | 1.83–2.30x on hit/typo; retained 4.77 MB → 3.81 MB                                          |
+| One selection kernel per metric, arithmetic in the loop rather than a callback              | select 0.1664 → 0.0467 ms (3.6x); end to end 1.41–1.92x                                     |
+| Generation marks dropped from both accumulation kernels                                     | 1.10–1.32x end to end, and 4 bytes per choice of scratch                                    |
 
 ## Dense postings — store who does _not_ have the gram
 
@@ -258,6 +263,94 @@ candidates arrive in ascending id order. The dense scan does count upward and
 each posting list is sorted — but `touched` is filled across _several_ lists, so
 a gram matching id 9 before another matches id 2 leaves it out of order.
 
+### Inside accumulation, one operation at a time
+
+Same method as selection: rungs that each add roughly one operation, read as a
+decomposition rather than an isolation — a rung changes what the loop accumulates
+as well as what it reads, so a step is the **ceiling** on what removing that
+operation could buy. One query class per process, because a variant profiled
+after another measured 1.8x its own time, reproducibly, on identical loops over
+identical postings; a `control:` rung re-runs an earlier one last and any gap
+between the two is the ladder's own noise floor.
+
+File paths, 10,000 choices, trigrams, `exact hit` — 84 grams, 58,471 posting
+entries, dense scan:
+
+| rung                     |     ms |    step | share |
+| ------------------------ | -----: | ------: | ----: |
+| query gram loop          | 0.0001 |       — |     — |
+| + ordinal `Map.get`      | 0.0006 | +0.0005 |  0.3% |
+| + offsets                | 0.0008 | +0.0002 |  0.1% |
+| + posting scan, ids only | 0.0576 | +0.0568 | 36.0% |
+| + accumulator update     | 0.0989 | +0.0413 | 26.0% |
+| + count load and min     | 0.1232 | +0.0244 | 15.0% |
+| + generation marks       | 0.1653 | +0.0420 | 26.0% |
+| + `touched` push         | 0.1670 | +0.0018 |  1.0% |
+
+**Streaming the ids and updating the accumulator are 62% of the loop between
+them**, which is the answer to what kind of loop this is: memory-traffic bound,
+on 234 KB of ids read sequentially and 80 KB of accumulator hit at random.
+
+### The generation marks are gone, and that is 1.10–1.32x
+
+The marks existed because dense postings broke `accumulator[id] === 0` as a
+first-touch test: an absence contributes `−1` and a sparse gram `+1`, so a
+candidate can be written to and land back on zero. Both halves of that turn out
+not to bind:
+
+- **A dense list is reached** ⇒ every candidate is scanned ⇒ `touched` is never
+  read ⇒ nothing needs recording at all.
+- **No dense list is reached** ⇒ every contribution is a positive frequency or a
+  product of two ⇒ zero means untouched again.
+
+So the marks were load-bearing in no case, and they cost a random `Uint32` read
+plus a random write per posting entry — a **fourth** array in a loop already
+streaming three. Removed from both kernels, along with the `Uint32Array` itself:
+retained memory on the 10k corpus falls 3.08 MB → 3.04 MB, and 4 bytes per choice
+is 4 MB at a million.
+
+| file-paths, threshold 0.5 | `e2c9a26` | dense scan only | marks gone | total |
+| ------------------------- | --------: | --------------: | ---------: | ----: |
+| exact hit (dice)          |    0.2381 |          0.1786 |     0.1799 | 1.32x |
+| 1 typo (dice)             |    0.2303 |          0.2048 |     0.2014 | 1.14x |
+| 2 typos (cosine)          |    0.2224 |          0.2008 |     0.2002 | 1.11x |
+| common substring (cosine) |    0.0475 |          0.0465 |     0.0433 | 1.10x |
+| rare substring (cosine)   |    0.0452 |          0.0465 |     0.0512 | 0.88x |
+
+Minimum of three runs per arm; the whole gain is the dense-scan half, and
+swapping the sparse path's marks for the zero test is neutral to within the
+noise on 0.04 ms queries. It is kept for the memory, not the time.
+
+`modifiedCandidates` becomes `null` under a dense scan — the counter the marks
+also fed. It had already done its work, below.
+
+### Two more optimisations, killed by the same ladder
+
+**Resolving the query's ordinals once** — the `Map.get` per distinct gram, moved
+into preparation — is bounded by rung 1: **0.0005 ms**, 0.3% of the loop, 40x
+below the ~0.02 ms that would be worth implementing. Counting the second pass in
+`reachesDenseList` doubles it to 0.001 ms. A ladder rung that reads pre-resolved
+ordinals from an `Int32Array` measures the same as its `Map.get` twin, both ways
+round. The intuition that a `Map` in a hot loop must be costly is wrong here by
+two orders of magnitude: there are 84 lookups against 58,471 posting entries.
+
+**Per-list implicit counts** — `SPARSE_ONE` / `SPARSE_COUNTED` and the dense
+pair, so a list whose frequencies are all `1` needs no count byte — is bounded by
+rung 5 at 0.0183 ms, times the share of read entries that qualify:
+
+| query            | count-free lists | count-free entries |
+| ---------------- | ---------------: | -----------------: |
+| exact hit        |            27/84 |     17,452 (29.8%) |
+| common substring |             0/10 |           0 (0.0%) |
+| rare substring   |              4/4 |     2,780 (100.0%) |
+
+**83.4% of lists are all-count-1, but only 29.8% of the entries a query reads
+are** — the long lists are exactly the ones with repeats, so the aggregate
+statistic points the wrong way by 2.8x. The ceiling is 0.0055 ms on `exact hit`,
+zero on `common substring`, and 0.0015 ms on the class where every list
+qualifies. The index-wide `counts === null` split already banks the only case
+where this is free.
+
 ### Skipping the unmodified candidates: measured, and it does not pay
 
 A dense list gives every candidate a base score, and a candidate the accumulation
@@ -311,10 +404,14 @@ find a V8 crossover would measure the synthetic corpus, not the decision.
   objective outranks the multiply.
 - **Packed keys as a memory optimization.** They are a build optimization: the
   posting arrays outweigh seventeen thousand key strings, so memory moved 1%.
-- **An implicit "every count is 1" posting.** The flag never fires: one gram
-  repeated in one choice disables it for the whole corpus, and every corpus
-  measured had some. `countsWidth` reports 1 byte everywhere, so the adaptive
-  width below captures the same saving without the fragility.
+- **An implicit "every count is 1" posting.** The corpus-wide flag never fires:
+  one gram repeated in one choice disables it everywhere, and every corpus
+  measured had some. The **per-list** version was then bounded at 0.0055 ms —
+  the long lists are the ones with repeats, so only 29.8% of the entries a query
+  reads would qualify. `countsWidth` reports 1 byte everywhere, so the adaptive
+  width below captures the saving that is left.
+- **Resolving the query's ordinals once.** 0.0005 ms of a 0.16 ms loop: 84
+  lookups against 58,471 posting entries. Bounded before it was built.
 - **Term-frequency weighting in the predictor.** Better motivated — a query
   draws grams by term frequency, not document frequency — but on these corpora
   the two agree to three decimals and order the configurations identically, one
@@ -564,12 +661,17 @@ Everything below stays deliberately unbuilt:
    the flattened arrays entirely. Deliberately postponed: the scratch reuse is
    in, and further query-preparation micro-work would answer a smaller question
    than the one still open.
-2. **Sparse counts.** 93.5% of posting lists are all-ones (59.8% on Zipf) but a
-   corpus maximum of 3 forces a counts array anyway. A per-list flag would fire
-   where the corpus-wide one cannot — only worth it if one byte per entry stops
-   being cheap enough.
+2. **Sparse counts.** Measured and closed above: a per-list flag would fire on
+   83.4% of lists but only 29.8% of the entries a query reads, for a ceiling of
+   0.0055 ms.
 3. **Delta-encoded ids.** Postings are sorted, so the gaps are small — but it
    costs the binary search, so only after the cheaper layout wins are banked.
+   The ladder makes the id stream the largest single rung, 36% of the loop, so
+   the two remaining credible layout experiments are both there: **`Uint16` ids
+   when `choiceCount ≤ 65536`**, halving 234 KB of sequential reads, and an
+   **`Int32` Dice accumulator**, halving 80 KB of random ones. Both are
+   width changes, both attack per-posting-entry traffic, and neither is worth
+   starting before the one above it is measured alone.
 4. **`best()` bootstrap** — score the rarest gram's candidates first and use that
    as a cutoff, to get the early exit the exhaustive path has.
 5. **Cosine has no prefix filtering**; its threshold does not become a
