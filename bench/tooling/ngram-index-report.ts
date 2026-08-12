@@ -450,6 +450,17 @@ interface ExperimentConfig {
    * or `null` for the all-sparse representation this is measured against.
    */
   readonly denseCutoff: number | null
+  /**
+   * Posting ids in the narrowest word the corpus fits in. Part of the config
+   * rather than a bare flag because the fixed parity corpora are all small
+   * enough for `Uint16`, so nothing would ever exercise the wide arm otherwise.
+   */
+  readonly narrowIds: boolean
+  /**
+   * Dice's shared counts in an `Int32Array`. Dice only — an index built this way
+   * refuses Cosine, so the parity sweep runs half the metrics for these.
+   */
+  readonly narrowAccumulator: boolean
 }
 
 const START_RADIX: Readonly<Record<KeyMode, number | null>> = {
@@ -485,6 +496,8 @@ function indexFor(
     config.keyMode !== 'string',
     START_RADIX[config.keyMode],
     config.denseCutoff,
+    config.narrowIds,
+    config.narrowAccumulator,
   )
 }
 
@@ -552,10 +565,22 @@ const KEY_MODES = ['auto', 'bmp', 'full', 'string'] as const
  * on each. `supports` drops the pairs a gram size cannot hold.
  */
 const DENSE_CUTOFFS: readonly (number | null)[] = [null, DENSE_CUTOFF]
+const ID_WIDTHS: readonly boolean[] = [true, false]
+const ACCUMULATOR_WIDTHS: readonly boolean[] = [false, true]
 
 const CONFIGS: readonly ExperimentConfig[] = BUILD_MODES.flatMap((buildMode) =>
   KEY_MODES.flatMap((keyMode) =>
-    DENSE_CUTOFFS.map((denseCutoff) => ({ buildMode, keyMode, denseCutoff })),
+    DENSE_CUTOFFS.flatMap((denseCutoff) =>
+      ID_WIDTHS.flatMap((narrowIds) =>
+        ACCUMULATOR_WIDTHS.map((narrowAccumulator) => ({
+          buildMode,
+          keyMode,
+          denseCutoff,
+          narrowIds,
+          narrowAccumulator,
+        })),
+      ),
+    ),
   ),
 )
 
@@ -703,6 +728,8 @@ function fixedParity(
   let cases = 0
   for (const config of configs) {
     for (const metric of METRICS) {
+      // A narrow accumulator is a Dice representation and throws on Cosine.
+      if (config.narrowAccumulator && metric !== 'dice') continue
       for (const gramSize of [2, 3]) {
         if (!supports(config, gramSize)) continue
         for (const choices of corpora) {
@@ -755,6 +782,7 @@ async function parity(runs: number): Promise<void> {
       fc.constantFrom(...CONFIGS),
       (choices, query, threshold, limit, gramSize, metric, config) => {
         if (!supports(config, gramSize)) return true
+        if (config.narrowAccumulator && metric !== 'dice') return true
         checkCase({ metric, gramSize, choices, query, threshold, limit, config })
         return true
       },
@@ -862,6 +890,8 @@ interface CounterRow {
   readonly buildMode: BuildMode
   readonly keyMode: KeyMode
   readonly denseCutoff: number | null
+  readonly narrowIds: boolean
+  readonly narrowAccumulator: boolean
   readonly threshold: number
   readonly limit: number
   readonly queryVariants: number
@@ -924,6 +954,7 @@ function counterRows(
   const runs = counterRuns(n)
   const rows: CounterRow[] = []
   for (const metric of METRICS) {
+    if (config.narrowAccumulator && metric !== 'dice') continue
     let matcher: ExhaustiveMatcher | null = null
     let matcherBuildMs: number | null = null
     if (n <= EXHAUSTIVE_LIMIT) {
@@ -993,6 +1024,8 @@ function counterRows(
         buildMode: config.buildMode,
         keyMode: config.keyMode,
         denseCutoff: config.denseCutoff,
+        narrowIds: config.narrowIds,
+        narrowAccumulator: config.narrowAccumulator,
         threshold,
         limit: COUNTER_LIMIT,
         queryVariants: variants.length,
@@ -1057,6 +1090,8 @@ interface MemoryRow {
   readonly buildMode: BuildMode
   readonly keyMode: KeyMode
   readonly denseCutoff: number | null
+  readonly narrowIds: boolean
+  readonly narrowAccumulator: boolean
   readonly bytes: number
   readonly bytesPerChoice: number
 }
@@ -1118,6 +1153,8 @@ function measureArm(
     buildMode: config.buildMode,
     keyMode: config.keyMode,
     denseCutoff: config.denseCutoff,
+    narrowIds: config.narrowIds,
+    narrowAccumulator: config.narrowAccumulator,
     bytes: held,
     bytesPerChoice: held / n,
   }
@@ -1131,6 +1168,8 @@ interface PeakRow {
   readonly buildMode: BuildMode
   readonly keyMode: KeyMode
   readonly denseCutoff: number | null
+  readonly narrowIds: boolean
+  readonly narrowAccumulator: boolean
   /**
    * Everything held before the build starts: the corpus, plus the runtime and
    * module heap under it. Not the corpus's size — nothing here measures that.
@@ -1210,6 +1249,8 @@ function measurePeak(
     buildMode: config.buildMode,
     keyMode: config.keyMode,
     denseCutoff: config.denseCutoff,
+    narrowIds: config.narrowIds,
+    narrowAccumulator: config.narrowAccumulator,
     baselineBytes: baseline,
     peakHeapBytes: peakHeap,
     peakArrayBufferBytes: peakBuffers,
@@ -1533,6 +1574,8 @@ function parseOptions(): Options {
   let keyMode: KeyMode = 'auto'
   let buildMode: BuildMode = 'profile'
   let denseCutoff: number | null = DENSE_CUTOFF
+  let narrowIds = true
+  let narrowAccumulator = false
   for (const argument of process.argv.slice(2)) {
     if (argument === '--parity') mode = 'parity'
     else if (argument === '--counters') mode = 'counters'
@@ -1543,6 +1586,8 @@ function parseOptions(): Options {
     else if (argument === '--select') mode = 'select'
     else if (argument === '--accumulate') mode = 'accumulate'
     else if (argument === '--sweep') sweep = true
+    else if (argument === '--wide-ids') narrowIds = false
+    else if (argument === '--narrow-accumulator') narrowAccumulator = true
     else if (argument.startsWith('--build=')) {
       buildMode = buildModeOf(argument.slice('--build='.length))
     } else if (argument.startsWith('--keys=')) {
@@ -1588,7 +1633,7 @@ function parseOptions(): Options {
     threshold,
     sweep,
     query,
-    config: { buildMode, keyMode, denseCutoff },
+    config: { buildMode, keyMode, denseCutoff, narrowIds, narrowAccumulator },
   }
 }
 
