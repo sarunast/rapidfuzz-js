@@ -864,6 +864,8 @@ interface CounterRow {
   readonly postingsPerChoicePerGram: number
   readonly candidatesTouched: number
   readonly candidatesTouchedRatio: number
+  /** Candidates the accumulation wrote to; the rest score the dense default. */
+  readonly modifiedCandidates: number
   readonly candidatesQualified: number
   readonly indexedMs: number
   /** Null below `P95_MINIMUM_RUNS` samples — see {@link Latency}. */
@@ -995,6 +997,7 @@ function counterRows(
             : counters.postingEntriesTouched / (n * counters.distinctQueryGrams),
         candidatesTouched: counters.candidatesTouched,
         candidatesTouchedRatio: counters.candidatesTouched / n,
+        modifiedCandidates: counters.modifiedCandidates,
         candidatesQualified: counters.candidatesQualified,
         indexedMs: indexed.p50,
         indexedP95Ms: indexed.p95,
@@ -1265,6 +1268,59 @@ function probeDense(
 }
 
 /**
+ * Where the selection scan's time goes, per query class. Dense postings moved
+ * `common substring` by 3% after taking 30x off its posting traffic, so this is
+ * the loop that decides that query — and nothing had measured inside it.
+ */
+function profileSelection(
+  n: number,
+  corpusClass: CorpusClass,
+  gramSize: number,
+  threshold: number,
+  config: ExperimentConfig,
+): void {
+  const corpus = corpusOf(corpusClass, n, gramSize)
+  const index = buildIndex(corpus.choices, gramSize, config).index
+  const runs = n >= 100_000 ? 15 : 60
+  process.stdout.write(
+    `\n  ${corpusClass}, n=${n.toLocaleString()}, gram size ${gramSize}, ` +
+      `threshold ${threshold}, dense ${config.denseCutoff === null ? 'off' : 'on'}\n`,
+  )
+  for (const queryClass of QUERY_CLASSES) {
+    const variants = corpus.queries.get(queryClass)
+    if (variants === undefined || variants.length === 0) {
+      throw new Error(`missing query class ${queryClass}`)
+    }
+    const phases = index.profilePhases(variants[0], threshold, COUNTER_LIMIT, runs)
+    process.stdout.write(`    ${queryClass}\n`)
+    let previous = 0
+    for (const phase of phases) {
+      const step = phase.name.startsWith('accumulate alone')
+        ? phase.ms
+        : phase.ms - previous
+      if (!phase.name.startsWith('accumulate alone')) previous = phase.ms
+      process.stdout.write(
+        `      ${phase.name.padEnd(34)}${phase.ms.toFixed(4).padStart(9)} ms` +
+          `${`(${step >= 0 ? '+' : ''}${step.toFixed(4)})`.padStart(12)}\n`,
+      )
+    }
+    const rows = index.profileSelection(
+      buildProfile(variants[0], gramSize),
+      threshold,
+      runs,
+    )
+    const floor = rows[0].ms
+    for (const row of rows) {
+      process.stdout.write(
+        `        ${row.name.padEnd(32)}${row.ms.toFixed(4).padStart(9)} ms` +
+          `${`+${(row.ms - floor).toFixed(4)}`.padStart(11)}` +
+          `${String(row.qualified).padStart(10)}\n`,
+      )
+    }
+  }
+}
+
+/**
  * One corpus, described the way it needs to be read: what the index is, and
  * what one query of each class costs against it, beside the number of
  * candidates the exhaustive Matcher would have scored.
@@ -1319,7 +1375,7 @@ function summarise(
 
 const SIZES: readonly number[] = [100, 1_000, 10_000, 100_000, 1_000_000]
 
-type Mode = 'parity' | 'counters' | 'memory' | 'peak' | 'summary' | 'dense'
+type Mode = 'parity' | 'counters' | 'memory' | 'peak' | 'summary' | 'dense' | 'select'
 
 interface Options {
   readonly mode: Mode
@@ -1393,6 +1449,7 @@ function parseOptions(): Options {
     else if (argument === '--peak') mode = 'peak'
     else if (argument === '--summary') mode = 'summary'
     else if (argument === '--dense') mode = 'dense'
+    else if (argument === '--select') mode = 'select'
     else if (argument === '--sweep') sweep = true
     else if (argument.startsWith('--build=')) {
       buildMode = buildModeOf(argument.slice('--build='.length))
@@ -1513,6 +1570,10 @@ if (options.mode === 'parity') {
         }
         if (options.mode === 'dense') {
           probeDense(n, corpusClass, gramSize, options.config)
+          continue
+        }
+        if (options.mode === 'select') {
+          profileSelection(n, corpusClass, gramSize, options.threshold, options.config)
           continue
         }
         const corpus = corpusOf(corpusClass, n, gramSize)

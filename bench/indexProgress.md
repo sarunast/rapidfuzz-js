@@ -166,6 +166,87 @@ Three bugs, all caught by parity, none by inspection:
   to a perfect score. Both score functions now answer `0` for a choice with no
   grams.
 
+## Where a query's time goes
+
+`common substring` shed 30x its posting traffic for a 3% gain, so the next thing
+to measure was the loop that gain did not reach. Stages are timed as prefixes of
+the whole call and the differences read off — timing a stage alone would measure
+it on state the previous stage never built — and reported as the minimum of many
+runs, because these are tens of microseconds on a machine that spikes.
+
+File paths, 12,947 choices, trigrams, `exact hit`, threshold 0.5, dense on:
+
+| stage        |     ms | share |
+| ------------ | -----: | ----: |
+| buildProfile | 0.0060 |  1.5% |
+| flatten      | 0.0081 |  2.1% |
+| accumulate   | 0.2083 | 54.4% |
+| select       | 0.1664 | 42.0% |
+
+Preparation is 4%, so **skipping the query's `NGramProfile` cannot matter here**
+whatever it saves. Accumulation is still the largest single stage. Selection is
+the surprise: it is nearly half of a query that touches 75,805 posting entries.
+
+Inside selection, every variant scanning the same accumulated state:
+
+| variant                        |     ms |
+| ------------------------------ | -----: |
+| loop only                      | 0.0047 |
+| + accumulator read             | 0.0294 |
+| + divide, inline               | 0.0220 |
+| + divide, through the callback | 0.0323 |
+| callback over hoisted locals   | 0.0219 |
+| **callback + top-5 insertion** | 0.0447 |
+| **inline + top-5 insertion**   | 0.0259 |
+| length band, then divide       | 0.0254 |
+
+Two things fall out. **Inlining the score into the loop is 1.7x** — the callback
+is not free once it runs per _corpus_ candidate rather than per touched one, and
+hoisting the fields it reads off `this` recovers most of that on its own. And the
+**length band buys nothing**: `2·min(q,g)/(q+g) ≥ t` rejects almost nobody here,
+because a corpus of file paths has file-path-shaped lengths.
+
+The isolated loops are optimistic — they rerun over an accumulator nothing is
+rewriting — so the honest reading is that selection is 0.045–0.166 ms of a
+0.39 ms query, and the part of it worth attacking is the per-candidate callback.
+
+### Skipping the unmodified candidates: measured, and it does not pay
+
+A dense list gives every candidate a base score, and a candidate the accumulation
+never wrote to scores exactly `2·base/(q + g)` — monotonic in `gramCount` alone.
+So a precomputed `gramCount` order would let top-k stop after a handful of them
+instead of scanning the corpus. Whether that pays depends on one number nobody
+had counted: how many scanned candidates are actually modified.
+
+| query            | scored | modified | unmodified | modified share |
+| ---------------- | -----: | -------: | ---------: | -------------: |
+| exact hit        | 12,947 |   12,110 |        837 |          93.5% |
+| 1 typo           | 12,947 |   12,105 |        842 |          93.5% |
+| 2 typos          | 12,947 |   12,040 |        907 |          93.0% |
+| common substring | 12,947 |    1,793 |     11,154 |          13.8% |
+| rare substring   |  3,616 |    3,616 |          0 |         100.0% |
+
+**93% modified on the classes that dominate**, so the ordering would skip 6.5% of
+a scan that is itself 43% of the query. It pays on exactly one class — `common
+substring`, 86% unmodified — and that is the cheapest query on the corpus at
+0.104 ms against the Matcher's 0.205 ms. Not built: the design is sound and the
+corpus it needs is not this one.
+
+### The cutoff sweep cannot discriminate
+
+| cutoff | exact hit | 1 typo | common substring | retained |
+| ------ | --------: | -----: | ---------------: | -------: |
+| off    |    0.8893 | 0.9170 |           0.1118 |  4.77 MB |
+| 0.50   |    0.3895 | 0.3875 |           0.1079 |  3.84 MB |
+| 0.6667 |    0.3993 | 0.4277 |           0.1127 |  3.83 MB |
+| 0.90   |    0.3911 | 0.4246 |           0.1149 |  3.86 MB |
+
+Every cutoff from 0.5 to 0.9 measures the same, in latency and in bytes, because
+**this corpus has no posting list in that band** — the 17 that qualify are all
+far above 0.9. So the sweep confirms dense against sparse (2.3x) and says nothing
+about where the cutoff belongs. `2/3` stays a derivation rather than a
+measurement, which is the honest label for it.
+
 ## Measured and _not_ adopted
 
 - **Rare-gram-first ordering on its own.** Visiting the same posting lists in a
