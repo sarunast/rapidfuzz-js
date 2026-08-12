@@ -451,7 +451,7 @@ interface FlatLevel {
   readonly firstKeys: unknown[]
   readonly secondKeys: unknown[][]
   readonly frequencies: number[][]
-  readonly remaining: Int32Array
+  readonly remaining: Uint32Array
 }
 
 /**
@@ -459,16 +459,20 @@ interface FlatLevel {
  * so `shared + remaining[index]` is everything the walk could still reach.
  * Summed from the inserted counts and never from `gramCount`: a gram holding
  * `NaN` counts toward the latter and can never be matched.
+ *
+ * Unsigned because the total is bounded by the sequence length, which the
+ * contract allows up to `0xffff_ffff`: signed, a query past 2^31 grams stores a
+ * negative bound and the walk rejects candidates that qualify.
  */
-function remainingTotals(totals: readonly number[]): Int32Array {
-  const remaining = new Int32Array(totals.length + 1)
+function remainingTotals(totals: readonly number[]): Uint32Array {
+  const remaining = new Uint32Array(totals.length + 1)
   for (let index = totals.length - 1; index >= 0; index--) {
     remaining[index] = remaining[index + 1] + totals[index]
   }
   return remaining
 }
 
-function flattenUnigrams(query: NGramProfile): [unknown[], number[], Int32Array] {
+function flattenUnigrams(query: NGramProfile): [unknown[], number[], Uint32Array] {
   const keys: unknown[] = []
   const frequencies: number[] = []
   for (const [element, count] of countsOf(query.root)) {
@@ -483,7 +487,7 @@ interface FlatTrigramLevel {
   readonly secondKeys: unknown[][]
   readonly thirdKeys: unknown[][][]
   readonly frequencies: number[][][]
-  readonly remaining: Int32Array
+  readonly remaining: Uint32Array
 }
 
 function flattenBigrams(query: NGramProfile): FlatLevel {
