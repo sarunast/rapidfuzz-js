@@ -1,4 +1,4 @@
-import type { PreparedKernel } from '../../core/protocol.js'
+import type { ChoiceIndexBuilder, PreparedKernel } from '../../core/protocol.js'
 import type { Sequence } from '../../core/types.js'
 import {
   distanceCutoffFor,
@@ -18,6 +18,11 @@ export type ChoicePreparer = (choice: Sequence) => unknown
 export interface MetricPreparation {
   readonly prepareQuery: (query: Sequence) => PreparedKernel
   readonly prepareChoice: ChoicePreparer
+  // Declared where the configuration has already been parsed, so an index is
+  // built at the same gram size the kernels compare at. Only the metrics that
+  // have a corpus-wide representation define it; the adapter copies it onto the
+  // compilation either way.
+  readonly indexChoices?: (() => ChoiceIndexBuilder) | undefined
 }
 
 export type PreparationFactory = (

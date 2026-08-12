@@ -148,8 +148,12 @@ export interface Matcher<
   ) => readonly Match<TItem, TKey>[]
   /**
    * Every qualifying match, streamed in collection order rather than by score —
-   * which is why it takes no `limit`. Stop iterating and the rest is never
-   * scored.
+   * which is why it takes no `limit`.
+   *
+   * How much is done before the first result depends on how the matcher was
+   * built: `createMatcher` scores lazily, so stopping early leaves the rest
+   * unscored, while an indexed matcher settles the qualifying set up front. The
+   * values and their order are the same either way.
    */
   readonly searchIter: (
     query: MaybeSequence,
