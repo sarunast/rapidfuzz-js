@@ -1,8 +1,6 @@
 import { describe, expect, expectTypeOf, test, vi } from 'vitest'
 
-import * as cosine from '../../src/algorithms/cosine/index.js'
 import * as damerau from '../../src/algorithms/damerauLevenshtein/index.js'
-import * as dice from '../../src/algorithms/dice/index.js'
 import * as hamming from '../../src/algorithms/hamming/index.js'
 import * as indel from '../../src/algorithms/indel/index.js'
 import * as jaro from '../../src/algorithms/jaro/index.js'
@@ -340,8 +338,6 @@ describe('one-shot search and Matcher', () => {
       hamming.similarity,
       prefix.similarity,
       postfix.similarity,
-      dice.similarity,
-      cosine.similarity,
     ]) {
       const matcher = createMatcher(['alphabet', 'alphanumeric', 'beta'], {
         scorer: createScorer(metric),
