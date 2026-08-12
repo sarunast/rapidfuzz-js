@@ -210,6 +210,54 @@ The isolated loops are optimistic — they rerun over an accumulator nothing is
 rewriting — so the honest reading is that selection is 0.045–0.166 ms of a
 0.39 ms query, and the part of it worth attacking is the per-candidate callback.
 
+### The callback went, and the bottleneck moved
+
+Two versions were measured rather than one, because the microbench suggested the
+cheap one might be enough:
+
+| version                                  | isolated top-5 |     end to end |
+| ---------------------------------------- | -------------: | -------------: |
+| callback reading `this`                  |       0.0457ms |              — |
+| closure over hoisted locals              |       0.0292ms |     1.04–1.18x |
+| **four kernels, arithmetic in the loop** |   **0.0259ms** | **1.41–1.92x** |
+
+Hoisting the fields out of the closure captures most of the _isolated_ gap and
+about a fifth of the real one. The rest is the call boundary, and only
+duplication removes it: `diceTop`, `cosineTop`, `diceBestOf`, `cosineBestOf`,
+each with the metric's arithmetic literally in the loop. Unlimited search still
+goes through the generic path — it sorts everything it returns, so the callback
+is not what it pays for.
+
+The select stage fell from **0.1664 ms to 0.0467 ms, 3.6x**, and against the
+exhaustive Matcher the real corpus now reads **50–70x on Dice** and **99–106x on
+Cosine**, from 16–24x before dense postings.
+
+| file-paths, threshold 0.5 | callback | specialised | ratio |
+| ------------------------- | -------: | ----------: | ----: |
+| exact hit (dice)          |   0.4032 |      0.2750 | 1.47x |
+| 2 typos (cosine)          |   0.3668 |      0.2488 | 1.47x |
+| common substring (dice)   |   0.1093 |      0.0617 | 1.77x |
+| rare substring (cosine)   |   0.0914 |      0.0479 | 1.91x |
+
+**The profile has inverted.** What was 54/42 accumulation-to-selection is now:
+
+| stage        |     ms | share |
+| ------------ | -----: | ----: |
+| buildProfile | 0.0062 |  2.3% |
+| flatten      | 0.0082 |  3.0% |
+| accumulate   | 0.2115 | 77.6% |
+| select       | 0.0467 | 17.1% |
+
+Accumulation is where anything further has to come from, and preparation is 5%
+of a 0.27 ms query — so bypassing the query's `NGramProfile` is now worth at most
+that, whatever it costs to build.
+
+One bug, caught by parity on a two-choice corpus: the specialised `best` kernels
+dropped the `score === bestScore && id < bestId` tie test, on the reasoning that
+candidates arrive in ascending id order. The dense scan does count upward and
+each posting list is sorted — but `touched` is filled across _several_ lists, so
+a gram matching id 9 before another matches id 2 leaves it out of order.
+
 ### Skipping the unmodified candidates: measured, and it does not pay
 
 A dense list gives every candidate a base score, and a candidate the accumulation
@@ -244,8 +292,14 @@ corpus it needs is not this one.
 Every cutoff from 0.5 to 0.9 measures the same, in latency and in bytes, because
 **this corpus has no posting list in that band** — the 17 that qualify are all
 far above 0.9. So the sweep confirms dense against sparse (2.3x) and says nothing
-about where the cutoff belongs. `2/3` stays a derivation rather than a
-measurement, which is the honest label for it.
+about where the cutoff belongs. The honest label, and the one the code carries:
+
+> `2/3` is analytically derived. The real corpus validates the dense
+> representation and does not distinguish the threshold, because its gram
+> frequencies are discontinuous there.
+
+Revisit it if a corpus turns up with lists around 0.55–0.85. Fabricating one to
+find a V8 crossover would measure the synthetic corpus, not the decision.
 
 ## Measured and _not_ adopted
 
