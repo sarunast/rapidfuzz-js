@@ -51,9 +51,29 @@ export interface IndexCounters {
   suffixWalked: number
 }
 
-interface Posting {
+/**
+ * Posting lists in compressed-sparse-row form: one `ids` array for the whole
+ * index, and `offsets[ordinal] .. offsets[ordinal + 1]` marking each gram's
+ * slice of it. The map holds an ordinal rather than an object.
+ *
+ * The shape it replaces was two typed arrays per distinct gram, so a corpus
+ * with seventeen thousand distinct trigrams carried seventeen thousand posting
+ * objects, thirty-four thousand typed arrays and as many array buffers — object
+ * headers and collector work proportional to gram variety rather than to the
+ * data. It also scatters the walk across that many allocations, where this
+ * streams one array.
+ *
+ * `counts` is `null` when every frequency in the index is 1, which is the
+ * common case for n-grams over natural text: a gram usually occurs once in a
+ * given choice. When it is not null it is the narrowest width that holds the
+ * largest frequency, because a 32-bit word for a number that is nearly always 1
+ * is most of the payload.
+ */
+interface Postings {
+  readonly ordinals: Map<string | number, number>
+  readonly offsets: Uint32Array
   readonly ids: Uint32Array
-  readonly counts: Uint32Array
+  readonly counts: Uint8Array | Uint16Array | Uint32Array | null
 }
 
 interface PostingBuilder {
@@ -267,15 +287,25 @@ function outranks(score: number, id: number, other: Scored): boolean {
   return score > other.score || (score === other.score && id < other.id)
 }
 
+/**
+ * `matcher.search` answers a zero limit with no results and refuses a negative
+ * one, so this does too — the insertion-sorted top-k would otherwise index
+ * `top[-1]` on the first candidate it saw.
+ */
+function emptyLimit(limit: number): Scored[] {
+  if (limit < 0) throw new RangeError('limit must be null or a non-negative integer')
+  return []
+}
+
 /** One choice's frequency for a gram, or 0. The posting list is sorted by id. */
-function frequencyOf(posting: Posting, id: number): number {
-  const ids = posting.ids
-  let low = 0
-  let high = ids.length - 1
+function frequencyOf(postings: Postings, ordinal: number, id: number): number {
+  const ids = postings.ids
+  let low = postings.offsets[ordinal]
+  let high = postings.offsets[ordinal + 1] - 1
   while (low <= high) {
     const middle = (low + high) >>> 1
     const found = ids[middle]
-    if (found === id) return posting.counts[middle]
+    if (found === id) return postings.counts === null ? 1 : postings.counts[middle]
     if (found < id) low = middle + 1
     else high = middle - 1
   }
@@ -327,10 +357,17 @@ const PROBE_WEIGHT = 4
 
 export class NGramIndex {
   private builder: Map<string | number, PostingBuilder> | null = new Map()
-  private postings: Map<string | number, Posting> | null = null
+  private postings: Postings | null = null
   private radix: number | null
   /** Whether an out-of-range element forced the key scheme to change. */
   downgraded = false
+  /**
+   * Choices must arrive in id order, because that is what leaves every posting
+   * list sorted and lets `frequencyOf` binary-search it. Checked on the way in
+   * rather than at `compact`, where a duplicate id would already have written
+   * itself into every list it touched.
+   */
+  private nextChoiceId = 0
   private readonly gramCount: Uint32Array
   private readonly squaredNorm: Float64Array
   private readonly gramless: GramlessChoice[] = []
@@ -386,9 +423,7 @@ export class NGramIndex {
     if (profile.gramSize !== this.gramSize) {
       throw new TypeError('profile gram size does not match the index')
     }
-    if (choiceId < 0 || choiceId >= this.choiceCount) {
-      throw new RangeError('choice id is outside the index')
-    }
+    this.acceptChoiceId(choiceId)
     this.gramCount[choiceId] = profile.gramCount
     this.squaredNorm[choiceId] = profile.squaredNorm
     if (profile.gramCount === 0) {
@@ -426,9 +461,7 @@ export class NGramIndex {
   addSequence(choiceId: number, sequence: string): void {
     const builder = this.builder
     if (builder === null) throw new TypeError('the index is already compacted')
-    if (choiceId < 0 || choiceId >= this.choiceCount) {
-      throw new RangeError('choice id is outside the index')
-    }
+    this.acceptChoiceId(choiceId)
     const elements = convSequence(sequence)
     const gramSize = this.gramSize
     const gramCount = elements.length - gramSize + 1
@@ -457,6 +490,7 @@ export class NGramIndex {
             // Rare enough to pay for: re-key everything and start this choice
             // again with joined strings.
             this.downgrade(builder, choiceId)
+            this.nextChoiceId--
             this.addSequence(choiceId, sequence)
             return
           }
@@ -479,6 +513,18 @@ export class NGramIndex {
       posting.ids.push(choiceId)
       posting.counts.push(count)
     }
+  }
+
+  private acceptChoiceId(choiceId: number): void {
+    if (choiceId !== this.nextChoiceId) {
+      throw new RangeError(
+        `choices must arrive in id order: expected ${this.nextChoiceId}, got ${choiceId}`,
+      )
+    }
+    if (choiceId >= this.choiceCount) {
+      throw new RangeError('choice id is outside the index')
+    }
+    this.nextChoiceId++
   }
 
   private insert(
@@ -533,24 +579,60 @@ export class NGramIndex {
   compact(): void {
     const builder = this.builder
     if (builder === null) throw new TypeError('the index is already compacted')
-    const postings = new Map<string | number, Posting>()
-    for (const [key, posting] of builder) {
-      const ids = Uint32Array.from(posting.ids)
-      // Ascending by construction, because choices arrive in id order — and
-      // `frequencyOf` binary-searches these, so it is worth saying out loud
-      // rather than leaving as a property someone could quietly break.
-      for (let at = 1; at < ids.length; at++) {
-        if (ids[at - 1] >= ids[at]) throw new Error('posting list is not sorted by id')
-      }
-      postings.set(key, { ids, counts: Uint32Array.from(posting.counts) })
+    let total = 0
+    let widest = 0
+    for (const posting of builder.values()) {
+      total += posting.ids.length
+      for (const count of posting.counts) if (count > widest) widest = count
     }
-    this.postings = postings
+    const ordinals = new Map<string | number, number>()
+    const offsets = new Uint32Array(builder.size + 1)
+    const ids = new Uint32Array(total)
+    const counts =
+      widest <= 1
+        ? null
+        : widest < 0x100
+          ? new Uint8Array(total)
+          : widest < 0x1_0000
+            ? new Uint16Array(total)
+            : new Uint32Array(total)
+    let ordinal = 0
+    let at = 0
+    for (const [key, posting] of builder) {
+      ordinals.set(key, ordinal)
+      offsets[ordinal] = at
+      const sourceIds = posting.ids
+      for (let index = 0; index < sourceIds.length; index++) {
+        // Ascending by construction, because choices arrive in id order — and
+        // `frequencyOf` binary-searches these, so it is worth saying out loud
+        // rather than leaving as a property someone could quietly break.
+        if (index > 0 && sourceIds[index - 1] >= sourceIds[index]) {
+          throw new Error('posting list is not sorted by id')
+        }
+        ids[at] = sourceIds[index]
+        if (counts !== null) counts[at] = posting.counts[index]
+        at++
+      }
+      ordinal++
+    }
+    offsets[ordinal] = at
+    this.postings = { ordinals, offsets, ids, counts }
     this.builder = null
   }
 
-  /** Distinct grams in the compacted index — the posting map's size. */
+  /**
+   * Bytes per stored frequency, or 0 when every frequency is 1 and the counts
+   * array is absent entirely. Diagnostic: it is what says whether the implicit
+   * count path is actually firing on a given corpus.
+   */
+  countsWidth(): number {
+    const counts = this.requirePostings().counts
+    return counts === null ? 0 : counts.BYTES_PER_ELEMENT
+  }
+
+  /** Distinct grams in the compacted index. */
   gramVariety(): number {
-    return this.requirePostings().size
+    return this.requirePostings().ordinals.size
   }
 
   /**
@@ -575,22 +657,38 @@ export class NGramIndex {
     totalEntries: number
     meanShare: number
     weightedShare: number
+    termWeightedShare: number
   } {
     const postings = this.requirePostings()
+    const offsets = postings.offsets
+    const counts = postings.counts
+    const distinctGrams = postings.ordinals.size
     let totalEntries = 0
     let squared = 0
-    for (const posting of postings.values()) {
-      const length = posting.ids.length
-      totalEntries += length
-      squared += length * length
+    let termTotal = 0
+    let termWeighted = 0
+    for (let ordinal = 0; ordinal < distinctGrams; ordinal++) {
+      const from = offsets[ordinal]
+      const upto = offsets[ordinal + 1]
+      const documentFrequency = upto - from
+      totalEntries += documentFrequency
+      squared += documentFrequency * documentFrequency
+      let termFrequency = documentFrequency
+      if (counts !== null) {
+        termFrequency = 0
+        for (let at = from; at < upto; at++) termFrequency += counts[at]
+      }
+      termTotal += termFrequency
+      termWeighted += termFrequency * documentFrequency
     }
-    const distinctGrams = postings.size
     return {
       distinctGrams,
       totalEntries,
       meanShare:
         distinctGrams === 0 ? 0 : totalEntries / distinctGrams / this.choiceCount,
       weightedShare: totalEntries === 0 ? 0 : squared / totalEntries / this.choiceCount,
+      termWeightedShare:
+        termTotal === 0 ? 0 : termWeighted / termTotal / this.choiceCount,
     }
   }
 
@@ -608,6 +706,7 @@ export class NGramIndex {
     threshold: number | null,
     limit: number | null,
   ): Scored[] {
+    if (limit !== null && limit <= 0) return emptyLimit(limit)
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
     this.diceAccumulate(flattenQuery(query, this.radix))
@@ -638,6 +737,7 @@ export class NGramIndex {
     threshold: number | null,
     limit: number | null,
   ): Scored[] {
+    if (limit !== null && limit <= 0) return emptyLimit(limit)
     if (threshold === null || threshold <= 0)
       return this.diceSearch(query, threshold, limit)
     this.beginQuery(query)
@@ -668,6 +768,7 @@ export class NGramIndex {
     threshold: number | null,
     limit: number | null,
   ): Scored[] {
+    if (limit !== null && limit <= 0) return emptyLimit(limit)
     this.beginQuery(query)
     if (query.gramCount === 0) return this.gramlessSearch(query, threshold, limit)
     this.cosineAccumulate(flattenQuery(query, this.radix))
@@ -690,10 +791,23 @@ export class NGramIndex {
     const lengths: number[] = new Array<number>(keys.length)
     const order: number[] = new Array<number>(keys.length)
     for (let index = 0; index < keys.length; index++) {
-      lengths[index] = postings.get(keys[index])?.ids.length ?? 0
+      const ordinal = postings.ordinals.get(keys[index])
+      lengths[index] =
+        ordinal === undefined
+          ? 0
+          : postings.offsets[ordinal + 1] - postings.offsets[ordinal]
       order[index] = index
     }
-    order.sort((left, right) => lengths[left] - lengths[right])
+    // Cost per unit of prefix coverage, not raw posting length. The prefix
+    // target is measured in query gram *occurrences*, so a gram the query holds
+    // twenty times covers twenty of them for one list walk. Ordering by
+    // `length / queryCount` picks the cheaper list per occurrence covered;
+    // where every query count is 1, which is most n-gram text, it is the same
+    // order as before. Any prefix satisfying the target is exact, so this only
+    // changes which valid one gets chosen.
+    order.sort(
+      (left, right) => lengths[left] / counts[left] - lengths[right] / counts[right],
+    )
 
     const target = prefixTarget(query.gramCount, threshold)
     const accumulator = this.accumulator
@@ -705,12 +819,22 @@ export class NGramIndex {
       const at = order[index]
       const queryCount = counts[at]
       covered += queryCount
-      const posting = postings.get(keys[at])
-      if (posting === undefined) continue
-      const ids = posting.ids
-      const postingCounts = posting.counts
-      entries += ids.length
-      for (let scan = 0; scan < ids.length; scan++) {
+      const ordinal = postings.ordinals.get(keys[at])
+      if (ordinal === undefined) continue
+      const ids = postings.ids
+      const postingCounts = postings.counts
+      const from = postings.offsets[ordinal]
+      const upto = postings.offsets[ordinal + 1]
+      entries += upto - from
+      if (postingCounts === null) {
+        for (let scan = from; scan < upto; scan++) {
+          const id = ids[scan]
+          if (accumulator[id] === 0) touched.push(id)
+          accumulator[id] += queryCount < 1 ? queryCount : 1
+        }
+        continue
+      }
+      for (let scan = from; scan < upto; scan++) {
         const id = ids[scan]
         if (accumulator[id] === 0) touched.push(id)
         const count = postingCounts[scan]
@@ -755,13 +879,23 @@ export class NGramIndex {
     const accumulator = this.accumulator
     let entries = 0
     for (let at = 0; at < plan.suffixKeys.length; at++) {
-      const posting = postings.get(plan.suffixKeys[at])
-      if (posting === undefined) continue
-      const ids = posting.ids
-      const counts = posting.counts
+      const ordinal = postings.ordinals.get(plan.suffixKeys[at])
+      if (ordinal === undefined) continue
+      const ids = postings.ids
+      const counts = postings.counts
       const queryCount = plan.suffixCounts[at]
-      entries += ids.length
-      for (let scan = 0; scan < ids.length; scan++) {
+      const from = postings.offsets[ordinal]
+      const upto = postings.offsets[ordinal + 1]
+      entries += upto - from
+      if (counts === null) {
+        for (let scan = from; scan < upto; scan++) {
+          const id = ids[scan]
+          if (accumulator[id] === 0) continue
+          accumulator[id] += queryCount < 1 ? queryCount : 1
+        }
+        continue
+      }
+      for (let scan = from; scan < upto; scan++) {
         const id = ids[scan]
         if (accumulator[id] === 0) continue
         const count = counts[scan]
@@ -849,12 +983,12 @@ export class NGramIndex {
       if ((2 * (shared + remaining)) / denominator < cutoff) continue
       let alive = true
       for (let at = 0; at < suffixKeys.length; at++) {
-        const posting = postings.get(suffixKeys[at])
+        const ordinal = postings.ordinals.get(suffixKeys[at])
         const queryCount = suffixCounts[at]
         remaining -= queryCount
-        if (posting !== undefined) {
+        if (ordinal !== undefined) {
           probes++
-          const count = frequencyOf(posting, id)
+          const count = frequencyOf(postings, ordinal, id)
           if (count > 0) shared += queryCount < count ? queryCount : count
         }
         if ((2 * (shared + remaining)) / denominator < cutoff) {
@@ -908,7 +1042,7 @@ export class NGramIndex {
     touched.length = 0
   }
 
-  private requirePostings(): Map<string | number, Posting> {
+  private requirePostings(): Postings {
     const postings = this.postings
     if (postings === null) throw new TypeError('the index has not been compacted')
     return postings
@@ -946,17 +1080,32 @@ export class NGramIndex {
     const keys = query.keys
     const queryCounts = query.counts
     let entries = 0
+    const ids = postings.ids
+    const postingCounts = postings.counts
+    const offsets = postings.offsets
     for (let index = 0; index < keys.length; index++) {
-      const posting = postings.get(keys[index])
-      if (posting === undefined) continue
-      const ids = posting.ids
-      const counts = posting.counts
+      const ordinal = postings.ordinals.get(keys[index])
+      if (ordinal === undefined) continue
       const queryCount = queryCounts[index]
-      entries += ids.length
-      for (let at = 0; at < ids.length; at++) {
+      const from = offsets[ordinal]
+      const upto = offsets[ordinal + 1]
+      entries += upto - from
+      // Split once per posting list rather than branching per entry: where
+      // every frequency is 1 the whole counts array is absent, and the shared
+      // minimum collapses to a constant.
+      if (postingCounts === null) {
+        const capped = queryCount < 1 ? queryCount : 1
+        for (let at = from; at < upto; at++) {
+          const id = ids[at]
+          if (accumulator[id] === 0) touched.push(id)
+          accumulator[id] += capped
+        }
+        continue
+      }
+      for (let at = from; at < upto; at++) {
         const id = ids[at]
         if (accumulator[id] === 0) touched.push(id)
-        const count = counts[at]
+        const count = postingCounts[at]
         accumulator[id] += queryCount < count ? queryCount : count
       }
     }
@@ -972,17 +1121,28 @@ export class NGramIndex {
     const keys = query.keys
     const queryCounts = query.counts
     let entries = 0
+    const ids = postings.ids
+    const postingCounts = postings.counts
+    const offsets = postings.offsets
     for (let index = 0; index < keys.length; index++) {
-      const posting = postings.get(keys[index])
-      if (posting === undefined) continue
-      const ids = posting.ids
-      const counts = posting.counts
+      const ordinal = postings.ordinals.get(keys[index])
+      if (ordinal === undefined) continue
       const queryCount = queryCounts[index]
-      entries += ids.length
-      for (let at = 0; at < ids.length; at++) {
+      const from = offsets[ordinal]
+      const upto = offsets[ordinal + 1]
+      entries += upto - from
+      if (postingCounts === null) {
+        for (let at = from; at < upto; at++) {
+          const id = ids[at]
+          if (accumulator[id] === 0) touched.push(id)
+          accumulator[id] += queryCount
+        }
+        continue
+      }
+      for (let at = from; at < upto; at++) {
         const id = ids[at]
         if (accumulator[id] === 0) touched.push(id)
-        accumulator[id] += queryCount * counts[at]
+        accumulator[id] += queryCount * postingCounts[at]
       }
     }
     this.counters.distinctQueryGrams = keys.length
