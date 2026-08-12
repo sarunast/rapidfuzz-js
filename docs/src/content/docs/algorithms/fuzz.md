@@ -3,7 +3,7 @@ title: Fuzz
 description: The 0–100 family for messy real-world text — partial matches, word order, and the do-the-right-thing metric.
 ---
 
-Edit distances compare *characters*. But most real-world mismatches aren't
+Edit distances compare _characters_. But most real-world mismatches aren't
 character noise — they're **structural**: the same words in a different
 order, one string containing the other, extra words on one side.
 
@@ -42,23 +42,60 @@ tokenSortSimilarity('fuzzy wuzzy was a bear', 'wuzzy fuzzy was a bear') // 100
 ```
 
 **Overlapping words, different amounts of extra** → `tokenSetSimilarity`.
-Compares the word *sets*, factoring out the words both sides share — one
-side having extra words hurts far less.
+Compares the word _sets_, factoring out the words both sides share — one
+side having extra words hurts far less — far enough less that containment
+scores a flat `100`:
+
+```ts
+tokenSetSimilarity('data engineer', 'data engineer cloud platform') // 100
+tokenSortSimilarity('data engineer', 'data engineer cloud platform') // 63.41
+```
+
+That's the right opinion for a company name and the wrong one for a job
+title. [Matching records](/guides/matching-records/) works through the
+difference.
 
 **Combinations** — `tokenSimilarity` takes the better of sort/set;
 `partialTokenSortSimilarity`, `partialTokenSetSimilarity`, and
 `partialTokenSimilarity` apply the token strategies over the best partial
 window.
 
-**Just handle it** → `fuzzySimilarity`. Tries the appropriate strategies
+**Just handle it** → `weightedSimilarity`. Tries the appropriate strategies
 per pair, weights them by how the lengths compare, and reports the best —
 the port of RapidFuzz's famous `WRatio`. **This is the right default**:
 start here, inspect real mismatches, and only pin a specific metric when
-you can name what `fuzzySimilarity` gets wrong.
+you can name what `weightedSimilarity` gets wrong.
 
 Coming from Python RapidFuzz? The mapping is mechanical: `ratio` →
 `similarity`, `partial_ratio` → `partialSimilarity`, `token_sort_ratio` →
-`tokenSortSimilarity`, `WRatio` → `fuzzySimilarity`, and so on.
+`tokenSortSimilarity`, `WRatio` → `weightedSimilarity`, and so on.
+
+## Empty inputs: the family disagrees on purpose
+
+Compare two empty strings and the answer depends on which fuzz metric you
+asked:
+
+```ts
+similarity('', '') // 100
+tokenSortSimilarity('', '') // 100
+tokenSetSimilarity('', '') // 0
+partialTokenSetSimilarity('', '') // 0
+weightedSimilarity('', '') // 0
+```
+
+The set-based scorers intersect _sets of tokens_, and a side with no tokens
+has no set to intersect — so they report `0` where the character-level and
+sort-based scorers report `100`. This isn't a bug being preserved by
+accident: FuzzyWuzzy answered `0` here, RapidFuzz kept it deliberately
+(upstream issue 110), and this port matches so that scores stay comparable
+across all three.
+
+Whitespace-only input is where `weightedSimilarity` splits from the two set
+scorers — `weightedSimilarity('   ', '   ')` is `100`, while
+`tokenSetSimilarity('   ', '   ')` stays `0`.
+
+If empty values are meaningful in your data, filter them before scoring
+rather than reasoning about which scorer does what.
 
 ## Two things fuzz metrics don't do
 

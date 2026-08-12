@@ -9,10 +9,10 @@ the "mathematically complete" version of what [OSA](/algorithms/osa/)
 approximates.
 
 ```ts
-import { distance, similarity } from 'rapidfuzz-js/damerau-levenshtein'
+import { distance, normalizedSimilarity } from 'rapidfuzz-js/damerau-levenshtein'
 
 distance('ca', 'abc') // 2 — swap to 'ac', insert 'b'
-similarity('ca', 'abc') // 0.333 (0–1)
+normalizedSimilarity('ca', 'abc') // 0.333 (0–1)
 ```
 
 OSA charges that same pair 3, because its once-edited-stays-edited rule

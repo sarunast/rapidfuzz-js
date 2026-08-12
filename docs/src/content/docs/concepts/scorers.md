@@ -20,7 +20,7 @@ const weighted = createScorer(distance, {
 weighted.score('kitten', 'sitting') // 5
 ```
 
-The scorer also *describes itself* — useful when code needs to handle any
+The scorer also _describes itself_ — useful when code needs to handle any
 scorer generically:
 
 ```ts
@@ -47,8 +47,8 @@ weighted.score('kitten', 'sitting', { threshold: 3 }) // undefined — 5 edits i
 Three rules, all consequences of the scorer knowing its own direction and
 scale:
 
-- For a **similarity**, the threshold is a *minimum* ("at least 70").
-- For a **distance**, it's a *maximum* ("at most 3 edits").
+- For a **similarity**, the threshold is a _minimum_ ("at least 70").
+- For a **distance**, it's a _maximum_ ("at most 3 edits").
 - It's always in the scorer's own units — `70` for fuzz, `0.7` for a 0–1
   similarity, `3` for an edit distance.
 
@@ -69,7 +69,7 @@ isMatch(weighted, 'kitten', 'sitting', { threshold: 3 }) // false
 :::tip
 Thresholds aren't only a filter — they're a speed lever. The edit-distance
 algorithms use the threshold as a cutoff and abandon a pair as soon as it
-can no longer qualify. A meaningful threshold makes searches *faster*, not
+can no longer qualify. A meaningful threshold makes searches _faster_, not
 just cleaner.
 :::
 
@@ -80,10 +80,18 @@ similarity scorers treat a missing operand as "matches nothing":
 
 ```ts
 import { createScorer } from 'rapidfuzz-js'
-import { fuzzySimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(fuzzySimilarity)
+const scorer = createScorer(weightedSimilarity)
 scorer.score(null, 'text') // 0
+```
+
+Two missing operands score `0` as well, not `100`. Unknown compared with
+unknown isn't evidence of a match, and scoring it perfect would sort every
+missing record to the top of a search:
+
+```ts
+scorer.score(null, null) // 0
 ```
 
 That default keeps a search over gappy data running, with missing entries
@@ -91,17 +99,31 @@ naturally scoring at the bottom. If a `null` reaching the scorer means a bug
 upstream, opt into strictness:
 
 ```ts
-const strict = createScorer(fuzzySimilarity, { missing: 'throw' })
+const strict = createScorer(weightedSimilarity, { missing: 'throw' })
 strict.score(null, 'text') // throws TypeError
 ```
 
 Distance scorers always throw on missing operands — there's no honest
 "worst possible distance" to report when distances are unbounded.
 
-One boundary worth knowing: *missing* is lenient by default, *invalid* never
+One boundary worth knowing: _missing_ is lenient by default, _invalid_ never
 is. Empty strings are valid (they're just empty). Numbers, booleans, and
 objects without an array-like `length` always throw — they're type errors in
 your data, not gaps in it.
+
+## Options objects reject unknown keys
+
+A misspelled option is a `TypeError`, not a silently ignored property:
+
+```ts
+search('new york', teams, { scorer, limitt: 2 })
+// TypeError: unknown search option 'limitt'
+```
+
+This covers the searches, the Matcher methods, `scoreMatrix`, `scorePairs`,
+and `prepareChoice`. The failure it prevents is the quiet one — a typo'd
+`threshold` or `limit` that leaves you looking at unfiltered results and
+wondering why the option "didn't work".
 
 ## One more thing a scorer can do
 

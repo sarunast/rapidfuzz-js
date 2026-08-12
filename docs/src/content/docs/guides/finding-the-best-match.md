@@ -8,9 +8,9 @@ of valid values, find the one they meant.
 
 ```ts
 import { bestMatch, createScorer } from 'rapidfuzz-js'
-import { fuzzySimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(fuzzySimilarity)
+const scorer = createScorer(weightedSimilarity)
 const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 bestMatch('new york jet', teams, { scorer })
@@ -23,7 +23,7 @@ and its `score`.
 
 ## Always set a threshold
 
-"Best" only means *best available*. Ask for the best match to `'quokka'` and
+"Best" only means _best available_. Ask for the best match to `'quokka'` and
 you'll get one — some team name that's marginally less unlike it than the
 others. That's how "did you mean?" features end up suggesting nonsense.
 
@@ -39,7 +39,7 @@ maximum — always in the scorer's own units.
 
 There's no universal right number. Log real queries with their scores for a
 day, look at where good and bad matches separate, and put the line there.
-As a starting point for `fuzzySimilarity`, `70` is conservative and `60`
+As a starting point for `weightedSimilarity`, `70` is conservative and `60`
 permissive.
 
 ## Answering many queries

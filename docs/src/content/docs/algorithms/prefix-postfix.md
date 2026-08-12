@@ -9,20 +9,21 @@ the run at the **end**. No alignment, no edits — just "how far do they agree
 from this side?"
 
 ```ts
-import { distance, similarity } from 'rapidfuzz-js/prefix'
+import { distance, normalizedSimilarity, similarity } from 'rapidfuzz-js/prefix'
 
-similarity('apple', 'applesauce') // 0.5 — 5 shared of the longer 10
+similarity('apple', 'applesauce') // 5 — the shared run is 5 characters long
+normalizedSimilarity('apple', 'applesauce') // 0.5 — 5 shared of the longer 10
 distance('apple', 'applesauce') // 5 — the characters outside the shared run
 ```
 
 ```ts
-import { similarity as postfix } from 'rapidfuzz-js/postfix'
+import { normalizedSimilarity as postfix } from 'rapidfuzz-js/postfix'
 
 postfix('walking', 'running') // 0.429 — shared 'ing' against length 7
 ```
 
-`similarity` is the shared length over the longer input (0–1); `distance`
-counts everything outside the shared run.
+`similarity` is the length of the shared run; `normalizedSimilarity` divides
+it by the longer input (0–1); `distance` counts everything outside the run.
 
 ## When to use it
 
@@ -32,7 +33,7 @@ counts everything outside the shared run.
   and spend the real algorithm on survivors.
 - **When the domain really is the edge.** Version strings, file paths,
   hierarchical codes, or suffixes like file extensions — places where "how
-  far do they agree from the start/end" *is* the question, not a proxy
+  far do they agree from the start/end" _is_ the question, not a proxy
   for it.
 
 For general similarity these are the wrong tool — `prefix` scores

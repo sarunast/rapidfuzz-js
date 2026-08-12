@@ -9,9 +9,9 @@ search results pages:
 
 ```ts
 import { createScorer, search } from 'rapidfuzz-js'
-import { fuzzySimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(fuzzySimilarity)
+const scorer = createScorer(weightedSimilarity)
 const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 search('new york', teams, { scorer, threshold: 60, limit: 2 })
@@ -28,13 +28,13 @@ Results come best first. Two options shape the list:
 - **`limit`** — the count cap, default `5`. Pass `limit: null` for
   everything that clears the threshold.
 
-The two compose naturally: *threshold* decides what deserves to appear,
-*limit* decides how many you show.
+The two compose naturally: _threshold_ decides what deserves to appear,
+_limit_ decides how many you show.
 
 ## More than arrays
 
 Anything list-like is searchable — arrays, iterables, Maps, plain objects —
-and each result's `key` tells you where the item lives in *your* structure:
+and each result's `key` tells you where the item lives in _your_ structure:
 
 ```ts
 const byId = new Map([
@@ -78,6 +78,14 @@ searchable field — prepare each candidate yourself with
 `scorer.prepareChoice` and hand the handles back through `getPrepared`.
 One-shot flexibility, Matcher-grade speed:
 [Prepared choices](/guides/prepared-choices/).
+
+## When the items have more than one field
+
+Everything above searches one piece of text per item. When a record has
+several fields that should each be judged on their own terms — a title _and_
+a company, a name _and_ an address — don't concatenate them into one string:
+[Matching records](/guides/matching-records/) shows why that inflates scores
+on pairs that aren't duplicates, and what to do instead.
 
 ## When you want scores, not rankings
 

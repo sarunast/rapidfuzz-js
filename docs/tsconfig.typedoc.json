@@ -1,12 +1,37 @@
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"strict": true,
-		"noEmit": true,
-		"skipLibCheck": true,
-		"types": []
-	},
-	"include": ["src/api-entries/*.d.ts", "node_modules/rapidfuzz-js/dist/**/*.d.ts"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [],
+    // Each public subpath is resolved to the source module behind it rather
+    // than to the built declaration it normally resolves to. Two reasons, and
+    // the first is the load-bearing one: TypeDoc only emits a source link for a
+    // file git tracks, and `dist/` is ignored, so documenting the declarations
+    // produced "Defined in: dist/…d.ts" as dead text. Reading the sources also
+    // carries their JSDoc through to the generated reference.
+    //
+    // The entry points in `src/api-entries/` still name the subpaths, so the
+    // module headings stay the import paths a consumer types.
+    "paths": {
+      "rapidfuzz-js": ["../src/index.ts"],
+      "rapidfuzz-js/fuzz": ["../src/fuzz/index.ts"],
+      "rapidfuzz-js/levenshtein": ["../src/algorithms/levenshtein/index.ts"],
+      "rapidfuzz-js/indel": ["../src/algorithms/indel/index.ts"],
+      "rapidfuzz-js/lcs": ["../src/algorithms/lcs/index.ts"],
+      "rapidfuzz-js/osa": ["../src/algorithms/osa/index.ts"],
+      "rapidfuzz-js/damerau-levenshtein": [
+        "../src/algorithms/damerauLevenshtein/index.ts"
+      ],
+      "rapidfuzz-js/hamming": ["../src/algorithms/hamming/index.ts"],
+      "rapidfuzz-js/jaro": ["../src/algorithms/jaro/index.ts"],
+      "rapidfuzz-js/jaro-winkler": ["../src/algorithms/jaroWinkler/index.ts"],
+      "rapidfuzz-js/prefix": ["../src/algorithms/prefix/index.ts"],
+      "rapidfuzz-js/postfix": ["../src/algorithms/postfix/index.ts"]
+    }
+  },
+  "include": ["src/api-entries/*.d.ts", "../src/**/*.ts"]
 }

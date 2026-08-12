@@ -1,6 +1,6 @@
 ---
 title: Levenshtein
-description: "The classic edit distance: how many single-character fixes turn one string into the other?"
+description: 'The classic edit distance: how many single-character fixes turn one string into the other?'
 ---
 
 The Levenshtein distance answers the most intuitive similarity question
@@ -18,16 +18,21 @@ Three fixes — so the distance is 3. No shorter route exists, and the
 algorithm guarantees it finds the minimum.
 
 ```ts
-import { distance, similarity } from 'rapidfuzz-js/levenshtein'
+import { distance, normalizedSimilarity } from 'rapidfuzz-js/levenshtein'
 
 distance('kitten', 'sitting') // 3
-similarity('kitten', 'sitting') // 0.571 — the same fact as a 0–1 score
+normalizedSimilarity('kitten', 'sitting') // 0.571 — the same fact as a 0–1 score
 ```
 
 Use `distance` when the count itself is meaningful ("reject if more than 2
-edits"); use `similarity` when comparing across strings of different lengths
-— 3 edits is bad for a 6-letter word and trivial for a paragraph, and the
-0–1 score accounts for that.
+edits"); use `normalizedSimilarity` when comparing across strings of
+different lengths — 3 edits is bad for a 6-letter word and trivial for a
+paragraph, and the 0–1 score accounts for that.
+
+The subpath also exports `similarity` and `normalizedDistance`. Watch the
+names: `similarity('kitten', 'sitting')` is `4`, not `0.571` — it counts
+what the strings share rather than scaling it
+([Metrics](/concepts/metrics/#raw-or-normalized-four-names-per-algorithm)).
 
 ## Tuning the costs
 
@@ -57,8 +62,10 @@ highlighting differences or building diff views:
 ```ts
 import { editops } from 'rapidfuzz-js/levenshtein'
 
-editops('kitten', 'sitting')
-// { tag: 'replace', srcPos: 0, destPos: 0 }, ... 
+Array.from(editops('kitten', 'sitting'))
+// [ { tag: 'replace', srcPos: 0, destPos: 0 },   // k → s
+//   { tag: 'replace', srcPos: 4, destPos: 4 },   // e → i
+//   { tag: 'insert', srcPos: 6, destPos: 6 } ]   // g
 ```
 
 See [Comparing strings](/guides/comparing-strings/#recovering-the-edits).
@@ -68,7 +75,7 @@ See [Comparing strings](/guides/comparing-strings/#recovering-the-edits).
 The default for **typo tolerance on whole strings**: misspelled words, OCR
 output, close variants of codes and identifiers. Reach elsewhere when:
 
-- Swapped adjacent letters (`teh`) should count as *one* mistake →
+- Swapped adjacent letters (`teh`) should count as _one_ mistake →
   [OSA](/algorithms/osa/).
 - Word order or extra words are the real difference →
   [Fuzz](/algorithms/fuzz/) token metrics.
