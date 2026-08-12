@@ -5,18 +5,29 @@
  * Run through `ngram-index-scale.ts`, which bundles this file — it reaches into
  * `src/`, so node cannot execute it directly.
  *
- * Parity runs first and throws on the first mismatch: a latency number for a
- * wrong result is worth nothing. Rows are written as JSON lines as they are
- * produced, so an interrupted run still leaves usable output.
+ * Every measuring mode runs a smoke parity suite first, under the same build and
+ * key configuration it is about to measure, and throws on the first mismatch: a
+ * latency number for a wrong result is worth nothing. `--parity` is the
+ * exhaustive version of the same check. Rows are written as JSON lines as they
+ * are produced, so an interrupted run still leaves usable output, and each row
+ * carries the configuration that produced it — two runs differing only in
+ * `--build` or `--keys` are otherwise indistinguishable after the fact.
  */
 
+import { type Dirent, readdirSync } from 'node:fs'
 import process from 'node:process'
+import { pathToFileURL } from 'node:url'
 
 import { similarity as cosineMetric } from '../../src/algorithms/cosine/index.js'
 import { similarity as diceMetric } from '../../src/algorithms/dice/index.js'
 import { buildProfile, NGramProfile } from '../../src/algorithms/shared/ngram.js'
 import { createMatcher, createScorer } from '../../src/index.js'
-import { NGramIndex, type IndexCounters, type Scored } from './ngramIndex.js'
+import {
+  feasibleRadices,
+  NGramIndex,
+  type IndexCounters,
+  type Scored,
+} from './ngramIndex.js'
 
 type Metric = 'dice' | 'cosine'
 
@@ -38,15 +49,17 @@ interface ExhaustiveMatcher {
   ): { readonly key: number; readonly score: number } | undefined
 }
 
+// `createMatcher` takes a `readonly TItem[]`, so the corpus goes in as it is. A
+// defensive copy here would be charged to `matcherBuildMs`, and no caller
+// comparing an index against a Matcher would ever make one.
 function matcherFor(
   metric: Metric,
   gramSize: number,
   choices: readonly string[],
 ): ExhaustiveMatcher {
-  const items = [...choices]
   return metric === 'dice'
-    ? createMatcher(items, { scorer: createScorer(diceMetric, { gramSize }) })
-    : createMatcher(items, { scorer: createScorer(cosineMetric, { gramSize }) })
+    ? createMatcher(choices, { scorer: createScorer(diceMetric, { gramSize }) })
+    : createMatcher(choices, { scorer: createScorer(cosineMetric, { gramSize }) })
 }
 
 // ---------------------------------------------------------------- corpora
@@ -74,9 +87,14 @@ const LOWER: readonly string[] = [...'abcdefghijklmnopqrstuvwxyz']
  * lists. The sweep exists because the first round measured only 2 and 26, which
  * left the whole middle of the range — where the index stops paying — unmeasured.
  */
-type CorpusClass = `alphabet-${number}` | 'zipf-words'
+type CorpusClass = `alphabet-${number}` | 'zipf-words' | 'file-paths'
 
-const CORPUS_CLASSES: readonly CorpusClass[] = ['alphabet-2', 'alphabet-26', 'zipf-words']
+const CORPUS_CLASSES: readonly CorpusClass[] = [
+  'alphabet-2',
+  'alphabet-26',
+  'zipf-words',
+  'file-paths',
+]
 
 const SWEEP_CLASSES: readonly CorpusClass[] = [
   'alphabet-3',
@@ -111,9 +129,18 @@ const QUERY_CLASSES: readonly QueryClass[] = [
   'rare substring',
 ]
 
+/**
+ * How many distinct queries each class carries. One query per class, timed in a
+ * loop, touches exactly the same posting slices on every iteration — which the
+ * index likes and the exhaustive arm, walking the whole corpus regardless,
+ * cannot benefit from. Cycling through several spreads the footprint. Counters
+ * are still read from the first, since they describe one query.
+ */
+const QUERY_VARIANTS = 8
+
 interface Corpus {
   readonly choices: string[]
-  readonly queries: ReadonlyMap<QueryClass, string>
+  readonly queries: ReadonlyMap<QueryClass, readonly string[]>
   /**
    * A uniform-random corpus has a flat gram distribution, so its "common" and
    * "rare" substring queries are the same class by construction. Only
@@ -139,6 +166,16 @@ function word(next: () => number, length: number, alphabet: readonly string[]): 
   return characters.join('')
 }
 
+/**
+ * `count` substitutions at `count` *distinct* positions, so the "2 typos" row
+ * measures two typos.
+ *
+ * Picking each position independently let two edits land on the same character,
+ * and on a small alphabet the second could restore the first — a "2 typos" query
+ * that was an exact hit. A partial Fisher-Yates over the positions samples
+ * without replacement, which is the only version of this the row's label is true
+ * of.
+ */
 function substitute(
   next: () => number,
   source: string,
@@ -146,8 +183,14 @@ function substitute(
   alphabet: readonly string[],
 ): string {
   const characters = [...source]
-  for (let edit = 0; edit < count && characters.length > 0; edit++) {
-    const at = Math.floor(next() * characters.length)
+  const positions: number[] = characters.map((_value, index) => index)
+  const edits = Math.min(count, characters.length)
+  for (let edit = 0; edit < edits; edit++) {
+    const picked = edit + Math.floor(next() * (positions.length - edit))
+    const swap = positions[edit]
+    positions[edit] = positions[picked]
+    positions[picked] = swap
+    const at = positions[edit]
     let replacement = alphabet[Math.floor(next() * alphabet.length)]
     while (replacement === characters[at]) {
       replacement = alphabet[Math.floor(next() * alphabet.length)]
@@ -180,22 +223,45 @@ function zipfCorpus(count: number, gramSize: number): Corpus {
     for (let part = 0; part < 4; part++) parts.push(pick())
     choices.push(parts.join(' '))
   }
-  const hit = choices[Math.floor(count / 2)] ?? vocabulary[0]
-  const frequent = vocabulary[0]
-  const rare = vocabulary[vocabulary.length - 1]
+  const hits = spread(choices, vocabulary[0])
+  const variants = (build: (hit: string, at: number) => string): string[] =>
+    hits.map(build)
   return {
     choices,
-    queries: new Map<QueryClass, string>([
-      ['exact hit', hit],
-      ['1 typo', substitute(next, hit, 1, LOWER)],
-      ['2 typos', substitute(next, hit, 2, LOWER)],
-      ['unrelated', `${word(next, 6, LOWER)} ${word(next, 7, LOWER)}`],
-      ['short', hit.slice(0, gramSize + 2)],
-      ['common substring', `${frequent} ${frequent}`],
-      ['rare substring', `${rare} ${rare}`],
+    queries: new Map<QueryClass, readonly string[]>([
+      ['exact hit', hits],
+      ['1 typo', variants((hit) => substitute(next, hit, 1, LOWER))],
+      ['2 typos', variants((hit) => substitute(next, hit, 2, LOWER))],
+      ['unrelated', variants(() => `${word(next, 6, LOWER)} ${word(next, 7, LOWER)}`)],
+      ['short', variants((hit) => hit.slice(0, gramSize + 2))],
+      // Ranked vocabularies, so "common" is the head of the Zipf curve and
+      // "rare" its tail — the pair the uniform corpora cannot separate.
+      ['common substring', variants((_hit, at) => `${vocabulary[at]} ${vocabulary[at]}`)],
+      [
+        'rare substring',
+        variants((_hit, at) => {
+          const rare = vocabulary[vocabulary.length - 1 - at]
+          return `${rare} ${rare}`
+        }),
+      ],
     ]),
     separatesFrequency: true,
   }
+}
+
+/**
+ * `QUERY_VARIANTS` entries drawn evenly across the corpus rather than from one
+ * end: adjacent choices in these corpora were generated back to back, so a
+ * contiguous slice would share more posting lists with itself than the corpus
+ * average.
+ */
+function spread(choices: readonly string[], fallback: string): string[] {
+  const picked: string[] = []
+  for (let at = 0; at < QUERY_VARIANTS; at++) {
+    const index = Math.floor((choices.length * (at + 0.5)) / QUERY_VARIANTS)
+    picked.push(choices[index] ?? fallback)
+  }
+  return picked
 }
 
 function uniformCorpus(
@@ -207,25 +273,123 @@ function uniformCorpus(
   const next = rng(seed)
   const choices: string[] = []
   for (let index = 0; index < count; index++) choices.push(word(next, 24, alphabet))
-  const hit = choices[Math.floor(count / 2)] ?? word(next, 24, alphabet)
-  const other = choices[0] ?? hit
+  const hits = spread(choices, word(next, 24, alphabet))
+  const variants = (build: (hit: string, at: number) => string): string[] =>
+    hits.map(build)
   return {
     choices,
-    queries: new Map<QueryClass, string>([
-      ['exact hit', hit],
-      ['1 typo', substitute(next, hit, 1, alphabet)],
-      ['2 typos', substitute(next, hit, 2, alphabet)],
-      ['unrelated', word(next, 24, alphabet)],
-      ['short', hit.slice(0, gramSize + 2)],
-      ['common substring', hit.slice(0, 12)],
-      ['rare substring', other.slice(0, 12)],
+    queries: new Map<QueryClass, readonly string[]>([
+      ['exact hit', hits],
+      ['1 typo', variants((hit) => substitute(next, hit, 1, alphabet))],
+      ['2 typos', variants((hit) => substitute(next, hit, 2, alphabet))],
+      ['unrelated', variants(() => word(next, 24, alphabet))],
+      ['short', variants((hit) => hit.slice(0, gramSize + 2))],
+      ['common substring', variants((hit) => hit.slice(0, 12))],
+      ['rare substring', variants((hit) => hit.slice(12))],
     ]),
     separatesFrequency: false,
   }
 }
 
+/**
+ * Real file paths, which is what a fuzzy finder is actually pointed at: mixed
+ * case, punctuation, long shared prefixes, and a segment-frequency curve nobody
+ * chose. The synthetic sweep says where the crossover is; this says which side
+ * of it a real workload sits on.
+ *
+ * Derived from the checkout rather than committed — `node_modules` after
+ * `pnpm install` is ~13k paths — and sorted, so a run is reproducible on the
+ * same install. It does not tile to reach a requested size: repeating a corpus
+ * would hand the index duplicate posting entries it would never see in life.
+ */
+function filePathCorpus(count: number, gramSize: number): Corpus {
+  const paths = realPaths()
+  if (paths.length < count) {
+    throw new RangeError(
+      `the file-path corpus holds ${paths.length} entries, short of ${count}`,
+    )
+  }
+  // Strided rather than sliced. The list is sorted, so its first thousand
+  // entries are one or two packages' worth of near-identical paths — a subset far
+  // more self-similar than the tree it came from, which would be a fake corpus
+  // wearing a real one's name. A stride samples the whole tree at any size, and
+  // is the identity when the whole corpus is asked for.
+  const stride = Math.max(1, Math.floor(paths.length / count))
+  const choices: string[] = new Array<string>(count)
+  for (let at = 0; at < count; at++) choices[at] = paths[at * stride]
+  const next = rng(0x0c0f_fee1)
+  const hits = spread(choices, 'index.js')
+  const segments = new Map<string, number>()
+  for (const each of choices) {
+    for (const segment of each.split('/')) {
+      segments.set(segment, (segments.get(segment) ?? 0) + 1)
+    }
+  }
+  const ranked = [...segments.entries()]
+    .filter(([segment]) => segment.length >= gramSize)
+    .sort((left, right) => right[1] - left[1] || (left[0] < right[0] ? -1 : 1))
+  const at = (index: number): string => ranked[index]?.[0] ?? 'index.js'
+  const variants = (build: (hit: string, index: number) => string): string[] =>
+    hits.map(build)
+  return {
+    choices,
+    queries: new Map<QueryClass, readonly string[]>([
+      ['exact hit', hits],
+      ['1 typo', variants((hit) => substitute(next, hit, 1, LOWER))],
+      ['2 typos', variants((hit) => substitute(next, hit, 2, LOWER))],
+      ['unrelated', variants(() => `${word(next, 8, LOWER)}/${word(next, 11, LOWER)}`)],
+      [
+        'short',
+        variants((hit) =>
+          hit.slice(hit.lastIndexOf('/') + 1, hit.lastIndexOf('/') + 1 + gramSize + 2),
+        ),
+      ],
+      ['common substring', variants((_hit, index) => at(index))],
+      ['rare substring', variants((_hit, index) => at(ranked.length - 1 - index))],
+    ]),
+    separatesFrequency: true,
+  }
+}
+
+let cachedPaths: readonly string[] | null = null
+
+function realPaths(): readonly string[] {
+  if (cachedPaths !== null) return cachedPaths
+  // From the working directory, not `import.meta.url`: the launcher bundles this
+  // file into a temp directory, so a module-relative path would resolve there.
+  const root = new URL('node_modules/', pathToFileURL(`${process.cwd()}/`))
+  const found: string[] = []
+  const walk = (directory: URL, prefix: string): void => {
+    let entries: readonly Dirent[]
+    try {
+      entries = readdirSync(directory, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      const name = `${prefix}${entry.name}`
+      if (entry.isDirectory()) walk(new URL(`${entry.name}/`, directory), `${name}/`)
+      else if (entry.isFile()) found.push(name)
+    }
+  }
+  walk(root, '')
+  found.sort()
+  cachedPaths = found
+  return found
+}
+
+/**
+ * Real corpora do not tile, so they cap the sizes they can appear at. Returned
+ * rather than thrown, because a run that asks for every size should measure the
+ * real corpus where it exists and skip it above that, not fail.
+ */
+function maxSizeFor(kind: CorpusClass): number {
+  return kind === 'file-paths' ? realPaths().length : Number.POSITIVE_INFINITY
+}
+
 function corpusOf(kind: CorpusClass, count: number, gramSize: number): Corpus {
   if (kind === 'zipf-words') return zipfCorpus(count, gramSize)
+  if (kind === 'file-paths') return filePathCorpus(count, gramSize)
   const letters = Number(kind.slice('alphabet-'.length))
   if (!Number.isSafeInteger(letters) || letters < 2 || letters > LOWER.length) {
     throw new RangeError(`alphabet size ${kind} is outside 2..${LOWER.length}`)
@@ -241,19 +405,73 @@ interface BuiltIndex {
 }
 
 /**
- * The fair build: every choice's profile is constructed here and dropped again,
- * because building one per choice is exactly what a Matcher pays during
- * construction. Handing prepared profiles to `add` would answer a different
- * question and answer it flatteringly.
+ * `direct` extracts grams straight from the text; `profile` goes the long way
+ * round, building an `NGramProfile` per choice and dropping it — which is what a
+ * Matcher pays during construction, and so the fair comparison for build cost.
  */
-let packedKeys = true
-let startRadix: number | null = null
-let directBuild = false
+type BuildMode = 'profile' | 'direct'
 
-function buildIndex(choices: readonly string[], gramSize: number): BuiltIndex {
+/**
+ * Which rung of the packed-key ladder an index starts on, or `string` for the
+ * joined-string keys. `auto` starts on the narrowest rung the gram size allows —
+ * a byte, up to gram size 6 — and widens when an element does not fit.
+ */
+type KeyMode = 'auto' | 'bmp' | 'full' | 'string'
+
+/**
+ * One value rather than three loose flags, and it travels into every row this
+ * script emits. Two runs differing only in `--keys` produce byte-identical rows
+ * otherwise, so a JSON file that does not carry this is a file whose numbers
+ * cannot be attributed afterwards.
+ */
+interface ExperimentConfig {
+  readonly buildMode: BuildMode
+  readonly keyMode: KeyMode
+}
+
+const START_RADIX: Readonly<Record<KeyMode, number | null>> = {
+  auto: null,
+  bmp: 0x1_0000,
+  full: 0x11_0000,
+  string: null,
+}
+
+/**
+ * Whether a pinned rung can hold a gram of this depth. The ladder's reach falls
+ * as depth rises — a byte to six elements, a BMP word to three, the full
+ * code-point range to two — so `--keys=full` is a trigram request the packing
+ * cannot answer, and a parity sweep has to skip that pair rather than fail on it.
+ */
+function supports(config: ExperimentConfig, gramSize: number): boolean {
+  const rung = START_RADIX[config.keyMode]
+  return (
+    config.keyMode === 'string' ||
+    rung === null ||
+    feasibleRadices(gramSize).includes(rung)
+  )
+}
+
+function indexFor(
+  gramSize: number,
+  choiceCount: number,
+  config: ExperimentConfig,
+): NGramIndex {
+  return new NGramIndex(
+    gramSize,
+    choiceCount,
+    config.keyMode !== 'string',
+    START_RADIX[config.keyMode],
+  )
+}
+
+function buildIndex(
+  choices: readonly string[],
+  gramSize: number,
+  config: ExperimentConfig,
+): BuiltIndex {
   const started = process.hrtime.bigint()
-  const index = new NGramIndex(gramSize, choices.length, packedKeys, startRadix)
-  if (directBuild) {
+  const index = indexFor(gramSize, choices.length, config)
+  if (config.buildMode === 'direct') {
     for (let id = 0; id < choices.length; id++) index.addSequence(id, choices[id])
   } else {
     for (let id = 0; id < choices.length; id++) {
@@ -296,16 +514,32 @@ interface ParityCase {
   readonly query: string
   readonly threshold: number | null
   readonly limit: number | null
+  readonly config: ExperimentConfig
 }
+
+/**
+ * `addSequence` and `add` are two separate builders, and each key scheme is a
+ * separate keying path, so parity has to cover the product rather than whichever
+ * configuration the last flag happened to select. `bmp` and `full` pin rungs the
+ * ladder would otherwise only reach when a wide element forces it.
+ */
+const CONFIGS: readonly ExperimentConfig[] = [
+  { buildMode: 'profile', keyMode: 'auto' },
+  { buildMode: 'profile', keyMode: 'string' },
+  { buildMode: 'direct', keyMode: 'auto' },
+  { buildMode: 'direct', keyMode: 'string' },
+  { buildMode: 'direct', keyMode: 'bmp' },
+  { buildMode: 'profile', keyMode: 'full' },
+]
 
 function label(each: ParityCase, call: 'search' | 'best'): string {
   return `${call} ${JSON.stringify(each)}`
 }
 
 function checkCase(each: ParityCase): void {
-  const { metric, gramSize, choices, query, threshold, limit } = each
+  const { metric, gramSize, choices, query, threshold, limit, config } = each
   const matcher = matcherFor(metric, gramSize, choices)
-  const index = buildIndex(choices, gramSize).index
+  const index = buildIndex(choices, gramSize, config).index
   const profile = buildProfile(query, gramSize)
 
   const expectedSearch = matcher.search(
@@ -429,16 +663,23 @@ const FIXED_QUERIES: readonly string[] = [
   'qqq',
 ]
 
-function fixedParity(): number {
+function fixedParity(
+  configs: readonly ExperimentConfig[],
+  corpora: readonly (readonly string[])[],
+  queries: readonly string[],
+): number {
   let cases = 0
-  for (const metric of METRICS) {
-    for (const gramSize of [2, 3]) {
-      for (const choices of FIXED_CORPORA) {
-        for (const query of FIXED_QUERIES) {
-          for (const threshold of THRESHOLDS) {
-            for (const limit of LIMITS) {
-              checkCase({ metric, gramSize, choices, query, threshold, limit })
-              cases++
+  for (const config of configs) {
+    for (const metric of METRICS) {
+      for (const gramSize of [2, 3]) {
+        if (!supports(config, gramSize)) continue
+        for (const choices of corpora) {
+          for (const query of queries) {
+            for (const threshold of THRESHOLDS) {
+              for (const limit of LIMITS) {
+                checkCase({ metric, gramSize, choices, query, threshold, limit, config })
+                cases++
+              }
             }
           }
         }
@@ -448,9 +689,25 @@ function fixedParity(): number {
   return cases
 }
 
+/**
+ * The cheap check every measuring mode runs before it measures anything: the two
+ * corpora that have caught real bugs — astral characters with a lone surrogate,
+ * and a repeated-character corpus — against the configuration about to be timed.
+ * Milliseconds, against a mode that runs for minutes.
+ */
+function smokeParity(config: ExperimentConfig): number {
+  return fixedParity(
+    [config],
+    [FIXED_CORPORA[5], FIXED_CORPORA[6], FIXED_CORPORA[7]],
+    ['abc', 'banana', '😀abc', 'aaaa'],
+  )
+}
+
 async function parity(runs: number): Promise<void> {
-  const cases = fixedParity()
-  process.stdout.write(`${JSON.stringify({ kind: 'parity', mode: 'fixed', cases })}\n`)
+  const cases = fixedParity(CONFIGS, FIXED_CORPORA, FIXED_QUERIES)
+  process.stdout.write(
+    `${JSON.stringify({ kind: 'parity', mode: 'fixed', cases, configs: CONFIGS.length })}\n`,
+  )
 
   const fc = await import('fast-check')
   const letters = fc.constantFrom('a', 'b', 'c', '😀', '\ud800', ' ')
@@ -463,8 +720,10 @@ async function parity(runs: number): Promise<void> {
       fc.constantFrom(...LIMITS),
       fc.constantFrom(2, 3),
       fc.constantFrom(...METRICS),
-      (choices, query, threshold, limit, gramSize, metric) => {
-        checkCase({ metric, gramSize, choices, query, threshold, limit })
+      fc.constantFrom(...CONFIGS),
+      (choices, query, threshold, limit, gramSize, metric, config) => {
+        if (!supports(config, gramSize)) return true
+        checkCase({ metric, gramSize, choices, query, threshold, limit, config })
         return true
       },
     ),
@@ -508,12 +767,15 @@ function retainedBytes(): number {
   return usage.heapUsed + usage.arrayBuffers
 }
 
-function medianOf(values: readonly number[]): number {
-  const sorted = [...values].sort((left, right) => left - right)
-  const middle = sorted.length >> 1
-  return sorted.length % 2 === 1
-    ? sorted[middle]
-    : (sorted[middle - 1] + sorted[middle]) / 2
+function quantile(sorted: readonly number[], fraction: number): number {
+  if (sorted.length === 0) return 0
+  const at = Math.min(sorted.length - 1, Math.floor(fraction * sorted.length))
+  return sorted[at]
+}
+
+interface Latency {
+  readonly p50: number
+  readonly p95: number
 }
 
 /** Where every timed body's result goes, so V8 cannot delete the work. */
@@ -525,17 +787,23 @@ const sink: { value: unknown } = { value: undefined }
  * ten times the work — the first call of three was carrying the median. These are
  * still indicative numbers; `bench/ngramIndex.bench.ts` is where the adaptive
  * sampling lives.
+ *
+ * The body is handed a run number rather than closing over one query, so a case
+ * can rotate through several. Timing one query repeatedly rewarms exactly the
+ * posting slices that query touches, which flatters the index and does nothing
+ * for the exhaustive arm — it walks the whole corpus either way.
  */
-function timeMedian(runs: number, body: () => unknown): number {
+function timeQuantiles(runs: number, body: (run: number) => unknown): Latency {
   const warmups = Math.max(3, runs)
-  for (let run = 0; run < warmups; run++) sink.value = body()
+  for (let run = 0; run < warmups; run++) sink.value = body(run)
   const samples: number[] = []
   for (let run = 0; run < runs; run++) {
     const started = process.hrtime.bigint()
-    sink.value = body()
+    sink.value = body(run)
     samples.push(Number(process.hrtime.bigint() - started) / 1e6)
   }
-  return medianOf(samples)
+  samples.sort((left, right) => left - right)
+  return { p50: quantile(samples, 0.5), p95: quantile(samples, 0.95) }
 }
 
 interface CounterRow {
@@ -546,6 +814,11 @@ interface CounterRow {
   readonly metric: Metric
   readonly queryClass: QueryClass
   readonly separatesFrequency: boolean
+  readonly buildMode: BuildMode
+  readonly keyMode: KeyMode
+  readonly threshold: number
+  readonly limit: number
+  readonly queryVariants: number
   readonly distinctQueryGrams: number
   readonly postingEntriesTouched: number
   readonly postingsPerChoice: number
@@ -554,9 +827,12 @@ interface CounterRow {
   readonly candidatesTouchedRatio: number
   readonly candidatesQualified: number
   readonly indexedMs: number
+  readonly indexedP95Ms: number
   readonly exhaustiveMs: number | null
+  readonly exhaustiveP95Ms: number | null
   /** The prefix-filtered Dice path, where it applies; null for Cosine. */
   readonly filteredMs: number | null
+  readonly filteredP95Ms: number | null
   readonly filteredPostings: number | null
   readonly filteredVerifyProbes: number | null
   readonly filteredVerified: number | null
@@ -568,15 +844,18 @@ interface CounterRow {
   readonly termWeightedShare: number
 }
 
-let counterThreshold = 0.5
 const COUNTER_LIMIT = 5
 /** Above this, a Matcher's profiles no longer fit beside the index. */
 const EXHAUSTIVE_LIMIT = 100_000
 
+/**
+ * Enough samples for a p95 to mean something, without letting the exhaustive arm
+ * at 100k — tens of milliseconds a query — set the length of the whole pass.
+ */
 function counterRuns(n: number): number {
-  if (n >= 100_000) return 3
-  if (n >= 10_000) return 7
-  return 21
+  if (n >= 100_000) return 5
+  if (n >= 10_000) return 15
+  return 31
 }
 
 function counterRows(
@@ -585,6 +864,8 @@ function counterRows(
   gramSize: number,
   corpus: Corpus,
   built: BuiltIndex,
+  config: ExperimentConfig,
+  threshold: number,
 ): CounterRow[] {
   const index = built.index
   const statistics = index.postingStatistics()
@@ -600,47 +881,51 @@ function counterRows(
       if (matcher.size !== n) throw new Error('matcher lost choices')
     }
     for (const queryClass of QUERY_CLASSES) {
-      const query = corpus.queries.get(queryClass)
-      if (query === undefined) throw new Error(`missing query class ${queryClass}`)
-      // One call to fill the counters, then the timed runs. Each timed run
-      // rebuilds the query profile, because a real query would.
+      const variants = corpus.queries.get(queryClass)
+      if (variants === undefined || variants.length === 0) {
+        throw new Error(`missing query class ${queryClass}`)
+      }
+      // Counters describe one query, so they come from the first variant. The
+      // timed runs rotate, and each rebuilds the query profile, because a real
+      // query would.
+      const rotate = (run: number): string => variants[run % variants.length]
       indexedSearch(
         index,
         metric,
-        buildProfile(query, gramSize),
-        counterThreshold,
+        buildProfile(variants[0], gramSize),
+        threshold,
         COUNTER_LIMIT,
       )
       const counters = { ...index.counters }
-      const indexedMs = timeMedian(runs, () =>
+      const indexed = timeQuantiles(runs, (run) =>
         indexedSearch(
           index,
           metric,
-          buildProfile(query, gramSize),
-          counterThreshold,
+          buildProfile(rotate(run), gramSize),
+          threshold,
           COUNTER_LIMIT,
         ),
       )
       const held = matcher
-      const exhaustiveMs =
+      const exhaustive =
         held === null
           ? null
-          : timeMedian(runs, () =>
-              held.search(query, { limit: COUNTER_LIMIT, threshold: counterThreshold }),
+          : timeQuantiles(runs, (run) =>
+              held.search(rotate(run), { limit: COUNTER_LIMIT, threshold }),
             )
-      let filteredMs: number | null = null
+      let filtered: Latency | null = null
       let filteredCounters: IndexCounters | null = null
       if (metric === 'dice') {
         index.dicePrefixSearch(
-          buildProfile(query, gramSize),
-          counterThreshold,
+          buildProfile(variants[0], gramSize),
+          threshold,
           COUNTER_LIMIT,
         )
         filteredCounters = { ...index.counters }
-        filteredMs = timeMedian(runs, () =>
+        filtered = timeQuantiles(runs, (run) =>
           index.dicePrefixSearch(
-            buildProfile(query, gramSize),
-            counterThreshold,
+            buildProfile(rotate(run), gramSize),
+            threshold,
             COUNTER_LIMIT,
           ),
         )
@@ -653,6 +938,11 @@ function counterRows(
         metric,
         queryClass,
         separatesFrequency: corpus.separatesFrequency,
+        buildMode: config.buildMode,
+        keyMode: config.keyMode,
+        threshold,
+        limit: COUNTER_LIMIT,
+        queryVariants: variants.length,
         distinctQueryGrams: counters.distinctQueryGrams,
         postingEntriesTouched: counters.postingEntriesTouched,
         postingsPerChoice: counters.postingEntriesTouched / n,
@@ -663,9 +953,12 @@ function counterRows(
         candidatesTouched: counters.candidatesTouched,
         candidatesTouchedRatio: counters.candidatesTouched / n,
         candidatesQualified: counters.candidatesQualified,
-        indexedMs,
-        exhaustiveMs,
-        filteredMs,
+        indexedMs: indexed.p50,
+        indexedP95Ms: indexed.p95,
+        exhaustiveMs: exhaustive === null ? null : exhaustive.p50,
+        exhaustiveP95Ms: exhaustive === null ? null : exhaustive.p95,
+        filteredMs: filtered === null ? null : filtered.p50,
+        filteredP95Ms: filtered === null ? null : filtered.p95,
         filteredPostings:
           filteredCounters === null ? null : filteredCounters.postingEntriesTouched,
         filteredVerifyProbes:
@@ -684,7 +977,22 @@ function counterRows(
   return rows
 }
 
-type Arm = 'index' | 'profiles'
+/**
+ * Three arms, because there are two honest comparisons and they answer different
+ * questions.
+ *
+ * `index` against `profiles` is the **representation** question — one corpus-wide
+ * inverted structure against the N prepared `NGramProfile`s it would replace, and
+ * nothing else on either side. That is the architectural claim.
+ *
+ * `index` against `matcher` is the **product** question — what a caller actually
+ * retains. A Matcher also keeps a row per choice holding the item, its key and
+ * its prepared value, so this arm is larger than `profiles` by an amount that
+ * grows with N. Reporting only this one against a bare index would flatter the
+ * index by charging the Matcher for bookkeeping an indexed Matcher would still
+ * have to do.
+ */
+type Arm = 'index' | 'profiles' | 'matcher'
 
 interface MemoryRow {
   readonly kind: 'memory'
@@ -692,6 +1000,8 @@ interface MemoryRow {
   readonly corpus: CorpusClass
   readonly gramSize: number
   readonly arm: Arm
+  readonly buildMode: BuildMode
+  readonly keyMode: KeyMode
   readonly bytes: number
   readonly bytesPerChoice: number
 }
@@ -711,25 +1021,33 @@ function measureArm(
   corpusClass: CorpusClass,
   gramSize: number,
   arm: Arm,
+  config: ExperimentConfig,
 ): MemoryRow {
   // 331 MiB per 100k prepared bigram profiles extrapolates to ~3.3 GiB at a
   // million, which measures the collector rather than the representation. The
   // 1M profile figure belongs in the writeup as an extrapolation, labelled.
-  if (arm === 'profiles' && n > 100_000) {
-    throw new RangeError('the profile arm stops at 100k — extrapolate above it')
+  if (arm !== 'index' && n > 100_000) {
+    throw new RangeError('the profile arms stop at 100k — extrapolate above them')
   }
   const corpus = corpusOf(corpusClass, n, gramSize)
   collect()
   const before = retainedBytes()
   let held: number = 0
   if (arm === 'index') {
-    const built = buildIndex(corpus.choices, gramSize)
+    const built = buildIndex(corpus.choices, gramSize, config)
     collect()
     held = retainedBytes() - before
     if (built.index.choiceCount !== n) throw new Error('index lost choices')
     if (n <= 100_000 && retainsProfile(built.index, 0)) {
       throw new Error('the index retained an NGramProfile — the memory claim is void')
     }
+  } else if (arm === 'profiles') {
+    const profiles: NGramProfile[] = new Array<NGramProfile>(n)
+    for (let id = 0; id < n; id++)
+      profiles[id] = buildProfile(corpus.choices[id], gramSize)
+    collect()
+    held = retainedBytes() - before
+    if (profiles.length !== n) throw new Error('profiles lost choices')
   } else {
     const matcher = matcherFor('dice', gramSize, corpus.choices)
     collect()
@@ -742,8 +1060,93 @@ function measureArm(
     corpus: corpusClass,
     gramSize,
     arm,
+    buildMode: config.buildMode,
+    keyMode: config.keyMode,
     bytes: held,
     bytesPerChoice: held / n,
+  }
+}
+
+interface PeakRow {
+  readonly kind: 'peak'
+  readonly n: number
+  readonly corpus: CorpusClass
+  readonly gramSize: number
+  readonly buildMode: BuildMode
+  readonly keyMode: KeyMode
+  /** The corpus itself, held before the build starts and after it ends. */
+  readonly corpusBytes: number
+  readonly peakHeapBytes: number
+  readonly peakArrayBufferBytes: number
+  readonly peakRssBytes: number
+  /** Peak heap over the corpus baseline: what the build itself needed. */
+  readonly peakBuildBytes: number
+  /** Retained over the corpus baseline, matching what `--memory` reports. */
+  readonly retainedBytes: number
+  readonly buildMs: number
+}
+
+/**
+ * What the build costs at its worst, not what it leaves behind.
+ *
+ * Until `compact()` runs, every posting list is a pair of growable JS arrays
+ * inside a Map, so the heap at that moment is nothing like the CSR arrays the
+ * index settles into. The retained figure is the architectural claim; this is
+ * the number that decides whether a corpus can be indexed at all on a given
+ * machine, and it is the one thing the retained measurement cannot show.
+ *
+ * Sampled inside the build loop rather than on a timer: the build is one
+ * synchronous run, so nothing else would ever get to look.
+ */
+function measurePeak(
+  n: number,
+  corpusClass: CorpusClass,
+  gramSize: number,
+  config: ExperimentConfig,
+): PeakRow {
+  const corpus = corpusOf(corpusClass, n, gramSize)
+  collect()
+  // A million 24-character strings are tens of megabytes on their own, and they
+  // are the caller's, not the index's. Every figure below is over this line.
+  const baseline = retainedBytes()
+  let peakHeap = 0
+  let peakBuffers = 0
+  let peakRss = 0
+  const sample = (): void => {
+    const usage = process.memoryUsage()
+    if (usage.heapUsed > peakHeap) peakHeap = usage.heapUsed
+    if (usage.arrayBuffers > peakBuffers) peakBuffers = usage.arrayBuffers
+    if (usage.rss > peakRss) peakRss = usage.rss
+  }
+  const every = Math.max(1, Math.floor(n / 1_000))
+  const index = indexFor(gramSize, n, config)
+  const started = process.hrtime.bigint()
+  for (let id = 0; id < n; id++) {
+    if (config.buildMode === 'direct') index.addSequence(id, corpus.choices[id])
+    else index.add(id, buildProfile(corpus.choices[id], gramSize))
+    if (id % every === 0) sample()
+  }
+  sample()
+  index.compact()
+  sample()
+  const buildMs = Number(process.hrtime.bigint() - started) / 1e6
+  collect()
+  const retained = retainedBytes()
+  if (index.choiceCount !== n) throw new Error('index lost choices')
+  return {
+    kind: 'peak',
+    n,
+    corpus: corpusClass,
+    gramSize,
+    buildMode: config.buildMode,
+    keyMode: config.keyMode,
+    corpusBytes: baseline,
+    peakHeapBytes: peakHeap,
+    peakArrayBufferBytes: peakBuffers,
+    peakRssBytes: peakRss,
+    peakBuildBytes: peakHeap - baseline,
+    retainedBytes: retained - baseline,
+    buildMs,
   }
 }
 
@@ -752,14 +1155,21 @@ function measureArm(
  * what one query of each class costs against it, beside the number of
  * candidates the exhaustive Matcher would have scored.
  */
-function summarise(n: number, corpusClass: CorpusClass, gramSize: number): void {
+function summarise(
+  n: number,
+  corpusClass: CorpusClass,
+  gramSize: number,
+  threshold: number,
+  config: ExperimentConfig,
+): void {
   const corpus = corpusOf(corpusClass, n, gramSize)
-  const built = buildIndex(corpus.choices, gramSize)
+  const built = buildIndex(corpus.choices, gramSize, config)
   const index = built.index
   const stats = index.postingStatistics()
   const percent = (value: number): string => `${(value * 100).toFixed(1)}%`
   process.stdout.write(
-    `\n  ${corpusClass}, gram size ${gramSize}\n` +
+    `\n  ${corpusClass}, gram size ${gramSize}, threshold ${threshold}, ` +
+      `${config.buildMode} build, ${config.keyMode} keys\n` +
       `    choices                ${n.toLocaleString().padStart(12)}\n` +
       `    distinct grams         ${stats.distinctGrams.toLocaleString().padStart(12)}\n` +
       `    posting entries        ${stats.totalEntries.toLocaleString().padStart(12)}\n` +
@@ -774,9 +1184,11 @@ function summarise(n: number, corpusClass: CorpusClass, gramSize: number): void 
       `\n    query              postings   candidates   verified   scored by Matcher\n`,
   )
   for (const queryClass of QUERY_CLASSES) {
-    const query = corpus.queries.get(queryClass)
-    if (query === undefined) throw new Error(`missing query class ${queryClass}`)
-    index.dicePrefixSearch(buildProfile(query, gramSize), 0.8, 5)
+    const variants = corpus.queries.get(queryClass)
+    if (variants === undefined || variants.length === 0) {
+      throw new Error(`missing query class ${queryClass}`)
+    }
+    index.dicePrefixSearch(buildProfile(variants[0], gramSize), threshold, COUNTER_LIMIT)
     const counters = { ...index.counters }
     process.stdout.write(
       `    ${queryClass.padEnd(17)}${counters.postingEntriesTouched.toLocaleString().padStart(9)}` +
@@ -791,7 +1203,7 @@ function summarise(n: number, corpusClass: CorpusClass, gramSize: number): void 
 
 const SIZES: readonly number[] = [100, 1_000, 10_000, 100_000, 1_000_000]
 
-type Mode = 'parity' | 'counters' | 'memory' | 'summary'
+type Mode = 'parity' | 'counters' | 'memory' | 'peak' | 'summary'
 
 interface Options {
   readonly mode: Mode
@@ -803,9 +1215,7 @@ interface Options {
   readonly arm: Arm | null
   readonly threshold: number
   readonly sweep: boolean
-  readonly packedKeys: boolean
-  readonly startRadix: number | null
-  readonly directBuild: boolean
+  readonly config: ExperimentConfig
 }
 
 function corpusClassOf(value: string): CorpusClass {
@@ -817,8 +1227,20 @@ function corpusClassOf(value: string): CorpusClass {
 }
 
 function armOf(value: string): Arm {
-  if (value === 'index' || value === 'profiles') return value
-  throw new Error(`unknown arm ${value}`)
+  if (value === 'index' || value === 'profiles' || value === 'matcher') return value
+  throw new Error(`unknown arm ${value} — index, profiles or matcher`)
+}
+
+function keyModeOf(value: string): KeyMode {
+  if (value === 'auto' || value === 'bmp' || value === 'full' || value === 'string') {
+    return value
+  }
+  throw new Error(`unknown key mode ${value} — auto, bmp, full or string`)
+}
+
+function buildModeOf(value: string): BuildMode {
+  if (value === 'profile' || value === 'direct') return value
+  throw new Error(`unknown build mode ${value} — profile or direct`)
 }
 
 function numberOf(argument: string, prefix: string): number {
@@ -829,6 +1251,12 @@ function numberOf(argument: string, prefix: string): number {
   return value
 }
 
+/**
+ * `--keys` is one value rather than interacting flags. Two of them used to write
+ * to separate variables, so `--keys=bmp --keys=string` left a string-keyed index
+ * carrying a pinned BMP rung — a state no single flag asks for and no row
+ * recorded.
+ */
 function parseOptions(): Options {
   let mode: Mode = 'counters'
   let max = 1_000_000
@@ -839,25 +1267,28 @@ function parseOptions(): Options {
   let arm: Arm | null = null
   let threshold = 0.5
   let sweep = false
-  let packedKeys = true
-  let startRadix: number | null = null
-  let directBuild = false
+  let keyMode: KeyMode = 'auto'
+  let buildMode: BuildMode = 'profile'
   for (const argument of process.argv.slice(2)) {
     if (argument === '--parity') mode = 'parity'
     else if (argument === '--counters') mode = 'counters'
     else if (argument === '--memory') mode = 'memory'
+    else if (argument === '--peak') mode = 'peak'
     else if (argument === '--summary') mode = 'summary'
     else if (argument === '--sweep') sweep = true
-    else if (argument === '--build=direct') directBuild = true
-    else if (argument === '--build=profile') directBuild = false
-    else if (argument === '--keys=string') packedKeys = false
-    else if (argument === '--keys=packed') packedKeys = true
-    else if (argument === '--keys=bmp') startRadix = 0x1_0000
-    else if (argument.startsWith('--max=')) max = numberOf(argument, '--max=')
+    else if (argument.startsWith('--build=')) {
+      buildMode = buildModeOf(argument.slice('--build='.length))
+    } else if (argument.startsWith('--keys=')) {
+      keyMode = keyModeOf(argument.slice('--keys='.length))
+    } else if (argument.startsWith('--max=')) max = numberOf(argument, '--max=')
     else if (argument.startsWith('--runs=')) runs = numberOf(argument, '--runs=')
     else if (argument.startsWith('--n=')) n = numberOf(argument, '--n=')
-    else if (argument.startsWith('--gram=')) gramSize = numberOf(argument, '--gram=')
-    else if (argument.startsWith('--threshold=')) {
+    else if (argument.startsWith('--gram=')) {
+      gramSize = numberOf(argument, '--gram=')
+      // The corpora and the query classes are written for these two depths, and
+      // anything else used to parse, then match no size, then print nothing.
+      if (gramSize !== 2 && gramSize !== 3) throw new RangeError('--gram must be 2 or 3')
+    } else if (argument.startsWith('--threshold=')) {
       threshold = Number(argument.slice('--threshold='.length))
       if (!(threshold > 0 && threshold <= 1)) {
         throw new RangeError('--threshold must be inside (0, 1]')
@@ -878,9 +1309,7 @@ function parseOptions(): Options {
     arm,
     threshold,
     sweep,
-    packedKeys,
-    startRadix,
-    directBuild,
+    config: { buildMode, keyMode },
   }
 }
 
@@ -894,45 +1323,79 @@ function gramSizesFor(n: number): readonly number[] {
 }
 
 const options = parseOptions()
-counterThreshold = options.threshold
-packedKeys = options.packedKeys
-startRadix = options.startRadix
-directBuild = options.directBuild
+
+/**
+ * `--n` names a size, it does not filter the standard ladder. Asking for 50,000
+ * used to be accepted, match nothing in `SIZES`, and print an empty run that
+ * looked like a finished one.
+ */
+function sizesFor(chosen: Options): readonly number[] {
+  return chosen.n === null ? SIZES.filter((size) => size <= chosen.max) : [chosen.n]
+}
+
+function classesFor(chosen: Options): readonly CorpusClass[] {
+  const all = chosen.sweep ? SWEEP_CLASSES : CORPUS_CLASSES
+  return chosen.corpus === null ? all : [chosen.corpus]
+}
+
+function depthsFor(chosen: Options, n: number): readonly number[] {
+  return gramSizesFor(n).filter(
+    (each) =>
+      (chosen.gramSize === null || each === chosen.gramSize) &&
+      supports(chosen.config, each),
+  )
+}
 
 if (options.mode === 'parity') {
   await parity(options.runs)
 } else if (options.mode === 'memory') {
-  const { n, corpus, gramSize, arm } = options
+  const { n, corpus, gramSize, arm, config } = options
   if (n === null || corpus === null || gramSize === null || arm === null) {
     throw new Error('--memory needs --n, --corpus, --gram and --arm')
   }
-  process.stdout.write(`${JSON.stringify(measureArm(n, corpus, gramSize, arm))}\n`)
-} else if (options.mode === 'summary') {
-  for (const n of SIZES) {
-    if (n > options.max) continue
-    if (options.n !== null && n !== options.n) continue
-    for (const corpusClass of options.sweep ? SWEEP_CLASSES : CORPUS_CLASSES) {
-      if (options.corpus !== null && corpusClass !== options.corpus) continue
-      for (const gramSize of gramSizesFor(n)) {
-        if (options.gramSize !== null && gramSize !== options.gramSize) continue
-        summarise(n, corpusClass, gramSize)
+  process.stdout.write(
+    `${JSON.stringify(measureArm(n, corpus, gramSize, arm, config))}\n`,
+  )
+} else if (options.mode === 'peak') {
+  const { n, corpus, gramSize, config } = options
+  if (n === null || corpus === null || gramSize === null) {
+    throw new Error('--peak needs --n, --corpus and --gram')
+  }
+  process.stdout.write(`${JSON.stringify(measurePeak(n, corpus, gramSize, config))}\n`)
+} else {
+  // Under the configuration about to be measured, not whichever one the last
+  // flag happened to select: `addSequence` and each key scheme are separate
+  // implementations, and a timing for a wrong answer is worth nothing.
+  const smoke = smokeParity(options.config)
+  process.stdout.write(
+    `${JSON.stringify({ kind: 'parity', mode: 'smoke', cases: smoke, ...options.config })}\n`,
+  )
+  let produced = 0
+  for (const n of sizesFor(options)) {
+    for (const corpusClass of classesFor(options)) {
+      if (n > maxSizeFor(corpusClass)) continue
+      for (const gramSize of depthsFor(options, n)) {
+        produced++
+        if (options.mode === 'summary') {
+          summarise(n, corpusClass, gramSize, options.threshold, options.config)
+          continue
+        }
+        const corpus = corpusOf(corpusClass, n, gramSize)
+        const built = buildIndex(corpus.choices, gramSize, options.config)
+        const rows = counterRows(
+          n,
+          corpusClass,
+          gramSize,
+          corpus,
+          built,
+          options.config,
+          options.threshold,
+        )
+        for (const row of rows) process.stdout.write(`${JSON.stringify(row)}\n`)
       }
     }
   }
-} else {
-  for (const n of SIZES) {
-    if (n > options.max) continue
-    if (options.n !== null && n !== options.n) continue
-    for (const corpusClass of options.sweep ? SWEEP_CLASSES : CORPUS_CLASSES) {
-      if (options.corpus !== null && corpusClass !== options.corpus) continue
-      for (const gramSize of gramSizesFor(n)) {
-        if (options.gramSize !== null && gramSize !== options.gramSize) continue
-        const corpus = corpusOf(corpusClass, n, gramSize)
-        const built = buildIndex(corpus.choices, gramSize)
-        for (const row of counterRows(n, corpusClass, gramSize, corpus, built)) {
-          process.stdout.write(`${JSON.stringify(row)}\n`)
-        }
-      }
-    }
+  if (produced === 0) {
+    throw new Error('no corpus matched the given filters, so nothing was measured')
   }
 }

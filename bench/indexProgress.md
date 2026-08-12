@@ -15,10 +15,27 @@ whether this is an option flag or a different corpus representation.
 
 ## Where it stands
 
-**Answer so far: yes, except on degenerate alphabets.** Exact on 5,760 fixed
-cases and 20,000 randomised corpora; hundreds to thousands of times faster on
-realistic text; 8–42x less memory; builds no slower than the Matcher it would
-replace. Loses on a 2-letter alphabet and that is inherent.
+**Stage B is answered. The prototype is frozen.**
+
+> A corpus-wide inverted n-gram representation can replace per-choice prepared
+> profiles for integer/code-point Dice and Cosine search while preserving exact
+> `Matcher` results — key, score and order.
+>
+> Full inverted accumulation is on its own orders of magnitude faster than
+> exhaustive search on selective trigram corpora, and 17–33x faster on a real
+> one. Prefix filtering adds to that for Dice at high thresholds and skewed
+> distributions; **it is not part of the architectural case.**
+>
+> Retained memory falls by 52–64x — 4.8 MB against 250 MB on the real corpus.
+> This is not the usual index trade of memory for speed; it is less of both.
+>
+> Performance tracks posting selectivity. Dense low-alphabet corpora remain the
+> adverse case, and no amount of filtering rescues them.
+
+**The index is the product. Prefix filtering is an optimisation.** That
+separation is the most useful thing this round produced, and the internal shape
+keeps it: `NGramIndex` accumulates exact Dice and exact Cosine, and carries an
+optional Dice prefix strategy beside them.
 
 ## Files
 
@@ -36,12 +53,18 @@ node --expose-gc bench/tooling/ngram-index-scale.ts --counters --max=100000
 node --expose-gc bench/tooling/ngram-index-scale.ts --counters --sweep --n=10000
 node --expose-gc bench/tooling/ngram-index-scale.ts --memory --n=100000 \
   --corpus=zipf-words --gram=3 --arm=index
+node --expose-gc bench/tooling/ngram-index-scale.ts --peak --n=1000000 \
+  --corpus=zipf-words --gram=3 --build=direct
 pnpm bench ngramIndex
 node bench/comparison/ngram-index.mjs
 ```
 
-Flags that matter: `--build=direct|profile`, `--keys=packed|string`,
-`--threshold=`, `--sweep`, `--arm=index|profiles`.
+Flags that matter: `--build=direct|profile`, `--keys=auto|bmp|full|string`,
+`--threshold=`, `--sweep`, `--arm=index|profiles|matcher`, `--corpus=`, `--n=`.
+
+Every row records `buildMode`, `keyMode`, `threshold` and `limit`. Two runs
+differing only in `--keys` used to emit byte-identical rows, which made a
+directory of JSON output unattributable after the fact.
 
 ## Landed, with the number that justified it
 
@@ -162,13 +185,92 @@ wrong measure and no index rescues it. Where it is comparing strings of similar
 length — dedup, record linkage, titles against a catalogue — the index is what
 makes it scale.
 
+## The real corpus
+
+Synthetic corpora say where the crossover is. This says which side of it a real
+workload sits on. **12,947 file paths** from the checkout's `node_modules`,
+sampled at a stride across the sorted list — the first 12,947 in order are one or
+two packages' worth of near-identical paths, a fake corpus wearing a real one's
+name, and slicing rather than striding overstated posting traffic 19x.
+
+Trigrams, threshold 0.5, limit 5, 8 distinct queries per class, milliseconds:
+
+| query            | exhaustive | indexed | prefix | speedup |
+| ---------------- | ---------: | ------: | -----: | ------: |
+| exact hit        |       14.1 |  0.8343 | 0.7943 |     17x |
+| 1 typo           |       15.5 |  0.7968 | 0.7255 |     20x |
+| 2 typos          |       18.1 |  0.8095 | 0.6270 |     22x |
+| unrelated        |      1.293 |  0.0073 | 0.0059 |    176x |
+| short            |     0.1988 |  0.0039 | 0.0027 |     51x |
+| common substring |     0.2048 |  0.0972 | 0.0486 |      2x |
+| rare substring   |     0.2009 |  0.0782 | 0.0052 |      3x |
+
+Cosine on the same corpus: 31–33x on the hit and typo classes, 93–1,603x on the
+selective ones. Build: **index 100.7 ms, Matcher 120–198 ms.**
+
+Three things this corpus says that no synthetic one did:
+
+- **Candidate pruning does almost nothing here.** An exact hit touches 12,932 of
+  12,947 choices, because `node_modules`, `dist` and `.js` are in nearly every
+  path. The win is not fewer candidates; it is that a posting entry is far
+  cheaper than a profile walk.
+- **17–33x, not 900x.** An order of magnitude below `alphabet-26`, and still
+  decisive. `weightedShare` is 0.33 — between the 0.304 that was the last win and
+  the 0.478 that was the first loss in the synthetic sweep. Real file paths sit
+  _inside_ the crossover band, on the winning side.
+- **`common substring` is the adverse class within a real corpus**, at 2x. It is
+  the one query shape where a caller would notice the index barely helping.
+
+Memory, same corpus, one arm per process:
+
+| arm             |    bytes | per choice |
+| --------------- | -------: | ---------: |
+| index           |  4.82 MB |      372 B |
+| profiles only   | 250.2 MB |   19,325 B |
+| whole `Matcher` | 251.0 MB |   19,385 B |
+
+Two comparisons, deliberately: index against **profiles** is the representation
+question, and index against the whole **Matcher** is what a caller retains. They
+differ by 0.77 MB — the per-choice row holding item, key and prepared value is
+**3% of what a Matcher keeps**, so the profiles are essentially all of it. The
+earlier index-vs-Matcher figures were not meaningfully flattering.
+
+## Peak build memory
+
+Retained bytes are the architectural claim; peak is what decides whether a corpus
+can be indexed at all. Until `compact()` runs, every posting list is a pair of
+growable JS arrays in a `Map`, so the build's high-water mark is nothing like the
+CSR arrays it settles into. Sampled inside the build loop — the build is one
+synchronous run, so a timer would never get a look. All figures over the corpus
+baseline, direct build, trigrams:
+
+| corpus      |         n | retained | peak heap | peak RSS | ratio |
+| ----------- | --------: | -------: | --------: | -------: | ----: |
+| alphabet-26 | 1,000,000 |  80.5 MB |    625 MB |   957 MB |  7.8x |
+| zipf-words  | 1,000,000 |  74.6 MB |    820 MB |  1046 MB | 11.0x |
+| file-paths  |    12,947 |  4.72 MB |   46.6 MB |   185 MB |  9.9x |
+
+**Peak runs 8–11x the final size, and that is fine.** A million choices index
+inside ~1 GB RSS, while a million prepared profiles would retain ~3.3 GB — the
+builder's high-water mark is still four times below the representation it
+replaces. So the two-pass CSR build (count posting lengths, allocate exactly,
+fill) stays a named fix and is **not** implemented: it trades a second corpus
+traversal for a problem nothing has yet.
+
 ## Correctness
 
 Parity compares against `matcher.search`/`.best` on **key, score and order**:
-5,760 fixed cases × 4 build/key combinations, plus 20,000 randomised corpora.
-Covers gram sizes 2 and 3, thresholds `null`/0/0.5/0.8/1, limits 0/1/3/`null`,
-duplicate choices, sequences shorter than `gramSize`, gramless queries, astral
-characters and lone surrogates.
+**31,680 fixed cases across six build/key configurations**, plus randomised
+corpora that draw their configuration too. Covers gram sizes 2 and 3, thresholds
+`null`/0/0.5/0.8/1, limits 0/1/3/`null`, duplicate choices, sequences shorter
+than `gramSize`, gramless queries, astral characters and lone surrogates.
+
+`addSequence` and `add` are two separate builders and each key scheme is a
+separate keying path, so parity covers the product rather than whichever
+configuration the last flag selected. Every measuring mode now runs a **smoke
+subset first, under the configuration it is about to measure** — milliseconds
+against a run of minutes, and the alternative was producing timings for an
+unvalidated path.
 
 Mutation-verified twice — the suite is only worth what it catches:
 
@@ -180,6 +282,19 @@ at `compact`, where a duplicate would already have written itself into every
 list); `limit: 0` indexed `top[-1]` and crashed — the parity suite had no zero in
 its limit set, which is why it never showed up.
 
+Two more the ladder brought with it:
+
+- **`radixFor` answered a rung for a negative element.** `-1 < 256` is true, so
+  it named the rung that had just failed, `rekey` did nothing, and the build died
+  with "key scheme failed to widen" — on an element the joined-string scheme
+  represents exactly. Negatives now go straight to strings. Unreachable from
+  `addSequence`, which sees only code points; reachable from `add`.
+- **A pinned rung too wide for the depth** overflowed `partial * radix + value`
+  past the safe-integer range, and lost precision shows up as two grams sharing a
+  key — a wrong score, not an exception. The constructor refuses it, which is how
+  `--keys=full --gram=3` stopped being a silent request: the full code-point
+  radix reaches two elements, not three.
+
 ## Scope, stated plainly
 
 Gram elements are integers — code points, in practice. Both `add` and
@@ -189,7 +304,26 @@ more general: its trie is keyed by `unknown` and treats `NaN` as unmatchable. An
 index for that would intern arbitrary elements to integer symbols first, and
 that is not Stage B.
 
-## Open
+## Open — and closed to further optimisation
+
+**Stage C is architecture, not another 20% off postings.** The question is how an
+index integrates with `Matcher` without damaging the scorer API, and the leading
+answer is an **explicit** `createIndexedMatcher` rather than silently changing
+what `createMatcher` builds — indexing changes construction strategy, rebuild
+expectations, which scorer families are supported, which input representations
+are, and what is retained. Automatic selection can come later, once the explicit
+form has proved itself; the `weightedShare` predictor below is what it would use.
+
+Two production-hardening items belong to that stage, not this one:
+
+- **Explicit width guards.** `gramCount`, `ids` and `offsets` are `Uint32Array`,
+  so `choiceCount`, total posting entries and a profile's `gramCount` all carry a
+  32-bit bound. Nothing realistic approaches them, and a library should throw
+  rather than truncate into a typed array.
+- **The two-pass CSR build**, if peak build memory ever becomes the limit. It is
+  measured above and it is not the limit today.
+
+Everything below stays deliberately unbuilt:
 
 1. **Direct query-trie traversal** for plain Dice/Cosine accumulation, skipping
    the flattened arrays entirely. Deliberately postponed: the scratch reuse is
@@ -227,3 +361,20 @@ accumulation, **C** optimised inverted (prefix filtering).
 - Corpora are built with `Array.join`, never `+=`. A string concatenated
   character by character is a chain of cons strings that the first
   `convSequence` flattens, so the corpus _shrinks_ mid-measurement.
+- **Each query class carries 8 distinct queries**, cycled through the timed runs.
+  Timing one query in a loop rewarms exactly the posting slices that query
+  touches — free for the index, worthless to the exhaustive arm, which walks the
+  whole corpus either way. p50 and p95 are both recorded.
+- **`substitute` samples positions without replacement.** Picking each
+  independently let two edits land on the same character, and on a small
+  alphabet the second could undo the first — a "2 typos" row measuring an exact
+  hit.
+- **No defensive copy in front of `createMatcher`.** It takes a
+  `readonly TItem[]`; a clone charged the Matcher's build for something no real
+  caller does.
+- **`--n` names a size rather than filtering the ladder.** `--n=50000` used to be
+  accepted, match nothing, and print an empty run that looked like a finished
+  one. A run that measures nothing now throws, and `--gram` accepts only 2 or 3.
+- **`--keys` is one value.** Two flags writing to separate variables let
+  `--keys=bmp --keys=string` produce a string-keyed index carrying a pinned BMP
+  rung — a state nothing asked for and no row recorded.
