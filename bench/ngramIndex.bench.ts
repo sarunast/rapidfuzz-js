@@ -27,6 +27,16 @@ const cosine = createScorer(cosineMetric, { gramSize: GRAM_SIZE })
 
 function indexOf(choices: readonly string[]): NGramIndex {
   const index = new NGramIndex(GRAM_SIZE, choices.length)
+  for (let id = 0; id < choices.length; id++) index.addSequence(id, choices[id])
+  index.compact()
+  return index
+}
+
+// What the index build costs when it goes the long way round, through a profile
+// per choice. Kept beside the real one because the difference is the whole
+// argument for `addSequence`.
+function indexViaProfiles(choices: readonly string[]): NGramIndex {
+  const index = new NGramIndex(GRAM_SIZE, choices.length)
   for (let id = 0; id < choices.length; id++) {
     index.add(id, buildProfile(choices[id], GRAM_SIZE))
   }
@@ -79,6 +89,7 @@ describe('ngram index build', () => {
   measure('matcher, 1000 choices', () => createMatcher(small, { scorer: dice }))
   measure('index, 10000 choices', () => indexOf(medium))
   measure('matcher, 10000 choices', () => createMatcher(medium, { scorer: dice }))
+  measure('index via profiles, 10000 choices', () => indexViaProfiles(medium))
 })
 
 describe('dice search, 1000 choices', () => {

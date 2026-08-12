@@ -105,13 +105,45 @@ first loss 0.478 — so 0.2 has more headroom than it did, not less. The alphabe
 because the first round measured 2 and 26 only, leaving the middle — where the
 answer changes — unmeasured.
 
+## The run
+
+`pnpm bench ngramIndex`, trigrams, three arms kept apart — **A** exhaustive
+prepared Matcher, **B** simple inverted, **C** prefix-filtered.
+
+```
+                                          A            B          C
+1,000 choices, 100 queries, 0.5      49.22ms      0.431ms          —
+10,000 choices, 100 queries, 0.5     644.5ms      0.711ms          —
+10,000 choices, 100 misses, 0.5      652.6ms      0.743ms          —
+10,000 sentences, 100 queries, 0.5   642.0ms      0.945ms          —
+10,000 choices, cosine, 0.5          809.8ms      0.998ms          —
+10,000 sentences, 100 queries, 0.8         —      0.959ms    0.808ms
+100,000 choices, 1 query, 0.5        59.93ms     0.0313ms          —
+100,000 choices, 1 query, 0.8              —     0.0313ms   0.0158ms
+10,000 best(), 100 exact hits         3.464ms     0.698ms          —
+
+build, 10,000 choices                 39.23ms      34.82ms    96.50ms via profiles
+```
+
+So: **B is where the win is** — three orders of magnitude at 10k, and it is the
+simple representation. **C adds up to 2x on top** where the threshold is high
+and the corpus has skew, and nothing at all where it does not. Attributing that
+separately is the reason the arms are kept apart.
+
+`best()` with no threshold is the narrowest margin at 4.96x, because the
+exhaustive scan breaks out the moment it scores 1.
+
+Memory, trigrams at 100k: **14.0 MB against 898 MB** (26-letter, 64x), **13.1 MB
+against 875 MB** (Zipf, 67x).
+
 ## Where it loses, and why
 
 - **2-letter alphabet**: 8 possible trigrams, so every posting list is the whole
   corpus and no prefix can be short. 0.1–0.2x of exhaustive on an exact hit at
   every threshold. Inherent.
-- **`best()` with no threshold**: only 3.6x, because the exhaustive scan breaks
-  out the moment it scores a perfect match and the index has no such exit.
+- **`best()` with no threshold**: 4.96x, the narrowest margin, because the
+  exhaustive scan breaks out the moment it scores a perfect match and the index
+  has no such exit.
 - **A cheap metric would narrow all of this.** uFuzzy scans every candidate and
   still beats our exhaustive path 20x, so the headline gap was partly Dice being
   expensive per candidate, not the scan being slow.
@@ -148,13 +180,25 @@ at `compact`, where a duplicate would already have written itself into every
 list); `limit: 0` indexed `top[-1]` and crashed — the parity suite had no zero in
 its limit set, which is why it never showed up.
 
+## Scope, stated plainly
+
+Gram elements are integers — code points, in practice. Both `add` and
+`addSequence` reach `integerElement`, so this is _"can an integer/code-point
+n-gram index replace prepared profiles for ordinary text"_. The metric itself is
+more general: its trie is keyed by `unknown` and treats `NaN` as unmatchable. An
+index for that would intern arbitrary elements to integer symbols first, and
+that is not Stage B.
+
 ## Open
 
-1. **`flattenQuery` allocates** two arrays and an object per query, needed only
-   by the prefix path's sort. Reuse or traverse directly.
-2. **Fixed-width string keys** (2 UTF-16 units per code point) as the fallback
-   encoding: exact for all code points at any gram size, and would remove the
-   astral downgrade entirely. Worth measuring against decimal before BigInt.
+1. **Direct query-trie traversal** for plain Dice/Cosine accumulation, skipping
+   the flattened arrays entirely. Deliberately postponed: the scratch reuse is
+   in, and further query-preparation micro-work would answer a smaller question
+   than the one still open.
+2. **Sparse counts.** 93.5% of posting lists are all-ones (59.8% on Zipf) but a
+   corpus maximum of 3 forces a counts array anyway. A per-list flag would fire
+   where the corpus-wide one cannot — only worth it if one byte per entry stops
+   being cheap enough.
 3. **Delta-encoded ids.** Postings are sorted, so the gaps are small — but it
    costs the binary search, so only after the cheaper layout wins are banked.
 4. **`best()` bootstrap** — score the rarest gram's candidates first and use that
