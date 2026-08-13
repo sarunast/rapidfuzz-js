@@ -10,6 +10,11 @@ import type { MaybeSequence } from '../core/types.js'
 import { buildChoiceTable, matchAt } from './choiceTable.js'
 import { assertCollection } from './collection.js'
 import {
+  missingSimilarityBest,
+  missingSimilarityMatches,
+  missingSimilarityTop,
+} from './missingQuery.js'
+import {
   CALL_BEST_KEYS,
   CALL_SEARCH_KEYS,
   INDEXED_MATCHER_OPTION_KEYS,
@@ -151,9 +156,7 @@ export function createIndexedMatcher<TItem, TBrand>(
     const threshold = optionalThreshold(call?.threshold)
     const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
-      const score = missingScoreOf(query, threshold)
-      if (threshold !== null && score < threshold) return undefined
-      return table.items.length === 0 ? undefined : matchAt(table, 0, score)
+      return missingSimilarityBest(table, missingScoreOf(query, threshold), threshold)
     }
     if (impossibleThreshold(compilation, threshold)) return undefined
     const found = index.select(normalized, kernelThreshold(compilation, threshold), 1)
@@ -171,12 +174,7 @@ export function createIndexedMatcher<TItem, TBrand>(
     const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
       const score = missingScoreOf(query, threshold)
-      if (threshold !== null && score < threshold) return []
-      const count = table.items.length
-      const length = limit === null ? count : Math.min(count, limit)
-      const matches: Match<TItem, unknown>[] = new Array(length)
-      for (let id = 0; id < length; id++) matches[id] = matchAt(table, id, score)
-      return matches
+      return missingSimilarityTop(table, score, threshold, limit)
     }
     if (impossibleThreshold(compilation, threshold)) return []
     return materialize(
@@ -197,8 +195,7 @@ export function createIndexedMatcher<TItem, TBrand>(
       const normalized = normalizeQuery(query, normalize)
       if (normalized === null) {
         const score = missingScoreOf(query, threshold)
-        if (threshold !== null && score < threshold) return
-        for (let id = 0; id < table.items.length; id++) yield matchAt(table, id, score)
+        yield* missingSimilarityMatches(table, score, threshold)
         return
       }
       if (impossibleThreshold(compilation, threshold)) return

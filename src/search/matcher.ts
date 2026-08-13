@@ -8,7 +8,6 @@ import {
   passesThreshold,
 } from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
-import type { ChoiceTable } from './choiceTable.js'
 import { buildChoiceTable, matchAt } from './choiceTable.js'
 import { assertCollection } from './collection.js'
 import { bestDistance } from './internal/bestDistance.js'
@@ -16,6 +15,11 @@ import { bestSimilarity } from './internal/bestSimilarity.js'
 import { topDistance } from './internal/topDistance.js'
 import { topSimilarity } from './internal/topSimilarity.js'
 import type { ScoredId } from './internal/types.js'
+import {
+  missingSimilarityBest,
+  missingSimilarityMatches,
+  missingSimilarityTop,
+} from './missingQuery.js'
 import {
   CALL_BEST_KEYS,
   CALL_SEARCH_KEYS,
@@ -33,33 +37,6 @@ import type {
   Matcher,
   SearchOptions,
 } from './types.js'
-
-// Both helpers answer a missing query, which only a similarity scorer accepts:
-// a distance metric refuses the pair in `validatePair` before a score exists.
-// That is why they qualify with `score < threshold` rather than reading the
-// direction — under distance the call has already thrown.
-function missingSimilarityBest<TItem>(
-  table: ChoiceTable<TItem>,
-  score: number,
-  threshold: number | null,
-): Match<TItem, unknown> | undefined {
-  if (threshold !== null && score < threshold) return undefined
-  return table.items.length === 0 ? undefined : matchAt(table, 0, score)
-}
-
-function missingSimilarityTop<TItem>(
-  table: ChoiceTable<TItem>,
-  score: number,
-  threshold: number | null,
-  limit: number | null,
-): readonly Match<TItem, unknown>[] {
-  if (threshold !== null && score < threshold) return []
-  const count = table.items.length
-  const length = limit === null ? count : Math.min(count, limit)
-  const matches: Match<TItem, unknown>[] = new Array(length)
-  for (let id = 0; id < length; id++) matches[id] = matchAt(table, id, score)
-  return matches
-}
 
 /**
  * Prepare a collection once and query it many times.
@@ -243,10 +220,7 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
       const normalized = normalizeQuery(query, normalize)
       if (normalized === null) {
         const missingScore = compilation.score(query, '', threshold)
-        if (threshold !== null && missingScore < threshold) return
-        for (let id = 0; id < table.items.length; id++) {
-          yield matchAt(table, id, missingScore)
-        }
+        yield* missingSimilarityMatches(table, missingScore, threshold)
         return
       }
       if (impossibleThreshold(compilation, threshold)) return

@@ -7,6 +7,7 @@ import {
   impossibleTrustedThreshold,
   kernelThreshold,
   optionalThreshold,
+  passesThreshold,
   qualifies,
   trustedKernelThreshold,
   knownOptimum,
@@ -76,6 +77,17 @@ describe('threshold boundaries', () => {
     expect(optionalThreshold(undefined)).toBeNull()
     expect(optionalThreshold(60)).toBe(60)
     expect(() => optionalThreshold(Infinity)).toThrow('threshold must be finite')
+  })
+
+  // Same boundaries as `qualifies`, plus the one thing it cannot say: a caller
+  // who asked for no threshold rejects nothing, in either direction.
+  test('the nullable form agrees with the strict one, and null passes', () => {
+    expect(passesThreshold('similarity', 60, 60)).toBe(true)
+    expect(passesThreshold('similarity', 59.9999, 60)).toBe(false)
+    expect(passesThreshold('distance', 3, 3)).toBe(true)
+    expect(passesThreshold('distance', 3.0001, 3)).toBe(false)
+    expect(passesThreshold('similarity', 0, null)).toBe(true)
+    expect(passesThreshold('distance', Number.MAX_VALUE, null)).toBe(true)
   })
 })
 
