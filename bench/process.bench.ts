@@ -1,3 +1,4 @@
+import { normalizedSimilarity as indelNormalizedSimilarity } from '../src/algorithms/indel/index.js'
 import {
   distance as levenshteinDistance,
   normalizedDistance as levenshteinNormalizedDistance,
@@ -37,6 +38,7 @@ const rawDistance = createScorer(levenshteinDistance)
 const rawSimilarity = createScorer(levenshteinSimilarity)
 const normalizedDistance = createScorer(levenshteinNormalizedDistance)
 const normalized = createScorer(levenshteinNormalizedSimilarity)
+const preparedIndel = createScorer(indelNormalizedSimilarity)
 const asymmetricNormalized = createScorer(levenshteinNormalizedSimilarity, {
   weights: { insertion: 1, deletion: 2, substitution: 1 },
 })
@@ -274,5 +276,26 @@ describe('prepared queries, two and three words', () => {
   })
   measure('2000 80-char choices, fuzzy threshold 80', () => {
     bestMatch(threeWordQuery, threeWordChoices, { scorer: fuzzy, threshold: 80 })
+  })
+})
+
+// The prepared Indel scorer, which nothing else here builds — every scorer above
+// is fuzz, Levenshtein or token-sort. It is the only way into the one-word arm
+// of the bounded prepared kernel: `ratioHeld` gates that kernel on the two
+// lengths summing to 128, which puts the target out of reach of a pattern of 32
+// elements or fewer, so no fuzz workload enters it at all. Counted rather than
+// reasoned about — 2000 calls here against 0 from every fuzz case.
+describe('prepared Indel, one-word queries', () => {
+  measure('2000 choices, normalized threshold 0.8', () => {
+    bestMatch(query, choices, { scorer: preparedIndel, threshold: 0.8 })
+  })
+  measure('2000 choices, normalized threshold 0.5', () => {
+    bestMatch(query, choices, { scorer: preparedIndel, threshold: 0.5 })
+  })
+  measure('2000 titles, 30-char query, normalized threshold 0.8', () => {
+    bestMatch(titleQuery, titles, { scorer: preparedIndel, threshold: 0.8 })
+  })
+  measure('2000 choices, search limit 5, threshold 0.7', () => {
+    search(query, choices, { scorer: preparedIndel, threshold: 0.7, limit: 5 })
   })
 })
