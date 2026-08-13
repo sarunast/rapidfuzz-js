@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 
 import { expect, it } from 'vitest'
 
-import { editopTuples, opcodeTuples } from '../../../testing/common.js'
+import { editopTuples, opcodeTuples } from '../../../testing/editopTuples.js'
 import { Levenshtein } from '../../../testing/scorers.js'
 import { scoreMatrix } from '../../batch/scoreMatrix.js'
 import { normalizeText as defaultProcess } from '../../core/normalize.js'

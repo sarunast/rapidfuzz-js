@@ -1,9 +1,9 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
-import { callUntyped } from '../../../testing/common.js'
-import { prepareScorerOf } from '../../../testing/preparation.js'
+import { prepareScorerOf } from '../../../testing/prepareScorer.js'
 import { Dice } from '../../../testing/scorers.js'
+import { callUntyped } from '../../../testing/untyped.js'
 import { scoreMatrix } from '../../batch/scoreMatrix.js'
 import { scorePairs } from '../../batch/scorePairs.js'
 import { createScorer } from '../../core/scoring/scorer.js'

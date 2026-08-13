@@ -1,7 +1,7 @@
 // Ported from RapidFuzz tests/distance/test_Jaro.py
 import { expect, it } from 'vitest'
 
-import { prepareScorerOf } from '../../../testing/preparation.js'
+import { prepareScorerOf } from '../../../testing/prepareScorer.js'
 import { Jaro } from '../../../testing/scorers.js'
 import { normalizeText as defaultProcess } from '../../core/normalize.js'
 import { jaroSimilarity } from './implementation.js'

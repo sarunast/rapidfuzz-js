@@ -44,7 +44,7 @@ import {
 } from '../../src/algorithms/prefix/index.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
 import type { MaybeSequence } from '../../src/core/types.js'
-import { callUntyped } from '../../testing/common.js'
+import { callUntyped } from '../../testing/untyped.js'
 
 type SimilarityMetric = (a: MaybeSequence, b: MaybeSequence) => number
 type DistanceMetric = (a: MaybeSequence, b: MaybeSequence) => number

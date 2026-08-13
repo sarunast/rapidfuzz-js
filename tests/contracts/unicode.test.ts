@@ -19,7 +19,7 @@ import {
 } from '../../src/algorithms/prefix/index.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { ratio } from '../../src/fuzz/similarity.js'
-import { editopTuples } from '../../testing/common.js'
+import { editopTuples } from '../../testing/editopTuples.js'
 
 interface UnicodeCase {
   readonly name: string

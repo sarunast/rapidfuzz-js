@@ -1,7 +1,7 @@
 // Ported from RapidFuzz tests/distance/test_Hamming.py
 import { expect, it } from 'vitest'
 
-import { editopTuples, opcodeTuples } from '../../../testing/common.js'
+import { editopTuples, opcodeTuples } from '../../../testing/editopTuples.js'
 import { Hamming } from '../../../testing/scorers.js'
 import { normalizeText as defaultProcess } from '../../core/normalize.js'
 import { hammingEditops, hammingOpcodes } from './implementation.js'

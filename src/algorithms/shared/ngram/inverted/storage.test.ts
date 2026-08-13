@@ -8,7 +8,7 @@ import {
   METRICS,
   pairs,
   THRESHOLDS,
-} from '../../../../../testing/ngramIndex.js'
+} from '../../../../../testing/invertedIndex.js'
 import { createScorer, scorerCompilation } from '../../../../core/scoring/scorer.js'
 import {
   distance as cosineDistance,

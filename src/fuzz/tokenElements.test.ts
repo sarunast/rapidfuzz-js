@@ -8,7 +8,7 @@
 // reach the same bucket, or one identity is counted as two tokens.
 import { describe, expect, it } from 'vitest'
 
-import { matrixScores } from '../../testing/matrix.js'
+import { matrixScores } from '../../testing/scoreMatrix.js'
 import { tokenSetRatio } from './tokenSet.js'
 import { tokenSortRatio } from './tokenSort.js'
 import { wRatio } from './weighted.js'

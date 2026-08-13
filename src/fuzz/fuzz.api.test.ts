@@ -1,7 +1,7 @@
 // Ported from RapidFuzz tests/test_fuzz.py
 import { describe, expect, it } from 'vitest'
 
-import { callUntyped } from '../../testing/common.js'
+import { callUntyped } from '../../testing/untyped.js'
 import { normalizeText as defaultProcess } from '../core/normalize.js'
 import { createScorer } from '../core/scoring/scorer.js'
 import * as publicFuzz from './index.js'

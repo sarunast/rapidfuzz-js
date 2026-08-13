@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { indexOf, pairs } from '../../../../../testing/ngramIndex.js'
+import { indexOf, pairs } from '../../../../../testing/invertedIndex.js'
 import { createScorer } from '../../../../core/scoring/scorer.js'
 import { similarity as diceSimilarity } from '../../../dice/index.js'
 import { assertAddressable } from './builder.js'
