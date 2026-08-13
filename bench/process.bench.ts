@@ -20,7 +20,7 @@ import {
   search,
   searchIter,
 } from '../src/index.js'
-import { sentences, words } from './tooling/corpus.js'
+import { sentences, similarPairs, words } from './tooling/corpus.js'
 import { describe, measure } from './tooling/harness.js'
 
 const choices = words(2_000, 12)
@@ -297,5 +297,35 @@ describe('prepared Indel, one-word queries', () => {
   })
   measure('2000 choices, search limit 5, threshold 0.7', () => {
     search(query, choices, { scorer: preparedIndel, threshold: 0.7, limit: 5 })
+  })
+})
+
+// The prepared Ukkonen band, which nothing else in the suite reaches. It needs
+// a held query wide enough that the band comes out narrower than the row, and
+// a threshold tight enough to draw one — 128 elements is the floor and none of
+// the prepared cases above is a quarter of that. Counted: 0 calls from every
+// existing case in this file and from `partialRatio` under a cutoff, against
+// 2000 from each of these.
+//
+// Both sides of the cutoff, because the band's bookkeeping is paid by every
+// candidate while the abandonment is only collected from the ones that fail.
+describe('prepared band, 256-char queries', () => {
+  const bandChoices = words(2_000, 256, 0x51ed_2705)
+  const bandQuery = words(1, 256, 0x51ed_2706)[0] ?? ''
+  const bandSimilar = similarPairs(2_000, 256, 0.15, 0x51ed_2707)
+  const bandSimilarChoices = bandSimilar.map(([, b]) => b)
+  const bandSimilarQuery = bandSimilar[0]?.[0] ?? ''
+
+  measure('2000 unrelated choices, fuzzy threshold 80', () => {
+    bestMatch(bandQuery, bandChoices, { scorer: fuzzy, threshold: 80 })
+  })
+  measure('2000 similar choices, fuzzy threshold 90', () => {
+    bestMatch(bandSimilarQuery, bandSimilarChoices, { scorer: fuzzy, threshold: 90 })
+  })
+  measure('2000 similar choices, prepared Indel threshold 0.95', () => {
+    bestMatch(bandSimilarQuery, bandSimilarChoices, {
+      scorer: preparedIndel,
+      threshold: 0.95,
+    })
   })
 })
