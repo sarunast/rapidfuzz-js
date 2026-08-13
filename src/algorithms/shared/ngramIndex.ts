@@ -2,7 +2,7 @@ import type {
   ChoiceIndex,
   ChoiceIndexBuilder,
   SelectedChoices,
-} from '../../core/scoring/compilation.js'
+} from '../../core/scoring/choiceIndex.js'
 import type { Sequence } from '../../core/types.js'
 import { feasibleRadices } from './gramKey.js'
 import { elementsEqual } from './ngram.js'

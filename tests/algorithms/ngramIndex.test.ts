@@ -19,7 +19,7 @@ import {
   createDiceIndexBuilder,
   repackKey,
 } from '../../src/algorithms/shared/ngramIndex.js'
-import type { ChoiceIndex } from '../../src/core/scoring/compilation.js'
+import type { ChoiceIndex } from '../../src/core/scoring/choiceIndex.js'
 import { createScorer, scorerCompilation } from '../../src/core/scoring/scorer.js'
 import { createMatcher } from '../../src/index.js'
 
