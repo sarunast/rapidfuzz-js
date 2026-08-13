@@ -1,6 +1,6 @@
 {
   "name": "rapidfuzz-js",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Fast fuzzy string matching for Node.js and the browser",
   "keywords": [
     "cosine-similarity",
