@@ -1,8 +1,10 @@
 # Inverted n-gram index — experiment log
 
-Branch `experiment/ngram-inverted-index`. Everything lives in `bench/`; nothing
-has been added to `src/`, and nothing should be until this log says the design
-is settled.
+Branch `experiment/ngram-inverted-index`. Stages A and B ran entirely in
+`bench/`, on the rule that nothing reached `src/` until this log said the design
+was settled. Stage C is where it shipped — `src/algorithms/shared/ngramIndex.ts`
+behind `createIndexedMatcher` — and the prototype was deleted with it, so the
+figures below are the record of how the shipped representation was arrived at.
 
 ## The question
 
