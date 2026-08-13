@@ -12,7 +12,7 @@ import {
   type ScoreArrayOf,
   scoreStoreRange,
   unstorableScore,
-} from './scoreArray.js'
+} from './storage.js'
 import type { BatchOptions } from './types.js'
 
 function normalizeInputs(

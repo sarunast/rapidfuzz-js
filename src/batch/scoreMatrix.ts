@@ -14,7 +14,7 @@ import {
   type ScoreMatrix,
   scoreStoreRange,
   unstorableScore,
-} from './scoreArray.js'
+} from './storage.js'
 import type { BatchOptions } from './types.js'
 
 // The normalizer is fixed for the whole call, so it decides which loop runs

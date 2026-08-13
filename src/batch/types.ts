@@ -1,6 +1,6 @@
 import type { Scorer } from '../core/scoring/scorer.js'
 import type { Direction, Normalizer } from '../core/types.js'
-import type { ScoreArrayKind } from './scoreArray.js'
+import type { ScoreArrayKind } from './storage.js'
 
 /** Shared by {@link scoreMatrix} and {@link scorePairs}. */
 export interface BatchOptions<

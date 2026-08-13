@@ -7,7 +7,7 @@ import {
   buildScoreMatrix,
   roundHalfAwayFromZero,
   scoreArrayFactory,
-} from '../../src/batch/scoreArray.js'
+} from '../../src/batch/storage.js'
 import { scorerCompilation } from '../../src/core/scoring/scorer.js'
 import { createScorer, scoreMatrix, scorePairs } from '../../src/index.js'
 import type { MaybeSequence, Sequence } from '../../src/index.js'

@@ -4,7 +4,7 @@ import {
   optionalThreshold,
 } from '../core/scoring/threshold.js'
 import type { Direction } from '../core/types.js'
-import type { ScoreArrayKind } from './scoreArray.js'
+import type { ScoreArrayKind } from './storage.js'
 import type { BatchOptions } from './types.js'
 
 export const BATCH_OPTION_KEYS: readonly string[] = [
