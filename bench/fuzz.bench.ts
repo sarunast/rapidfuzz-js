@@ -175,3 +175,14 @@ describe('partialRatio, two-word needle', () => {
     for (const haystack of partialHaystacksSome) partialRatio(needle, haystack)
   })
 })
+
+// The other width the row vector used to serve: 65 to 96 elements is three
+// words, and the case above is the only other one in the suite that is neither
+// one word nor four.
+describe('partialRatio, three-word needle', () => {
+  const needle = partialNeedle.slice(0, 80)
+
+  measure('80-char needle in long haystacks', () => {
+    for (const haystack of partialHaystacksSome) partialRatio(needle, haystack)
+  })
+})

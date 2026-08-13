@@ -169,6 +169,30 @@ describe('lcsSeqNormalizedSimilarity', () => {
   })
 })
 
+// The Ukkonen band, on both sides of its cutoff. The case above is refused on
+// length before a kernel runs, and `4096 chars, cutoff 4000` measures one width
+// only — neither separates what the band costs a candidate that clears the
+// cutoff from what it saves on one that cannot.
+//
+// The cutoffs are chosen from the corpora rather than picked: at 0.15 edits
+// these pairs score 0.88 to 0.92, so 0.85 passes all of them, 0.95 none, and
+// 0.9 splits them roughly in half — which is the mix an `extract` sees. Every
+// case here reaches `lcsManyWordsBanded` with a band of 3 to 11 words out of 16
+// or 32.
+describe('lcsSeqNormalizedSimilarity, banded', () => {
+  const half = similarPairs(40, 512, 0.15, 0x2f19_a3c1)
+
+  measure('512 chars, cutoff 0.95, all rejected', () => {
+    for (const [a, b] of half) lcsSeqNormalizedSimilarity(a, b, { scoreCutoff: 0.95 })
+  })
+  measure('1024 chars, cutoff 0.85, all accepted', () => {
+    for (const [a, b] of veryLong) lcsSeqNormalizedSimilarity(a, b, { scoreCutoff: 0.85 })
+  })
+  measure('1024 chars, cutoff 0.9, half rejected', () => {
+    for (const [a, b] of veryLong) lcsSeqNormalizedSimilarity(a, b, { scoreCutoff: 0.9 })
+  })
+})
+
 describe('jaroSimilarity', () => {
   measure('32 chars, similar', () => {
     for (const [a, b] of medium) jaroSimilarity(a, b)

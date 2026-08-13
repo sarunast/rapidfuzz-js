@@ -243,3 +243,36 @@ describe('scoreMatrix with explicit Scorer', () => {
     scoreMatrix(titleQueries, choices, { scorer: asymmetricNormalized })
   })
 })
+
+// Every prepared case above holds a 12-character query, which is one machine
+// word — so nothing here reaches the two- and three-word widths that most fuzz
+// scoring actually runs at.
+//
+// The choices are the same length as the query on purpose. `ratioHeld` rejects
+// on a length ratio before it scores anything, so a 64-character query against
+// 96-character choices never reaches a kernel at all under a threshold; and its
+// bounded kernel is gated on the two lengths summing to 128, which is why the
+// two-word case draws 64 rather than 48.
+describe('prepared queries, two and three words', () => {
+  const twoWordChoices = words(2_000, 64, 0x51ed_2701)
+  const threeWordChoices = words(2_000, 80, 0x51ed_2702)
+  // Drawn separately rather than taken from the list. A query that is also a
+  // choice scores a perfect 100 on the first candidate, `bestMatch` stops
+  // there, and the case measures the early exit instead of 2000 kernel runs —
+  // which it did, at a thousandth of the time the others take.
+  const twoWordQuery = words(1, 64, 0x51ed_2703)[0] ?? ''
+  const threeWordQuery = words(1, 80, 0x51ed_2704)[0] ?? ''
+
+  measure('2000 64-char choices, fuzzy', () => {
+    bestMatch(twoWordQuery, twoWordChoices, { scorer: fuzzy })
+  })
+  measure('2000 64-char choices, fuzzy threshold 80', () => {
+    bestMatch(twoWordQuery, twoWordChoices, { scorer: fuzzy, threshold: 80 })
+  })
+  measure('2000 80-char choices, fuzzy', () => {
+    bestMatch(threeWordQuery, threeWordChoices, { scorer: fuzzy })
+  })
+  measure('2000 80-char choices, fuzzy threshold 80', () => {
+    bestMatch(threeWordQuery, threeWordChoices, { scorer: fuzzy, threshold: 80 })
+  })
+})
