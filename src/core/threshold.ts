@@ -26,6 +26,24 @@ export function qualifies(
 }
 
 /**
+ * {@link qualifies} where the caller may not have asked for a threshold at all,
+ * which every score passes.
+ *
+ * Written out rather than delegating: both forms sit in scan loops that run once
+ * per candidate, and the pair is two comparisons either way.
+ */
+export function passesThreshold(
+  direction: Direction,
+  score: number,
+  threshold: number | null,
+): boolean {
+  return (
+    threshold === null ||
+    (direction === 'similarity' ? score >= threshold : score <= threshold)
+  )
+}
+
+/**
  * Outside the bounds, so nothing can satisfy it and the algorithm need not run.
  * Strict: a threshold *at* the bound is what an identical pair scores. `null`
  * is "no threshold asked for", which nothing can fail.
@@ -98,7 +116,7 @@ export function kernelThreshold(
  * The score nothing can beat, or `null` when there is no such score to stop a
  * scan on.
  */
-export function trustedOptimum(compilation: MetricCompilation<Direction>): number | null {
+export function knownOptimum(compilation: MetricCompilation<Direction>): number | null {
   if (!compilation.trusted) return null
   return compilation.direction === 'similarity'
     ? compilation.bounds[1]

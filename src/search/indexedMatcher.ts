@@ -9,15 +9,14 @@ import {
 import type { MaybeSequence } from '../core/types.js'
 import { buildChoiceTable, matchAt } from './choiceTable.js'
 import { assertCollection } from './collection.js'
-import type { Match } from './results.js'
 import {
   CALL_BEST_KEYS,
   CALL_SEARCH_KEYS,
   INDEXED_MATCHER_OPTION_KEYS,
-  normalizeQuery,
   resultLimit,
-  sequenceReader,
-} from './snapshot.js'
+} from './options.js'
+import { normalizeQuery, sequenceReader } from './readers.js'
+import type { Match } from './results.js'
 import type {
   BestOptions,
   IndexedMatcherOptions,
