@@ -212,9 +212,8 @@ export function containsWhitespace(s: ArrayLike<unknown>): boolean {
 /**
  * Element count {@link joinTokens} would produce, without building the array.
  *
- * Private again: `tokenSetRatioConverted` used to call this on its intersection,
- * and now accumulates the same total as it walks. {@link joinTokens} is the only
- * caller left.
+ * Private: `tokenSetRatioConverted` accumulates the same total as it walks, and
+ * hands it back through {@link joinTokens}'s `total` rather than calling here.
  */
 function joinedLength(tokens: readonly unknown[][]): number {
   if (tokens.length === 0) return 0
@@ -224,10 +223,21 @@ function joinedLength(tokens: readonly unknown[][]): number {
   return total
 }
 
-/** Rejoin tokens with a single space element, matching the element type. */
-export function joinTokens(tokens: readonly unknown[][]): unknown[] {
+/**
+ * Rejoin tokens with a single space element, matching the element type.
+ *
+ * `total` is the element count, for a caller that already knows it — sorting
+ * does not change it, so a length measured before the sort still describes the
+ * result. Left off, it is counted here. The default is in the signature rather
+ * than at the call sites because JavaScript evaluates it only when the argument
+ * is absent, which is what keeps the pass off the path that has the number.
+ */
+export function joinTokens(
+  tokens: readonly unknown[][],
+  total: number = joinedLength(tokens),
+): unknown[] {
   const separator = typeof tokens[0]?.[0] === 'string' ? ' ' : SPACE
-  const out = new Array<unknown>(joinedLength(tokens))
+  const out = new Array<unknown>(total)
   let n = 0
 
   for (let t = 0; t < tokens.length; t++) {

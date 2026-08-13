@@ -98,8 +98,15 @@ export function tokenSetRatioConverted(
   // of the intersection — only how many there are and how long they are joined —
   // so the array that used to hold them, and the traversal that measured it,
   // were both pure overhead.
+  //
+  // The differences are measured as they are collected, for the same reason the
+  // intersection is: `joinTokens` writes one separator between each pair, so the
+  // payload and the count give the joined length without the joined array. That
+  // is what lets the gate below refuse a pair before anything is sorted.
   let sectCount = 0
   let sectPayload = 0
+  let diffAbPayload = 0
+  let diffBaPayload = 0
   const diffAb: unknown[][] = []
   const diffBa: unknown[][] = []
 
@@ -107,14 +114,20 @@ export function tokenSetRatioConverted(
     if (tokensB.packed.has(key)) {
       sectCount++
       sectPayload += token.length
-    } else diffAb.push(token)
+    } else {
+      diffAbPayload += token.length
+      diffAb.push(token)
+    }
   }
   for (const [key, bucket] of tokensA.mixed) {
     for (const token of bucket) {
       if (tokensB.has(key, token)) {
         sectCount++
         sectPayload += token.length
-      } else diffAb.push(token)
+      } else {
+        diffAbPayload += token.length
+        diffAb.push(token)
+      }
     }
   }
 
@@ -127,44 +140,74 @@ export function tokenSetRatioConverted(
   if (sectCount !== 0 && diffAb.length === 0) return 100
 
   for (const [key, token] of tokensB.packed) {
-    if (!tokensA.packed.has(key)) diffBa.push(token)
+    if (!tokensA.packed.has(key)) {
+      diffBaPayload += token.length
+      diffBa.push(token)
+    }
   }
   for (const [key, bucket] of tokensB.mixed) {
     for (const token of bucket) {
-      if (!tokensA.has(key, token)) diffBa.push(token)
+      if (!tokensA.has(key, token)) {
+        diffBaPayload += token.length
+        diffBa.push(token)
+      }
     }
   }
 
   // Containment the other way round.
   if (sectCount !== 0 && diffBa.length === 0) return 100
 
-  const diffAbJoined = joinTokens(sortTokens(diffAb))
-  const diffBaJoined = joinTokens(sortTokens(diffBa))
-
-  const abLen = diffAbJoined.length
-  const baLen = diffBaJoined.length
-  // What `joinedLength` would have returned: one separator between each pair.
+  // Both differences hold something: a token either counts into `sectCount` or
+  // lands in one of them, so an empty `diffAb` would have returned 100 above.
+  // One separator between each pair, which is what `joinedLength` counts.
+  const abLen = diffAbPayload + diffAb.length - 1
+  const baLen = diffBaPayload + diffBa.length - 1
   const sectLen = sectCount === 0 ? 0 : sectPayload + sectCount - 1
 
   const sectAbLen = sectLen + (sectLen !== 0 ? 1 : 0) + abLen
   const sectBaLen = sectLen + (sectLen !== 0 ? 1 : 0) + baLen
 
-  let result = 0
-  const cutoffDistance = Math.ceil((sectAbLen + sectBaLen) * (1 - scoreCutoff / 100))
-  // The distance is discarded above `cutoffDistance`, so the kernel is free to
-  // stop being exact there.
-  const dist = indelDist(diffAbJoined, diffBaJoined, cutoffDistance)
-
-  if (dist <= cutoffDistance) {
-    result = normDistance(dist, sectAbLen + sectBaLen, scoreCutoff)
+  // Ahead of the difference comparison rather than after it, which is what lets
+  // them raise its cutoff. Only `sect` is shared, so these distances follow from
+  // the length difference and cost no comparison at all. They are 0 when there
+  // is no common section.
+  let sectAbRatio = 0
+  let sectBaRatio = 0
+  let cutoff = scoreCutoff
+  if (sectLen !== 0) {
+    sectAbRatio = normDistance(1 + abLen, sectLen + sectAbLen, scoreCutoff)
+    sectBaRatio = normDistance(1 + baLen, sectLen + sectBaLen, scoreCutoff)
+    if (sectAbRatio > cutoff) cutoff = sectAbRatio
+    if (sectBaRatio > cutoff) cutoff = sectBaRatio
   }
 
-  // The remaining ratios are 0 when there is no common section.
-  if (!sectLen) return result
+  // Raising the cutoff to a section score is exact because `normDistance` gates:
+  // it answers 0 or a value at or above `scoreCutoff`, so whatever raises
+  // `cutoff` here is a value the `Math.max` below reports anyway. A difference
+  // score the raised cutoff rejects is one that `Math.max` would have discarded.
+  let result = 0
+  const cutoffDistance = Math.ceil((sectAbLen + sectBaLen) * (1 - cutoff / 100))
+  const lengthDiff = abLen > baLen ? abLen - baLen : baLen - abLen
 
-  // Only `sect` is shared, so these distances follow from the length difference.
-  const sectAbRatio = normDistance(1 + abLen, sectLen + sectAbLen, scoreCutoff)
-  const sectBaRatio = normDistance(1 + baLen, sectLen + sectBaLen, scoreCutoff)
+  // The kernel refuses a length difference past its budget on its own. Deciding
+  // it here instead buys the two sorts and the two joins that would otherwise
+  // have built the sequences to hand it — the whole materialisation of a
+  // difference whose score could not have been reported. `indelDist` only ever
+  // overstates, so a distance bounded below by `lengthDiff` fails the test below
+  // however it is computed.
+  if (lengthDiff <= cutoffDistance) {
+    const diffAbJoined = joinTokens(sortTokens(diffAb), abLen)
+    const diffBaJoined = joinTokens(sortTokens(diffBa), baLen)
+    // The distance is discarded above `cutoffDistance`, so the kernel is free to
+    // stop being exact there.
+    const dist = indelDist(diffAbJoined, diffBaJoined, cutoffDistance)
+
+    if (dist <= cutoffDistance) {
+      result = normDistance(dist, sectAbLen + sectBaLen, cutoff)
+    }
+  }
+
+  if (!sectLen) return result
 
   return Math.max(result, sectAbRatio, sectBaRatio)
 }
