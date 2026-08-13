@@ -13,6 +13,7 @@ import { feasibleRadices } from '../../src/algorithms/shared/gramKey.js'
 import {
   assertAddressable,
   assertCosineExact,
+  assertCosineNormsExact,
   assertQueryIndexable,
   createCosineIndexBuilder,
   createDiceIndexBuilder,
@@ -168,6 +169,27 @@ describe('an indexed search answers what the exhaustive one does', () => {
       ),
       { numRuns: 400, seed: 0x5eed },
     )
+  })
+
+  it('answers nothing when a caller asks for nothing', () => {
+    // `limit: 0` is a supported answer rather than an excuse, and it is the one
+    // call that leaves selection with no result array to insert into. The dense
+    // corpus matters here: it puts every choice into the walk, so the empty
+    // room is reached with candidates in hand rather than none.
+    for (const metric of METRICS) {
+      for (const choices of [
+        ['node', 'nodes', 'noded', 'nodex', 'nodey', 'nodez', 'qq'],
+        ['abc', 'abd'],
+      ]) {
+        const index = indexOf(metric, 3, choices)
+        for (const threshold of THRESHOLDS) {
+          expect(pairs(index.select('node', threshold, 0))).toEqual([])
+          expect(pairs(index.select('node', threshold, 0))).toEqual(
+            exhaustive(metric, 3, choices, 'node', threshold, 0),
+          )
+        }
+      }
+    }
   })
 })
 
@@ -494,6 +516,33 @@ describe('what an index refuses', () => {
     )
     expect(() => assertCosineExact(116_982_125, 32)).not.toThrow()
     expect(() => assertCosineExact(0x7fff_ffff, 0x7fff_ffff)).toThrow(RangeError)
+    // `MAX_SAFE_INTEGER` is itself safe, so a product landing exactly on it is
+    // the last accepted pair rather than the first refused one.
+    expect(6361 * 69431 * 20_394_401).toBe(Number.MAX_SAFE_INTEGER)
+    expect(() => assertCosineExact(6361 * 69431, 20_394_401)).not.toThrow()
+  })
+
+  it('refuses a Cosine pair whose squared norms would leave the exact integers', () => {
+    // The second half of the denominator, and a second spelling of the same
+    // sum: this file adds `2c + 1` an occurrence, a packed profile adds `c²` a
+    // distinct gram. Both are exact while the norm is a safe integer, and one
+    // gram repeated 268,435,459 times is where they part.
+    const repeated = 268_435_459
+    let stepwise = 0
+    for (let count = 0; count < repeated; count++) stepwise += 2 * count + 1
+    expect(stepwise).not.toBe(repeated * repeated)
+    expect(stepwise - repeated * repeated).toBe(-16)
+
+    expect(() => assertCosineNormsExact(repeated * repeated, 4)).toThrow(RangeError)
+    expect(() => assertCosineNormsExact(4, repeated * repeated)).toThrow(
+      /repeated this often/,
+    )
+    // A norm, not a length: 100 million distinct grams never come near this,
+    // and the bound must not refuse them for being numerous.
+    expect(() => assertCosineNormsExact(100_000_000, 100_000_000)).not.toThrow()
+    expect(() =>
+      assertCosineNormsExact(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER),
+    ).not.toThrow()
   })
 
   it('takes a gramless sequence of any element the exhaustive scorer takes', () => {
