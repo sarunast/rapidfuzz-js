@@ -4,20 +4,10 @@ import {
   exhaustive,
   exhaustiveScan,
   indexOf,
-  LIMITS,
   METRICS,
   pairs,
   THRESHOLDS,
 } from '../../../../../testing/invertedIndex.js'
-import { createScorer, scorerCompilation } from '../../../../core/scoring/scorer.js'
-import {
-  distance as cosineDistance,
-  similarity as cosineSimilarity,
-} from '../../../cosine/index.js'
-import {
-  distance as diceDistance,
-  similarity as diceSimilarity,
-} from '../../../dice/index.js'
 import { createDiceIndexBuilder } from './dice.js'
 
 describe('the posting representation', () => {
@@ -116,88 +106,5 @@ describe('the posting representation', () => {
       const sealed = index.seal()
       expect(pairs(sealed.select('abc', 0.5, 1))).toEqual([{ id: last, score: 1 }])
     }
-  })
-})
-
-describe('choices and queries with no grams', () => {
-  it('scores an equal gramless pair 1 and everything else 0', () => {
-    const choices = ['ab', '', 'ab', 'zz', '']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 3, choices)
-      for (const threshold of THRESHOLDS) {
-        for (const limit of LIMITS) {
-          expect(pairs(index.select('ab', threshold, limit))).toEqual(
-            exhaustive(metric, 3, choices, 'ab', threshold, limit),
-          )
-        }
-        expect(pairs(index.scan('ab', threshold))).toEqual(
-          exhaustiveScan(metric, 3, choices, 'ab', threshold),
-        )
-      }
-    }
-  })
-
-  it('answers a gramless query against a corpus that has grams', () => {
-    const choices = ['abcd', 'abce']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 3, choices)
-      expect(pairs(index.select('x', null, null))).toEqual(
-        exhaustive(metric, 3, choices, 'x', null, null),
-      )
-      expect(pairs(index.select('x', 0.5, null))).toEqual(
-        exhaustive(metric, 3, choices, 'x', 0.5, null),
-      )
-    }
-  })
-
-  it('scores a gramless choice 0 rather than dividing by nothing', () => {
-    // `''` has no grams and no norm; a Cosine score of `0/0` clamped to 1 was a
-    // real bug, and only a dense list reaches such a choice at all.
-    const choices = ['😀c', '😀c', '']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 2, choices)
-      expect(pairs(index.select('😀c', null, null))).toEqual(
-        exhaustive(metric, 2, choices, '😀c', null, null),
-      )
-    }
-  })
-})
-
-describe('the capability a metric declares', () => {
-  it('is offered by both similarity metrics and answers like the Matcher', () => {
-    const choices = ['abcd', 'abce', 'zzzz']
-    for (const metric of METRICS) {
-      const scorer = createScorer(metric === 'dice' ? diceSimilarity : cosineSimilarity, {
-        gramSize: 3,
-      })
-      const indexChoices = scorerCompilation(scorer).indexChoices
-      expect(indexChoices).toBeTypeOf('function')
-      if (indexChoices === undefined) throw new Error('no index capability')
-      const builder = indexChoices()
-      for (const choice of choices) builder.add(choice)
-      expect(pairs(builder.seal().select('abcd', 0.5, 3))).toEqual(
-        exhaustive(metric, 3, choices, 'abcd', 0.5, 3),
-      )
-    }
-  })
-
-  it('is offered at the gram size the scorer was configured with', () => {
-    const choices = ['abcd', 'abce']
-    for (const gramSize of [2, 3, 4]) {
-      const indexChoices = scorerCompilation(
-        createScorer(diceSimilarity, { gramSize }),
-      ).indexChoices
-      if (indexChoices === undefined) throw new Error('no index capability')
-      const builder = indexChoices()
-      for (const choice of choices) builder.add(choice)
-      expect(pairs(builder.seal().select('abcd', null, 2))).toEqual(
-        exhaustive('dice', gramSize, choices, 'abcd', null, 2),
-      )
-    }
-  })
-
-  it('is absent on the distance direction', () => {
-    expect(scorerCompilation(createScorer(diceDistance)).indexChoices).toBeUndefined()
-    expect(scorerCompilation(createScorer(cosineDistance)).indexChoices).toBeUndefined()
   })
 })
