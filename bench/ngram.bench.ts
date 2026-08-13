@@ -12,11 +12,25 @@ import { describe, measure } from './tooling/harness.js'
 // Three length classes, as elsewhere in the suite: a profile's cost is one trie
 // insertion per element, so short inputs are dominated by conversion and
 // allocation while long ones are dominated by the Map traffic.
+// Below the point where a packed profile's fixed cost — two typed arrays and a
+// sort to hold a handful of grams — is paid back. Measured against the trie
+// build it replaced: 1.07x slower at four characters, 1.29x faster at six, so
+// the crossover sits between them and these two cases are what holds it there.
+const tiny = similarPairs(200, 4)
+const small = similarPairs(200, 6)
 const short = similarPairs(200, 8)
 const medium = similarPairs(200, 32)
 const long = similarPairs(100, 128)
 const veryLong = similarPairs(20, 512)
+// The other end of the same trade, and the one the packed representation loses:
+// sorting every gram is `O(n log n)` where inserting into a trie is linear, and
+// a one-shot comparison has no later query to amortise it over. Against the trie
+// build: level at 512 characters, 1.1x slower at 1024, 1.5x at 4096 and 1.6x at
+// 8192. A prepared choice pays the sort once and wins on every query after it,
+// which is why the representation is not gated on length.
+const large = similarPairs(10, 1024)
 const huge = similarPairs(5, 4096)
+const enormous = similarPairs(3, 8192)
 const dissimilar = pairs(words(200, 32))
 // The shape the shared profile is deliberately slower on: one gram repeated
 // thousands of times is one trie node whose count is walked up, where a
@@ -27,6 +41,37 @@ const repetitive = Array.from({ length: 5 }, (_value, index) => {
   const letter = String.fromCharCode(0x61 + index)
   return [letter.repeat(4096), `${letter.repeat(4095)}b`]
 })
+// A short side against a long one, sharing the short side's grams: the shape a
+// query-inside-a-document comparison has, and the one where the packed walk
+// searches the long side rather than walking it.
+const skewedSmallLarge = words(50, 1024, 0x0a1b_2c3d).map((text): [string, string] => [
+  text.slice(0, 32),
+  text,
+])
+const skewedSmallHuge = words(20, 4096, 0x0a1b_2c3e).map((text): [string, string] => [
+  text.slice(0, 32),
+  text,
+])
+const skewedMediumHuge = words(20, 4096, 0x0a1b_2c3f).map((text): [string, string] => [
+  text.slice(0, 512),
+  text,
+])
+
+// An astral code point has no packed rung at trigram depth — three of them
+// exceed a safe integer — so one anywhere in a sequence sends the whole profile
+// back to the trie, after a packing scan that is then discarded. Both sides
+// carry one so the comparison stays trie against trie; `long` is the same shape
+// packed, and the pair is what says what the fallback costs. Dice alone: which
+// representation a profile takes is the builder's decision, and Cosine reads
+// whatever it was given.
+const astralTail = long.map(([a, b]): [string, string] => [
+  `${a.slice(0, -2)}😀`,
+  `${b.slice(0, -2)}😀`,
+])
+const astralThroughout = long.map(([a, b]): [string, string] => [
+  a.replaceAll(/(.{9})./gu, '$1😀'),
+  b.replaceAll(/(.{9})./gu, '$1😀'),
+])
 // Lengths alone put these out of reach of a high cutoff, which is the case the
 // gram-count bound exists to answer without building either trie.
 const lengthSkewed = words(100, 512, 0x0ba7_d101).map((value, index) =>
@@ -74,6 +119,12 @@ const preparedCosineTrigramChoices = choices.map((text) => ({
 // first while its call site was still monomorphic.
 
 describe('diceSimilarity', () => {
+  measure('4 chars, similar', () => {
+    for (const [a, b] of tiny) diceSimilarity(a, b)
+  })
+  measure('6 chars, similar', () => {
+    for (const [a, b] of small) diceSimilarity(a, b)
+  })
   measure('8 chars, similar', () => {
     for (const [a, b] of short) diceSimilarity(a, b)
   })
@@ -89,8 +140,14 @@ describe('diceSimilarity', () => {
   measure('512 chars, similar', () => {
     for (const [a, b] of veryLong) diceSimilarity(a, b)
   })
+  measure('1024 chars, similar', () => {
+    for (const [a, b] of large) diceSimilarity(a, b)
+  })
   measure('4096 chars, similar', () => {
     for (const [a, b] of huge) diceSimilarity(a, b)
+  })
+  measure('8192 chars, similar', () => {
+    for (const [a, b] of enormous) diceSimilarity(a, b)
   })
   measure('4096 chars, one repeated gram', () => {
     for (const [a, b] of repetitive) diceSimilarity(a, b)
@@ -142,6 +199,49 @@ describe('cosineDistance', () => {
   })
   measure('128 chars, similar', () => {
     for (const [a, b] of long) cosineDistance(a, b)
+  })
+})
+
+describe('dice direct, long and skewed', () => {
+  // The symmetric cases above establish only that sorting loses to a trie
+  // somewhere past 512 characters at bigrams. Whether that is one boundary or
+  // several is what these ask: a short side keeps the sort small however long
+  // the other one is, and trigrams sort the same number of grams into three
+  // times the key width. A routing rule would need this whole matrix to move
+  // together before it could be written as one length.
+  measure('32 vs 1024 chars', () => {
+    for (const [a, b] of skewedSmallLarge) diceSimilarity(a, b)
+  })
+  measure('32 vs 4096 chars', () => {
+    for (const [a, b] of skewedSmallHuge) diceSimilarity(a, b)
+  })
+  measure('512 vs 4096 chars', () => {
+    for (const [a, b] of skewedMediumHuge) diceSimilarity(a, b)
+  })
+  measure('trigrams, 1024 chars, similar', () => {
+    for (const [a, b] of large) trigrams.score(a, b)
+  })
+  measure('trigrams, 4096 chars, similar', () => {
+    for (const [a, b] of huge) trigrams.score(a, b)
+  })
+})
+
+describe('dice packing fallback', () => {
+  // The control: the same 128 characters, packed. The gap between it and the
+  // two below is the trie's — building one and walking two of them — and not
+  // the discarded packing scan, which measured 2%: against the build that never
+  // attempted packing at all, an astral corpus is 1.02x slower wherever the
+  // refusing element sits, while ASCII construction is 1.51x faster. What these
+  // rows guard is that the fallback stays as cheap as the old path was, so a
+  // future scan-first idea has to show it costs nothing here.
+  measure('trigrams, 128 chars, ascii', () => {
+    for (const [a, b] of long) trigrams.score(a, b)
+  })
+  measure('trigrams, 128 chars, astral at the end', () => {
+    for (const [a, b] of astralTail) trigrams.score(a, b)
+  })
+  measure('trigrams, 128 chars, astral throughout', () => {
+    for (const [a, b] of astralThroughout) trigrams.score(a, b)
   })
 })
 
