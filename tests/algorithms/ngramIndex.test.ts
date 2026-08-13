@@ -540,9 +540,20 @@ describe('what an index refuses', () => {
     // A norm, not a length: 100 million distinct grams never come near this,
     // and the bound must not refuse them for being numerous.
     expect(() => assertCosineNormsExact(100_000_000, 100_000_000)).not.toThrow()
+    // Each side alone, since either can carry the norm out of range while the
+    // other is a single gram: the largest safe norm passes, and the first
+    // double above it does not.
+    expect(() => assertCosineNormsExact(Number.MAX_SAFE_INTEGER, 1)).not.toThrow()
+    expect(() => assertCosineNormsExact(1, Number.MAX_SAFE_INTEGER)).not.toThrow()
     expect(() =>
       assertCosineNormsExact(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER),
     ).not.toThrow()
+    expect(() => assertCosineNormsExact(Number.MAX_SAFE_INTEGER + 1, 1)).toThrow(
+      RangeError,
+    )
+    expect(() => assertCosineNormsExact(1, Number.MAX_SAFE_INTEGER + 1)).toThrow(
+      RangeError,
+    )
   })
 
   it('takes a gramless sequence of any element the exhaustive scorer takes', () => {
