@@ -225,6 +225,81 @@ describe('dependency direction', () => {
     ])
   })
 
+  it('keeps the n-gram subsystem laid out as its layers', () => {
+    const ngram = join(source, 'algorithms/shared/ngram')
+    expect(readdirSync(ngram).sort()).toEqual([
+      'README.md',
+      'compare.ts',
+      'gramSize.ts',
+      'inverted',
+      'kernel.ts',
+      'key.ts',
+      'packing.ts',
+      'profile.ts',
+    ])
+    expect(readdirSync(join(ngram, 'inverted')).sort()).toEqual([
+      'builder.ts',
+      'cosine.ts',
+      'dice.ts',
+      'keys.ts',
+      'query.ts',
+    ])
+  })
+
+  it('keeps the n-gram semantics below the index built on them', () => {
+    // The inverted index is an optional acceleration strategy over n-gram
+    // semantics, never the foundation: a profile, a comparison or a prepared
+    // kernel that reached into `inverted/` would invert that.
+    const ngram = join(source, 'algorithms/shared/ngram')
+    const inverted = join(ngram, 'inverted')
+    const semantics = typeScriptFiles(ngram).filter(
+      (path) => !path.startsWith(`${inverted}${sep}`),
+    )
+    expect(
+      semantics.flatMap((path) =>
+        sourceImports(path)
+          .filter((dependency) => dependency.startsWith(`${inverted}${sep}`))
+          .map(
+            (dependency) =>
+              `${relative(source, path)} -> ${relative(source, dependency)}`,
+          ),
+      ),
+    ).toEqual([])
+  })
+
+  it('keeps the n-gram index off the semantics it accelerates', () => {
+    // The other direction of the rule above, and the stronger half: the index
+    // reaches back into `ngram/` for the key arithmetic and nothing else, so it
+    // shares an encoding with the profiles without sharing a representation.
+    const ngram = join(source, 'algorithms/shared/ngram')
+    const inverted = join(ngram, 'inverted')
+    const permitted = join(ngram, 'key.ts')
+    expect(
+      typeScriptFiles(inverted).flatMap((path) =>
+        sourceImports(path)
+          .filter(
+            (dependency) =>
+              dependency.startsWith(`${ngram}${sep}`) &&
+              !dependency.startsWith(`${inverted}${sep}`) &&
+              dependency !== permitted,
+          )
+          .map(
+            (dependency) =>
+              `${relative(source, path)} -> ${relative(source, dependency)}`,
+          ),
+      ),
+    ).toEqual([])
+  })
+
+  it('keeps the n-gram key arithmetic and option parsing free of dependencies', () => {
+    // Both are leaves by construction — one is integer arithmetic over a radix
+    // ladder, the other reads a single option — and an edge out of either is
+    // the first sign that policy has leaked into them.
+    const ngram = join(source, 'algorithms/shared/ngram')
+    expect(sourceImports(join(ngram, 'key.ts'))).toEqual([])
+    expect(sourceImports(join(ngram, 'gramSize.ts'))).toEqual([])
+  })
+
   it('keeps fuzz families physically and directionally isolated', () => {
     const directory = join(source, 'fuzz')
     expect(readdirSync(directory).sort()).toEqual([
