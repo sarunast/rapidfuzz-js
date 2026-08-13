@@ -1,5 +1,5 @@
 import { assertOptionKeys } from '../../core/options.js'
-import type { ChoiceIndex, SelectedChoices } from '../../core/scoring/compilation.js'
+import type { ChoiceIndex, SelectedChoices } from '../../core/scoring/choiceIndex.js'
 import { scorerCompilation } from '../../core/scoring/scorer.js'
 import {
   impossibleThreshold,
