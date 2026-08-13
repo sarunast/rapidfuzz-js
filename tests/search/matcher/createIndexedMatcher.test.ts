@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { similarity as cosineSimilarity } from '../../src/algorithms/cosine/index.js'
-import { similarity as diceSimilarity } from '../../src/algorithms/dice/index.js'
-import { similarity as levenshteinSimilarity } from '../../src/algorithms/levenshtein/index.js'
+import { similarity as cosineSimilarity } from '../../../src/algorithms/cosine/index.js'
+import { similarity as diceSimilarity } from '../../../src/algorithms/dice/index.js'
+import { similarity as levenshteinSimilarity } from '../../../src/algorithms/levenshtein/index.js'
 import {
   createIndexedMatcher,
   createMatcher,
   createScorer,
   normalizeText,
-} from '../../src/index.js'
-import type { Matcher, MaybeSequence } from '../../src/index.js'
+} from '../../../src/index.js'
+import type { Matcher, MaybeSequence } from '../../../src/index.js'
 
 const METRICS = [
   { name: 'dice', metric: diceSimilarity },

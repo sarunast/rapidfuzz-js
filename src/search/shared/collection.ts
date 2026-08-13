@@ -1,4 +1,4 @@
-import type { Items } from './types.js'
+import type { Items } from '../types.js'
 
 export interface SourceEntry<TItem, TKey = unknown> {
   readonly item: TItem

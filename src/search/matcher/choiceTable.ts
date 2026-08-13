@@ -1,6 +1,6 @@
-import { collectionEntries } from './collection.js'
-import type { Match } from './results.js'
-import type { Items } from './types.js'
+import { collectionEntries } from '../shared/collection.js'
+import type { Match } from '../results.js'
+import type { Items } from '../types.js'
 
 /**
  * Which source item and key each dense choice id stands for.

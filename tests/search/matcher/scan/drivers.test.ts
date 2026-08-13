@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { bestDistance } from '../../src/search/internal/bestDistance.js'
-import { bestSimilarity } from '../../src/search/internal/bestSimilarity.js'
-import { topDistance } from '../../src/search/internal/topDistance.js'
-import { topSimilarity } from '../../src/search/internal/topSimilarity.js'
+import { bestDistance } from '../../../../src/search/matcher/scan/bestDistance.js'
+import { bestSimilarity } from '../../../../src/search/matcher/scan/bestSimilarity.js'
+import { topDistance } from '../../../../src/search/matcher/scan/topDistance.js'
+import { topSimilarity } from '../../../../src/search/matcher/scan/topSimilarity.js'
 
 function numeric(value: unknown): number {
   if (typeof value !== 'number') throw new TypeError('expected numeric prepared data')

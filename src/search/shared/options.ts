@@ -3,7 +3,7 @@ import type {
   MatcherOptions,
   PreparedMatcherOptions,
   SearchOptions,
-} from './types.js'
+} from '../types.js'
 
 /**
  * The keys each public entry point defines, in the file that already decides

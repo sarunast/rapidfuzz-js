@@ -9,11 +9,11 @@ import {
   passesThreshold,
 } from '../core/threshold.js'
 import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
-import { assertCollection, collectionEntries } from './collection.js'
-import type { SourceEntry } from './collection.js'
-import { pushHeap, replaceHeapRoot } from './internal/heap.js'
-import { BEST_OPTION_KEYS, SEARCH_OPTION_KEYS, resultLimit } from './options.js'
-import { choiceReader, normalizeQuery, type ChoiceReader } from './readers.js'
+import { assertCollection, collectionEntries } from './shared/collection.js'
+import type { SourceEntry } from './shared/collection.js'
+import { pushHeap, replaceHeapRoot } from './shared/heap.js'
+import { BEST_OPTION_KEYS, SEARCH_OPTION_KEYS, resultLimit } from './shared/options.js'
+import { choiceReader, normalizeQuery, type ChoiceReader } from './shared/readers.js'
 import type { Match } from './results.js'
 import type {
   BestOptions,
