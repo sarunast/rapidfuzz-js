@@ -628,6 +628,7 @@ export class PreparedTokenChoice {
   unique?: UniqueTokenSet
   sorted?: unknown[]
   hasWhitespace?: boolean
+  canonicalLength?: number
 
   constructor(readonly sequence: ArrayLike<unknown>) {}
 }
@@ -640,6 +641,59 @@ export function splitOf(choice: PreparedTokenChoice): unknown[][] {
 /** The deduplicated tokens of `choice`, built on first use. */
 export function uniqueOf(choice: PreparedTokenChoice): UniqueTokenSet {
   return (choice.unique ??= uniqueTokens(splitOf(choice)))
+}
+
+/**
+ * Length {@link sortedOf} would return, counted straight off the sequence.
+ *
+ * Sorting permutes tokens and joining writes one separator between each pair,
+ * so neither changes the count — which makes this answerable without splitting,
+ * sorting or allocating anything. `tokenSortRatioConverted` asks for it to reject
+ * a pair on the Indel length ceiling before it builds the forms that ceiling
+ * would have been applied to.
+ *
+ * Whichever form is already built answers instead of the scan: this is reached
+ * once per candidate, and a `wRatio` that already split for the token-set half
+ * would otherwise pay a second pass over the same input.
+ */
+export function canonicalLengthOf(choice: PreparedTokenChoice): number {
+  if (choice.canonicalLength !== undefined) return choice.canonicalLength
+  if (choice.sorted !== undefined) return (choice.canonicalLength = choice.sorted.length)
+  if (choice.split !== undefined) {
+    return (choice.canonicalLength = joinedLength(choice.split))
+  }
+
+  return (choice.canonicalLength = canonicalLength(choice.sequence))
+}
+
+/**
+ * The token-count arithmetic of {@link joinedLength}, over the raw sequence.
+ *
+ * A deliberate second copy of {@link splitSequence}'s whitespace walk, without
+ * its allocations: the point of the caller is to answer before any token array
+ * exists, so building one to measure it would defeat it.
+ */
+function canonicalLength(s: ArrayLike<unknown>): number {
+  let elements = 0
+  let tokens = 0
+  let inToken = false
+
+  for (let i = 0; i < s.length; i++) {
+    const element = s[i]
+    const space =
+      typeof element === 'number' ? isSpaceCodePoint(element) : isSpaceElement(element)
+
+    if (space) inToken = false
+    else {
+      if (!inToken) {
+        tokens++
+        inToken = true
+      }
+      elements++
+    }
+  }
+
+  return tokens === 0 ? 0 : elements + tokens - 1
 }
 
 /**
