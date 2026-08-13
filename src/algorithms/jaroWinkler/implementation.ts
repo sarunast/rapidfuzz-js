@@ -1,4 +1,4 @@
-import type { PreparedKernel } from '../../core/protocol.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import { jaroSimilarity_, jaroSimilarityPrepared_ } from '../jaro/implementation.js'
 import { commonPrefix } from '../shared/affix.js'
 import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'

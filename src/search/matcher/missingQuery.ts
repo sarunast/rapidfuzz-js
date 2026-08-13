@@ -1,4 +1,4 @@
-import { passesThreshold } from '../../core/threshold.js'
+import { passesThreshold } from '../../core/scoring/threshold.js'
 import type { Match } from '../results.js'
 import type { ChoiceTable } from './choiceTable.js'
 import { matchAt } from './choiceTable.js'

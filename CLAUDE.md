@@ -200,8 +200,21 @@ between families.
 
 Source ownership follows dependency direction, guarded in `tests/architecture/`:
 
-- `core/` knows types, protocols, scorer construction, thresholds and
-  normalization. It never imports algorithms.
+- `core/` never imports algorithms, and is itself two layers. Directly under it
+  are the primitives — `types`, `sequence`, `normalize`, `options` — and
+  `core/scoring/` holds the machinery built on them: metric, compilation,
+  choice index, scorer, prepared choice, threshold, match. The edge runs one
+  way only, `core/scoring/ -> core/`, so a primitive that reached back into
+  scoring would collapse the two into one layer again:
+
+  ```text
+  search / batch / algorithms
+            ↓
+       core/scoring
+            ↓
+     core primitives
+  ```
+
 - Each algorithm directory owns its public metric, compilation, preparation and
   hot kernels. Shared algorithm code is limited to proven low-level data
   structures under `algorithms/shared/`.

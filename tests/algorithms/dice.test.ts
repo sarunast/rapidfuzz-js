@@ -14,7 +14,7 @@ import {
   validGramSize,
 } from '../../src/algorithms/shared/ngram.js'
 import { scoreMatrix, scorePairs } from '../../src/batch/index.js'
-import { createScorer } from '../../src/core/scorer.js'
+import { createScorer } from '../../src/core/scoring/scorer.js'
 import { bestMatch, createMatcher, search, searchIter } from '../../src/search/index.js'
 import { callUntyped } from '../support/common.js'
 import { prepareScorerOf } from '../support/preparation.js'

@@ -1,11 +1,11 @@
 import { assertOptionKeys } from '../../core/options.js'
-import type { ChoiceIndex, SelectedChoices } from '../../core/protocol.js'
-import { scorerCompilation } from '../../core/scorer.js'
+import type { ChoiceIndex, SelectedChoices } from '../../core/scoring/compilation.js'
+import { scorerCompilation } from '../../core/scoring/scorer.js'
 import {
   impossibleThreshold,
   kernelThreshold,
   optionalThreshold,
-} from '../../core/threshold.js'
+} from '../../core/scoring/threshold.js'
 import type { MaybeSequence } from '../../core/types.js'
 import type { Match } from '../results.js'
 import { assertCollection } from '../shared/collection.js'

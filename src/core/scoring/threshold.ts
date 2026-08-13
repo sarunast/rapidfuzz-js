@@ -1,5 +1,5 @@
-import type { MetricCompilation } from './protocol.js'
-import type { Direction } from './types.js'
+import type { Direction } from '../types.js'
+import type { MetricCompilation } from './compilation.js'
 
 /**
  * Finite even for a scorer whose upper bound is `Infinity`: "everything

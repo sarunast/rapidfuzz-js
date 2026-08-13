@@ -1,5 +1,5 @@
-import type { AnyBrand, PreparedChoice } from '../core/prepared.js'
-import type { Scorer } from '../core/scorer.js'
+import type { AnyBrand, PreparedChoice } from '../core/scoring/preparedChoice.js'
+import type { Scorer } from '../core/scoring/scorer.js'
 import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
 import type { Match } from './results.js'
 

@@ -1,6 +1,6 @@
-import type { AnyBrand } from './prepared.js'
-import { COMPILE, type MetricCompilation } from './protocol.js'
-import type { Direction, MaybeSequence } from './types.js'
+import type { Direction, MaybeSequence } from '../types.js'
+import { COMPILE, type MetricCompilation } from './compilation.js'
+import type { AnyBrand } from './preparedChoice.js'
 
 /**
  * The configuration of a metric that has none.

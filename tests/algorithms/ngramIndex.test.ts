@@ -19,8 +19,8 @@ import {
   createDiceIndexBuilder,
   repackKey,
 } from '../../src/algorithms/shared/ngramIndex.js'
-import type { ChoiceIndex } from '../../src/core/protocol.js'
-import { createScorer, scorerCompilation } from '../../src/core/scorer.js'
+import type { ChoiceIndex } from '../../src/core/scoring/compilation.js'
+import { createScorer, scorerCompilation } from '../../src/core/scoring/scorer.js'
 import { createMatcher } from '../../src/index.js'
 
 type Metric = 'dice' | 'cosine'

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
-import { createScorer } from '../../src/core/scorer.js'
+import { createScorer } from '../../src/core/scoring/scorer.js'
 import * as publicFuzz from '../../src/fuzz/index.js'
 import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partial.js'
 import { partialTokenRatio } from '../../src/fuzz/partialToken.js'

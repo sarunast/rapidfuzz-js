@@ -6,8 +6,8 @@ import { describe, expect, test } from 'vitest'
 import * as cosine from '../../src/algorithms/cosine/index.js'
 import * as dice from '../../src/algorithms/dice/index.js'
 import { scoreMatrix, scorePairs } from '../../src/batch/index.js'
-import type { Metric } from '../../src/core/metric.js'
-import { createScorer } from '../../src/core/scorer.js'
+import type { Metric } from '../../src/core/scoring/metric.js'
+import { createScorer } from '../../src/core/scoring/scorer.js'
 import { bestMatch, createMatcher, search, searchIter } from '../../src/search/index.js'
 import fixture from '../fixtures/ngram-oracle.json' with { type: 'json' }
 

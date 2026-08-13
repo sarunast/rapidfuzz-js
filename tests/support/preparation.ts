@@ -2,7 +2,7 @@ import {
   PREPARE_SCORER,
   type PreparedCapability,
 } from '../../src/algorithms/shared/scorerSupport.js'
-import type { PreparedKernel } from '../../src/core/protocol.js'
+import type { PreparedKernel } from '../../src/core/scoring/compilation.js'
 import { validateSequence } from '../../src/core/sequence.js'
 import type { Sequence } from '../../src/core/types.js'
 

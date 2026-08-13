@@ -1,4 +1,4 @@
-import type { PreparedKernel } from '../../core/protocol.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import {
   lcsSeqEditops,
   lcsSeqLengthPrepared,

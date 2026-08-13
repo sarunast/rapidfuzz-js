@@ -1,9 +1,9 @@
-import type { Normalizer } from './types.js'
+import type { Normalizer } from '../types.js'
 
 /**
  * Assigned from inside the class body because its constructor is private.
- * These are runtime exports for `core/scorer` and `search/` alone: no package
- * entrypoint re-exports them, so no consumer can reach either door.
+ * These are runtime exports for `core/scoring/scorer` and `search/` alone: no
+ * package entrypoint re-exports them, so no consumer can reach either door.
  */
 export let createPreparedChoice: <TBrand>(
   owner: object,

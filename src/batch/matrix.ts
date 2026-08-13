@@ -1,8 +1,8 @@
 import { assertOptionKeys } from '../core/options.js'
-import type { MetricCompilation } from '../core/protocol.js'
-import { scorerCompilation } from '../core/scorer.js'
+import type { MetricCompilation } from '../core/scoring/compilation.js'
+import { scorerCompilation } from '../core/scoring/scorer.js'
+import { qualifies } from '../core/scoring/threshold.js'
 import { normalizeSequence, validateSequence } from '../core/sequence.js'
-import { qualifies } from '../core/threshold.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
 import { BATCH_OPTION_KEYS, rejectedScore, resolveBatchOptions } from './options.js'
 import {

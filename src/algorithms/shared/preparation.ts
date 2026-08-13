@@ -1,4 +1,7 @@
-import type { ChoiceIndexBuilder, PreparedKernel } from '../../core/protocol.js'
+import type {
+  ChoiceIndexBuilder,
+  PreparedKernel,
+} from '../../core/scoring/compilation.js'
 import type { Sequence } from '../../core/types.js'
 import {
   distanceCutoffFor,

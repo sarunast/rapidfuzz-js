@@ -1,4 +1,4 @@
-import type { Metric } from '../../core/metric.js'
+import type { Metric } from '../../core/scoring/metric.js'
 import type { Direction, SimilarityConfiguration } from '../../core/types.js'
 import { builtInMetric, type BuiltInMetric } from '../shared/metricAdapter.js'
 import type { MetricImplementation } from '../shared/scorerSupport.js'
