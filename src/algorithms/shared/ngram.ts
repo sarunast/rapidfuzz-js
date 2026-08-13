@@ -230,6 +230,69 @@ function packingDigits(
 }
 
 /**
+ * Every gram's packed key, in sequence order, or `null` for a sequence that has
+ * to stay a trie.
+ *
+ * Depths 2 and 3 carry the window forward instead of re-reading it: successive
+ * grams overlap in all but one element, so a rolling form reads each element
+ * once and needs no digit array at all, where the generic path reads every
+ * element `gramSize` times through one. Worth 1.06-1.55x over the whole build,
+ * most of it at short inputs where the dropped allocation is the call.
+ */
+function packedKeys(
+  elements: ArrayLike<unknown>,
+  gramSize: number,
+  gramCount: number,
+  radix: number,
+  domain: ElementDomain,
+): Float64Array | null {
+  // Nothing is allocated until the elements the window is seeded from have
+  // proved packable: a sequence that cannot be packed at all is the fallback
+  // path, and it should not first buy a buffer for the answer it will not give.
+  if (gramSize === 2) {
+    let first = packingDigit(elements[0], domain, radix)
+    if (first < 0) return null
+    const keys = new Float64Array(gramCount)
+    for (let start = 0; start < gramCount; start++) {
+      const second = packingDigit(elements[start + 1], domain, radix)
+      if (second < 0) return null
+      keys[start] = first * radix + second
+      first = second
+    }
+    return keys
+  }
+  if (gramSize === 3) {
+    let first = packingDigit(elements[0], domain, radix)
+    if (first < 0) return null
+    let second = packingDigit(elements[1], domain, radix)
+    if (second < 0) return null
+    const keys = new Float64Array(gramCount)
+    for (let start = 0; start < gramCount; start++) {
+      const third = packingDigit(elements[start + 2], domain, radix)
+      if (third < 0) return null
+      keys[start] = (first * radix + second) * radix + third
+      first = second
+      second = third
+    }
+    return keys
+  }
+  // The generic path validates every element before any of them is packed, so
+  // this allocation is reached only for a sequence that is going to fill it.
+  const digits = packingDigits(elements, radix, domain)
+  if (digits === null) return null
+  const keys = new Float64Array(gramCount)
+  for (let start = 0; start < gramCount; start++) {
+    keys[start] = packGram(digits, start, gramSize, radix)
+  }
+  return keys
+}
+
+/** The domain a sequence's first element puts it in, which every later one has to share. */
+function domainOf(elements: ArrayLike<unknown>): ElementDomain {
+  return typeof elements[0] === 'string' ? 'char' : 'number'
+}
+
+/**
  * The grams as sorted distinct keys, or `null` where the input cannot be packed
  * — an object element, a negative, `NaN`, an element past the canonical radix,
  * a mixed domain, or a `gramSize` with no rung at all.
@@ -247,10 +310,7 @@ export function packedProfile(
   if (gramCount === 0) return null
   const radix = canonicalRadix(gramSize)
   if (radix === null) return null
-  const first = elements[0]
-  const domain: ElementDomain = typeof first === 'string' ? 'char' : 'number'
-  const digits = packingDigits(elements, radix, domain)
-  if (digits === null) return null
+  const domain = domainOf(elements)
 
   // Sorting every gram, rather than tallying into a `Map` and sorting only the
   // distinct keys. The `Map` shape wins exactly where a long sequence draws on
@@ -259,10 +319,8 @@ export function packedProfile(
   // shapes prepared search is made of. The sort is 87% of this build (0.208 ms
   // of 0.239 ms at 4096 characters), which is why `bench:confirm` puts that one
   // case at 0.74x while the suite moves +28%.
-  const sorted = new Float64Array(gramCount)
-  for (let start = 0; start < gramCount; start++) {
-    sorted[start] = packGram(digits, start, gramSize, radix)
-  }
+  const sorted = packedKeys(elements, gramSize, gramCount, radix, domain)
+  if (sorted === null) return null
   sorted.sort()
 
   let distinct = 0
