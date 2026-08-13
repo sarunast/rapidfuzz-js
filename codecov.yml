@@ -42,7 +42,9 @@ coverage:
 ignore:
   - bench/**
   - scripts/**
+  - testing/**
   - tests/**
+  - src/**/*.test.ts
   - dist/**
   - '**/*.config.ts'
   - '**/*.bench.ts'

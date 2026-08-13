@@ -73,8 +73,9 @@
   },
   "overrides": [
     {
-      // Only `src/` ships. `scripts/`, `bench/` and `tests/` are Node tooling
-      // and import `node:` freely.
+      // Only `src/` ships. `scripts/`, `bench/`, `testing/` and `tests/` are
+      // Node tooling and import `node:` freely — as do the colocated
+      // `src/**/*.test.ts`, which the override below exempts by name.
       "files": ["src/**"],
       "rules": { "import/no-nodejs-modules": "error" }
     },
@@ -84,6 +85,11 @@
       "files": ["**/*.test.ts"],
       "plugins": ["vitest"],
       "rules": {
+        // Path-agnostic, and it sits after the `src/**` override so it wins for
+        // the colocated tests: a test may reach for `node:` wherever it lives.
+        // `levenshtein.test.ts` seeds randomized cases from `node:crypto`.
+        "import/no-nodejs-modules": "off",
+
         // The four the plugin turns on by default all read this suite's
         // deliberate shapes as mistakes, so each is off for a stated reason
         // rather than left to produce noise nobody reads.

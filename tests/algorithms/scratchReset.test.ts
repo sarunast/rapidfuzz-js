@@ -44,7 +44,7 @@ import {
   maskPoolOf,
   resetBitVectorScratch,
 } from '../../src/algorithms/shared/bitmask/blockMasks.js'
-import { matrixScores } from '../support/matrix.js'
+import { matrixScores } from '../../testing/matrix.js'
 
 function resetAll(): void {
   resetBitVectorScratch()

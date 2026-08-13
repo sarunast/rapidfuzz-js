@@ -35,5 +35,9 @@
       "rapidfuzz-js/postfix": ["../src/algorithms/postfix/index.ts"]
     }
   },
-  "include": ["src/api-entries/*.d.ts", "../src/**/*.ts"]
+  "include": ["src/api-entries/*.d.ts", "../src/**/*.ts"],
+  // Colocated tests are under `../src` but are not the documented surface, and
+  // this project compiles with `types: []`, so their vitest import would fail
+  // the docs build.
+  "exclude": ["../src/**/*.test.ts"]
 }

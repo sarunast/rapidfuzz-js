@@ -29,7 +29,7 @@ import { osaDistance } from '../../src/algorithms/osa/implementation.js'
 import type { Sequence } from '../../src/algorithms/shared/scorerSupport.js'
 import { partialRatio } from '../../src/fuzz/partial.js'
 import { ratio } from '../../src/fuzz/similarity.js'
-import { prepareScorerOf } from '../support/preparation.js'
+import { prepareScorerOf } from '../../testing/preparation.js'
 
 /** Textbook Levenshtein, O(n*m). */
 function levenshteinReference(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {

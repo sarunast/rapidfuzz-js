@@ -59,8 +59,8 @@ import {
 } from '../../src/algorithms/shared/bitParallel.js'
 import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partial.js'
 import { ratio } from '../../src/fuzz/similarity.js'
-import { editopTuples } from '../support/common.js'
-import { prepareScorerOf } from '../support/preparation.js'
+import { editopTuples } from '../../testing/common.js'
+import { prepareScorerOf } from '../../testing/preparation.js'
 
 function lcsLength(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
   return lcsLengthRange(s1, 0, s1.length, s2, 0, s2.length, Number.MAX_SAFE_INTEGER)

@@ -2,7 +2,7 @@ import { defineConfig, type ViteUserConfig } from 'vitest/config'
 
 const config: ViteUserConfig = defineConfig({
   test: {
-    include: ['tests/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     coverage: {
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts'],

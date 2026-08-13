@@ -263,6 +263,39 @@ driver may duplicate mechanics deliberately where that keeps a hot loop
 monomorphic, which is why `bestDistance` and `bestSimilarity` are two literal
 loops and not one comparator.
 
+## Test ownership
+
+A test's location says what owns the invariant it protects. The rule is one
+line: **one owner colocates, many owners go up**.
+
+Production TypeScript and its module-owned tests live together under `src/`,
+the test named `<module>.test.ts` beside what it covers, or
+`<module>.<aspect>.test.ts` where one module needs several files —
+`metric.test.ts`, `metric.fastPath.test.ts`, `metric.weightedBand.test.ts`.
+Never `levenshtein2.test.ts` or `…Advanced.test.ts`; a numbered name says
+nothing about what broke.
+
+Do not name a file after a module it does not own. A test that reaches an
+implementation, its public metric, the scorer and search is not
+`implementation.test.ts` — give it the directory's own name until it is split,
+because a name the contents contradict is worse than a vague one.
+
+Reusable test machinery lives under `testing/`, and stays small: no test cases,
+no domain-specific suites, no production code, and no algorithm-specific helper
+unless more than one suite shares it. Shipping source must never import it —
+every relative import made by a non-test file under `src/` resolves to another
+non-test file under `src/`. That rule exists because the architecture suite
+filters `*.test.ts` out of the source graph, which would otherwise let a
+production module import one unseen.
+
+Only tests whose subject is the library as a whole, or which span independent
+subsystems, live under `tests/`: architecture rules, public-surface and
+cross-algorithm contracts, RapidFuzz parity, and their fixtures. The admission
+question is not "does it touch several files" but **would moving it beside one
+implementation make its ownership misleading?** If not, colocate it — `tests/`
+is meant to stay small, and a mirror of `src/` under it is the shape this
+layout exists to prevent.
+
 ## Benchmarks
 
 Read the `benchmarks` skill before running any `pnpm bench*` script, before

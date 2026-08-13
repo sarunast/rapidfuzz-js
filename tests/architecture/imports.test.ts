@@ -5,14 +5,35 @@ import { describe, expect, it } from 'vitest'
 
 const source = resolve(import.meta.dirname, '../../src')
 
+// Every rule in this file describes the architecture of the shipping library,
+// so the module-owned tests living beside it are not part of the graph: they
+// import vitest, they reach across subsystems on purpose, and they are
+// reachable from no public entrypoint. Filtering here rather than in each rule
+// is what keeps that one decision in one place — `contents()` and every walk
+// below run through it.
 function typeScriptFiles(directory: string): string[] {
   const files: string[] = []
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name)
     if (entry.isDirectory()) files.push(...typeScriptFiles(path))
-    else if (entry.isFile() && entry.name.endsWith('.ts')) files.push(path)
+    else if (
+      entry.isFile() &&
+      entry.name.endsWith('.ts') &&
+      !entry.name.endsWith('.test.ts')
+    ) {
+      files.push(path)
+    }
   }
   return files
+}
+
+// The physical-layout assertions read a directory directly rather than through
+// the walk above, so they need the same exclusion: they pin what the subsystem
+// ships, not how many files test it.
+function shippedEntries(directory: string): string[] {
+  return readdirSync(directory)
+    .filter((name) => !name.endsWith('.test.ts'))
+    .sort()
 }
 
 function contents(directory: string): string {
@@ -54,6 +75,27 @@ describe('dependency direction', () => {
       }
     }
     expect(missing).toEqual([])
+  })
+
+  // The rule colocation makes necessary. Filtering `*.test.ts` out of every
+  // graph above leaves a blind spot: a production module could import one, or
+  // reach into `testing/`, and nothing here would see it. So state the whole
+  // containment instead — shipping source reaches shipping source and nothing
+  // else, not a test beside it, not the machinery those tests share. At zero
+  // today, which makes it a guard against a future edit rather than a cleanup.
+  it('keeps shipping source importing only shipping source', () => {
+    const escapes: string[] = []
+    for (const path of typeScriptFiles(source)) {
+      for (const dependency of sourceImports(path)) {
+        if (
+          !dependency.startsWith(`${source}${sep}`) ||
+          dependency.endsWith('.test.ts')
+        ) {
+          escapes.push(`${relative(source, path)} -> ${relative(source, dependency)}`)
+        }
+      }
+    }
+    expect(escapes).toEqual([])
   })
 
   it('keeps core algorithm-blind', () => {
@@ -218,7 +260,7 @@ describe('dependency direction', () => {
 
   it('keeps shared bitmask code representation-only', () => {
     const directory = join(source, 'algorithms/shared/bitmask')
-    expect(readdirSync(directory).sort()).toEqual([
+    expect(shippedEntries(directory)).toEqual([
       'blockMasks.ts',
       'lookup.ts',
       'pattern.ts',
@@ -227,7 +269,7 @@ describe('dependency direction', () => {
 
   it('keeps the n-gram subsystem laid out as its layers', () => {
     const ngram = join(source, 'algorithms/shared/ngram')
-    expect(readdirSync(ngram).sort()).toEqual([
+    expect(shippedEntries(ngram)).toEqual([
       'README.md',
       'compare.ts',
       'gramSize.ts',
@@ -237,7 +279,7 @@ describe('dependency direction', () => {
       'packing.ts',
       'profile.ts',
     ])
-    expect(readdirSync(join(ngram, 'inverted')).sort()).toEqual([
+    expect(shippedEntries(join(ngram, 'inverted'))).toEqual([
       'builder.ts',
       'cosine.ts',
       'dice.ts',
@@ -302,7 +344,7 @@ describe('dependency direction', () => {
 
   it('keeps fuzz families physically and directionally isolated', () => {
     const directory = join(source, 'fuzz')
-    expect(readdirSync(directory).sort()).toEqual([
+    expect(shippedEntries(directory)).toEqual([
       'index.ts',
       'internal',
       'partial.ts',

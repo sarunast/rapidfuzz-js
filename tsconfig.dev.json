@@ -8,5 +8,8 @@
     "declaration": false,
     "isolatedDeclarations": false
   },
-  "include": ["tests", "bench/**/*.ts", "*.config.ts"]
+  "include": ["src/**/*.test.ts", "testing", "tests", "bench/**/*.ts", "*.config.ts"],
+  // `exclude` is inherited through `extends`, and the library config excludes
+  // exactly the colocated tests this project exists to compile.
+  "exclude": []
 }

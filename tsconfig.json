@@ -40,5 +40,10 @@
     "declaration": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Module-owned tests sit beside what they test, but they are not the shipped
+  // library: they import vitest and Node, and `isolatedDeclarations` has
+  // nothing to say about them. tsconfig.dev.json compiles them instead, and
+  // resets `exclude` so this line does not follow it through `extends`.
+  "exclude": ["src/**/*.test.ts"]
 }
