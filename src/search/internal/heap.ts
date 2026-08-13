@@ -9,7 +9,10 @@ export function pushHeap<TItem>(
   let child = heap.length
   heap.push(value)
   while (child > 0) {
-    const parent = (child - 1) >> 1
+    // Unsigned: `>>` reads its operand as a signed 32-bit integer, so a child
+    // index above 2^31 halves to a negative parent. `>>>` is the same
+    // instruction and stays correct across every index an array can hold.
+    const parent = (child - 1) >>> 1
     const parentValue = heap[parent]
     if (!higherPriority(value, parentValue)) break
     heap[child] = parentValue

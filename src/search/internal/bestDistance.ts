@@ -1,33 +1,30 @@
-import type { DriverMatch, RawPreparedScore, StoredItem } from './types.js'
+import type { RawPreparedScore, ScoredId } from './types.js'
 
-export function bestDistance<TItem, TKey>(
-  items: readonly StoredItem<TItem, TKey>[],
+export function bestDistance(
+  prepared: readonly unknown[],
   score: RawPreparedScore,
   threshold: number | null,
   optimal: number | null,
-): DriverMatch<TItem, TKey> | undefined {
-  // The winner is carried as the stored entry it already is, so a run of
-  // improvements allocates one result rather than one per improvement.
+): ScoredId | undefined {
+  // The winner is carried as an id, so a run of improvements allocates one
+  // result rather than one per improvement.
   //
-  // What makes the first candidate a winner is `best`, not the sentinel: a
+  // What makes the first candidate a winner is `bestId`, not the sentinel: a
   // custom metric may return the sentinel as a real score, and a bare
   // `value < bestScore` would then select nothing. The sentinel is only here
   // to mirror `bestSimilarity`.
-  let best: StoredItem<TItem, TKey> | undefined
+  let bestId = -1
   let bestScore = Number.POSITIVE_INFINITY
   let cutoff = threshold
-  for (let index = 0; index < items.length; index++) {
-    const entry = items[index]
-    const value = score(entry.prepared, cutoff)
+  for (let id = 0; id < prepared.length; id++) {
+    const value = score(prepared[id], cutoff)
     if (threshold !== null && value > threshold) continue
-    if (best === undefined || value < bestScore) {
-      best = entry
+    if (bestId === -1 || value < bestScore) {
+      bestId = id
       bestScore = value
       cutoff = value
       if (optimal !== null && value === optimal) break
     }
   }
-  return best === undefined
-    ? undefined
-    : { item: best.item, key: best.key, score: bestScore }
+  return bestId === -1 ? undefined : { id: bestId, score: bestScore }
 }

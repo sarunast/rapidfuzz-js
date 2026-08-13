@@ -5,7 +5,7 @@ import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/thre
 import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
 import { assertCollection, collectionEntries } from './collection.js'
 import { pushHeap, replaceHeapRoot } from './internal/heap.js'
-import type { Match, ScoredEntry } from './results.js'
+import type { Match } from './results.js'
 import {
   BEST_OPTION_KEYS,
   SEARCH_OPTION_KEYS,
@@ -44,6 +44,16 @@ function stableOptionsOf<TItem, TDirection extends Direction, TBrand>(
     normalize,
     missingItems: options.missingItems,
   }
+}
+
+/**
+ * A scored candidate with the source position that breaks its ties.
+ *
+ * Carried here rather than as a choice id: a one-shot search skips over gaps as
+ * it reads, so the position a result reports is not the count of what it kept.
+ */
+interface ScoredEntry<TItem, TKey> extends Match<TItem, TKey> {
+  readonly order: number
 }
 
 function better(direction: Direction, score: number, current: number): boolean {
