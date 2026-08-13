@@ -9,9 +9,9 @@ import {
   validateSequence,
 } from './sequence.js'
 import {
-  impossibleTrustedThreshold,
+  impossibleThreshold,
+  kernelThreshold,
   qualifies,
-  trustedKernelThreshold,
   validateThreshold,
 } from './threshold.js'
 import type {
@@ -201,17 +201,16 @@ function createScoreMethod<TDirection extends Direction>(
   ): number | undefined {
     if (options === undefined) return compilation.score(a, b, null)
     const threshold = validateThreshold(options.threshold)
-    if (
-      compilation.trusted &&
-      impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
-    ) {
+    // Nothing can clear it, but a bad operand is still a `TypeError` rather
+    // than an `undefined`: the answer is skipped, never the validation. The
+    // `trusted` test is what makes `validate` visible — only a trusted
+    // compilation has a validation step separable from scoring, which is the
+    // same reason it is the only kind whose kernel may be skipped.
+    if (compilation.trusted && impossibleThreshold(compilation, threshold)) {
       compilation.validate(a, b)
       return undefined
     }
-    const activeThreshold = compilation.trusted
-      ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
-      : threshold
-    const result = compilation.score(a, b, activeThreshold)
+    const result = compilation.score(a, b, kernelThreshold(compilation, threshold))
     return qualifies(compilation.direction, result, threshold) ? result : undefined
   }
   return score
