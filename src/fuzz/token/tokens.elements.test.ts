@@ -8,10 +8,10 @@
 // reach the same bucket, or one identity is counted as two tokens.
 import { describe, expect, it } from 'vitest'
 
-import { matrixScores } from '../../testing/scoreMatrix.js'
-import { tokenSetRatio } from './token/tokenSetSimilarity.js'
-import { tokenSortRatio } from './token/tokenSortSimilarity.js'
-import { wRatio } from './weightedSimilarity.js'
+import { matrixScores } from '../../../testing/scoreMatrix.js'
+import { wRatio } from '../weightedSimilarity.js'
+import { tokenSetRatio } from './tokenSetSimilarity.js'
+import { tokenSortRatio } from './tokenSortSimilarity.js'
 
 describe('tokens holding objects', () => {
   // Regression: the hash used to be `String(x)`, which runs the caller's
