@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -40,6 +40,34 @@ describe('dependency direction', () => {
   it('keeps search and batch independent from algorithms', () => {
     expect(contents('search')).not.toMatch(/from ['"][^'"]*(algorithms|fuzz)/)
     expect(contents('batch')).not.toMatch(/from ['"][^'"]*(algorithms|fuzz|search)/)
+  })
+
+  // search/ is grouped by lifetime: shared/ is input plumbing both modes use,
+  // oneShot/ retains no corpus state, matcher/ builds it once and reuses it.
+  // Only `-> shared` crosses; the two execution modes never reach into each
+  // other. Judged by the directory an import *starts* in, so search/index.ts
+  // naming both modes is the barrel doing its job rather than a cross edge.
+  const SEARCH_SUBSYSTEMS: readonly string[] = ['shared', 'oneShot', 'matcher']
+
+  function searchSubsystem(path: string): string | null {
+    const within = relative(join(source, 'search'), path)
+    if (within.startsWith('..')) return null
+    const top = within.split(sep)[0]
+    return SEARCH_SUBSYSTEMS.includes(top) ? top : null
+  }
+
+  it('keeps the search subsystems from tangling', () => {
+    const crossings: string[] = []
+    for (const path of typeScriptFiles(join(source, 'search'))) {
+      const from = searchSubsystem(path)
+      if (from === null) continue
+      for (const dependency of sourceImports(path)) {
+        const to = searchSubsystem(dependency)
+        if (to === null || to === from || to === 'shared') continue
+        crossings.push(`${relative(source, path)} -> ${relative(source, dependency)}`)
+      }
+    }
+    expect(crossings).toEqual([])
   })
 
   it('keeps the root entrypoint orchestration-only', () => {

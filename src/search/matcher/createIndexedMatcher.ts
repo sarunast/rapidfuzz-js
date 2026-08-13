@@ -1,14 +1,14 @@
-import { assertOptionKeys } from '../core/options.js'
-import type { ChoiceIndex, SelectedChoices } from '../core/protocol.js'
-import { scorerCompilation } from '../core/scorer.js'
+import { assertOptionKeys } from '../../core/options.js'
+import type { ChoiceIndex, SelectedChoices } from '../../core/protocol.js'
+import { scorerCompilation } from '../../core/scorer.js'
 import {
   impossibleThreshold,
   kernelThreshold,
   optionalThreshold,
-} from '../core/threshold.js'
-import type { MaybeSequence } from '../core/types.js'
+} from '../../core/threshold.js'
+import type { MaybeSequence } from '../../core/types.js'
 import { buildChoiceTable, matchAt } from './choiceTable.js'
-import { assertCollection } from './collection.js'
+import { assertCollection } from '../shared/collection.js'
 import {
   missingSimilarityBest,
   missingSimilarityMatches,
@@ -19,9 +19,9 @@ import {
   CALL_SEARCH_KEYS,
   INDEXED_MATCHER_OPTION_KEYS,
   resultLimit,
-} from './options.js'
-import { normalizeQuery, sequenceReader } from './readers.js'
-import type { Match } from './results.js'
+} from '../shared/options.js'
+import { normalizeQuery, sequenceReader } from '../shared/readers.js'
+import type { Match } from '../results.js'
 import type {
   BestOptions,
   IndexedMatcherOptions,
@@ -29,7 +29,7 @@ import type {
   Items,
   Matcher,
   SearchOptions,
-} from './types.js'
+} from '../types.js'
 
 /**
  * Prepare a collection into one searchable index and query it many times.

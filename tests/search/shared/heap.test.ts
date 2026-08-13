@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { pushHeap, replaceHeapRoot } from '../../src/search/internal/heap.js'
+import { pushHeap, replaceHeapRoot } from '../../../src/search/shared/heap.js'
 
 const higher = (left: number, right: number): boolean => left > right
 

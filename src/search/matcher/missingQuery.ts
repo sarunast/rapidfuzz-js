@@ -1,7 +1,7 @@
-import { passesThreshold } from '../core/threshold.js'
+import { passesThreshold } from '../../core/threshold.js'
 import type { ChoiceTable } from './choiceTable.js'
 import { matchAt } from './choiceTable.js'
-import type { Match } from './results.js'
+import type { Match } from '../results.js'
 
 // What every search returns for a query with no text to score: one score
 // against every choice, so the only questions left are whether it clears the

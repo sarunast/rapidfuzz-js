@@ -1,5 +1,5 @@
-export { createIndexedMatcher } from './indexedMatcher.js'
-export { createMatcher } from './matcher.js'
+export { createIndexedMatcher } from './matcher/createIndexedMatcher.js'
+export { createMatcher } from './matcher/createMatcher.js'
 export { bestMatch, search, searchIter } from './oneShot.js'
 export type { Match } from './results.js'
 export type {

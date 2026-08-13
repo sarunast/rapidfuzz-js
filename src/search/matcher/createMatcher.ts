@@ -1,20 +1,20 @@
-import { assertOptionKeys } from '../core/options.js'
-import { scorerCompilation } from '../core/scorer.js'
+import { assertOptionKeys } from '../../core/options.js'
+import { scorerCompilation } from '../../core/scorer.js'
 import {
   impossibleThreshold,
   kernelThreshold,
   knownOptimum,
   optionalThreshold,
   passesThreshold,
-} from '../core/threshold.js'
-import type { Direction, MaybeSequence } from '../core/types.js'
+} from '../../core/threshold.js'
+import type { Direction, MaybeSequence } from '../../core/types.js'
 import { buildChoiceTable, matchAt } from './choiceTable.js'
-import { assertCollection } from './collection.js'
-import { bestDistance } from './internal/bestDistance.js'
-import { bestSimilarity } from './internal/bestSimilarity.js'
-import { topDistance } from './internal/topDistance.js'
-import { topSimilarity } from './internal/topSimilarity.js'
-import type { ScoredId } from './internal/types.js'
+import { assertCollection } from '../shared/collection.js'
+import { bestDistance } from './scan/bestDistance.js'
+import { bestSimilarity } from './scan/bestSimilarity.js'
+import { topDistance } from './scan/topDistance.js'
+import { topSimilarity } from './scan/topSimilarity.js'
+import type { ScoredId } from './scan/types.js'
 import {
   missingSimilarityBest,
   missingSimilarityMatches,
@@ -25,9 +25,9 @@ import {
   CALL_SEARCH_KEYS,
   MATCHER_OPTION_KEYS,
   resultLimit,
-} from './options.js'
-import { choiceReader, normalizeQuery } from './readers.js'
-import type { Match } from './results.js'
+} from '../shared/options.js'
+import { choiceReader, normalizeQuery } from '../shared/readers.js'
+import type { Match } from '../results.js'
 import type {
   AnyMatcherOptions,
   ResolvedMatcherOptions,
@@ -36,7 +36,7 @@ import type {
   Items,
   Matcher,
   SearchOptions,
-} from './types.js'
+} from '../types.js'
 
 /**
  * Prepare a collection once and query it many times.

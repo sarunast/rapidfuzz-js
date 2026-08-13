@@ -1,11 +1,11 @@
-import { resolvePreparedChoice } from '../core/prepared.js'
+import { resolvePreparedChoice } from '../../core/prepared.js'
 import {
   normalizeSequence,
   snapshotSequence,
   validateSequence,
-} from '../core/sequence.js'
-import type { Direction, MaybeSequence, Normalizer, Sequence } from '../core/types.js'
-import type { ResolvedMatcherOptions } from './types.js'
+} from '../../core/sequence.js'
+import type { Direction, MaybeSequence, Normalizer, Sequence } from '../../core/types.js'
+import type { ResolvedMatcherOptions } from '../types.js'
 
 export type SequenceReader<TItem> = (item: TItem) => Sequence | null
 

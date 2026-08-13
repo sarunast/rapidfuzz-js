@@ -1,18 +1,18 @@
-import type { PreparedKernel } from '../../core/protocol.js'
-import { bestSimilarity } from './bestSimilarity.js'
-import { pushHeap, replaceHeapRoot } from './heap.js'
+import type { PreparedKernel } from '../../../core/protocol.js'
+import { bestDistance } from './bestDistance.js'
+import { pushHeap, replaceHeapRoot } from '../../shared/heap.js'
 import type { ScoredId } from './types.js'
 
 function worse(left: ScoredId, right: ScoredId): boolean {
-  return left.score < right.score || (left.score === right.score && left.id > right.id)
+  return left.score > right.score || (left.score === right.score && left.id > right.id)
 }
 
 function result(entries: ScoredId[]): readonly ScoredId[] {
-  entries.sort((a, b) => b.score - a.score || a.id - b.id)
+  entries.sort((a, b) => a.score - b.score || a.id - b.id)
   return entries
 }
 
-export function topSimilarity(
+export function topDistance(
   prepared: readonly unknown[],
   score: PreparedKernel,
   threshold: number | null,
@@ -21,7 +21,7 @@ export function topSimilarity(
 ): readonly ScoredId[] {
   if (limit === 0) return []
   if (limit === 1) {
-    const found = bestSimilarity(prepared, score, threshold, optimal)
+    const found = bestDistance(prepared, score, threshold, optimal)
     return found === undefined ? [] : [found]
   }
 
@@ -33,7 +33,7 @@ export function topSimilarity(
     let cutoff = threshold
     for (let id = 0; id < prepared.length; id++) {
       const value = score(prepared[id], cutoff)
-      if (threshold !== null && value < threshold) continue
+      if (threshold !== null && value > threshold) continue
       if (heap.length < limit) {
         pushHeap(heap, { id, score: value }, worse)
         if (heap.length === limit) {
@@ -44,7 +44,7 @@ export function topSimilarity(
       }
       // A tie loses on id, and every later candidate has a later id, so the
       // numeric test alone decides admission — no comparator call.
-      if (value <= heap[0].score) continue
+      if (value >= heap[0].score) continue
       replaceHeapRoot(heap, { id, score: value }, worse)
       cutoff = heap[0].score
       if (optimal !== null && cutoff === optimal) break
@@ -55,7 +55,7 @@ export function topSimilarity(
   const results: ScoredId[] = []
   for (let id = 0; id < prepared.length; id++) {
     const value = score(prepared[id], threshold)
-    if (threshold === null || value >= threshold) {
+    if (threshold === null || value <= threshold) {
       results.push({ id, score: value })
     }
   }
