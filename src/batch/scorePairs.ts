@@ -3,7 +3,12 @@ import { scorerCompilation } from '../core/scoring/scorer.js'
 import { qualifies } from '../core/scoring/threshold.js'
 import { normalizeSequence, validateSequence } from '../core/sequence.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
-import { BATCH_OPTION_KEYS, rejectedScore, resolveBatchOptions } from './options.js'
+import {
+  BATCH_OPTION_KEYS,
+  type BatchOptions,
+  rejectedScore,
+  resolveBatchOptions,
+} from './options.js'
 import {
   allocateScores,
   roundHalfAwayFromZero,
@@ -13,7 +18,6 @@ import {
   scoreStoreRange,
   unstorableScore,
 } from './storage.js'
-import type { BatchOptions } from './types.js'
 
 function normalizeInputs(
   values: readonly Sequence[],

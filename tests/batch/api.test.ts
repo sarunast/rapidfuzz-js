@@ -2,9 +2,9 @@ import { describe, expect, test, vi } from 'vitest'
 
 import * as indel from '../../src/algorithms/indel/index.js'
 import * as levenshtein from '../../src/algorithms/levenshtein/index.js'
+import { buildScoreMatrix } from '../../src/batch/scoreMatrix.js'
 import {
   allocateScores,
-  buildScoreMatrix,
   roundHalfAwayFromZero,
   scoreArrayFactory,
 } from '../../src/batch/storage.js'

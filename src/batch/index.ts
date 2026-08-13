@@ -1,9 +1,4 @@
-export { scoreMatrix } from './scoreMatrix.js'
+export { scoreMatrix, type ScoreMatrix } from './scoreMatrix.js'
 export { scorePairs } from './scorePairs.js'
-export type { BatchOptions } from './types.js'
-export type {
-  ScoreArray,
-  ScoreArrayKind,
-  ScoreArrayOf,
-  ScoreMatrix,
-} from './storage.js'
+export type { BatchOptions } from './options.js'
+export type { ScoreArray, ScoreArrayKind, ScoreArrayOf } from './storage.js'

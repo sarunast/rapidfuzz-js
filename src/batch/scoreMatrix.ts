@@ -4,18 +4,44 @@ import { scorerCompilation } from '../core/scoring/scorer.js'
 import { qualifies } from '../core/scoring/threshold.js'
 import { normalizeSequence, validateSequence } from '../core/sequence.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
-import { BATCH_OPTION_KEYS, rejectedScore, resolveBatchOptions } from './options.js'
 import {
-  buildScoreMatrix,
+  BATCH_OPTION_KEYS,
+  type BatchOptions,
+  rejectedScore,
+  resolveBatchOptions,
+} from './options.js'
+import {
+  allocateScores,
   roundHalfAwayFromZero,
   type ScoreArray,
+  scoreArrayFactory,
   type ScoreArrayKind,
   type ScoreArrayOf,
-  type ScoreMatrix,
   scoreStoreRange,
   unstorableScore,
 } from './storage.js'
-import type { BatchOptions } from './types.js'
+
+/**
+ * A `queries × choices` block of scores, stored row-major in one typed array.
+ *
+ * Storage backing {@link scoreMatrix}. Two-dimensional
+ * indexing is the only thing a flat array does not already give a caller, so
+ * that is all this adds.
+ */
+export interface ScoreMatrix<TArray extends ScoreArray = Float64Array> {
+  /** Number of queries. */
+  readonly rows: number
+  /** Number of choices. */
+  readonly cols: number
+  /** Row-major scores, `rows * cols` long. `data[row * cols + col]`. */
+  readonly data: TArray
+  /** The score of `queries[row]` against `choices[col]`. */
+  at(row: number, col: number): number
+  /** A copy as nested plain arrays. */
+  toArray(): number[][]
+  /** Each row in turn, as a view over {@link data} rather than a copy. */
+  [Symbol.iterator](): IterableIterator<TArray>
+}
 
 // The normalizer is fixed for the whole call, so it decides which loop runs
 // rather than being re-tested per sequence — the same split `scorePairs` makes.
@@ -83,6 +109,78 @@ function fill(
       store[rowOffset + column] = stored
       if (symmetric && row !== column) store[column * columns + row] = stored
     }
+  }
+}
+
+/**
+ * Check a dimension on its own, because the allocation only ever sees their
+ * product: `-1 × -1` is a length of one, and so is `0.5 × 2`. Either would
+ * build a matrix whose `at`, `toArray` and row iterator all disagree with the
+ * data behind them, and `allocateScores` would accept both.
+ *
+ * {@link scoreMatrix} cannot reach this — its dimensions are array lengths — so
+ * what it guards is {@link buildScoreMatrix}'s own contract: nothing there
+ * should be able to return an internally inconsistent {@link ScoreMatrix}.
+ */
+function validateDimension(value: number, name: string, what: string): void {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(`${what} needs a ${name} count, not ${value}`)
+  }
+}
+
+/**
+ * Allocate a matrix of `kind`, fill it, and wrap it.
+ *
+ * `kind` has to arrive as a single literal rather than the union, which is what
+ * lets `view` come back at the concrete element type and the row iterator
+ * promise `TArray` instead of the whole union. Callers holding a runtime kind
+ * dispatch to a literal first — see {@link scoreMatrix}.
+ */
+export function buildScoreMatrix<TKind extends ScoreArrayKind>(
+  kind: TKind,
+  rows: number,
+  cols: number,
+  what: string,
+  fill: (data: ScoreArrayOf[TKind], integral: boolean) => void,
+): ScoreMatrix<ScoreArrayOf[TKind]> {
+  validateDimension(rows, 'row', what)
+  validateDimension(cols, 'column', what)
+  const { integral, view } = scoreArrayFactory(kind)
+  const data = allocateScores(kind, rows * cols, what)
+  fill(data, integral)
+
+  return {
+    rows,
+    cols,
+    data,
+    at(row, col) {
+      // A `RangeError` rather than `undefined`, which is what keeps the return
+      // type honestly `number` under `noUncheckedIndexedAccess: false`.
+      if (
+        !Number.isInteger(row) ||
+        row < 0 ||
+        row >= rows ||
+        !Number.isInteger(col) ||
+        col < 0 ||
+        col >= cols
+      ) {
+        throw new RangeError(`(${row}, ${col}) is outside a ${rows} × ${cols} matrix`)
+      }
+      return data[row * cols + col]
+    },
+    toArray() {
+      const out = new Array<number[]>(rows)
+      for (let i = 0; i < rows; i++) {
+        const row = new Array<number>(cols)
+        const base = i * cols
+        for (let j = 0; j < cols; j++) row[j] = data[base + j]
+        out[i] = row
+      }
+      return out
+    },
+    *[Symbol.iterator]() {
+      for (let i = 0; i < rows; i++) yield view(data, i * cols, (i + 1) * cols)
+    },
   }
 }
 
