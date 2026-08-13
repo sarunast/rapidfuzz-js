@@ -40,22 +40,41 @@ const medium = words(10_000, 24)
 const large = words(100_000, 24, 0x0ba7_d101)
 const phrases = sentences(10_000, 4)
 
+// Every choice sharing most of its grams with every other, which is the shape
+// the index is worst at and the docs lead with. Built here rather than in
+// `tooling/corpus.ts` because that file is hashed into every baseline entry in
+// the suite, and this corpus is one file's business.
+// Three tail lengths, not one: against a corpus of a single length a short
+// query is refused by Dice's length bound alone, and the exhaustive arm would
+// be measured rejecting choices rather than scoring them.
+const PATH_TAILS = ['dist/index.js', 'lib/a.js', 'src/nested/deep/module/index.ts']
+const paths = words(10_000, 8, 0x51ed_2701).map(
+  (name, index) => `node_modules/${name}/${PATH_TAILS[index % PATH_TAILS.length]}`,
+)
+
 const smallQueries = words(100, 24, 0x1357_9bdf)
 const mediumQueries = medium.slice(0, 100)
 const phraseQueries = phrases.slice(0, 100)
 const oneQuery = large[50_000]
+// The three a shared-prefix corpus answers differently: grams nearly every
+// choice holds, a whole path, and a fragment only one choice holds.
+const commonPrefixQuery = 'node_modules/'
+const wholePathQuery = paths[8_391]
+const rareFragmentQuery = paths[8_391].slice(13, 21)
 
 const smallIndexed = createIndexedMatcher(small, { scorer: dice })
 const mediumIndexed = createIndexedMatcher(medium, { scorer: dice })
 const largeIndexed = createIndexedMatcher(large, { scorer: dice })
 const phraseIndexed = createIndexedMatcher(phrases, { scorer: dice })
 const mediumCosineIndexed = createIndexedMatcher(medium, { scorer: cosine })
+const pathIndexed = createIndexedMatcher(paths, { scorer: dice })
 
 const smallMatcher = createMatcher(small, { scorer: dice })
 const mediumMatcher = createMatcher(medium, { scorer: dice })
 const largeMatcher = createMatcher(large, { scorer: dice })
 const phraseMatcher = createMatcher(phrases, { scorer: dice })
 const mediumCosineMatcher = createMatcher(medium, { scorer: cosine })
+const pathMatcher = createMatcher(paths, { scorer: dice })
 
 // The control's own corpus, identical to the case it mirrors in
 // `bench/ngram.bench.ts`.
@@ -175,6 +194,66 @@ describe('dice search, 10000 sentences', () => {
     for (const query of phraseQueries)
       phraseMatcher.search(query, { limit: 5, threshold: 0.8 })
   })
+})
+
+// `limit: null` is a different selection strategy, not a larger `limit`: with no
+// room bound the top-k insertion walk degrades to a quadratic one, so an
+// unlimited call collects and sorts instead. Both thresholds, because the
+// threshold is what decides whether the sorted set is a handful or the corpus.
+describe('dice search, unlimited results', () => {
+  measure('indexed, 100 queries, 1000 choices, threshold 0.5', () => {
+    for (const query of smallQueries)
+      smallIndexed.search(query, { limit: null, threshold: 0.5 })
+  })
+  measure('exhaustive, 100 queries, 1000 choices, threshold 0.5', () => {
+    for (const query of smallQueries)
+      smallMatcher.search(query, { limit: null, threshold: 0.5 })
+  })
+  measure('indexed, 20 queries, 10000 choices, threshold 0.5', () => {
+    for (let at = 0; at < 20; at++)
+      mediumIndexed.search(mediumQueries[at], { limit: null, threshold: 0.5 })
+  })
+  measure('exhaustive, 20 queries, 10000 choices, threshold 0.5', () => {
+    for (let at = 0; at < 20; at++)
+      mediumMatcher.search(mediumQueries[at], { limit: null, threshold: 0.5 })
+  })
+  // No threshold, so every choice qualifies and the result *is* the corpus —
+  // the one shape where sorting costs more than inserting, and the reason this
+  // pair is here rather than only the selective one above.
+  measure('indexed, 5 queries, 10000 choices, no threshold', () => {
+    for (let at = 0; at < 5; at++)
+      mediumIndexed.search(mediumQueries[at], { limit: null })
+  })
+  measure('exhaustive, 5 queries, 10000 choices, no threshold', () => {
+    for (let at = 0; at < 5; at++)
+      mediumMatcher.search(mediumQueries[at], { limit: null })
+  })
+})
+
+// The adverse shape, kept where a future optimisation has to walk past it: file
+// paths under one directory share nearly all their grams, so a query's posting
+// lists name most of the corpus and the index has little left to skip. One
+// query per case, because the exhaustive arm scores 10,000 choices of ~40
+// characters.
+describe('dice search, 10000 shared-prefix paths', () => {
+  measure('indexed, common prefix query', () =>
+    pathIndexed.search(commonPrefixQuery, { limit: 5, threshold: 0.5 }),
+  )
+  measure('exhaustive, common prefix query', () =>
+    pathMatcher.search(commonPrefixQuery, { limit: 5, threshold: 0.5 }),
+  )
+  measure('indexed, whole path query', () =>
+    pathIndexed.search(wholePathQuery, { limit: 5, threshold: 0.5 }),
+  )
+  measure('exhaustive, whole path query', () =>
+    pathMatcher.search(wholePathQuery, { limit: 5, threshold: 0.5 }),
+  )
+  measure('indexed, rare fragment query', () =>
+    pathIndexed.search(rareFragmentQuery, { limit: 5, threshold: 0.5 }),
+  )
+  measure('exhaustive, rare fragment query', () =>
+    pathMatcher.search(rareFragmentQuery, { limit: 5, threshold: 0.5 }),
+  )
 })
 
 // One query, not a hundred: the exhaustive arm is tens of milliseconds per
