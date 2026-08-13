@@ -1062,6 +1062,12 @@ class DiceIndex implements ChoiceIndex {
  * `queryGrams × choiceGrams` rather than by the query alone, so a long query
  * against a long choice can carry it past what an `Int32Array` holds, and the
  * failure mode would be a wrong score rather than a thrown error.
+ *
+ * Two exactness conditions rather than one, and the denominator owns the
+ * second: a packed profile sums the same squared norm in a different order, so
+ * a query checks `assertCosineExact` for the numerator before extraction and
+ * `assertCosineNormsExact` for the norms after it, once the query's own is
+ * known.
  */
 class CosineIndex implements ChoiceIndex {
   private readonly state = new QueryState()
