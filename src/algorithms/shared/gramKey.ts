@@ -12,7 +12,9 @@ const RADIX_LADDER: readonly number[] = [0x100, 0x1_0000, 0x11_0000]
  *
  * Depth decides how far the ladder reaches: a byte radix holds six elements, a
  * BMP radix three, the full code-point radix two. A trigram over astral text
- * therefore has no packed rung at all and falls back to joined strings.
+ * therefore has no packed rung at all, and what happens then belongs to the
+ * caller: an index joins the gram's elements into a string key, a prepared
+ * profile keeps its trie.
  */
 export function feasibleRadices(gramSize: number): readonly number[] {
   return RADIX_LADDER.filter(

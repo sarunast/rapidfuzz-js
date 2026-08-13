@@ -6,7 +6,7 @@ import { similarity as cosineMetric } from '../src/algorithms/cosine/index.js'
 import { diceDistance, diceSimilarity } from '../src/algorithms/dice/implementation.js'
 import { similarity as diceMetric } from '../src/algorithms/dice/index.js'
 import { bestMatch, createMatcher, createScorer, search } from '../src/index.js'
-import { pairs, similarPairs, words } from './tooling/corpus.js'
+import { editedPairs, pairs, similarPairs, words } from './tooling/corpus.js'
 import { describe, measure } from './tooling/harness.js'
 
 // Three length classes, as elsewhere in the suite: a profile's cost is one trie
@@ -22,12 +22,14 @@ const short = similarPairs(200, 8)
 const medium = similarPairs(200, 32)
 const long = similarPairs(100, 128)
 const veryLong = similarPairs(20, 512)
-// The other end of the same trade, and the one the packed representation loses:
-// sorting every gram is `O(n log n)` where inserting into a trie is linear, and
-// a one-shot comparison has no later query to amortise it over. Against the trie
-// build: level at 512 characters, 1.1x slower at 1024, 1.5x at 4096 and 1.6x at
-// 8192. A prepared choice pays the sort once and wins on every query after it,
-// which is why the representation is not gated on length.
+// The other end of the same trade, and where the packed representation used to
+// lose: sorting every gram is `O(n log n)` where inserting into a trie is
+// linear, and a one-shot comparison has no later query to amortise it over.
+// Against the trie build it was level at 512 characters, 1.1x slower at 1024,
+// 1.5x at 4096 and 1.6x at 8192 — which is what the transient direct counter in
+// `dice/implementation.ts` was written to answer, and these are the lengths it
+// answers them at. A prepared choice still sorts, once, and wins on every query
+// after it, which is why the stored representation is not gated on length.
 const large = similarPairs(10, 1024)
 const huge = similarPairs(5, 4096)
 const enormous = similarPairs(3, 8192)
@@ -86,6 +88,23 @@ const astralTrailingLarge = large.map(([a, b]): [string, string] => [
   `${a.slice(0, -2)}😀`,
   `${b.slice(0, -2)}😀`,
 ])
+const astralThroughoutLarge = large.map(([a, b]): [string, string] => [
+  a.replaceAll(/(.{9})./gu, '$1😀'),
+  b.replaceAll(/(.{9})./gu, '$1😀'),
+])
+// Either side of the gram count at which Dice routes a direct comparison to the
+// transient counter — 511 grams against 512, so one pair takes the profiles and
+// the next takes the counter and nothing else differs.
+//
+// `editedPairs`, not `similarPairs`: the counter is selected on a gram count, so
+// a case labelled 513 characters has to *be* 513 characters. `similarPairs`
+// inserts and deletes, and a pair generated at the boundary could land either
+// side of it — which would make these two cases measure the same path and say
+// nothing.
+const belowGate = editedPairs(20, 512, 8)
+const atGate = editedPairs(20, 513, 8)
+const trigramsBelowGate = editedPairs(20, 513, 8, 0x51c0_de01)
+const trigramsAtGate = editedPairs(20, 514, 8, 0x51c0_de01)
 // Lengths alone put these out of reach of a high cutoff, which is the case the
 // gram-count bound exists to answer without building either trie.
 const lengthSkewed = words(100, 512, 0x0ba7_d101).map((value, index) =>
@@ -165,6 +184,12 @@ describe('diceSimilarity', () => {
   })
   measure('4096 chars, one repeated gram', () => {
     for (const [a, b] of repetitive) diceSimilarity(a, b)
+  })
+  // The same trade at the other routed depth. Both depths cross the counter's
+  // gate here and both lose on text with almost no distinct grams, so a change
+  // that improves one and ruins the other has to show it.
+  measure('trigrams, 4096 chars, one repeated gram', () => {
+    for (const [a, b] of repetitive) trigrams.score(a, b)
   })
   measure('trigrams, 128 chars, similar', () => {
     for (const [a, b] of long) trigrams.score(a, b)
@@ -262,6 +287,28 @@ describe('dice packing fallback', () => {
   })
   measure('trigrams, 1024 chars, astral at the end', () => {
     for (const [a, b] of astralTrailingLarge) trigrams.score(a, b)
+  })
+  measure('trigrams, 1024 chars, astral throughout', () => {
+    for (const [a, b] of astralThroughoutLarge) trigrams.score(a, b)
+  })
+})
+
+describe('dice counter routing boundary', () => {
+  // 511 grams against 512: below the gate the profiles answer, at it the
+  // transient counter does. The gap between the two rows in a pair is what the
+  // routing decision is worth at the point it is taken, and the pair is what
+  // stops the constant being moved without a number.
+  measure('511 grams, profiles', () => {
+    for (const [a, b] of belowGate) diceSimilarity(a, b)
+  })
+  measure('512 grams, counter', () => {
+    for (const [a, b] of atGate) diceSimilarity(a, b)
+  })
+  measure('trigrams, 511 grams, profiles', () => {
+    for (const [a, b] of trigramsBelowGate) trigrams.score(a, b)
+  })
+  measure('trigrams, 512 grams, counter', () => {
+    for (const [a, b] of trigramsAtGate) trigrams.score(a, b)
   })
 })
 
