@@ -23,7 +23,7 @@ import { lcsSeqNormalizedSimilarity } from '../../src/algorithms/lcs/implementat
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { resetBitVectorScratch } from '../../src/algorithms/shared/bitmask/blockMasks.js'
 import { resetPartialRatioScratch } from '../../src/fuzz/internal/partialWindow.js'
-import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partial.js'
+import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partialSimilarity.js'
 
 /** One before the counter's ceiling, so the next build but one wraps it. */
 const NEAR_LIMIT = 0x7fff_fffd

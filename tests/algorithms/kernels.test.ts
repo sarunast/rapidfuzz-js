@@ -57,7 +57,7 @@ import {
   rowBitSet,
   shiftedRowBitSet,
 } from '../../src/algorithms/shared/bitParallel.js'
-import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partial.js'
+import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partialSimilarity.js'
 import { ratio } from '../../src/fuzz/similarity.js'
 import { editopTuples } from '../../testing/editopTuples.js'
 import { prepareScorerOf } from '../../testing/prepareScorer.js'

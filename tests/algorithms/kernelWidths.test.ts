@@ -27,7 +27,7 @@ import { levenshteinEditops } from '../../src/algorithms/levenshtein/editops.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../../src/algorithms/osa/implementation.js'
 import type { Sequence } from '../../src/algorithms/shared/scorerSupport.js'
-import { partialRatio } from '../../src/fuzz/partial.js'
+import { partialRatio } from '../../src/fuzz/partialSimilarity.js'
 import { ratio } from '../../src/fuzz/similarity.js'
 import { prepareScorerOf } from '../../testing/prepareScorer.js'
 

@@ -16,7 +16,7 @@
 // `partialRatioScan` makes it right on purpose, and these assertions keep it so.
 import { describe, expect, it } from 'vitest'
 
-import { partialRatio, partialRatioAlignment } from './partial.js'
+import { partialRatio, partialRatioAlignment } from './partialSimilarity.js'
 import { ratio } from './similarity.js'
 
 // The windows `partialRatioScan` is defined over: every prefix and every suffix

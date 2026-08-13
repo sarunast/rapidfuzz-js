@@ -8,7 +8,7 @@
 // insertion order of the maps behind `UniqueTokenSet` — so the accessors must
 // give one answer whichever order they are driven in.
 //
-// These reach into `fuzz/internal/tokens.js` on purpose. The invariant is internal, and
+// These reach into `fuzz/token/tokens.js` on purpose. The invariant is internal, and
 // asserting it through the public scorers alone would only test the access order
 // those scorers happen to use today.
 import { describe, expect, it } from 'vitest'
@@ -22,10 +22,10 @@ import {
   tokenViewOf,
   uniqueOf,
   type UniqueTokenSet,
-} from './internal/tokens.js'
-import { tokenRatio } from './token.js'
-import { tokenSetRatio } from './tokenSet.js'
-import { tokenSortRatio } from './tokenSort.js'
+} from './token/tokens.js'
+import { tokenSetRatio } from './token/tokenSetSimilarity.js'
+import { tokenRatio } from './token/tokenSimilarity.js'
+import { tokenSortRatio } from './token/tokenSortSimilarity.js'
 
 /** Everything observable about a token set, in an order-free form. */
 function snapshot(set: UniqueTokenSet): { size: number; tokens: string[] } {

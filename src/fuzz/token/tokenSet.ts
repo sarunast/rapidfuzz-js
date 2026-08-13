@@ -23,12 +23,12 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * `tokenSetRatioConverted` is their only caller.
  */
 import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
-import type { FuzzInput, FuzzOptions } from '../types.js'
 import {
   type CharSet,
   partialAlignmentConverted,
   partialRatioConverted,
-} from './partialWindow.js'
+} from '../internal/partialWindow.js'
+import type { FuzzInput, FuzzOptions } from '../types.js'
 import {
   difference,
   intersects,

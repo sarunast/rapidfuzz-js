@@ -1,18 +1,18 @@
-import { prepareLcsPattern } from '../algorithms/lcs/implementation.js'
-import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
-import type { BuiltInMetric } from '../algorithms/shared/metricAdapter.js'
+import { prepareLcsPattern } from '../../algorithms/lcs/implementation.js'
+import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
+import type { BuiltInMetric } from '../../algorithms/shared/metricAdapter.js'
 import {
   type PreparationFactory,
   FUZZ_FLAGS,
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
-} from '../algorithms/shared/scorerSupport.js'
-import type { PreparedKernel } from '../core/scoring/compilation.js'
-import type { Sequence } from '../core/types.js'
-import { fuzzMetric } from './internal/metric.js'
-import { preparedTokenChoice, sortedOf, tokenChoicePreparer } from './internal/tokens.js'
-import { tokenSortRatio_impl, tokenSortRatioConverted } from './internal/tokenSort.js'
-import type { FuzzOptions } from './types.js'
+} from '../../algorithms/shared/scorerSupport.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import type { Sequence } from '../../core/types.js'
+import { fuzzMetric } from '../internal/metric.js'
+import type { FuzzOptions } from '../types.js'
+import { preparedTokenChoice, sortedOf, tokenChoicePreparer } from './tokens.js'
+import { tokenSortRatio_impl, tokenSortRatioConverted } from './tokenSort.js'
 
 /** Narrow prepared-query implementation for token-sort similarity. */
 export function prepareTokenSort(): PreparationFactory {

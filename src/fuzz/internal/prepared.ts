@@ -13,10 +13,10 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * ## The one-way rule
  *
  * This module sits above every scorer family and imports the reusable cores from
- * `partialWindow.ts`, `tokens.ts` and `tokenSet.ts`. None of them may import this
+ * `partialWindow.ts`, `token/tokens.ts` and `token/tokenSet.ts`. None of them may import this
  * one, which is what keeps the graph acyclic.
  *
- * `weighted.ts` is deliberately **not** among them. Its `wRatio_impl`, like every
+ * `weightedSimilarity.ts` is deliberately **not** among them. Its `wRatio_impl`, like every
  * other public scorer's implementation, validates and converts raw input — the
  * work already done by the time a branch below runs — so the composite strategy
  * is reproduced here over prepared state rather than called. The `wRatio` branch
@@ -35,6 +35,19 @@ import {
 } from '../../algorithms/shared/scorerSupport.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import type { Sequence } from '../../core/types.js'
+import {
+  hasWhitespaceOf,
+  preparedTokenChoice,
+  sortedOf,
+  tokenChoicePreparer,
+  tokenViewOf,
+} from '../token/tokens.js'
+import {
+  partialTokenRatioConverted,
+  partialTokenSetRatioConverted,
+  tokenRatioConverted,
+  tokenSetRatioConverted,
+} from '../token/tokenSet.js'
 import type { PreparedFuzzKind } from '../types.js'
 import {
   type CharSet,
@@ -44,19 +57,6 @@ import {
   partialRatioImpl,
   ratioHeld,
 } from './partialWindow.js'
-import {
-  hasWhitespaceOf,
-  preparedTokenChoice,
-  sortedOf,
-  tokenChoicePreparer,
-  tokenViewOf,
-} from './tokens.js'
-import {
-  partialTokenRatioConverted,
-  partialTokenSetRatioConverted,
-  tokenRatioConverted,
-  tokenSetRatioConverted,
-} from './tokenSet.js'
 
 /**
  * Whether this scorer ever splits an input into tokens.

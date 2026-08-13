@@ -342,37 +342,40 @@ describe('dependency direction', () => {
     expect(sourceImports(join(ngram, 'gramSize.ts'))).toEqual([])
   })
 
+  // The layout carries the scorer graph: a public scorer module is named after
+  // the method it exposes, and `token/` is the one genuine family — six public
+  // strategies over a token engine they share. Pinning both listings is what
+  // stops a seventh scorer landing loose at the root.
   it('keeps fuzz families physically and directionally isolated', () => {
     const directory = join(source, 'fuzz')
+    const family = join(directory, 'token')
     expect(shippedEntries(directory)).toEqual([
       'index.ts',
       'internal',
-      'partial.ts',
-      'partialToken.ts',
-      'partialTokenSet.ts',
-      'partialTokenSort.ts',
+      'partialSimilarity.ts',
       'similarity.ts',
-      'token.ts',
-      'tokenSet.ts',
-      'tokenSort.ts',
+      'token',
       'types.ts',
-      'weighted.ts',
+      'weightedSimilarity.ts',
     ])
-    expect(readFileSync(join(directory, 'similarity.ts'), 'utf8')).not.toMatch(
-      /from ['"]\.\/(weighted|partial|partialToken|partialTokenSet|partialTokenSort|token|tokenSet|tokenSort)\.js/,
-    )
-    expect(readFileSync(join(directory, 'partial.ts'), 'utf8')).not.toMatch(
-      /from ['"]\.\/(weighted|partialToken|partialTokenSet|partialTokenSort|token|tokenSet|tokenSort)\.js/,
-    )
-    for (const name of [
-      'partialToken.ts',
-      'partialTokenSet.ts',
-      'partialTokenSort.ts',
-      'token.ts',
+    expect(shippedEntries(family)).toEqual([
+      'partialTokenSetSimilarity.ts',
+      'partialTokenSimilarity.ts',
+      'partialTokenSortSimilarity.ts',
       'tokenSet.ts',
+      'tokenSetSimilarity.ts',
+      'tokenSimilarity.ts',
       'tokenSort.ts',
-    ]) {
+      'tokenSortSimilarity.ts',
+      'tokens.ts',
+    ])
+    for (const name of ['similarity.ts', 'partialSimilarity.ts']) {
       expect(readFileSync(join(directory, name), 'utf8')).not.toMatch(
+        /from ['"][^'"]*(token|weightedSimilarity)/,
+      )
+    }
+    for (const name of shippedEntries(family)) {
+      expect(readFileSync(join(family, name), 'utf8')).not.toMatch(
         /from ['"][^'"]*weighted/,
       )
     }

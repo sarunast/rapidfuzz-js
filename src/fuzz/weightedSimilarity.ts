@@ -29,8 +29,8 @@ import {
   containsWhitespace,
   stringContainsWhitespace,
   tokenForm,
-} from './internal/tokens.js'
-import { partialTokenRatioConverted, tokenRatioConverted } from './internal/tokenSet.js'
+} from './token/tokens.js'
+import { partialTokenRatioConverted, tokenRatioConverted } from './token/tokenSet.js'
 import type { FuzzInput, FuzzOptions } from './types.js'
 
 /**

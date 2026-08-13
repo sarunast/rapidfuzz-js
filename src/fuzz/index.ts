@@ -1,15 +1,15 @@
 export { similarity } from './similarity.js'
 
-export { partialSimilarity, partialSimilarityAlignment } from './partial.js'
+export { partialSimilarity, partialSimilarityAlignment } from './partialSimilarity.js'
 
-export { tokenSimilarity } from './token.js'
-export { tokenSetSimilarity } from './tokenSet.js'
-export { tokenSortSimilarity } from './tokenSort.js'
+export { tokenSimilarity } from './token/tokenSimilarity.js'
+export { tokenSetSimilarity } from './token/tokenSetSimilarity.js'
+export { tokenSortSimilarity } from './token/tokenSortSimilarity.js'
 
-export { partialTokenSimilarity } from './partialToken.js'
-export { partialTokenSetSimilarity } from './partialTokenSet.js'
-export { partialTokenSortSimilarity } from './partialTokenSort.js'
+export { partialTokenSimilarity } from './token/partialTokenSimilarity.js'
+export { partialTokenSetSimilarity } from './token/partialTokenSetSimilarity.js'
+export { partialTokenSortSimilarity } from './token/partialTokenSortSimilarity.js'
 
-export { weightedSimilarity } from './weighted.js'
+export { weightedSimilarity } from './weightedSimilarity.js'
 
 export type { FuzzConfiguration, ScoreAlignment } from './types.js'

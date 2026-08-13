@@ -9,9 +9,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { matrixScores } from '../../testing/scoreMatrix.js'
-import { tokenSetRatio } from './tokenSet.js'
-import { tokenSortRatio } from './tokenSort.js'
-import { wRatio } from './weighted.js'
+import { tokenSetRatio } from './token/tokenSetSimilarity.js'
+import { tokenSortRatio } from './token/tokenSortSimilarity.js'
+import { wRatio } from './weightedSimilarity.js'
 
 describe('tokens holding objects', () => {
   // Regression: the hash used to be `String(x)`, which runs the caller's
