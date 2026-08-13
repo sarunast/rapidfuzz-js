@@ -1,4 +1,5 @@
 import { assertOptionKeys } from '../../core/options.js'
+import type { OptimumProof } from '../../core/scoring/optimumProof.js'
 import { scorerCompilation } from '../../core/scoring/scorer.js'
 import {
   impossibleThreshold,
@@ -154,6 +155,28 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
   })
   prepared.length = table.items.length
 
+  // Built on the first query that could actually use it, never at construction:
+  // a metric offering a proof is not a caller wanting one, and a collection that
+  // is only ever streamed through `searchIter` must not pay to index itself.
+  // `null` records that there is nothing to build, so the test happens once.
+  let proof: OptimumProof | null | undefined
+  const optimumProof = (): OptimumProof | null => {
+    if (proof === undefined) {
+      const factory = compilation.proveOptimum
+      proof =
+        factory === undefined || optimal === null || direction !== 'similarity'
+          ? null
+          : factory(prepared)
+    }
+    return proof
+  }
+  // A threshold above the optimum admits nothing, and one at or below it admits
+  // every optimal choice — so the proof applies exactly when the threshold does
+  // not exclude the optimum. `impossibleThreshold` has already refused the
+  // first case by the time either caller reaches this.
+  const proofApplies = (threshold: number | null): boolean =>
+    threshold === null || optimal === null || threshold <= optimal
+
   const materialize = (found: readonly ScoredId[]): readonly Match<TItem, unknown>[] => {
     const matches: Match<TItem, unknown>[] = new Array(found.length)
     for (let at = 0; at < found.length; at++) {
@@ -176,6 +199,12 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
       return missingSimilarityBest(table, missingScore, threshold)
     }
     if (impossibleThreshold(compilation, threshold)) return undefined
+    if (proofApplies(threshold) && optimal !== null) {
+      // Ahead of `prepareQuery`, so a settled query never builds the kernel
+      // state it would have scored with.
+      const settled = optimumProof()?.best(normalized)
+      if (settled !== undefined) return matchAt(table, settled, optimal)
+    }
     const activeThreshold = kernelThreshold(compilation, threshold)
     const score = compilation.prepareQuery(normalized)
     const found =
@@ -198,6 +227,20 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
       return missingSimilarityTop(table, missingScore, threshold, limit)
     }
     if (impossibleThreshold(compilation, threshold)) return []
+    // Only a limited search: an unlimited one has to report the choices below
+    // the optimum too, which the proof knows nothing about. `resultLimit` gives
+    // an absent `limit` the default 5, so a bare `search()` does reach here —
+    // `limit: null` is the one spelling that never does.
+    if (limit !== null && proofApplies(threshold) && optimal !== null) {
+      const settled = optimumProof()?.top(normalized, limit)
+      if (settled !== undefined) {
+        const matches: Match<TItem, unknown>[] = new Array(settled.length)
+        for (let at = 0; at < settled.length; at++) {
+          matches[at] = matchAt(table, settled[at], optimal)
+        }
+        return matches
+      }
+    }
     const activeThreshold = kernelThreshold(compilation, threshold)
     const score = compilation.prepareQuery(normalized)
     return materialize(

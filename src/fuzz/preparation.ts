@@ -43,6 +43,7 @@ import {
   partialRatioImpl,
   ratioHeld,
 } from './partialWindow.js'
+import { tokenContainmentProof } from './token/containment.js'
 import {
   hasWhitespaceOf,
   preparedTokenChoice,
@@ -361,5 +362,12 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
     }
     return score
   }
-  return () => ({ prepareQuery, prepareChoice: choicePreparer })
+  // Token-set only. Its 100 *is* containment, so the proof describes exactly
+  // its perfect matches. `tokenRatio` reaches 100 through a `Math.max` and
+  // `wRatio` scales every component, so neither is claimed here without tests
+  // of its own — a proof that is right for the wrong reason is still a wrong
+  // answer waiting for an input nobody tried.
+  const proveOptimum = kind === 'tokenSetRatio' ? tokenContainmentProof : undefined
+
+  return () => ({ prepareQuery, prepareChoice: choicePreparer, proveOptimum })
 }

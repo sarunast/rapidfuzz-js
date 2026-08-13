@@ -1,5 +1,6 @@
 import type { Direction, MaybeSequence, Sequence } from '../types.js'
 import type { ChoiceIndexBuilder } from './choiceIndex.js'
+import type { OptimumProof } from './optimumProof.js'
 import type { AnyBrand } from './preparedChoice.js'
 
 export const COMPILE: unique symbol = Symbol('rapidfuzz.metric.compile')
@@ -33,6 +34,13 @@ interface Compilation<TDirection extends Direction, TBrand = AnyBrand> {
   // caller cannot know how many choices it will keep until it has read them
   // all, so ids come from the order they arrive in.
   readonly indexChoices?: (() => ChoiceIndexBuilder) | undefined
+  // Names the choices that score the optimum without scoring the rest. A
+  // factory over the prepared array rather than a builder fed one choice at a
+  // time, because the caller already owns that array for its whole lifetime —
+  // `indexChoices` takes them one by one only because an indexed reader lends
+  // each sequence for the length of a callback. Absent on every metric with no
+  // structural account of its perfect matches, which is most of them.
+  readonly proveOptimum?: ((prepared: readonly unknown[]) => OptimumProof) | undefined
   // Never assigned and never read: it exists so a scorer's handles carry the
   // metric that made them into the type system.
   readonly preparedChoiceBrand?: TBrand

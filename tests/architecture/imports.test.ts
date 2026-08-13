@@ -361,6 +361,7 @@ describe('dependency direction', () => {
       'weightedSimilarity.ts',
     ])
     expect(shippedEntries(family)).toEqual([
+      'containment.ts',
       'partialTokenSetSimilarity.ts',
       'partialTokenSimilarity.ts',
       'partialTokenSortSimilarity.ts',

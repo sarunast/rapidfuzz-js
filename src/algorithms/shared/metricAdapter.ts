@@ -167,6 +167,7 @@ export function builtInMetric<
       prepareQuery: preparation.prepareQuery,
       prepareChoice: preparation.prepareChoice,
       indexChoices: preparation.indexChoices,
+      proveOptimum: preparation.proveOptimum,
       // `convSequence` copies a string and a plain array-like on its way to a
       // prepared representation, and keeps a typed array by reference. Only
       // that one has to be copied for a handle the caller keeps.

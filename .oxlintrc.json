@@ -120,6 +120,7 @@
               "assertType",
               "expectBounded",
               "expectExact",
+              "expectAgrees",
               "agree",
               "same",
               "fc.assert"

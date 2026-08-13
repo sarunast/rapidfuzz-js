@@ -1,5 +1,6 @@
 import type { ChoiceIndexBuilder } from '../../core/scoring/choiceIndex.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import type { OptimumProof } from '../../core/scoring/optimumProof.js'
 import type { Sequence } from '../../core/types.js'
 import {
   distanceCutoffFor,
@@ -24,6 +25,10 @@ export interface MetricPreparation {
   // have a corpus-wide representation define it; the adapter copies it onto the
   // compilation either way.
   readonly indexChoices?: (() => ChoiceIndexBuilder) | undefined
+  // Declared beside `indexChoices` and copied across the same way. A metric
+  // defines it only where its perfect matches have a structural description —
+  // token-set containment is the one that does.
+  readonly proveOptimum?: ((prepared: readonly unknown[]) => OptimumProof) | undefined
 }
 
 export type PreparationFactory = (
