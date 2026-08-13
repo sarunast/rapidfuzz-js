@@ -673,6 +673,8 @@ export function lcsLengthPrepared(
   const words = prepared.words
   if (words === 0 || textLength === 0) return 0
   if (words === 4) return lcsFourWordsPrepared(prepared, text, textStart, textLength)
+  if (words === 2) return lcsTwoWordsPrepared(prepared, text, textStart, textLength)
+  if (words === 3) return lcsThreeWordsPrepared(prepared, text, textStart, textLength)
 
   if (words === 1) {
     let s = -1
@@ -774,11 +776,11 @@ export function lcsLengthPrepared(
     }
     if (base < 0) continue
 
-    // The two- and three-word widths are written out rather than looped: they
-    // cover 33 to 96 elements, which is most of what the fuzz scorers see, and
-    // dropping the loop counter and its bounds check is worth 1.15x there.
-    // Extracting this into a shared helper gave most of that back — the call
-    // does not inline — so it stays spelled out at each kernel that runs it.
+    // The first three words are written out and the rest are a loop. This arm
+    // only ever runs at five words or more — one to four have kernels of their
+    // own above, which hold the whole row in locals — so the peeling here buys
+    // the loop counter and its bounds check on three of every `words` steps
+    // rather than deciding the width.
     let s = row[0]
     let u = s & masks[base]
     let sum = (s + u) | 0
@@ -790,14 +792,12 @@ export function lcsLengthPrepared(
     sum = (s + u + carry) | 0
     carry = ((s & u) | ((s | u) & ~sum)) >>> 31
     row[1] = sum | (s & ~u)
-    if (words === 2) continue
 
     s = row[2]
     u = s & masks[base + 2]
     sum = (s + u + carry) | 0
     carry = ((s & u) | ((s | u) & ~sum)) >>> 31
     row[2] = sum | (s & ~u)
-    if (words === 3) continue
 
     for (let w = 3; w < words; w++) {
       s = row[w]
@@ -811,6 +811,149 @@ export function lcsLengthPrepared(
   let count = 0
   for (let w = 0; w < words; w++) count += popcount(~row[w])
   return count
+}
+
+/**
+ * Two words of held-pattern LCS state in locals, for patterns of 33 to 64
+ * elements.
+ *
+ * The width this and {@link lcsThreeWordsPrepared} cover — 33 to 96 elements —
+ * is most of what the fuzz scorers are handed, and both used to run the shared
+ * row vector below, where every word of every text element is a typed-array
+ * load and a store. Holding the row in locals is the same trade
+ * `levenshteinTwoWords` and its siblings already take, measured at 1.5x there.
+ */
+function lcsTwoWordsPrepared(
+  prepared: PatternMask,
+  text: ArrayLike<unknown>,
+  textStart: number,
+  textLength: number,
+): number {
+  const masks = prepared.masks
+  const highBase = prepared.highBase
+  const highCount = prepared.highCount
+  const highStart = prepared.highStart
+  const wideOffsets = prepared.wideOffsets
+  const stringText = typeof text === 'string'
+  let s0 = -1
+  let s1 = -1
+
+  for (let i = 0; i < textLength; i++) {
+    let base = -1
+
+    if (stringText) {
+      const symbol = text.charCodeAt(textStart + i)
+      if (symbol < DIRECT_LOOKUP_LIMIT) {
+        base = symbol * 2
+      } else {
+        const shifted = symbol - highBase
+        base =
+          shifted >= 0 && shifted < highCount
+            ? highStart + shifted * 2
+            : (wideOffsets.get(symbol) ?? -1)
+      }
+    } else {
+      const symbol = text[textStart + i]
+      if (
+        typeof symbol === 'number' &&
+        symbol >= 0 &&
+        symbol < DIRECT_LOOKUP_LIMIT &&
+        (symbol | 0) === symbol
+      ) {
+        base = symbol * 2
+      } else if (typeof symbol === 'number' && (symbol | 0) === symbol) {
+        const shifted = symbol - highBase
+        base =
+          shifted >= 0 && shifted < highCount
+            ? highStart + shifted * 2
+            : (wideOffsets.get(symbol) ?? -1)
+      } else if (symbol === symbol) {
+        base = wideOffsets.get(symbol) ?? -1
+      }
+    }
+    if (base < 0) continue
+
+    let u = s0 & masks[base]
+    let sum = (s0 + u) | 0
+    const carry = ((s0 & u) | ((s0 | u) & ~sum)) >>> 31
+    s0 = sum | (s0 & ~u)
+
+    u = s1 & masks[base + 1]
+    sum = (s1 + u + carry) | 0
+    s1 = sum | (s1 & ~u)
+  }
+
+  return popcount(~s0) + popcount(~s1)
+}
+
+/** Three words of held-pattern LCS state in locals — see {@link lcsTwoWordsPrepared}. */
+function lcsThreeWordsPrepared(
+  prepared: PatternMask,
+  text: ArrayLike<unknown>,
+  textStart: number,
+  textLength: number,
+): number {
+  const masks = prepared.masks
+  const highBase = prepared.highBase
+  const highCount = prepared.highCount
+  const highStart = prepared.highStart
+  const wideOffsets = prepared.wideOffsets
+  const stringText = typeof text === 'string'
+  let s0 = -1
+  let s1 = -1
+  let s2 = -1
+
+  for (let i = 0; i < textLength; i++) {
+    let base = -1
+
+    if (stringText) {
+      const symbol = text.charCodeAt(textStart + i)
+      if (symbol < DIRECT_LOOKUP_LIMIT) {
+        base = symbol * 3
+      } else {
+        const shifted = symbol - highBase
+        base =
+          shifted >= 0 && shifted < highCount
+            ? highStart + shifted * 3
+            : (wideOffsets.get(symbol) ?? -1)
+      }
+    } else {
+      const symbol = text[textStart + i]
+      if (
+        typeof symbol === 'number' &&
+        symbol >= 0 &&
+        symbol < DIRECT_LOOKUP_LIMIT &&
+        (symbol | 0) === symbol
+      ) {
+        base = symbol * 3
+      } else if (typeof symbol === 'number' && (symbol | 0) === symbol) {
+        const shifted = symbol - highBase
+        base =
+          shifted >= 0 && shifted < highCount
+            ? highStart + shifted * 3
+            : (wideOffsets.get(symbol) ?? -1)
+      } else if (symbol === symbol) {
+        base = wideOffsets.get(symbol) ?? -1
+      }
+    }
+    if (base < 0) continue
+
+    let u = s0 & masks[base]
+    let sum = (s0 + u) | 0
+    let carry = ((s0 & u) | ((s0 | u) & ~sum)) >>> 31
+    s0 = sum | (s0 & ~u)
+
+    u = s1 & masks[base + 1]
+    sum = (s1 + u + carry) | 0
+    carry = ((s1 & u) | ((s1 | u) & ~sum)) >>> 31
+    s1 = sum | (s1 & ~u)
+
+    u = s2 & masks[base + 2]
+    sum = (s2 + u + carry) | 0
+    s2 = sum | (s2 & ~u)
+  }
+
+  return popcount(~s0) + popcount(~s1) + popcount(~s2)
 }
 
 /** Four-word held-pattern LCS for `partialRatio` and prepared scorers. */
@@ -1015,6 +1158,161 @@ function lcsPreparedBanded(
 }
 
 /**
+ * {@link lcsTwoWordsPrepared} carrying the periodic acceptance bound.
+ *
+ * The recurrence is guarded rather than skipped with a `continue`: the bound
+ * below reads the state instead of advancing it, so an element the pattern does
+ * not hold still has to be counted against the text that remains. Skipping the
+ * iteration outright would let a run of misses postpone every check.
+ */
+function lcsTwoWordsPreparedBounded(
+  prepared: PatternMask,
+  text: ArrayLike<unknown>,
+  textStart: number,
+  textLength: number,
+  required: number,
+): number {
+  const masks = prepared.masks
+  const highBase = prepared.highBase
+  const highCount = prepared.highCount
+  const highStart = prepared.highStart
+  const wideOffsets = prepared.wideOffsets
+  const stringText = typeof text === 'string'
+  let s0 = -1
+  let s1 = -1
+
+  for (let i = 0; i < textLength; i++) {
+    let base = -1
+
+    if (stringText) {
+      const symbol = text.charCodeAt(textStart + i)
+      if (symbol < DIRECT_LOOKUP_LIMIT) {
+        base = symbol * 2
+      } else {
+        const shifted = symbol - highBase
+        base =
+          shifted >= 0 && shifted < highCount
+            ? highStart + shifted * 2
+            : (wideOffsets.get(symbol) ?? -1)
+      }
+    } else {
+      const symbol = text[textStart + i]
+      if (
+        typeof symbol === 'number' &&
+        symbol >= 0 &&
+        symbol < DIRECT_LOOKUP_LIMIT &&
+        (symbol | 0) === symbol
+      ) {
+        base = symbol * 2
+      } else if (typeof symbol === 'number' && (symbol | 0) === symbol) {
+        const shifted = symbol - highBase
+        base =
+          shifted >= 0 && shifted < highCount
+            ? highStart + shifted * 2
+            : (wideOffsets.get(symbol) ?? -1)
+      } else if (symbol === symbol) {
+        base = wideOffsets.get(symbol) ?? -1
+      }
+    }
+
+    if (base >= 0) {
+      let u = s0 & masks[base]
+      let sum = (s0 + u) | 0
+      const carry = ((s0 & u) | ((s0 | u) & ~sum)) >>> 31
+      s0 = sum | (s0 & ~u)
+
+      u = s1 & masks[base + 1]
+      sum = (s1 + u + carry) | 0
+      s1 = sum | (s1 & ~u)
+    }
+
+    if ((i & 7) === 7 || i + 1 === textLength) {
+      if (popcount(~s0) + popcount(~s1) + textLength - i - 1 < required) return -1
+    }
+  }
+
+  return popcount(~s0) + popcount(~s1)
+}
+
+/** {@link lcsThreeWordsPrepared} with the same bound — see {@link lcsTwoWordsPreparedBounded}. */
+function lcsThreeWordsPreparedBounded(
+  prepared: PatternMask,
+  text: ArrayLike<unknown>,
+  textStart: number,
+  textLength: number,
+  required: number,
+): number {
+  const masks = prepared.masks
+  const highBase = prepared.highBase
+  const highCount = prepared.highCount
+  const highStart = prepared.highStart
+  const wideOffsets = prepared.wideOffsets
+  const stringText = typeof text === 'string'
+  let s0 = -1
+  let s1 = -1
+  let s2 = -1
+
+  for (let i = 0; i < textLength; i++) {
+    let base = -1
+
+    if (stringText) {
+      const symbol = text.charCodeAt(textStart + i)
+      if (symbol < DIRECT_LOOKUP_LIMIT) {
+        base = symbol * 3
+      } else {
+        const shifted = symbol - highBase
+        base =
+          shifted >= 0 && shifted < highCount
+            ? highStart + shifted * 3
+            : (wideOffsets.get(symbol) ?? -1)
+      }
+    } else {
+      const symbol = text[textStart + i]
+      if (
+        typeof symbol === 'number' &&
+        symbol >= 0 &&
+        symbol < DIRECT_LOOKUP_LIMIT &&
+        (symbol | 0) === symbol
+      ) {
+        base = symbol * 3
+      } else if (typeof symbol === 'number' && (symbol | 0) === symbol) {
+        const shifted = symbol - highBase
+        base =
+          shifted >= 0 && shifted < highCount
+            ? highStart + shifted * 3
+            : (wideOffsets.get(symbol) ?? -1)
+      } else if (symbol === symbol) {
+        base = wideOffsets.get(symbol) ?? -1
+      }
+    }
+
+    if (base >= 0) {
+      let u = s0 & masks[base]
+      let sum = (s0 + u) | 0
+      let carry = ((s0 & u) | ((s0 | u) & ~sum)) >>> 31
+      s0 = sum | (s0 & ~u)
+
+      u = s1 & masks[base + 1]
+      sum = (s1 + u + carry) | 0
+      carry = ((s1 & u) | ((s1 | u) & ~sum)) >>> 31
+      s1 = sum | (s1 & ~u)
+
+      u = s2 & masks[base + 2]
+      sum = (s2 + u + carry) | 0
+      s2 = sum | (s2 & ~u)
+    }
+
+    if ((i & 7) === 7 || i + 1 === textLength) {
+      if (popcount(~s0) + popcount(~s1) + popcount(~s2) + textLength - i - 1 < required) {
+        return -1
+      }
+    }
+  }
+
+  return popcount(~s0) + popcount(~s1) + popcount(~s2)
+}
+
+/**
  * Prepared LCS with a conservative acceptance bound.
  *
  * A negative result only means the requested LCS can no longer be reached;
@@ -1110,6 +1408,16 @@ export function lcsLengthPreparedBounded(
     return lcsPreparedBanded(prepared, words, text, textStart, textLength, required)
   }
 
+  // After the band rather than before it: at two words the band can never be
+  // narrower than the pattern, but at three it can, and the band is the better
+  // kernel wherever it applies.
+  if (words === 2) {
+    return lcsTwoWordsPreparedBounded(prepared, text, textStart, textLength, required)
+  }
+  if (words === 3) {
+    return lcsThreeWordsPreparedBounded(prepared, text, textStart, textLength, required)
+  }
+
   const row = rowVector(words)
   clearRange(row, -1, 0, words)
   const stringText = typeof text === 'string'
@@ -1147,7 +1455,10 @@ export function lcsLengthPreparedBounded(
     }
 
     if (base >= 0) {
-      // Written out to three words for the reason given in `lcsLengthPrepared`.
+      // Written out to three words for the reason given in `lcsLengthPrepared`,
+      // and unconditionally: two and three words have kernels of their own
+      // above, so this arm runs at four or more and the third word is always
+      // there to take.
       let s = row[0]
       let u = s & masks[base]
       let sum = (s + u) | 0
@@ -1160,20 +1471,18 @@ export function lcsLengthPreparedBounded(
       carry = ((s & u) | ((s | u) & ~sum)) >>> 31
       row[1] = sum | (s & ~u)
 
-      if (words > 2) {
-        s = row[2]
-        u = s & masks[base + 2]
+      s = row[2]
+      u = s & masks[base + 2]
+      sum = (s + u + carry) | 0
+      carry = ((s & u) | ((s | u) & ~sum)) >>> 31
+      row[2] = sum | (s & ~u)
+
+      for (let word = 3; word < words; word++) {
+        s = row[word]
+        u = s & masks[base + word]
         sum = (s + u + carry) | 0
         carry = ((s & u) | ((s | u) & ~sum)) >>> 31
-        row[2] = sum | (s & ~u)
-
-        for (let word = 3; word < words; word++) {
-          s = row[word]
-          u = s & masks[base + word]
-          sum = (s + u + carry) | 0
-          carry = ((s & u) | ((s | u) & ~sum)) >>> 31
-          row[word] = sum | (s & ~u)
-        }
+        row[word] = sum | (s & ~u)
       }
     }
 
