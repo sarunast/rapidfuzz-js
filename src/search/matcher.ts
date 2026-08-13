@@ -1,6 +1,11 @@
 import { assertOptionKeys } from '../core/options.js'
 import { scorerCompilation } from '../core/scorer.js'
-import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
+import {
+  impossibleThreshold,
+  kernelThreshold,
+  optionalThreshold,
+  trustedOptimum,
+} from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
 import type { ChoiceTable } from './choiceTable.js'
 import { buildChoiceTable, matchAt } from './choiceTable.js'
@@ -17,7 +22,6 @@ import {
   MATCHER_OPTION_KEYS,
   choiceReader,
   normalizeQuery,
-  optionalThreshold,
   resultLimit,
 } from './snapshot.js'
 import type {
@@ -138,11 +142,7 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
   // Fixed for the matcher's lifetime: direction and bounds belong to the
   // scorer, and only the threshold changes from one call to the next.
   const direction = compilation.direction
-  const optimal = compilation.trusted
-    ? direction === 'similarity'
-      ? compilation.bounds[1]
-      : compilation.bounds[0]
-    : null
+  const optimal = trustedOptimum(compilation)
   // A copy, so a caller who mutates their options object afterwards cannot
   // change a matcher that has already read them. The properties are declared
   // as `| undefined`, so naming an absent one costs nothing.
@@ -199,15 +199,8 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
       const missingScore = compilation.score(query, '', threshold)
       return missingSimilarityBest(table, missingScore, threshold)
     }
-    if (
-      compilation.trusted &&
-      impossibleTrustedThreshold(direction, compilation.bounds, threshold)
-    ) {
-      return undefined
-    }
-    const activeThreshold = compilation.trusted
-      ? trustedKernelThreshold(direction, compilation.bounds, threshold)
-      : threshold
+    if (impossibleThreshold(compilation, threshold)) return undefined
+    const activeThreshold = kernelThreshold(compilation, threshold)
     const score = compilation.prepareQuery(normalized)
     const found =
       direction === 'similarity'
@@ -228,15 +221,8 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
       const missingScore = compilation.score(query, '', threshold)
       return missingSimilarityTop(table, missingScore, threshold, limit)
     }
-    if (
-      compilation.trusted &&
-      impossibleTrustedThreshold(direction, compilation.bounds, threshold)
-    ) {
-      return []
-    }
-    const activeThreshold = compilation.trusted
-      ? trustedKernelThreshold(direction, compilation.bounds, threshold)
-      : threshold
+    if (impossibleThreshold(compilation, threshold)) return []
+    const activeThreshold = kernelThreshold(compilation, threshold)
     const score = compilation.prepareQuery(normalized)
     return materialize(
       direction === 'similarity'
@@ -263,15 +249,8 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
         }
         return
       }
-      if (
-        compilation.trusted &&
-        impossibleTrustedThreshold(direction, compilation.bounds, threshold)
-      ) {
-        return
-      }
-      const activeThreshold = compilation.trusted
-        ? trustedKernelThreshold(direction, compilation.bounds, threshold)
-        : threshold
+      if (impossibleThreshold(compilation, threshold)) return
+      const activeThreshold = kernelThreshold(compilation, threshold)
       const score = compilation.prepareQuery(normalized)
       const similarity = direction === 'similarity'
       for (let id = 0; id < prepared.length; id++) {

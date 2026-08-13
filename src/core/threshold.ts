@@ -1,3 +1,4 @@
+import type { MetricCompilation } from './protocol.js'
 import type { Direction } from './types.js'
 
 /**
@@ -8,6 +9,11 @@ import type { Direction } from './types.js'
 export function validateThreshold(value: number): number {
   if (!Number.isFinite(value)) throw new RangeError('threshold must be finite')
   return value
+}
+
+/** An absent threshold as the `null` every internal caller reads. */
+export function optionalThreshold(value: number | undefined): number | null {
+  return value === undefined ? null : validateThreshold(value)
 }
 
 /** Always applied to the caller's threshold, never the kernel's. */
@@ -56,4 +62,45 @@ export function trustedKernelThreshold(
     : threshold >= bounds[1]
       ? null
       : threshold
+}
+
+/**
+ * The three questions a search asks of a threshold before it reaches a kernel,
+ * each answered once for both kinds of compilation.
+ *
+ * A custom metric's bounds are the caller's claim rather than the algorithm's,
+ * so nothing may be concluded from them: no threshold is impossible, the kernel
+ * is told exactly what the caller asked for, and no score is known to be
+ * unbeatable. Spelling that out at every call site is how one of them ends up
+ * pruning a scorer that never agreed to be pruned.
+ */
+export function impossibleThreshold(
+  compilation: MetricCompilation<Direction>,
+  threshold: number | null,
+): boolean {
+  return (
+    compilation.trusted &&
+    impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
+  )
+}
+
+/** What the kernel is told, given {@link impossibleThreshold} answered `false`. */
+export function kernelThreshold(
+  compilation: MetricCompilation<Direction>,
+  threshold: number | null,
+): number | null {
+  return compilation.trusted
+    ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
+    : threshold
+}
+
+/**
+ * The score nothing can beat, or `null` when there is no such score to stop a
+ * scan on.
+ */
+export function trustedOptimum(compilation: MetricCompilation<Direction>): number | null {
+  if (!compilation.trusted) return null
+  return compilation.direction === 'similarity'
+    ? compilation.bounds[1]
+    : compilation.bounds[0]
 }

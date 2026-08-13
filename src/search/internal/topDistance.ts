@@ -1,6 +1,7 @@
+import type { PreparedKernel } from '../../core/protocol.js'
 import { bestDistance } from './bestDistance.js'
 import { pushHeap, replaceHeapRoot } from './heap.js'
-import type { RawPreparedScore, ScoredId } from './types.js'
+import type { ScoredId } from './types.js'
 
 function worse(left: ScoredId, right: ScoredId): boolean {
   return left.score > right.score || (left.score === right.score && left.id > right.id)
@@ -13,7 +14,7 @@ function result(entries: ScoredId[]): readonly ScoredId[] {
 
 export function topDistance(
   prepared: readonly unknown[],
-  score: RawPreparedScore,
+  score: PreparedKernel,
   threshold: number | null,
   limit: number | null,
   optimal: number | null,

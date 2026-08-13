@@ -1,5 +1,5 @@
 import type { MetricCompilation } from '../core/protocol.js'
-import { impossibleTrustedThreshold, validateThreshold } from '../core/threshold.js'
+import { impossibleTrustedThreshold, optionalThreshold } from '../core/threshold.js'
 import type { Direction } from '../core/types.js'
 import type { ScoreArrayKind } from './scoreArray.js'
 import type { BatchOptions } from './types.js'
@@ -26,7 +26,7 @@ export function resolveBatchOptions(
     throw new RangeError('scoreMultiplier must be finite')
   }
   return {
-    threshold: threshold === undefined ? null : validateThreshold(threshold),
+    threshold: optionalThreshold(threshold),
     multiplier: resolvedMultiplier,
   }
 }

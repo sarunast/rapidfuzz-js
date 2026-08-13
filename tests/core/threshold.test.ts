@@ -1,9 +1,15 @@
 import { describe, expect, test } from 'vitest'
 
+import * as levenshtein from '../../src/algorithms/levenshtein/index.js'
+import { createScorer, scorerCompilation } from '../../src/core/scorer.js'
 import {
+  impossibleThreshold,
   impossibleTrustedThreshold,
+  kernelThreshold,
+  optionalThreshold,
   qualifies,
   trustedKernelThreshold,
+  trustedOptimum,
   validateThreshold,
 } from '../../src/core/threshold.js'
 
@@ -66,5 +72,47 @@ describe('threshold boundaries', () => {
     }
     expect(validateThreshold(-0)).toBe(-0)
     expect(validateThreshold(1e308)).toBe(1e308)
+    expect(optionalThreshold(undefined)).toBeNull()
+    expect(optionalThreshold(60)).toBe(60)
+    expect(() => optionalThreshold(Infinity)).toThrow('threshold must be finite')
+  })
+})
+
+// The three helpers every search goes through, and the one rule they exist to
+// state once: a custom scorer's bounds are the caller's claim rather than the
+// algorithm's, so nothing may be concluded from them. Pinned here because the
+// searches that would notice a wrong answer are the ones with a custom scorer
+// and a threshold outside its declared bounds — a shape easy to leave untested
+// at each of the six call sites this replaced.
+describe('what a compilation concludes about a threshold', () => {
+  const trusted = scorerCompilation(createScorer(levenshtein.normalizedSimilarity))
+  const custom = scorerCompilation(
+    createScorer(() => 1, { direction: 'similarity', bounds: [0, 1], symmetric: true }),
+  )
+
+  test('a trusted compilation applies its own bounds', () => {
+    expect(impossibleThreshold(trusted, 1.5)).toBe(true)
+    expect(impossibleThreshold(trusted, 1)).toBe(false)
+    expect(impossibleThreshold(trusted, null)).toBe(false)
+    expect(kernelThreshold(trusted, 0)).toBeNull()
+    expect(kernelThreshold(trusted, 0.5)).toBe(0.5)
+    expect(trustedOptimum(trusted)).toBe(1)
+  })
+
+  test('a custom one concludes nothing, whatever bounds it declared', () => {
+    expect(impossibleThreshold(custom, 1.5)).toBe(false)
+    expect(impossibleThreshold(custom, 99)).toBe(false)
+    // Handed through unchanged where a trusted scorer would have lost it.
+    expect(kernelThreshold(custom, 0)).toBe(0)
+    expect(kernelThreshold(custom, 0.5)).toBe(0.5)
+    expect(kernelThreshold(custom, null)).toBeNull()
+    // No score is known to be unbeatable, so no scan may stop early.
+    expect(trustedOptimum(custom)).toBeNull()
+  })
+
+  test('a trusted distance reads the other end of its bounds', () => {
+    const distance = scorerCompilation(createScorer(levenshtein.distance))
+    expect(trustedOptimum(distance)).toBe(0)
+    expect(impossibleThreshold(distance, -1)).toBe(true)
   })
 })
