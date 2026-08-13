@@ -9,13 +9,13 @@ import {
   distance as diceDistance,
   similarity as diceSimilarity,
 } from '../../src/algorithms/dice/index.js'
+import { feasibleRadices } from '../../src/algorithms/shared/gramKey.js'
 import {
   assertAddressable,
   assertCosineExact,
   assertQueryIndexable,
   createCosineIndexBuilder,
   createDiceIndexBuilder,
-  feasibleRadices,
   repackKey,
 } from '../../src/algorithms/shared/ngramIndex.js'
 import type { ChoiceIndex } from '../../src/core/protocol.js'
