@@ -112,12 +112,21 @@ export function createIndexedMatcher<TItem, TBrand>(
   // capability, so a distance scorer is already refused above.
   const direction = compilation.direction
   const read = sequenceReader({ scorer, getText, normalize, missingItems }, false)
-  // The same table `createMatcher` builds. Where that one keeps the values as
-  // its prepared array, this one feeds them to the index and drops them: the
-  // sequences are held only until `seal`, and nothing per-choice survives it.
-  const { table, values: sequences } = buildChoiceTable(items, read)
+  // The same table `createMatcher` builds, filling an index where that one
+  // fills a prepared array.
+  //
+  // `add` inside the walk, not over a collected array afterwards: the reader
+  // borrows its sequence rather than snapshotting it, so an accessor handing
+  // back one reused buffer would leave every choice indexed as the last. It
+  // also keeps an unindexable choice from being discovered only after the whole
+  // collection has been read.
   const builder = indexChoices()
-  for (let id = 0; id < sequences.length; id++) builder.add(sequences[id])
+  const table = buildChoiceTable(items, (item) => {
+    const sequence = read(item)
+    if (sequence === null) return false
+    builder.add(sequence)
+    return true
+  })
   const index: ChoiceIndex = builder.seal()
 
   // The same two decisions `createMatcher` makes before reaching a kernel: can

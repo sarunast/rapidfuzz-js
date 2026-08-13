@@ -197,6 +197,39 @@ describe('gaps in the collection', () => {
   })
 })
 
+describe('what construction borrows', () => {
+  it('indexes a choice before the accessor can overwrite it', () => {
+    // The indexed reader does not snapshot: the sequence it answers with is
+    // whatever the accessor returned, and this accessor returns one buffer
+    // every time. Indexing has to happen inside the walk, or every choice is
+    // indexed as the last one — here both would match `[7, 8, 9]` and neither
+    // `[1, 2, 3]`.
+    const scorer = createScorer(diceSimilarity, { gramSize: 2 })
+    const source = [
+      [1, 2, 3],
+      [7, 8, 9],
+    ]
+    const reused = [0, 0, 0]
+    const getText = (item: readonly number[]): readonly number[] => {
+      for (let at = 0; at < item.length; at++) reused[at] = item[at]
+      return reused
+    }
+    const indexed = createIndexedMatcher(source, { scorer, getText })
+    // The exhaustive Matcher is the oracle it always is here: its reader owns
+    // what it prepares, so the same accessor is safe on that side.
+    const exhaustive = createMatcher(source, { scorer, getText })
+    for (const query of [
+      [1, 2, 3],
+      [7, 8, 9],
+    ]) {
+      expect(indexed.search(query, { limit: null })).toEqual(
+        exhaustive.search(query, { limit: null }),
+      )
+    }
+    expect(indexed.best([1, 2, 3])?.key).toBe(0)
+  })
+})
+
 describe('the generator boundary', () => {
   const scorer = createScorer(diceSimilarity, { gramSize: 2 })
 
@@ -276,6 +309,31 @@ describe('what it refuses', () => {
     expect(() => createIndexedMatcher([[{}, {}, {}]], { scorer })).toThrow(
       /integer elements only/,
     )
+  })
+
+  it('refuses an unindexable choice before reading the rest', () => {
+    // Construction reads and indexes one choice at a time, so the collection
+    // after a bad one is never touched. Collecting the sequences and indexing
+    // them afterwards would run every accessor first and refuse the same
+    // choice later, which is a different set of side effects.
+    const scorer = createScorer(diceSimilarity, { gramSize: 2 })
+    let reads = 0
+    expect(() =>
+      createIndexedMatcher(
+        [
+          [{}, {}, {}],
+          [1, 2, 3],
+        ],
+        {
+          scorer,
+          getText: (item: unknown[]) => {
+            reads++
+            return item
+          },
+        },
+      ),
+    ).toThrow(/integer elements only/)
+    expect(reads).toBe(1)
   })
 })
 

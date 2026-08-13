@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ChoiceTable, ChoiceTableBuild } from '../../src/search/choiceTable.js'
+import type { ChoiceTable } from '../../src/search/choiceTable.js'
 import { buildChoiceTable, keyAt, matchAt } from '../../src/search/choiceTable.js'
 import type { Items } from '../../src/search/types.js'
 
-/** Keeps everything but the literal `'skip'`. */
-function tableOf(items: Items<string>): ChoiceTableBuild<string, string> {
-  return buildChoiceTable(items, (item: string) => (item === 'skip' ? null : item))
+/** Keeps everything but the literal `'skip'`, recording what it retained. */
+function tableOf(items: Items<string>): {
+  table: ChoiceTable<string>
+  values: string[]
+} {
+  const values: string[] = []
+  const table = buildChoiceTable(items, (item: string, id: number) => {
+    if (item === 'skip') return false
+    values[id] = item
+    return true
+  })
+  return { table, values }
 }
 
 function keysOf(table: ChoiceTable<string>): unknown[] {
@@ -19,7 +28,7 @@ describe('choice table', () => {
     expect(table.keys).toBeNull()
     expect(table.items).toEqual(['a', 'b', 'c'])
     expect(keysOf(table)).toEqual([0, 1, 2])
-    // The values contract: one entry per retained choice, in ascending id order.
+    // The id `accept` is handed is the one the item ends up at.
     expect(values).toEqual(['a', 'b', 'c'])
   })
 
@@ -55,5 +64,16 @@ describe('choice table', () => {
     // `'0' !== 0`, so the first property already diverges from its position.
     expect(table.keys).toEqual(['0', '1'])
     expect(keyAt(table, 0)).toBe('0')
+  })
+
+  it('accepts one choice at a time, in collection order', () => {
+    // What lets a caller take a borrowed representation inside the call: the
+    // next item is not read until this one has answered.
+    const order: string[] = []
+    buildChoiceTable(['a', 'skip', 'c'], (item: string, id: number) => {
+      order.push(`${item}@${id}`)
+      return item !== 'skip'
+    })
+    expect(order).toEqual(['a@0', 'skip@1', 'c@1'])
   })
 })

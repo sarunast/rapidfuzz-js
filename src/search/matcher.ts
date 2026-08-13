@@ -166,7 +166,17 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
   // `prepared[id]` and `table.items[id]` are the same choice. The corpus-wide
   // index `createIndexedMatcher` builds sits in exactly this position, which is
   // the whole point of the two sharing a table.
-  const { table, values: prepared } = buildChoiceTable(items, choices.read)
+  //
+  // Sized from the source where the source has a size, because growing it one
+  // choice at a time is what a flat layout otherwise pays for the second array.
+  const prepared: unknown[] = Array.isArray(items) ? new Array(items.length) : []
+  const table = buildChoiceTable(items, (item, id) => {
+    const value = choices.read(item)
+    if (value === null) return false
+    prepared[id] = value
+    return true
+  })
+  prepared.length = table.items.length
 
   const materialize = (found: readonly ScoredId[]): readonly Match<TItem, unknown>[] => {
     const matches: Match<TItem, unknown>[] = new Array(found.length)
