@@ -1,13 +1,10 @@
-export interface StoredItem<TItem, TKey> {
-  readonly item: TItem
-  readonly key: TKey
-  readonly prepared: unknown
+/** A choice id and what it scored — what a driver hands back to its caller. */
+export interface ScoredId {
+  readonly id: number
+  readonly score: number
 }
-
-export type DriverMatch<TItem, TKey> = Match<TItem, TKey>
 
 export interface RawPreparedScore {
   /** Returns the actual score when it qualifies; pruning may return only a miss. */
   (choice: unknown, threshold: number | null): number
 }
-import type { Match } from '../results.js'

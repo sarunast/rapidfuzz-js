@@ -13,7 +13,3 @@ export interface Match<TItem, TKey> {
   /** On the scorer's own scale. */
   readonly score: number
 }
-
-export interface ScoredEntry<TItem, TKey> extends Match<TItem, TKey> {
-  readonly order: number
-}

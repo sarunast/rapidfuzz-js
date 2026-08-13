@@ -2,12 +2,14 @@ import { assertOptionKeys } from '../core/options.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
-import { assertCollection, collectionEntries } from './collection.js'
+import type { ChoiceTable } from './choiceTable.js'
+import { buildChoiceTable, matchAt } from './choiceTable.js'
+import { assertCollection } from './collection.js'
 import { bestDistance } from './internal/bestDistance.js'
 import { bestSimilarity } from './internal/bestSimilarity.js'
 import { topDistance } from './internal/topDistance.js'
 import { topSimilarity } from './internal/topSimilarity.js'
-import type { StoredItem } from './internal/types.js'
+import type { ScoredId } from './internal/types.js'
 import type { Match } from './results.js'
 import {
   CALL_BEST_KEYS,
@@ -32,29 +34,26 @@ import type {
 // a distance metric refuses the pair in `validatePair` before a score exists.
 // That is why they qualify with `score < threshold` rather than reading the
 // direction — under distance the call has already thrown.
-function missingSimilarityBest<TItem, TKey>(
-  items: readonly StoredItem<TItem, TKey>[],
+function missingSimilarityBest<TItem>(
+  table: ChoiceTable<TItem>,
   score: number,
   threshold: number | null,
-): Match<TItem, TKey> | undefined {
+): Match<TItem, unknown> | undefined {
   if (threshold !== null && score < threshold) return undefined
-  const first = items[0]
-  return first === undefined ? undefined : { item: first.item, key: first.key, score }
+  return table.items.length === 0 ? undefined : matchAt(table, 0, score)
 }
 
-function missingSimilarityTop<TItem, TKey>(
-  items: readonly StoredItem<TItem, TKey>[],
+function missingSimilarityTop<TItem>(
+  table: ChoiceTable<TItem>,
   score: number,
   threshold: number | null,
   limit: number | null,
-): readonly Match<TItem, TKey>[] {
+): readonly Match<TItem, unknown>[] {
   if (threshold !== null && score < threshold) return []
-  const length = limit === null ? items.length : Math.min(items.length, limit)
-  const matches: Match<TItem, TKey>[] = new Array(length)
-  for (let index = 0; index < length; index++) {
-    const entry = items[index]
-    matches[index] = { item: entry.item, key: entry.key, score }
-  }
+  const count = table.items.length
+  const length = limit === null ? count : Math.min(count, limit)
+  const matches: Match<TItem, unknown>[] = new Array(length)
+  for (let id = 0; id < length; id++) matches[id] = matchAt(table, id, score)
   return matches
 }
 
@@ -156,7 +155,6 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
     normalize,
     missingItems,
   }
-  const stored: StoredItem<TItem, unknown>[] = []
   // Every handle is resolved here, once, so a query pays nothing for the mode
   // it was built in — the drivers read `prepared` the same way either way.
   const choices = choiceReader(
@@ -165,21 +163,17 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
     compilation.preparedChoiceKey,
     true,
   )
-  if (Array.isArray(items)) {
-    for (let key = 0; key < items.length; key++) {
-      const item = items[key]
-      const prepared = choices.read(item)
-      if (prepared !== null) {
-        stored.push({ item, key, prepared })
-      }
+  // `prepared[id]` and `table.items[id]` are the same choice. The corpus-wide
+  // index `createIndexedMatcher` builds sits in exactly this position, which is
+  // the whole point of the two sharing a table.
+  const { table, values: prepared } = buildChoiceTable(items, choices.read)
+
+  const materialize = (found: readonly ScoredId[]): readonly Match<TItem, unknown>[] => {
+    const matches: Match<TItem, unknown>[] = new Array(found.length)
+    for (let at = 0; at < found.length; at++) {
+      matches[at] = matchAt(table, found[at].id, found[at].score)
     }
-  } else {
-    for (const entry of collectionEntries(items)) {
-      const prepared = choices.read(entry.item)
-      if (prepared !== null) {
-        stored.push({ item: entry.item, key: entry.key, prepared })
-      }
-    }
+    return matches
   }
 
   const best = (
@@ -193,7 +187,7 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
     const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
       const missingScore = compilation.score(query, '', threshold)
-      return missingSimilarityBest(stored, missingScore, threshold)
+      return missingSimilarityBest(table, missingScore, threshold)
     }
     if (
       compilation.trusted &&
@@ -205,9 +199,11 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
       ? trustedKernelThreshold(direction, compilation.bounds, threshold)
       : threshold
     const score = compilation.prepareQuery(normalized)
-    return direction === 'similarity'
-      ? bestSimilarity(stored, score, activeThreshold, optimal)
-      : bestDistance(stored, score, activeThreshold, optimal)
+    const found =
+      direction === 'similarity'
+        ? bestSimilarity(prepared, score, activeThreshold, optimal)
+        : bestDistance(prepared, score, activeThreshold, optimal)
+    return found === undefined ? undefined : matchAt(table, found.id, found.score)
   }
   const search = (
     query: MaybeSequence,
@@ -220,7 +216,7 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
     const normalized = normalizeQuery(query, normalize)
     if (normalized === null) {
       const missingScore = compilation.score(query, '', threshold)
-      return missingSimilarityTop(stored, missingScore, threshold, limit)
+      return missingSimilarityTop(table, missingScore, threshold, limit)
     }
     if (
       compilation.trusted &&
@@ -232,9 +228,11 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
       ? trustedKernelThreshold(direction, compilation.bounds, threshold)
       : threshold
     const score = compilation.prepareQuery(normalized)
-    return direction === 'similarity'
-      ? topSimilarity(stored, score, activeThreshold, limit, optimal)
-      : topDistance(stored, score, activeThreshold, limit, optimal)
+    return materialize(
+      direction === 'similarity'
+        ? topSimilarity(prepared, score, activeThreshold, limit, optimal)
+        : topDistance(prepared, score, activeThreshold, limit, optimal),
+    )
   }
   const searchIter = (
     query: MaybeSequence,
@@ -250,9 +248,8 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
       if (normalized === null) {
         const missingScore = compilation.score(query, '', threshold)
         if (threshold !== null && missingScore < threshold) return
-        for (let index = 0; index < stored.length; index++) {
-          const entry = stored[index]
-          yield { item: entry.item, key: entry.key, score: missingScore }
+        for (let id = 0; id < table.items.length; id++) {
+          yield matchAt(table, id, missingScore)
         }
         return
       }
@@ -267,14 +264,13 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
         : threshold
       const score = compilation.prepareQuery(normalized)
       const similarity = direction === 'similarity'
-      for (let index = 0; index < stored.length; index++) {
-        const entry = stored[index]
-        const value = score(entry.prepared, activeThreshold)
+      for (let id = 0; id < prepared.length; id++) {
+        const value = score(prepared[id], activeThreshold)
         if (
           threshold === null ||
           (similarity ? value >= threshold : value <= threshold)
         ) {
-          yield { item: entry.item, key: entry.key, score: value }
+          yield matchAt(table, id, value)
         }
       }
     }
@@ -282,7 +278,7 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
     return iterate()
   }
   return Object.freeze({
-    size: stored.length,
+    size: table.items.length,
     scorer,
     best,
     search,

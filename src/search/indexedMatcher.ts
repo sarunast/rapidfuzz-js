@@ -3,7 +3,8 @@ import type { ChoiceIndex, SelectedChoices } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
 import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
 import type { MaybeSequence } from '../core/types.js'
-import { assertCollection, collectionEntries } from './collection.js'
+import { buildChoiceTable, matchAt } from './choiceTable.js'
+import { assertCollection } from './collection.js'
 import type { Match } from './results.js'
 import {
   CALL_BEST_KEYS,
@@ -111,41 +112,13 @@ export function createIndexedMatcher<TItem, TBrand>(
   // capability, so a distance scorer is already refused above.
   const direction = compilation.direction
   const read = sequenceReader({ scorer, getText, normalize, missingItems }, false)
-  // Flat and parallel rather than one row object per choice. Removing the
-  // prepared representation promotes the bookkeeping: beside a Matcher's
-  // profiles the per-choice rows were 0.3% of what it retained, and beside an
-  // index they are the largest thing left.
-  const kept: TItem[] = []
-  // `null` while every key is its own position, which is an array with no gaps —
-  // the common case, and the difference between a second array and nothing.
-  let keys: unknown[] | null = null
+  // The same table `createMatcher` builds. Where that one keeps the values as
+  // its prepared array, this one feeds them to the index and drops them: the
+  // sequences are held only until `seal`, and nothing per-choice survives it.
+  const { table, values: sequences } = buildChoiceTable(items, read)
   const builder = indexChoices()
-  let position = 0
-  const accept = (item: TItem, key: unknown): void => {
-    const sequence = read(item)
-    if (sequence === null) return
-    if (keys === null && key !== position) {
-      keys = []
-      for (let index = 0; index < position; index++) keys.push(index)
-    }
-    if (keys !== null) keys.push(key)
-    kept.push(item)
-    builder.add(sequence)
-    position++
-  }
-  if (Array.isArray(items)) {
-    for (let key = 0; key < items.length; key++) accept(items[key], key)
-  } else {
-    for (const entry of collectionEntries(items)) accept(entry.item, entry.key)
-  }
+  for (let id = 0; id < sequences.length; id++) builder.add(sequences[id])
   const index: ChoiceIndex = builder.seal()
-  const storedKeys = keys
-  const keyOf = (id: number): unknown => (storedKeys === null ? id : storedKeys[id])
-  const matchAt = (id: number, score: number): Match<TItem, unknown> => ({
-    item: kept[id],
-    key: keyOf(id),
-    score,
-  })
 
   // The same two decisions `createMatcher` makes before reaching a kernel: can
   // anything clear this threshold, and what does the kernel get told.
@@ -166,7 +139,7 @@ export function createIndexedMatcher<TItem, TBrand>(
   const materialize = (found: SelectedChoices): Match<TItem, unknown>[] => {
     const matches: Match<TItem, unknown>[] = new Array(found.length)
     for (let at = 0; at < found.length; at++) {
-      matches[at] = matchAt(found.ids[at], found.scores[at])
+      matches[at] = matchAt(table, found.ids[at], found.scores[at])
     }
     return matches
   }
@@ -181,11 +154,11 @@ export function createIndexedMatcher<TItem, TBrand>(
     if (normalized === null) {
       const score = missingScoreOf(query, threshold)
       if (threshold !== null && score < threshold) return undefined
-      return kept.length === 0 ? undefined : matchAt(0, score)
+      return table.items.length === 0 ? undefined : matchAt(table, 0, score)
     }
     if (impossible(threshold)) return undefined
     const found = index.select(normalized, activeThreshold(threshold), 1)
-    return found.length === 0 ? undefined : matchAt(found.ids[0], found.scores[0])
+    return found.length === 0 ? undefined : matchAt(table, found.ids[0], found.scores[0])
   }
 
   const search = (
@@ -200,9 +173,10 @@ export function createIndexedMatcher<TItem, TBrand>(
     if (normalized === null) {
       const score = missingScoreOf(query, threshold)
       if (threshold !== null && score < threshold) return []
-      const length = limit === null ? kept.length : Math.min(kept.length, limit)
+      const count = table.items.length
+      const length = limit === null ? count : Math.min(count, limit)
       const matches: Match<TItem, unknown>[] = new Array(length)
-      for (let id = 0; id < length; id++) matches[id] = matchAt(id, score)
+      for (let id = 0; id < length; id++) matches[id] = matchAt(table, id, score)
       return matches
     }
     if (impossible(threshold)) return []
@@ -223,7 +197,7 @@ export function createIndexedMatcher<TItem, TBrand>(
       if (normalized === null) {
         const score = missingScoreOf(query, threshold)
         if (threshold !== null && score < threshold) return
-        for (let id = 0; id < kept.length; id++) yield matchAt(id, score)
+        for (let id = 0; id < table.items.length; id++) yield matchAt(table, id, score)
         return
       }
       if (impossible(threshold)) return
@@ -240,13 +214,13 @@ export function createIndexedMatcher<TItem, TBrand>(
       const found = index.scan(normalized, activeThreshold(threshold))
       const ids = found.ids.slice(0, found.length)
       const scores = found.scores.slice(0, found.length)
-      for (let at = 0; at < ids.length; at++) yield matchAt(ids[at], scores[at])
+      for (let at = 0; at < ids.length; at++) yield matchAt(table, ids[at], scores[at])
     }
     return iterate()
   }
 
   return Object.freeze({
-    size: kept.length,
+    size: table.items.length,
     scorer,
     best,
     search,

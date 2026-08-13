@@ -1,73 +1,61 @@
-import type { Match, ScoredEntry } from '../results.js'
 import { bestSimilarity } from './bestSimilarity.js'
 import { pushHeap, replaceHeapRoot } from './heap.js'
-import type { RawPreparedScore, StoredItem } from './types.js'
+import type { RawPreparedScore, ScoredId } from './types.js'
 
-function worse<TItem, TKey>(
-  left: ScoredEntry<TItem, TKey>,
-  right: ScoredEntry<TItem, TKey>,
-): boolean {
-  return (
-    left.score < right.score || (left.score === right.score && left.order > right.order)
-  )
+function worse(left: ScoredId, right: ScoredId): boolean {
+  return left.score < right.score || (left.score === right.score && left.id > right.id)
 }
 
-function result<TItem, TKey>(
-  entries: ScoredEntry<TItem, TKey>[],
-): readonly Match<TItem, TKey>[] {
-  entries.sort((a, b) => b.score - a.score || a.order - b.order)
-  return entries.map(({ item, key, score }) => ({ item, key, score }))
+function result(entries: ScoredId[]): readonly ScoredId[] {
+  entries.sort((a, b) => b.score - a.score || a.id - b.id)
+  return entries
 }
 
-export function topSimilarity<TItem, TKey>(
-  items: readonly StoredItem<TItem, TKey>[],
+export function topSimilarity(
+  prepared: readonly unknown[],
   score: RawPreparedScore,
   threshold: number | null,
   limit: number | null,
   optimal: number | null,
-): readonly Match<TItem, TKey>[] {
+): readonly ScoredId[] {
   if (limit === 0) return []
   if (limit === 1) {
-    const found = bestSimilarity(items, score, threshold, optimal)
+    const found = bestSimilarity(prepared, score, threshold, optimal)
     return found === undefined ? [] : [found]
   }
 
-  // `order` is the source position, which for stored items is the loop index:
-  // nothing is skipped before scoring, so a separate counter tracked `index`
-  // exactly.
+  // A tie is broken by the id, which is the source position: nothing is skipped
+  // before scoring, so the loop counter is the order a separate field used to
+  // carry.
   if (limit !== null) {
-    const heap: ScoredEntry<TItem, TKey>[] = []
+    const heap: ScoredId[] = []
     let cutoff = threshold
-    for (let index = 0; index < items.length; index++) {
-      const entry = items[index]
-      const value = score(entry.prepared, cutoff)
+    for (let id = 0; id < prepared.length; id++) {
+      const value = score(prepared[id], cutoff)
       if (threshold !== null && value < threshold) continue
       if (heap.length < limit) {
-        const candidate = { item: entry.item, key: entry.key, score: value, order: index }
-        pushHeap(heap, candidate, worse)
+        pushHeap(heap, { id, score: value }, worse)
         if (heap.length === limit) {
           cutoff = heap[0].score
           if (optimal !== null && cutoff === optimal) break
         }
         continue
       }
-      // A tie loses on order, and every later candidate has a later order, so
-      // the numeric test alone decides admission — no comparator call.
+      // A tie loses on id, and every later candidate has a later id, so the
+      // numeric test alone decides admission — no comparator call.
       if (value <= heap[0].score) continue
-      const candidate = { item: entry.item, key: entry.key, score: value, order: index }
-      replaceHeapRoot(heap, candidate, worse)
+      replaceHeapRoot(heap, { id, score: value }, worse)
       cutoff = heap[0].score
       if (optimal !== null && cutoff === optimal) break
     }
     return result(heap)
   }
 
-  const results: ScoredEntry<TItem, TKey>[] = []
-  for (let index = 0; index < items.length; index++) {
-    const entry = items[index]
-    const value = score(entry.prepared, threshold)
+  const results: ScoredId[] = []
+  for (let id = 0; id < prepared.length; id++) {
+    const value = score(prepared[id], threshold)
     if (threshold === null || value >= threshold) {
-      results.push({ item: entry.item, key: entry.key, score: value, order: index })
+      results.push({ id, score: value })
     }
   }
   return result(results)
