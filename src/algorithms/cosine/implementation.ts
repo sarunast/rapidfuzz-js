@@ -1,17 +1,15 @@
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import { dotProduct } from '../shared/ngram/compare.js'
+import { parseGramSize, validGramSize } from '../shared/ngram/gramSize.js'
+import { createCosineIndexBuilder } from '../shared/ngram/inverted/cosine.js'
+import { dotProductKernel, type FrequencyKernel } from '../shared/ngram/kernel.js'
 import {
   buildProfile,
-  dotProduct,
-  dotProductKernel,
-  parseGramSize,
   preparedProfile,
   profileOfElements,
-  validGramSize,
   zeroGramSimilarity,
-  type FrequencyKernel,
   type NGramProfile,
-} from '../shared/ngram.js'
-import { createCosineIndexBuilder } from '../shared/ngramIndex.js'
+} from '../shared/ngram/profile.js'
 import {
   asSequence,
   convPair,

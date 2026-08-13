@@ -10,7 +10,8 @@ import {
   similarity as cosineMetric,
 } from '../../src/algorithms/cosine/index.js'
 import { similarity as diceMetric } from '../../src/algorithms/dice/index.js'
-import { buildProfile, dotProduct } from '../../src/algorithms/shared/ngram.js'
+import { dotProduct } from '../../src/algorithms/shared/ngram/compare.js'
+import { buildProfile } from '../../src/algorithms/shared/ngram/profile.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
 import { bestMatch, createMatcher } from '../../src/search/index.js'
 import { callUntyped } from '../support/common.js'

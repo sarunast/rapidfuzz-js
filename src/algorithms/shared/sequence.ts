@@ -80,3 +80,16 @@ export function alignRepresentation(
 export function isMissing(value: unknown): value is null | undefined {
   return value == null
 }
+
+/**
+ * Element-wise `===` over two converted sequences, which is the equality every
+ * metric here compares by — so `NaN` matches nothing, including itself, and
+ * `-0` matches `0`.
+ */
+export function elementsEqual(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
+  if (a.length !== b.length) return false
+  for (let index = 0; index < a.length; index++) {
+    if (a[index] !== b[index]) return false
+  }
+  return true
+}

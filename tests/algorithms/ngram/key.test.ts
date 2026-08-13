@@ -6,7 +6,7 @@ import {
   feasibleRadices,
   packGram,
   unpackGram,
-} from '../../src/algorithms/shared/gramKey.js'
+} from '../../../src/algorithms/shared/ngram/key.js'
 
 describe('the radix ladder', () => {
   it('stays narrowest first, which is the order an index widens through', () => {

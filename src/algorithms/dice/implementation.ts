@@ -1,22 +1,22 @@
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import { directSharedFrequency, sharedFrequency } from '../shared/ngram/compare.js'
+import { parseGramSize, validGramSize } from '../shared/ngram/gramSize.js'
+import { createDiceIndexBuilder } from '../shared/ngram/inverted/dice.js'
+import {
+  sharedFrequencyKernel,
+  type BoundedFrequencyKernel,
+} from '../shared/ngram/kernel.js'
 import {
   buildProfile,
-  directSharedFrequency,
-  elementsEqual,
-  parseGramSize,
   preparedProfile,
   profileOfElements,
-  sharedFrequency,
-  sharedFrequencyKernel,
-  validGramSize,
   zeroGramSimilarity,
-  type BoundedFrequencyKernel,
   type NGramProfile,
-} from '../shared/ngram.js'
-import { createDiceIndexBuilder } from '../shared/ngramIndex.js'
+} from '../shared/ngram/profile.js'
 import {
   asSequence,
   convPair,
+  elementsEqual,
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   normDistCutoff,

@@ -6,13 +6,13 @@ import {
   distance as diceDistanceMetric,
   similarity as diceMetric,
 } from '../../src/algorithms/dice/index.js'
+import { sharedFrequency } from '../../src/algorithms/shared/ngram/compare.js'
+import { validGramSize } from '../../src/algorithms/shared/ngram/gramSize.js'
 import {
   buildProfile,
-  elementsEqual,
   preparedProfile,
-  sharedFrequency,
-  validGramSize,
-} from '../../src/algorithms/shared/ngram.js'
+} from '../../src/algorithms/shared/ngram/profile.js'
+import { elementsEqual } from '../../src/algorithms/shared/sequence.js'
 import { scoreMatrix } from '../../src/batch/scoreMatrix.js'
 import { scorePairs } from '../../src/batch/scorePairs.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
