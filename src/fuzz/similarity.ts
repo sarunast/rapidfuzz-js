@@ -11,8 +11,8 @@ import {
 } from '../algorithms/shared/scorerSupport.js'
 import type { PreparedKernel } from '../core/scoring/compilation.js'
 import type { Sequence } from '../core/types.js'
-import { fuzzMetric } from './internal/metric.js'
-import { ratioHeld, ratio_impl } from './internal/partialWindow.js'
+import { fuzzMetric } from './metric.js'
+import { ratioHeld, ratio_impl } from './partialWindow.js'
 import type { FuzzOptions } from './types.js'
 
 /** Narrow prepared-query implementation for the basic fuzz similarity. */

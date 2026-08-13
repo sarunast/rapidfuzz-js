@@ -4,9 +4,9 @@ import {
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
-import { fuzzMetric } from './internal/metric.js'
-import { partialRatioAlignment, partialRatio_impl } from './internal/partialWindow.js'
-import { prepareFuzz } from './internal/prepared.js'
+import { fuzzMetric } from './metric.js'
+import { partialRatioAlignment, partialRatio_impl } from './partialWindow.js'
+import { prepareFuzz } from './preparation.js'
 import type { FuzzInput, FuzzOptions, ScoreAlignment } from './types.js'
 
 export const partialRatio: MaybeSequenceMetricImplementation<FuzzOptions> =

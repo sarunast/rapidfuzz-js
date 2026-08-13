@@ -22,9 +22,9 @@ import {
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
-import { fuzzMetric } from './internal/metric.js'
-import { partialRatioConverted, ratioConverted } from './internal/partialWindow.js'
-import { prepareFuzz } from './internal/prepared.js'
+import { fuzzMetric } from './metric.js'
+import { partialRatioConverted, ratioConverted } from './partialWindow.js'
+import { prepareFuzz } from './preparation.js'
 import {
   containsWhitespace,
   stringContainsWhitespace,

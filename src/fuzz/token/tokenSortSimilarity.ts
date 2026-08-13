@@ -9,7 +9,7 @@ import {
 } from '../../algorithms/shared/scorerSupport.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import type { Sequence } from '../../core/types.js'
-import { fuzzMetric } from '../internal/metric.js'
+import { fuzzMetric } from '../metric.js'
 import type { FuzzOptions } from '../types.js'
 import { preparedTokenChoice, sortedOf, tokenChoicePreparer } from './tokens.js'
 import { tokenSortRatio_impl, tokenSortRatioConverted } from './tokenSort.js'

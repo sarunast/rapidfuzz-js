@@ -351,8 +351,10 @@ describe('dependency direction', () => {
     const family = join(directory, 'token')
     expect(shippedEntries(directory)).toEqual([
       'index.ts',
-      'internal',
+      'metric.ts',
       'partialSimilarity.ts',
+      'partialWindow.ts',
+      'preparation.ts',
       'similarity.ts',
       'token',
       'types.ts',
@@ -379,6 +381,17 @@ describe('dependency direction', () => {
         /from ['"][^'"]*weighted/,
       )
     }
+    // The two edges that hold the layers apart, and the ones a later edit is
+    // most likely to reverse. partialWindow is the primitive both similarity
+    // and every token strategy bottom out in, so it must stay usable without
+    // loading the token engine; preparation sits above all of them and reaches
+    // the reusable cores, never a module that declares a public metric.
+    expect(readFileSync(join(directory, 'partialWindow.ts'), 'utf8')).not.toMatch(
+      /from ['"][^'"]*token/,
+    )
+    expect(readFileSync(join(directory, 'preparation.ts'), 'utf8')).not.toMatch(
+      /from ['"][^'"]*[Ss]imilarity\.js/,
+    )
   })
 })
 

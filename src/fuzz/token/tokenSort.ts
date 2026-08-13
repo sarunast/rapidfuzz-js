@@ -1,6 +1,6 @@
 import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
 import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
-import { indelNormSimHeld, ratioConverted } from '../internal/partialWindow.js'
+import { indelNormSimHeld, ratioConverted } from '../partialWindow.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
 import { sortedOf, tokenPair, tokenViewOf, type PreparedTokenChoice } from './tokens.js'
 

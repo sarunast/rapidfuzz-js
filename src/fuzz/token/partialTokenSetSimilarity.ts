@@ -4,8 +4,8 @@ import {
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../../algorithms/shared/scorerSupport.js'
-import { fuzzMetric } from '../internal/metric.js'
-import { prepareFuzz } from '../internal/prepared.js'
+import { fuzzMetric } from '../metric.js'
+import { prepareFuzz } from '../preparation.js'
 import type { FuzzOptions } from '../types.js'
 import { partialTokenSetRatio_impl } from './tokenSet.js'
 

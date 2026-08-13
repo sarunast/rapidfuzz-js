@@ -27,7 +27,7 @@ import {
   type CharSet,
   partialAlignmentConverted,
   partialRatioConverted,
-} from '../internal/partialWindow.js'
+} from '../partialWindow.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
 import {
   difference,

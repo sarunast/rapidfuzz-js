@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
-import { preparePattern } from '../../algorithms/shared/bitmask/pattern.js'
-import { prepareSimilarity } from '../similarity.js'
-import {
-  preparedTokenChoice,
-  sortTokens,
-  sortedOf,
-  tokenChoicePreparer,
-} from '../token/tokens.js'
-import { partialTokenRatioConverted } from '../token/tokenSet.js'
-import { prepareTokenSort } from '../token/tokenSortSimilarity.js'
+import { preparePattern } from '../algorithms/shared/bitmask/pattern.js'
 import {
   indelNormSimHeld,
   partialRatioAlignment,
   partialRatioImpl,
 } from './partialWindow.js'
-import { prepareFuzz } from './prepared.js'
+import { prepareFuzz } from './preparation.js'
+import { prepareSimilarity } from './similarity.js'
+import {
+  preparedTokenChoice,
+  sortTokens,
+  sortedOf,
+  tokenChoicePreparer,
+} from './token/tokens.js'
+import { partialTokenRatioConverted } from './token/tokenSet.js'
+import { prepareTokenSort } from './token/tokenSortSimilarity.js'
 
 describe('fuzz preparation invariants', () => {
   it('covers ratio preparation cutoffs and bounds', () => {

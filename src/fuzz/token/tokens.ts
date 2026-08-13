@@ -32,7 +32,7 @@
  * for it, which is what lets a scoring branch pay only for what it reads. See
  * {@link PreparedTokenChoice}.
  *
- * Nothing here imports a public fuzz family: `partialWindow.ts` is a sibling,
+ * Nothing here imports a public fuzz family: `../partialWindow.ts` is a peer,
  * not a dependency, and the basic and partial similarities must stay usable
  * without tokenising anything.
  */

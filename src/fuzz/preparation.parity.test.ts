@@ -12,12 +12,12 @@
 // enough to make `extract` disagree with `ratio`.
 import { describe, expect, it } from 'vitest'
 
-import { partialRatio } from '../partialSimilarity.js'
-import { prepareSimilarity, ratio } from '../similarity.js'
-import { tokenSetRatio } from '../token/tokenSetSimilarity.js'
-import { tokenRatio } from '../token/tokenSimilarity.js'
-import { wRatio } from '../weightedSimilarity.js'
-import { prepareFuzz } from './prepared.js'
+import { partialRatio } from './partialSimilarity.js'
+import { prepareFuzz } from './preparation.js'
+import { prepareSimilarity, ratio } from './similarity.js'
+import { tokenSetRatio } from './token/tokenSetSimilarity.js'
+import { tokenRatio } from './token/tokenSimilarity.js'
+import { wRatio } from './weightedSimilarity.js'
 
 const preparedScore = (
   factory: ReturnType<typeof prepareSimilarity>,

@@ -1,5 +1,5 @@
-import { prepareLcsPattern } from '../../algorithms/lcs/implementation.js'
-import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
+import { prepareLcsPattern } from '../algorithms/lcs/implementation.js'
+import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
 /**
  * The prepared-query hook every fuzz scorer shares.
  *
@@ -32,23 +32,9 @@ import {
   scorerSequence,
   type ChoicePreparer,
   type PreparationFactory,
-} from '../../algorithms/shared/scorerSupport.js'
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import type { Sequence } from '../../core/types.js'
-import {
-  hasWhitespaceOf,
-  preparedTokenChoice,
-  sortedOf,
-  tokenChoicePreparer,
-  tokenViewOf,
-} from '../token/tokens.js'
-import {
-  partialTokenRatioConverted,
-  partialTokenSetRatioConverted,
-  tokenRatioConverted,
-  tokenSetRatioConverted,
-} from '../token/tokenSet.js'
-import type { PreparedFuzzKind } from '../types.js'
+} from '../algorithms/shared/scorerSupport.js'
+import type { PreparedKernel } from '../core/scoring/compilation.js'
+import type { Sequence } from '../core/types.js'
 import {
   type CharSet,
   charSetOf,
@@ -57,6 +43,20 @@ import {
   partialRatioImpl,
   ratioHeld,
 } from './partialWindow.js'
+import {
+  hasWhitespaceOf,
+  preparedTokenChoice,
+  sortedOf,
+  tokenChoicePreparer,
+  tokenViewOf,
+} from './token/tokens.js'
+import {
+  partialTokenRatioConverted,
+  partialTokenSetRatioConverted,
+  tokenRatioConverted,
+  tokenSetRatioConverted,
+} from './token/tokenSet.js'
+import type { PreparedFuzzKind } from './types.js'
 
 /**
  * Whether this scorer ever splits an input into tokens.

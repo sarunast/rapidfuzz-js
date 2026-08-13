@@ -3,16 +3,16 @@ import {
   lcsSeqLengthPreparedBounded,
   lcsSeqLengthRange,
   prepareLcsPattern,
-} from '../../algorithms/lcs/implementation.js'
-import { checkedStartGeneration } from '../../algorithms/shared/bitmask/blockMasks.js'
-import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
+} from '../algorithms/lcs/implementation.js'
+import { checkedStartGeneration } from '../algorithms/shared/bitmask/blockMasks.js'
+import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
 /**
  * `ratio` and `partialRatio` — the two scorers that bottom out directly in
  * normalised Indel similarity.
  *
  * ## This module must not tokenise
  *
- * `partialWindow.ts` and `tokens.ts` are siblings, not a chain: nothing here may
+ * `partialWindow.ts` and `token/tokens.ts` are peers, not a chain: nothing here may
  * import the token engine. Basic and partial similarity are the lower-level
  * subsystem, and keeping them usable without loading or splitting anything is
  * what makes the dependency graph readable. Token families and adaptive fuzzy
@@ -23,8 +23,8 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  * shared `common` module precisely because this one is already upstream of
  * everything that wants them.
  */
-import { asSequence, convPair, isMissing } from '../../algorithms/shared/scorerSupport.js'
-import type { FuzzInput, FuzzOptions, ScoreAlignment } from '../types.js'
+import { asSequence, convPair, isMissing } from '../algorithms/shared/scorerSupport.js'
+import type { FuzzInput, FuzzOptions, ScoreAlignment } from './types.js'
 
 function indelNormSim(
   a: ArrayLike<unknown>,
