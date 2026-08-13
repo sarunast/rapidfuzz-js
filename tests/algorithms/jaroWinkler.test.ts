@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 
 import { jaroWinklerSimilarity } from '../../src/algorithms/jaroWinkler/implementation.js'
 import { similarity as jaroWinklerMetric } from '../../src/algorithms/jaroWinkler/index.js'
-import { scoreMatrix } from '../../src/batch/index.js'
+import { scoreMatrix } from '../../src/batch/scoreMatrix.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
 import { createMatcher } from '../../src/search/index.js'

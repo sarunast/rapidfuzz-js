@@ -8,7 +8,8 @@ export {
   search,
   searchIter,
 } from './search/index.js'
-export { scoreMatrix, scorePairs } from './batch/index.js'
+export { scoreMatrix } from './batch/scoreMatrix.js'
+export { scorePairs } from './batch/scorePairs.js'
 
 export type { Metric } from './core/scoring/metric.js'
 export type {
@@ -31,10 +32,6 @@ export type {
   PreparedMatcherOptions,
   SearchOptions,
 } from './search/index.js'
-export type {
-  BatchOptions,
-  ScoreArray,
-  ScoreArrayKind,
-  ScoreArrayOf,
-  ScoreMatrix,
-} from './batch/index.js'
+export type { BatchOptions } from './batch/options.js'
+export type { ScoreMatrix } from './batch/scoreMatrix.js'
+export type { ScoreArray, ScoreArrayKind, ScoreArrayOf } from './batch/storage.js'

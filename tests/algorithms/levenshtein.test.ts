@@ -16,7 +16,7 @@ import {
   levenshteinNormalizedDistanceImpl,
   levenshteinSimilarityImpl,
 } from '../../src/algorithms/levenshtein/internal/engine.js'
-import { scoreMatrix } from '../../src/batch/index.js'
+import { scoreMatrix } from '../../src/batch/scoreMatrix.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
 import { editopTuples, opcodeTuples } from '../support/common.js'

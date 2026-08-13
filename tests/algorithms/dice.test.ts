@@ -13,7 +13,8 @@ import {
   sharedFrequency,
   validGramSize,
 } from '../../src/algorithms/shared/ngram.js'
-import { scoreMatrix, scorePairs } from '../../src/batch/index.js'
+import { scoreMatrix } from '../../src/batch/scoreMatrix.js'
+import { scorePairs } from '../../src/batch/scorePairs.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
 import { bestMatch, createMatcher, search, searchIter } from '../../src/search/index.js'
 import { callUntyped } from '../support/common.js'

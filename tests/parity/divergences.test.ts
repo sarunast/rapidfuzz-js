@@ -16,7 +16,7 @@ import { describe, expect, test } from 'vitest'
 
 import * as jaroWinkler from '../../src/algorithms/jaroWinkler/index.js'
 import * as levenshtein from '../../src/algorithms/levenshtein/index.js'
-import { scorePairs } from '../../src/batch/index.js'
+import { scorePairs } from '../../src/batch/scorePairs.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
 import type { Sequence } from '../../src/core/types.js'
 import * as fuzz from '../../src/fuzz/index.js'
