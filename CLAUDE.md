@@ -217,7 +217,13 @@ Source ownership follows dependency direction, guarded in `tests/architecture/`:
 
 - Each algorithm directory owns its public metric, compilation, preparation and
   hot kernels. Shared algorithm code is limited to proven low-level data
-  structures under `algorithms/shared/`.
+  structures under `algorithms/shared/`. Where one grows past a single file it
+  becomes a directory of peer modules with no barrel, imported file by file —
+  `shared/bitmask/`, and `shared/ngram/`, whose layers run
+  `key -> packing -> profile -> compare -> kernel` with the optional inverted
+  index in `ngram/inverted/` built on top and never reached back into.
+  `tests/architecture/imports.test.ts` pins both directory listings and that
+  direction.
 - `fuzz/` is split by scorer family; basic similarity must not import token or
   adaptive-fuzzy modules.
 - `search/` and `batch/` depend only on core protocols, never on named

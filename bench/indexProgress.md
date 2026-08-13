@@ -2,7 +2,7 @@
 
 Branch `experiment/ngram-inverted-index`. Stages A and B ran entirely in
 `bench/`, on the rule that nothing reached `src/` until this log said the design
-was settled. Stage C is where it shipped — `src/algorithms/shared/ngramIndex.ts`
+was settled. Stage C is where it shipped — `src/algorithms/shared/ngram/inverted/`
 behind `createIndexedMatcher` — and the prototype was deleted with it, so the
 figures below are the record of how the shipped representation was arrived at.
 
@@ -44,7 +44,7 @@ optional Dice prefix strategy beside them.
 ## Files
 
 **Stage C shipped it, and the prototype is gone.** The representation lives in
-`src/algorithms/shared/ngramIndex.ts` behind `createIndexedMatcher`; parity
+`src/algorithms/shared/ngram/inverted/` behind `createIndexedMatcher`; parity
 against the exhaustive Matcher moved to `tests/algorithms/ngramIndex.test.ts`
 and `tests/search/indexedMatcher.test.ts`, where CI runs it on every change
 rather than a script run by hand. `bench/tooling/ngramIndex.ts` and the

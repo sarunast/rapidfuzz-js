@@ -96,7 +96,7 @@ it immediately.
 | `src/search/indexedMatcher.ts`                   | new — `createIndexedMatcher`                                            |
 | `src/search/types.ts`                            | `IndexedMatcherOptions`                                                 |
 | `src/search/index.ts`, `src/index.ts`            | export both                                                             |
-| `src/algorithms/shared/ngramIndex.ts`            | new — the CSR posting store, from `bench/tooling/ngramIndex.ts`         |
+| `src/algorithms/shared/ngram/inverted/`          | new — the CSR posting store, from `bench/tooling/ngramIndex.ts`         |
 | `src/algorithms/shared/metricAdapter.ts`         | pass an optional `indexChoices` through `builtInMetric`                 |
 | `src/algorithms/{dice,cosine}/implementation.ts` | declare theirs                                                          |
 
