@@ -17,9 +17,9 @@ import {
   resultLimit,
 } from '../shared/options.js'
 import { choiceReader, normalizeQuery } from '../shared/readers.js'
+import type { ReaderOptions } from '../shared/readers.js'
 import type {
   AnyMatcherOptions,
-  ResolvedMatcherOptions,
   BestOptions,
   ItemIterable,
   Items,
@@ -125,8 +125,7 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
   // as `| undefined`, so naming an absent one costs nothing.
   // Both accessors travel through, so a JavaScript caller who passed each kind
   // is refused by the reader rather than quietly served the prepared one.
-  const stableOptions: ResolvedMatcherOptions<TItem, Direction, TBrand> = {
-    scorer,
+  const stableOptions: ReaderOptions<TItem, TBrand> = {
     getText,
     getPrepared,
     normalize,

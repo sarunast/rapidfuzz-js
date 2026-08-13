@@ -118,7 +118,7 @@ export function createIndexedMatcher<TItem, TBrand>(
   // Nothing reads the direction: only a similarity metric declares the
   // capability, so a distance scorer is already refused above, and the shared
   // threshold helpers take the compilation rather than a direction and bounds.
-  const read = sequenceReader({ scorer, getText, normalize, missingItems }, false)
+  const read = sequenceReader({ getText, normalize, missingItems }, false)
   // The same table `createMatcher` builds, filling an index where that one
   // fills a prepared array.
   //

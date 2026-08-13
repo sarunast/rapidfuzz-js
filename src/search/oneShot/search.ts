@@ -113,7 +113,7 @@ export function search<TItem, TDirection extends Direction, TBrand>(
   const scorer = options.scorer
   const compilation = scorerCompilation(scorer)
   const normalize = options.normalize
-  const stableOptions = stableOptionsOf(options, scorer, normalize)
+  const stableOptions = stableOptionsOf(options, normalize)
   const choices = choiceReader(
     stableOptions,
     compilation.prepareChoice,

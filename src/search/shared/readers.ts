@@ -1,13 +1,29 @@
 import { resolvePreparedChoice } from '../../core/prepared.js'
+import type { AnyBrand, PreparedChoice } from '../../core/prepared.js'
 import {
   normalizeSequence,
   snapshotSequence,
   validateSequence,
 } from '../../core/sequence.js'
-import type { Direction, MaybeSequence, Normalizer, Sequence } from '../../core/types.js'
-import type { ResolvedMatcherOptions } from '../types.js'
+import type { MaybeSequence, Normalizer, Sequence } from '../../core/types.js'
+import type { MissingItemsPolicy } from '../types.js'
 
 export type SequenceReader<TItem> = (item: TItem) => Sequence | null
+
+/**
+ * What a reader consumes, which is not what a search was configured with: no
+ * scorer, because a reader turns an item into a choice and never scores one.
+ *
+ * Both accessors at once, which the public union refuses and a JavaScript
+ * caller can still pass. Reading them by value and refusing the combination is
+ * `choiceReader`'s job, so the shape it takes has to be able to hold one.
+ */
+export interface ReaderOptions<TItem, TBrand = AnyBrand> {
+  readonly getText?: ((item: TItem) => MaybeSequence) | undefined
+  readonly getPrepared?: ((item: TItem) => PreparedChoice<NoInfer<TBrand>>) | undefined
+  readonly normalize?: Normalizer | undefined
+  readonly missingItems?: MissingItemsPolicy | undefined
+}
 
 /**
  * How a search reads its choices.
@@ -26,7 +42,7 @@ export interface ChoiceReader<TItem> {
 }
 
 export function choiceReader<TItem, TBrand>(
-  options: ResolvedMatcherOptions<TItem, Direction, TBrand>,
+  options: ReaderOptions<TItem, TBrand>,
   prepareChoice: (choice: Sequence) => unknown,
   preparedChoiceKey: object,
   own: boolean,
@@ -73,7 +89,7 @@ export function choiceReader<TItem, TBrand>(
 }
 
 export function sequenceReader<TItem>(
-  options: ResolvedMatcherOptions<TItem, Direction>,
+  options: ReaderOptions<TItem>,
   own: boolean,
 ): SequenceReader<TItem> {
   const retain = own ? snapshotSequence : identity
@@ -109,7 +125,7 @@ function requireFunction<TImplementation>(
  * that never prepare anything.
  */
 function itemReader<TItem, TResult>(
-  options: ResolvedMatcherOptions<TItem, Direction>,
+  options: ReaderOptions<TItem>,
   finish: (value: Sequence) => TResult,
 ): (item: TItem) => TResult | null {
   const policy = options.missingItems ?? 'skip'
