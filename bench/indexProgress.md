@@ -55,7 +55,7 @@ have cost more than it could tell us.
 | File                               | What it is                          |
 | ---------------------------------- | ----------------------------------- |
 | `bench/ngramIndex.bench.ts`        | indexed against exhaustive, sampled |
-| `bench/comparison/ngram-index.mjs` | against uFuzzy                      |
+| `bench/comparison/ngram-index.mjs` | against the field, 100 to 1,000,000 |
 
 ```sh
 pnpm bench ngramIndex
