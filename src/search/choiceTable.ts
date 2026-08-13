@@ -5,9 +5,9 @@ import type { Items } from './types.js'
 /**
  * Which source item and key each dense choice id stands for.
  *
- * Flat and parallel rather than one row object per choice, and the shape both
- * Matchers agree on: an id indexes `items` here, the scoring representation
- * beside it, and nothing else needs to know which of the two a search walked.
+ * Flat and parallel rather than one row object per choice, and the whole of
+ * what the two Matchers share: an id names a choice, and how that choice is
+ * scored is the constructor's business rather than the table's.
  */
 export interface ChoiceTable<TItem> {
   readonly items: readonly TItem[]
@@ -19,63 +19,54 @@ export interface ChoiceTable<TItem> {
 }
 
 /**
- * A table and the values read alongside it, one per id.
+ * Establishes dense choice identity, and nothing else.
  *
- * The values are handed back rather than kept on the table: what they are is
- * the difference between the two Matchers — one holds them as its prepared
- * array, the other feeds them to an index and drops them — and the table is the
- * half that is the same either way.
- */
-export interface ChoiceTableBuild<TItem, TValue> {
-  readonly table: ChoiceTable<TItem>
-  readonly values: readonly TValue[]
-}
-
-/**
- * Reads a collection once, keeping the choices `read` answers for.
+ * `accept` is called for every source item in collection order, with the id
+ * that item **would** hold — a candidate, which becomes the item's id only when
+ * the call answers `true`. A `false` consumes no id, so the next item is
+ * offered the same one.
  *
- * `null` from `read` is the skip sentinel, and `values` holds exactly one entry
- * for every retained choice, in ascending id order. That contract is what makes
- * the table shareable: `values[id]` and `table.items[id]` are the same source
- * choice.
+ * Whatever the caller wants beside that id has to be built or stored **inside
+ * the call**: a reader may borrow rather than copy, handing back one mutable
+ * buffer every time, so a value collected here and consumed after the walk can
+ * be the next choice's by then. That lifetime is the reason this takes a
+ * callback rather than returning the values it read.
+ *
+ * A table knows an item, its key and its id. What sits beside the id — a
+ * prepared handle, a posting list — it never learns.
  */
-export function buildChoiceTable<TItem, TValue>(
+export function buildChoiceTable<TItem>(
   items: Items<TItem>,
-  read: (item: TItem) => TValue | null,
-): ChoiceTableBuild<TItem, TValue> {
+  accept: (item: TItem, id: number) => boolean,
+): ChoiceTable<TItem> {
   let keys: unknown[] | null = null
   let position = 0
-  // Two literal loops, for the same reason the drivers are two: an array knows
-  // its own upper bound, and sizing both arrays once rather than growing them
-  // is what pays for the second array. Measured over 2,000 choices: growing
-  // 31.8ns a choice against 29.0 for the row objects this replaces, sized once
-  // 26.0. Reads cost the same either way — 1.28ns, against an order control.
+  // Two literal loops, so the common walk reads its key off the counter rather
+  // than off an entry object it never had to allocate, and can size what it
+  // fills from what it is reading. That sizing is what pays for a second array
+  // per choice: over 2,000 choices, growing by push measured 31.8ns a choice
+  // against 29.0 for the row objects this layout replaces, and sized once 26.0.
+  // Reads cost the same either way, 1.28ns, against an order control.
   if (Array.isArray(items)) {
     const count = items.length
     const kept: TItem[] = new Array(count)
-    const values: TValue[] = new Array(count)
     for (let key = 0; key < count; key++) {
       const item = items[key]
-      const value = read(item)
-      if (value === null) continue
+      if (!accept(item, position)) continue
       if (keys === null && key !== position) {
         keys = []
         for (let index = 0; index < position; index++) keys.push(index)
       }
       if (keys !== null) keys.push(key)
       kept[position] = item
-      values[position] = value
       position++
     }
     kept.length = position
-    values.length = position
-    return { table: { items: kept, keys }, values }
+    return { items: kept, keys }
   }
   const kept: TItem[] = []
-  const values: TValue[] = []
   for (const entry of collectionEntries(items)) {
-    const value = read(entry.item)
-    if (value === null) continue
+    if (!accept(entry.item, position)) continue
     const key = entry.key
     if (keys === null && key !== position) {
       keys = []
@@ -83,10 +74,9 @@ export function buildChoiceTable<TItem, TValue>(
     }
     if (keys !== null) keys.push(key)
     kept.push(entry.item)
-    values.push(value)
     position++
   }
-  return { table: { items: kept, keys }, values }
+  return { items: kept, keys }
 }
 
 export function keyAt<TItem>(table: ChoiceTable<TItem>, id: number): unknown {
