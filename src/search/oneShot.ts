@@ -1,7 +1,12 @@
 import { assertOptionKeys } from '../core/options.js'
 import type { MetricCompilation, PreparedKernel } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
-import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
+import {
+  impossibleThreshold,
+  kernelThreshold,
+  optionalThreshold,
+  trustedOptimum,
+} from '../core/threshold.js'
 import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
 import { assertCollection, collectionEntries } from './collection.js'
 import { pushHeap, replaceHeapRoot } from './internal/heap.js'
@@ -11,7 +16,6 @@ import {
   SEARCH_OPTION_KEYS,
   choiceReader,
   normalizeQuery,
-  optionalThreshold,
   resultLimit,
   type ChoiceReader,
 } from './snapshot.js'
@@ -220,22 +224,11 @@ function bestOfCollection<TItem, TDirection extends Direction, TBrand>(
     return undefined
   }
 
-  if (
-    compilation.trusted &&
-    impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
-  ) {
-    return undefined
-  }
-  const activeThreshold = compilation.trusted
-    ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
-    : threshold
+  if (impossibleThreshold(compilation, threshold)) return undefined
+  const activeThreshold = kernelThreshold(compilation, threshold)
 
   const prepared = compilation.prepareQuery(normalized)
-  const optimal = compilation.trusted
-    ? compilation.direction === 'similarity'
-      ? compilation.bounds[1]
-      : compilation.bounds[0]
-    : null
+  const optimal = trustedOptimum(compilation)
   let found: Match<TItem, unknown> | undefined
   let cutoff = activeThreshold
 
@@ -372,15 +365,8 @@ export function search<TItem, TDirection extends Direction, TBrand>(
     return results
   }
 
-  if (
-    compilation.trusted &&
-    impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
-  ) {
-    return []
-  }
-  const activeThreshold = compilation.trusted
-    ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
-    : threshold
+  if (impossibleThreshold(compilation, threshold)) return []
+  const activeThreshold = kernelThreshold(compilation, threshold)
 
   const prepared = compilation.prepareQuery(normalized)
   const results: ScoredEntry<TItem, unknown>[] = []
@@ -391,11 +377,7 @@ export function search<TItem, TDirection extends Direction, TBrand>(
   // Once a full heap holds nothing but optimal scores, later candidates can
   // only tie, and a tie loses on order — so the scan is finished. The Matcher
   // drivers stop on the same condition.
-  const optimal = compilation.trusted
-    ? compilation.direction === 'similarity'
-      ? compilation.bounds[1]
-      : compilation.bounds[0]
-    : null
+  const optimal = trustedOptimum(compilation)
   let cutoff = activeThreshold
 
   if (arrayItems !== null) {
@@ -575,15 +557,8 @@ function* iterateMatches<TItem>(
     return
   }
 
-  if (
-    compilation.trusted &&
-    impossibleTrustedThreshold(compilation.direction, compilation.bounds, threshold)
-  ) {
-    return
-  }
-  const activeThreshold = compilation.trusted
-    ? trustedKernelThreshold(compilation.direction, compilation.bounds, threshold)
-    : threshold
+  if (impossibleThreshold(compilation, threshold)) return
+  const activeThreshold = kernelThreshold(compilation, threshold)
   const sequences = choices.sequences
   // The raw-score window scores sequences directly, so it belongs to text mode
   // alone: a prepared choice is not one, and prepared mode has a held

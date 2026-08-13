@@ -1,8 +1,9 @@
-import type { RawPreparedScore, ScoredId } from './types.js'
+import type { PreparedKernel } from '../../core/protocol.js'
+import type { ScoredId } from './types.js'
 
 export function bestDistance(
   prepared: readonly unknown[],
-  score: RawPreparedScore,
+  score: PreparedKernel,
   threshold: number | null,
   optimal: number | null,
 ): ScoredId | undefined {

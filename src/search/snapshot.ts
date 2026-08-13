@@ -249,12 +249,6 @@ export function normalizeQuery(
   return normalizeSequence(valid, normalize)
 }
 
-export function optionalThreshold(value: number | undefined): number | null {
-  if (value === undefined) return null
-  if (!Number.isFinite(value)) throw new RangeError('threshold must be finite')
-  return value
-}
-
 export function resultLimit(value: number | null | undefined): number | null {
   if (value === null) return null
   const limit = value ?? 5

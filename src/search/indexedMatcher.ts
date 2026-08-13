@@ -1,7 +1,11 @@
 import { assertOptionKeys } from '../core/options.js'
 import type { ChoiceIndex, SelectedChoices } from '../core/protocol.js'
 import { scorerCompilation } from '../core/scorer.js'
-import { impossibleTrustedThreshold, trustedKernelThreshold } from '../core/threshold.js'
+import {
+  impossibleThreshold,
+  kernelThreshold,
+  optionalThreshold,
+} from '../core/threshold.js'
 import type { MaybeSequence } from '../core/types.js'
 import { buildChoiceTable, matchAt } from './choiceTable.js'
 import { assertCollection } from './collection.js'
@@ -11,7 +15,6 @@ import {
   CALL_SEARCH_KEYS,
   INDEXED_MATCHER_OPTION_KEYS,
   normalizeQuery,
-  optionalThreshold,
   resultLimit,
   sequenceReader,
 } from './snapshot.js'
@@ -108,9 +111,9 @@ export function createIndexedMatcher<TItem, TBrand>(
         'Indexed search is available for dice.similarity and cosine.similarity.',
     )
   }
-  // No runtime direction check: only a similarity metric declares the
-  // capability, so a distance scorer is already refused above.
-  const direction = compilation.direction
+  // Nothing reads the direction: only a similarity metric declares the
+  // capability, so a distance scorer is already refused above, and the shared
+  // threshold helpers take the compilation rather than a direction and bounds.
   const read = sequenceReader({ scorer, getText, normalize, missingItems }, false)
   // The same table `createMatcher` builds, filling an index where that one
   // fills a prepared array.
@@ -128,18 +131,6 @@ export function createIndexedMatcher<TItem, TBrand>(
     return true
   })
   const index: ChoiceIndex = builder.seal()
-
-  // The same two decisions `createMatcher` makes before reaching a kernel: can
-  // anything clear this threshold, and what does the kernel get told.
-  //
-  // Unconditionally the trusted forms, where `createMatcher` has to ask. Only a
-  // built-in metric declares an index, and a built-in metric's bounds are its
-  // own — the reason `createMatcher` asks is a custom scorer, which never
-  // reaches here because it offers no capability to refuse.
-  const impossible = (threshold: number | null): boolean =>
-    impossibleTrustedThreshold(direction, compilation.bounds, threshold)
-  const activeThreshold = (threshold: number | null): number | null =>
-    trustedKernelThreshold(direction, compilation.bounds, threshold)
 
   /** What a query with no text to score is worth against every choice. */
   const missingScoreOf = (query: MaybeSequence, threshold: number | null): number =>
@@ -165,8 +156,8 @@ export function createIndexedMatcher<TItem, TBrand>(
       if (threshold !== null && score < threshold) return undefined
       return table.items.length === 0 ? undefined : matchAt(table, 0, score)
     }
-    if (impossible(threshold)) return undefined
-    const found = index.select(normalized, activeThreshold(threshold), 1)
+    if (impossibleThreshold(compilation, threshold)) return undefined
+    const found = index.select(normalized, kernelThreshold(compilation, threshold), 1)
     return found.length === 0 ? undefined : matchAt(table, found.ids[0], found.scores[0])
   }
 
@@ -188,8 +179,10 @@ export function createIndexedMatcher<TItem, TBrand>(
       for (let id = 0; id < length; id++) matches[id] = matchAt(table, id, score)
       return matches
     }
-    if (impossible(threshold)) return []
-    return materialize(index.select(normalized, activeThreshold(threshold), limit))
+    if (impossibleThreshold(compilation, threshold)) return []
+    return materialize(
+      index.select(normalized, kernelThreshold(compilation, threshold), limit),
+    )
   }
 
   const searchIter = (
@@ -209,7 +202,7 @@ export function createIndexedMatcher<TItem, TBrand>(
         for (let id = 0; id < table.items.length; id++) yield matchAt(table, id, score)
         return
       }
-      if (impossible(threshold)) return
+      if (impossibleThreshold(compilation, threshold)) return
       // The ids and scores are copied before the first yield, never streamed
       // from the index: the arrays a scan hands back are the index's own
       // scratch, so a `search` run between two `next()` calls would otherwise
@@ -220,7 +213,7 @@ export function createIndexedMatcher<TItem, TBrand>(
       // 100,000 measured 0.06x, and even a full drain 0.54x, against
       // materializing them all up front. Below ~100 results it costs 0.2µs
       // against a query that costs tens.
-      const found = index.scan(normalized, activeThreshold(threshold))
+      const found = index.scan(normalized, kernelThreshold(compilation, threshold))
       const ids = found.ids.slice(0, found.length)
       const scores = found.scores.slice(0, found.length)
       for (let at = 0; at < ids.length; at++) yield matchAt(table, ids[at], scores[at])

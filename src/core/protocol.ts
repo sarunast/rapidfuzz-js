@@ -4,6 +4,7 @@ import type { Direction, MaybeSequence, Sequence } from './types.js'
 export const COMPILE: unique symbol = Symbol('rapidfuzz.metric.compile')
 
 export interface PreparedKernel {
+  /** Returns the actual score when it qualifies; pruning may return only a miss. */
   (choice: unknown, threshold: number | null): number
 }
 
