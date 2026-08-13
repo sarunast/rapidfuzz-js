@@ -11,6 +11,7 @@ import {
 } from '../../src/algorithms/dice/index.js'
 import {
   assertAddressable,
+  assertCosineExact,
   assertQueryIndexable,
   createCosineIndexBuilder,
   createDiceIndexBuilder,
@@ -478,6 +479,38 @@ describe('what an index refuses', () => {
     expect(() => assertQueryIndexable(0x8000_0000)).toThrow(RangeError)
     expect(() => assertQueryIndexable(0x8000_0000)).toThrow(/2147483647 grams/)
     expect(() => assertQueryIndexable(0x7fff_ffff)).not.toThrow()
+  })
+
+  it('refuses a Cosine pair whose dot product would leave the exact integers', () => {
+    // The bound is a product, not a length: a query is refused against a corpus
+    // holding one enormous choice and accepted against the same query length
+    // when nothing in the corpus is long. Above it a dense list's `q·(c-1) + q`
+    // and a sparse list's `q·c` stop agreeing — 12358404163972748 against
+    // 12358404163972750 at these two counts.
+    expect(() => assertCosineExact(116_982_125, 105_643_526)).toThrow(RangeError)
+    expect(() => assertCosineExact(116_982_125, 105_643_526)).toThrow(/cosine query/)
+    expect(116_982_125 * (105_643_526 - 1) + 116_982_125).not.toBe(
+      116_982_125 * 105_643_526,
+    )
+    expect(() => assertCosineExact(116_982_125, 32)).not.toThrow()
+    expect(() => assertCosineExact(0x7fff_ffff, 0x7fff_ffff)).toThrow(RangeError)
+  })
+
+  it('takes a gramless sequence of any element the exhaustive scorer takes', () => {
+    // Not an oversight that `add` skips the integer check here: the gramless
+    // branch stores elements and compares them, and refusing what the metric
+    // itself scores would be the one thing an index may not do — disagree with
+    // the scorer it stands in for. Longer sequences still reach the check.
+    const scorer = createScorer(diceSimilarity, { gramSize: 3 })
+    const builder = createDiceIndexBuilder(3)
+    expect(() => builder.add([{}, {}])).not.toThrow()
+    expect(builder.seal().select([{}, {}], null, 1).scores[0]).toBe(0)
+    expect(scorer.score([{}, {}], [{}, {}])).toBe(0)
+    const shared = [{}, {}]
+    const sharedBuilder = createDiceIndexBuilder(3)
+    sharedBuilder.add(shared)
+    expect(sharedBuilder.seal().select(shared, null, 1).scores[0]).toBe(1)
+    expect(scorer.score(shared, shared)).toBe(1)
   })
 
   it('scores nothing when the threshold is past the scale', () => {

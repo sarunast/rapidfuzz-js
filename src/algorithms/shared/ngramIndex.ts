@@ -73,6 +73,8 @@ interface SealedIndex<TNorm extends Float64Array | null> {
   readonly choiceCount: number
   readonly postings: Postings
   readonly gramCount: Uint32Array
+  /** The largest of `gramCount`, which is what bounds a Cosine dot product. */
+  readonly maxGramCount: number
   /** Cosine's denominator; `null` on a Dice index, which has no use for it. */
   readonly squaredNorm: TNorm
   /** Ascending by id, because ids are the order the choices arrived in. */
@@ -155,6 +157,27 @@ export function assertAddressable(
 export function assertQueryIndexable(gramCount: number): void {
   if (gramCount > 0x7fff_ffff) {
     throw new RangeError('a query of more than 2147483647 grams cannot be indexed')
+  }
+}
+
+/**
+ * Cosine's dot product is `Σ qᵢ·cᵢ`, which is bounded by
+ * `gramCount(query) · gramCount(choice)` — so while that product is a safe
+ * integer, every term and every partial sum is exact whatever order they are
+ * added in, and the index matches the exhaustive scorer to the bit.
+ *
+ * Above it they can disagree, because a dense list decomposes a repeated gram's
+ * contribution as `q·(c-1) + q` where a sparse one computes `q·c`: at
+ * `q = 116,982,125` and `c = 105,643,526` those are 12358404163972748 and
+ * 12358404163972750. Checked rather than assumed, for the reason the Dice bound
+ * above is: the failure mode is a wrong score rather than a thrown error. It
+ * takes ~100-million-gram sequences on both sides to reach.
+ */
+export function assertCosineExact(queryGrams: number, maxChoiceGrams: number): void {
+  if (queryGrams * maxChoiceGrams >= Number.MAX_SAFE_INTEGER) {
+    throw new RangeError(
+      'a cosine query of this many grams cannot be scored exactly against a choice this long',
+    )
   }
 }
 
@@ -457,6 +480,7 @@ class NGramIndexBuilder<TNorm extends Float64Array | null> implements ChoiceInde
   private readonly keys: (string | number)[] = []
   private readonly counts: number[] = []
   private entries = 0
+  private maxGramCount = 0
 
   constructor(
     private readonly gramSize: number,
@@ -499,6 +523,7 @@ class NGramIndexBuilder<TNorm extends Float64Array | null> implements ChoiceInde
           this.counts,
         )
         this.gramCount.push(total)
+        if (total > this.maxGramCount) this.maxGramCount = total
         this.squaredNorm.push(squaredNorm)
         this.record(postings, id)
         return
@@ -555,6 +580,7 @@ class NGramIndexBuilder<TNorm extends Float64Array | null> implements ChoiceInde
       choiceCount,
       postings: compact(postings, choiceCount),
       gramCount: Uint32Array.from(this.gramCount),
+      maxGramCount: this.maxGramCount,
       squaredNorm: this.norms(this.squaredNorm),
       gramless: this.gramless,
     })
@@ -565,8 +591,11 @@ class NGramIndexBuilder<TNorm extends Float64Array | null> implements ChoiceInde
  * What every query of either metric needs: the flattened query, the set of
  * choices accumulation reached, and the arrays a result is written into.
  *
- * Held for the index's lifetime and reused, so a query allocates nothing beyond
- * a result larger than any before it.
+ * Held for the index's lifetime and reused, so none of it is allocated per
+ * query. What still is: the `seen` map inside `extractGrams`, a gramless
+ * query's matches, and an unlimited call's sorted result — none of them on the
+ * path this exists to keep cheap, and query preparation measured a few percent
+ * of a query.
  */
 class QueryState {
   readonly keys: (string | number)[] = []
@@ -703,6 +732,39 @@ function reachesDenseList(
 }
 
 /**
+ * An unlimited call's results, ranked by sorting the collected set once.
+ *
+ * `top` places each qualifying choice by walking the results it already holds,
+ * which is what makes a small limit cheap and what makes an unlimited one
+ * quadratic: with room for the whole corpus every qualifying choice can shift
+ * every earlier one. A scan collects the same set in id order, so the ranking
+ * left to do is `O(k log k)` over it.
+ *
+ * The arrays come back freshly allocated rather than borrowed from the query
+ * scratch, which is what the collected set already fills.
+ */
+function rankSelected(found: SelectedChoices): SelectedChoices {
+  const length = found.length
+  const collectedIds = found.ids
+  const collectedScores = found.scores
+  const order = new Array<number>(length)
+  for (let at = 0; at < length; at++) order[at] = at
+  order.sort(
+    (left, right) =>
+      collectedScores[right] - collectedScores[left] ||
+      collectedIds[left] - collectedIds[right],
+  )
+  const ids = new Uint32Array(length)
+  const scores = new Float64Array(length)
+  for (let at = 0; at < length; at++) {
+    const from = order[at]
+    ids[at] = collectedIds[from]
+    scores[at] = collectedScores[from]
+  }
+  return { ids, scores, length }
+}
+
+/**
  * The ids a sparse query may still qualify, ascending.
  *
  * Only under a positive threshold: nothing untouched can clear one, so the walk
@@ -752,6 +814,9 @@ class DiceIndex implements ChoiceIndex {
     threshold: number | null,
     limit: number | null,
   ): SelectedChoices {
+    // Collect and sort rather than insert into place: with no limit there is no
+    // room bound to make the insertion walk in `top` cheap.
+    if (limit === null) return rankSelected(this.collect(query, threshold, false))
     const sealed = this.sealed
     const state = this.state
     const elements = this.begin(query)
@@ -776,17 +841,32 @@ class DiceIndex implements ChoiceIndex {
   }
 
   scan(query: Sequence, threshold: number | null): SelectedChoices {
+    return this.collect(query, threshold, true)
+  }
+
+  /**
+   * Every qualifying choice, in the cheapest order the caller can use: `scan`
+   * needs ascending ids and pays for them, while a ranked call sorts by score
+   * afterwards and would throw that order away. Ordering the touched set is not
+   * a rounding error — it measured 84% of a `threshold: 0.5` query over 10,000
+   * choices, where accumulation itself was 5%.
+   */
+  private collect(
+    query: Sequence,
+    threshold: number | null,
+    ascending: boolean,
+  ): SelectedChoices {
     const sealed = this.sealed
     const state = this.state
     const elements = this.begin(query)
     if (elements.length < sealed.gramSize) {
-      return gramlessResult(sealed, state, elements, threshold, null, true)
+      return gramlessResult(sealed, state, elements, threshold, null, ascending)
     }
     const queryGrams = elements.length - sealed.gramSize + 1
     extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
     this.accumulate()
     const everyChoice = state.scannedAll || zeroesQualify(threshold)
-    const source = everyChoice ? null : sortedTouched(state)
+    const source = everyChoice ? null : ascending ? sortedTouched(state) : state.touched
     const total = source === null ? sealed.choiceCount : source.length
     state.reserve(total)
     const ids = state.ids
@@ -969,14 +1049,31 @@ class CosineIndex implements ChoiceIndex {
     this.accumulator = new Float64Array(sealed.choiceCount)
   }
 
+  /**
+   * `Σ qᵢ·cᵢ ≤ gramCount(query) · gramCount(choice)`, and the longest choice in
+   * the index is the one that can carry it past a double's exact integers —
+   * where a dense list and a sparse one stop agreeing to the bit.
+   */
+  private begin(query: Sequence): ArrayLike<unknown> {
+    const elements = convSequence(query)
+    assertCosineExact(
+      elements.length - this.sealed.gramSize + 1,
+      this.sealed.maxGramCount,
+    )
+    return elements
+  }
+
   select(
     query: Sequence,
     threshold: number | null,
     limit: number | null,
   ): SelectedChoices {
+    // Collect and sort rather than insert into place, for the reason
+    // `DiceIndex.select` gives.
+    if (limit === null) return rankSelected(this.collect(query, threshold, false))
     const sealed = this.sealed
     const state = this.state
-    const elements = convSequence(query)
+    const elements = this.begin(query)
     if (elements.length < sealed.gramSize) {
       return gramlessResult(sealed, state, elements, threshold, limit, false)
     }
@@ -1004,11 +1101,20 @@ class CosineIndex implements ChoiceIndex {
   }
 
   scan(query: Sequence, threshold: number | null): SelectedChoices {
+    return this.collect(query, threshold, true)
+  }
+
+  /** Every qualifying choice, as `DiceIndex.collect` explains. */
+  private collect(
+    query: Sequence,
+    threshold: number | null,
+    ascending: boolean,
+  ): SelectedChoices {
     const sealed = this.sealed
     const state = this.state
-    const elements = convSequence(query)
+    const elements = this.begin(query)
     if (elements.length < sealed.gramSize) {
-      return gramlessResult(sealed, state, elements, threshold, null, true)
+      return gramlessResult(sealed, state, elements, threshold, null, ascending)
     }
     const queryNorm = extractGrams(
       elements,
@@ -1020,7 +1126,7 @@ class CosineIndex implements ChoiceIndex {
     )
     this.accumulate()
     const everyChoice = state.scannedAll || zeroesQualify(threshold)
-    const source = everyChoice ? null : sortedTouched(state)
+    const source = everyChoice ? null : ascending ? sortedTouched(state) : state.touched
     const total = source === null ? sealed.choiceCount : source.length
     state.reserve(total)
     const ids = state.ids
