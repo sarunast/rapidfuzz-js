@@ -125,6 +125,13 @@ jobs:
       #
       # puts that sentence above the list. Editing the release afterwards works
       # too — this only writes the body once, when the release is created.
+      #
+      # Write that message in ONE LINE PER PARAGRAPH, not wrapped at 72 columns
+      # the way a commit message is. GitHub renders release notes as GitHub
+      # Flavored Markdown with hard line breaks on, so every newline inside a
+      # paragraph becomes a visible `<br>` and a normally-wrapped tag message
+      # arrives looking like a commit log. `git tag -a` from an editor or a
+      # heredoc keeps long lines fine; only the display reflows them.
       - name: Create the GitHub release
         run: |
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
