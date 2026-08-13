@@ -688,16 +688,35 @@ describe('the transient direct counter', () => {
   // The counter returns a *count*, so it is checked against the profiles as an
   // integer rather than through a score within a tolerance: a rounding-sized
   // disagreement would be a wrong multiset, and `toBe` is what says so.
-  const packableNumbers = fc.array(fc.integer({ min: 0, max: 0xff }), { maxLength: 24 })
-  const packableChars = fc.array(fc.constantFrom('a', 'b', 'c', 'd'), { maxLength: 24 })
+  // Long enough that every depth up to six has grams to intersect: a pair the
+  // counter declines for having none tests the decline, not the count, and the
+  // declines have their own cases below.
+  const bounds = { minLength: 7, maxLength: 24 }
+  const packableNumbers = fc.array(fc.integer({ min: 0, max: 0xff }), bounds)
+  const packableChars = fc.array(fc.constantFrom('a', 'b', 'c', 'd'), bounds)
+  // Each canonical radix and the first value above it, so every depth draws
+  // elements from both sides of its own boundary: `0xff`/`0x100` at depths 4-6,
+  // `0xffff`/`0x10000` at 3, `0x10ffff`/`0x110000` at 1-2.
+  const radixEdges = fc.array(
+    fc.constantFrom(0, 1, 0xff, 0x100, 0xffff, 0x1_0000, 0x10_ffff, 0x11_0000),
+    bounds,
+  )
+  // Both sides drawn from one domain. Drawing them independently spent a large
+  // share of the runs on cross-domain pairs, which decline before counting
+  // anything — a decline this file tests directly, and which tells the count
+  // nothing.
+  const sameDomainPair = fc.oneof(
+    fc.tuple(packableNumbers, packableNumbers),
+    fc.tuple(packableChars, packableChars),
+    fc.tuple(radixEdges, radixEdges),
+  )
 
   it('counts exactly what the two profiles intersect to', () => {
     fc.assert(
       fc.property(
-        fc.oneof(packableNumbers, packableChars),
-        fc.oneof(packableNumbers, packableChars),
+        sameDomainPair,
         fc.integer({ min: 1, max: 6 }),
-        (left, right, gramSize) => {
+        ([left, right], gramSize) => {
           const counted = directSharedFrequency(left, right, gramSize)
           if (counted === null) return
           expect(counted).toBe(
@@ -737,6 +756,20 @@ describe('the transient direct counter', () => {
     expect(directSharedFrequency('aaaaaaaa', 'aaaa', 2)).toBe(3)
     // And a gram the smaller side never held at all.
     expect(directSharedFrequency('abab', 'cdcdcdcd', 2)).toBe(0)
+  })
+
+  it('stops once the smaller side is spent, without loosening what it refuses', () => {
+    // `ab`, `bc` and `cd` are all found in the larger side's first three grams,
+    // and nothing in the six after them can raise a count that has already
+    // reached the smaller side's total.
+    expect(directSharedFrequency('abcd', 'abcdefghij', 2)).toBe(3)
+    // The saturating walk must not turn into a licence to skip validation: the
+    // keys are packed before any of them is counted, so an element the packing
+    // refuses still declines the whole pair even when it sits past the point
+    // the count stopped at. `null`, not `3`.
+    const refusingTail = [...'abcdefghij', 'zz']
+    expect(directSharedFrequency([...'abcd'], refusingTail, 2)).toBeNull()
+    expect(directSharedFrequency(refusingTail, [...'abcd'], 2)).toBeNull()
   })
 
   it('declines every shape it cannot pack, leaving the profiles to answer', () => {
