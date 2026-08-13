@@ -107,7 +107,7 @@ export function searchIter<TItem, TDirection extends Direction, TBrand>(
     items,
     compilation,
     choiceReader(
-      stableOptionsOf(options, scorer, normalize),
+      stableOptionsOf(options, normalize),
       compilation.prepareChoice,
       compilation.preparedChoiceKey,
       false,

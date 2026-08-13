@@ -119,24 +119,6 @@ export interface IndexedMatcherOptions<TItem, TBrand = AnyBrand> {
   readonly getPrepared?: never
 }
 
-/**
- * What a reader is built from: both accessors at once, which the public union
- * refuses and a JavaScript caller can still pass. Reading them by value and
- * refusing the combination is `choiceReader`'s job, so the shape it takes has
- * to be able to hold one.
- */
-export interface ResolvedMatcherOptions<
-  TItem,
-  TDirection extends Direction = Direction,
-  TBrand = AnyBrand,
-> {
-  readonly scorer: Scorer<TDirection, TBrand>
-  readonly getText?: ((item: TItem) => MaybeSequence) | undefined
-  readonly getPrepared?: ((item: TItem) => PreparedChoice<NoInfer<TBrand>>) | undefined
-  readonly normalize?: Normalizer | undefined
-  readonly missingItems?: MissingItemsPolicy | undefined
-}
-
 /** Accepted by every single-result and streaming search. */
 export interface BestOptions {
   /**

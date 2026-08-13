@@ -100,7 +100,7 @@ export function bestOfCollection<TItem, TDirection extends Direction, TBrand>(
   const scorer = options.scorer
   const compilation = scorerCompilation(scorer)
   const normalize = options.normalize
-  const stableOptions = stableOptionsOf(options, scorer, normalize)
+  const stableOptions = stableOptionsOf(options, normalize)
   // Before the query is normalized, so `search` at any limit refuses a wrong
   // option in the same order — `limit: 1` delegates here.
   const choices = choiceReader(

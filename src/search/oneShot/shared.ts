@@ -1,24 +1,24 @@
 import type { Direction, Normalizer } from '../../core/types.js'
 import { collectionEntries } from '../shared/collection.js'
 import type { SourceEntry } from '../shared/collection.js'
-import type { ChoiceReader } from '../shared/readers.js'
-import type { AnyMatcherOptions, Items, ResolvedMatcherOptions } from '../types.js'
+import type { ChoiceReader, ReaderOptions } from '../shared/readers.js'
+import type { AnyMatcherOptions, Items } from '../types.js'
 
 /**
- * Every option read exactly once, as `createMatcher` does it.
+ * Every option a reader consumes, read exactly once, as `createMatcher` does
+ * it.
  *
  * The reader and the query have to be handed the same normalizer: an accessor
  * that answers one function to each passes the prepared-choice check and then
  * scores against a query normalized some other way, which is the silent
- * mismatch that check exists to refuse.
+ * mismatch that check exists to refuse. That is why `normalize` arrives as an
+ * argument, already read, rather than being taken from `options` here.
  */
 export function stableOptionsOf<TItem, TDirection extends Direction, TBrand>(
   options: AnyMatcherOptions<TItem, TDirection, TBrand>,
-  scorer: ResolvedMatcherOptions<TItem, Direction, TBrand>['scorer'],
   normalize: Normalizer | undefined,
-): ResolvedMatcherOptions<TItem, Direction, TBrand> {
+): ReaderOptions<TItem, TBrand> {
   return {
-    scorer,
     getText: options.getText,
     getPrepared: options.getPrepared,
     normalize,
