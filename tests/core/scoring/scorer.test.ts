@@ -1,20 +1,20 @@
 import { describe, expect, test } from 'vitest'
 
-import * as cosine from '../../src/algorithms/cosine/index.js'
-import * as damerau from '../../src/algorithms/damerauLevenshtein/index.js'
-import * as dice from '../../src/algorithms/dice/index.js'
-import * as hamming from '../../src/algorithms/hamming/index.js'
-import * as indel from '../../src/algorithms/indel/index.js'
-import * as jaro from '../../src/algorithms/jaro/index.js'
-import * as jaroWinkler from '../../src/algorithms/jaroWinkler/index.js'
-import * as lcs from '../../src/algorithms/lcs/index.js'
-import * as levenshtein from '../../src/algorithms/levenshtein/index.js'
-import * as osa from '../../src/algorithms/osa/index.js'
-import * as postfix from '../../src/algorithms/postfix/index.js'
-import * as prefix from '../../src/algorithms/prefix/index.js'
-import { scorerCompilation } from '../../src/core/scorer.js'
-import { trustedKernelThreshold } from '../../src/core/threshold.js'
-import * as fuzz from '../../src/fuzz/index.js'
+import * as cosine from '../../../src/algorithms/cosine/index.js'
+import * as damerau from '../../../src/algorithms/damerauLevenshtein/index.js'
+import * as dice from '../../../src/algorithms/dice/index.js'
+import * as hamming from '../../../src/algorithms/hamming/index.js'
+import * as indel from '../../../src/algorithms/indel/index.js'
+import * as jaro from '../../../src/algorithms/jaro/index.js'
+import * as jaroWinkler from '../../../src/algorithms/jaroWinkler/index.js'
+import * as lcs from '../../../src/algorithms/lcs/index.js'
+import * as levenshtein from '../../../src/algorithms/levenshtein/index.js'
+import * as osa from '../../../src/algorithms/osa/index.js'
+import * as postfix from '../../../src/algorithms/postfix/index.js'
+import * as prefix from '../../../src/algorithms/prefix/index.js'
+import { scorerCompilation } from '../../../src/core/scoring/scorer.js'
+import { trustedKernelThreshold } from '../../../src/core/scoring/threshold.js'
+import * as fuzz from '../../../src/fuzz/index.js'
 import {
   bestMatch,
   createMatcher,
@@ -22,7 +22,7 @@ import {
   isMatch,
   normalizeText,
   scoreIfMatch,
-} from '../../src/index.js'
+} from '../../../src/index.js'
 
 describe('Metric and Scorer contracts', () => {
   test('trusted kernel thresholds normalize no-op distance bounds once', () => {

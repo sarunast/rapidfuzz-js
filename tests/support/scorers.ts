@@ -80,8 +80,8 @@ import {
   normalizedSimilarity as prefixNormalizedSimilarity,
   similarity as prefixSimilarity,
 } from '../../src/algorithms/prefix/index.js'
-import type { Metric } from '../../src/core/metric.js'
-import { createScorer, type Scorer } from '../../src/core/scorer.js'
+import type { Metric } from '../../src/core/scoring/metric.js'
+import { createScorer, type Scorer } from '../../src/core/scoring/scorer.js'
 import type { Sequence } from '../../src/core/types.js'
 import type { SimilarityConfiguration } from '../../src/core/types.js'
 

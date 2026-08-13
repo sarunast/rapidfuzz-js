@@ -42,7 +42,7 @@ import {
   normalizedSimilarity as prefixNormalizedSimilarity,
   similarity as prefixSimilarity,
 } from '../../src/algorithms/prefix/index.js'
-import { createScorer } from '../../src/core/scorer.js'
+import { createScorer } from '../../src/core/scoring/scorer.js'
 import type { MaybeSequence } from '../../src/core/types.js'
 import { callUntyped } from '../support/common.js'
 

@@ -1,5 +1,5 @@
-import { resolvePreparedChoice } from '../../core/prepared.js'
-import type { AnyBrand, PreparedChoice } from '../../core/prepared.js'
+import { resolvePreparedChoice } from '../../core/scoring/preparedChoice.js'
+import type { AnyBrand, PreparedChoice } from '../../core/scoring/preparedChoice.js'
 import {
   normalizeSequence,
   snapshotSequence,

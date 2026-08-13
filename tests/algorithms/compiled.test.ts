@@ -73,7 +73,7 @@ import {
   similarity as prefixSimilarity,
 } from '../../src/algorithms/prefix/index.js'
 import { scorePairs } from '../../src/batch/index.js'
-import { createScorer, type Scorer } from '../../src/core/scorer.js'
+import { createScorer, type Scorer } from '../../src/core/scoring/scorer.js'
 import type { Direction } from '../../src/core/types.js'
 import { createMatcher } from '../../src/search/index.js'
 

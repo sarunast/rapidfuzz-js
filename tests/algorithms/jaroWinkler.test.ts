@@ -5,7 +5,7 @@ import { jaroWinklerSimilarity } from '../../src/algorithms/jaroWinkler/implemen
 import { similarity as jaroWinklerMetric } from '../../src/algorithms/jaroWinkler/index.js'
 import { scoreMatrix } from '../../src/batch/index.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
-import { createScorer } from '../../src/core/scorer.js'
+import { createScorer } from '../../src/core/scoring/scorer.js'
 import { createMatcher } from '../../src/search/index.js'
 import { prepareScorerOf } from '../support/preparation.js'
 import { JaroWinkler } from '../support/scorers.js'

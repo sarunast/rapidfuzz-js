@@ -11,7 +11,7 @@ import {
 } from '../../src/algorithms/cosine/index.js'
 import { similarity as diceMetric } from '../../src/algorithms/dice/index.js'
 import { buildProfile, dotProduct } from '../../src/algorithms/shared/ngram.js'
-import { createScorer } from '../../src/core/scorer.js'
+import { createScorer } from '../../src/core/scoring/scorer.js'
 import { bestMatch, createMatcher } from '../../src/search/index.js'
 import { callUntyped } from '../support/common.js'
 import { Cosine } from '../support/scorers.js'

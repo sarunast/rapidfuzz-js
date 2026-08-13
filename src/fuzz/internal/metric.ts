@@ -1,6 +1,6 @@
 import { builtInMetric } from '../../algorithms/shared/metricAdapter.js'
 import type { MaybeSequenceMetricImplementation } from '../../algorithms/shared/scorerSupport.js'
-import type { Metric } from '../../core/metric.js'
+import type { Metric } from '../../core/scoring/metric.js'
 import type { FuzzOptions } from '../types.js'
 
 // Every fuzz scorer reports a percentage.

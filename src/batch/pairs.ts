@@ -1,7 +1,7 @@
 import { assertOptionKeys } from '../core/options.js'
-import { scorerCompilation } from '../core/scorer.js'
+import { scorerCompilation } from '../core/scoring/scorer.js'
+import { qualifies } from '../core/scoring/threshold.js'
 import { normalizeSequence, validateSequence } from '../core/sequence.js'
-import { qualifies } from '../core/threshold.js'
 import type { Direction, Normalizer, Sequence } from '../core/types.js'
 import { BATCH_OPTION_KEYS, rejectedScore, resolveBatchOptions } from './options.js'
 import {

@@ -1,4 +1,4 @@
-import type { PreparedKernel } from '../../core/protocol.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import { commonAffix, sharesAffix } from '../shared/affix.js'
 import { UNBOUNDED_MISSES, wordCount } from '../shared/bitmask/blockMasks.js'
 import { preparePattern } from '../shared/bitmask/pattern.js'

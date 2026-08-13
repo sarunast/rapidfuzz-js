@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
-import * as levenshtein from '../../src/algorithms/levenshtein/index.js'
-import { createScorer, scorerCompilation } from '../../src/core/scorer.js'
+import * as levenshtein from '../../../src/algorithms/levenshtein/index.js'
+import { createScorer, scorerCompilation } from '../../../src/core/scoring/scorer.js'
 import {
   impossibleThreshold,
   impossibleTrustedThreshold,
@@ -12,8 +12,8 @@ import {
   trustedKernelThreshold,
   knownOptimum,
   validateThreshold,
-} from '../../src/core/threshold.js'
-import { bestMatch, createMatcher, search, searchIter } from '../../src/index.js'
+} from '../../../src/core/scoring/threshold.js'
+import { bestMatch, createMatcher, search, searchIter } from '../../../src/index.js'
 
 // Every assertion is an exact boundary. The two functions differ only in strict
 // versus inclusive comparisons, and a `>` that becomes a `>=` skips an

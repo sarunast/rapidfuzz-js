@@ -12,7 +12,7 @@ import * as levenshtein from '../../src/algorithms/levenshtein/index.js'
 import * as osa from '../../src/algorithms/osa/index.js'
 import * as postfix from '../../src/algorithms/postfix/index.js'
 import * as prefix from '../../src/algorithms/prefix/index.js'
-import { withPublicScoreObserver } from '../../src/core/scorer.js'
+import { withPublicScoreObserver } from '../../src/core/scoring/scorer.js'
 import * as fuzz from '../../src/fuzz/index.js'
 import {
   bestMatch,

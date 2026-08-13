@@ -1,5 +1,8 @@
-import type { MetricCompilation } from '../core/protocol.js'
-import { impossibleTrustedThreshold, optionalThreshold } from '../core/threshold.js'
+import type { MetricCompilation } from '../core/scoring/compilation.js'
+import {
+  impossibleTrustedThreshold,
+  optionalThreshold,
+} from '../core/scoring/threshold.js'
 import type { Direction } from '../core/types.js'
 import type { ScoreArrayKind } from './scoreArray.js'
 import type { BatchOptions } from './types.js'

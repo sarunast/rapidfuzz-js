@@ -33,7 +33,7 @@ import {
   type ChoicePreparer,
   type PreparationFactory,
 } from '../../algorithms/shared/scorerSupport.js'
-import type { PreparedKernel } from '../../core/protocol.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import type { Sequence } from '../../core/types.js'
 import type { PreparedFuzzKind } from '../types.js'
 import {

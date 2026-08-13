@@ -1,6 +1,6 @@
+import type { Direction, MaybeSequence } from '../types.js'
 import { scorerCompilation, type Scorer, type ThresholdOptions } from './scorer.js'
 import { kernelThreshold, validateThreshold } from './threshold.js'
-import type { Direction, MaybeSequence } from './types.js'
 
 /**
  * The score for a pair, or `undefined` when it does not clear the threshold —

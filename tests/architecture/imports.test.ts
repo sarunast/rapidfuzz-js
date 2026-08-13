@@ -21,10 +21,16 @@ function contents(directory: string): string {
     .join('\n')
 }
 
+// Both forms, because a side-effect `import './setup.js'` has no `from` and
+// would otherwise be invisible to every graph built here.
 function sourceImports(path: string): string[] {
   const imports: string[] = []
   const text = readFileSync(path, 'utf8')
-  for (const match of text.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+  const specifiers = [
+    ...text.matchAll(/from\s+['"]([^'"]+)['"]/g),
+    ...text.matchAll(/import\s+['"]([^'"]+)['"]/g),
+  ]
+  for (const match of specifiers) {
     const specifier = match[1]
     if (!specifier.startsWith('.')) continue
     imports.push(resolve(dirname(path), specifier.replace(/\.js$/, '.ts')))
@@ -33,8 +39,43 @@ function sourceImports(path: string): string[] {
 }
 
 describe('dependency direction', () => {
+  // Everything below reads specifiers off disk without resolving them, so a
+  // typo silently drops an edge instead of failing: the cycle walk sees one
+  // less edge, and reachability still passes whenever another importer keeps
+  // both files in the graph. This is what makes the rest of them mean
+  // something.
+  it('keeps every relative static source import resolvable', () => {
+    const missing: string[] = []
+    for (const path of typeScriptFiles(source)) {
+      for (const dependency of sourceImports(path)) {
+        if (!existsSync(dependency)) {
+          missing.push(`${relative(source, path)} -> ${relative(source, dependency)}`)
+        }
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
   it('keeps core algorithm-blind', () => {
     expect(contents('core')).not.toMatch(/from ['"][^'"]*(algorithms|fuzz|search|batch)/)
+  })
+
+  // The reason the subdirectory exists: types, sequence and normalize are what
+  // scoring is built from, so an edge back into it would make the two halves
+  // one layer again. Structural rather than a listing of the files directly in
+  // `core/`, so a later `core/sequence/` cannot escape it.
+  it('keeps core primitives below the scoring subsystem', () => {
+    const scoring = join(source, 'core', 'scoring') + sep
+    const crossings: string[] = []
+    for (const path of typeScriptFiles(join(source, 'core'))) {
+      if (path.startsWith(scoring)) continue
+      for (const dependency of sourceImports(path)) {
+        if (dependency.startsWith(scoring)) {
+          crossings.push(`${relative(source, path)} -> ${relative(source, dependency)}`)
+        }
+      }
+    }
+    expect(crossings).toEqual([])
   })
 
   it('keeps search and batch independent from algorithms', () => {

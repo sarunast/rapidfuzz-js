@@ -1,5 +1,5 @@
-import type { AnyBrand } from './prepared.js'
-import type { Direction, MaybeSequence, Sequence } from './types.js'
+import type { Direction, MaybeSequence, Sequence } from '../types.js'
+import type { AnyBrand } from './preparedChoice.js'
 
 export const COMPILE: unique symbol = Symbol('rapidfuzz.metric.compile')
 

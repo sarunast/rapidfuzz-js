@@ -1,4 +1,4 @@
-import type { PreparedKernel } from '../../core/protocol.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import type { Sequence } from '../../core/types.js'
 import { sharesWideAffix } from '../shared/affix.js'
 import { wordCount } from '../shared/bitmask/blockMasks.js'

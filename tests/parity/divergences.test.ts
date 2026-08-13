@@ -17,7 +17,7 @@ import { describe, expect, test } from 'vitest'
 import * as jaroWinkler from '../../src/algorithms/jaroWinkler/index.js'
 import * as levenshtein from '../../src/algorithms/levenshtein/index.js'
 import { scorePairs } from '../../src/batch/index.js'
-import { createScorer } from '../../src/core/scorer.js'
+import { createScorer } from '../../src/core/scoring/scorer.js'
 import type { Sequence } from '../../src/core/types.js'
 import * as fuzz from '../../src/fuzz/index.js'
 import fixture from '../fixtures/rapidfuzz-3.14.5.json' with { type: 'json' }

@@ -1,5 +1,5 @@
-import { type Metric, type NoConfiguration } from '../../core/metric.js'
-import { COMPILE, type MetricCompilation } from '../../core/protocol.js'
+import { COMPILE, type MetricCompilation } from '../../core/scoring/compilation.js'
+import { type Metric, type NoConfiguration } from '../../core/scoring/metric.js'
 import { snapshotSequence, validatePair, validateSequence } from '../../core/sequence.js'
 import type {
   Direction,

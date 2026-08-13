@@ -1,26 +1,30 @@
-import { isBuiltInMetric, type Metric } from './metric.js'
-import { assertOptionKeys } from './options.js'
-import { createPreparedChoice, type AnyBrand, type PreparedChoice } from './prepared.js'
-import { COMPILE, type MetricCompilation } from './protocol.js'
+import { assertOptionKeys } from '../options.js'
 import {
   normalizeSequence,
   snapshotSequence,
   validatePair,
   validateSequence,
-} from './sequence.js'
-import {
-  impossibleThreshold,
-  kernelThreshold,
-  qualifies,
-  validateThreshold,
-} from './threshold.js'
+} from '../sequence.js'
 import type {
   Direction,
   MaybeSequence,
   MissingPolicy,
   Normalizer,
   Sequence,
-} from './types.js'
+} from '../types.js'
+import { COMPILE, type MetricCompilation } from './compilation.js'
+import { isBuiltInMetric, type Metric } from './metric.js'
+import {
+  createPreparedChoice,
+  type AnyBrand,
+  type PreparedChoice,
+} from './preparedChoice.js'
+import {
+  impossibleThreshold,
+  kernelThreshold,
+  qualifies,
+  validateThreshold,
+} from './threshold.js'
 
 /**
  * The quality bar a score has to clear, on the scorer's own scale — `0..100`

@@ -8,7 +8,7 @@ import {
   roundHalfAwayFromZero,
   scoreArrayFactory,
 } from '../../src/batch/scoreArray.js'
-import { scorerCompilation } from '../../src/core/scorer.js'
+import { scorerCompilation } from '../../src/core/scoring/scorer.js'
 import { createScorer, scoreMatrix, scorePairs } from '../../src/index.js'
 import type { MaybeSequence, Sequence } from '../../src/index.js'
 
