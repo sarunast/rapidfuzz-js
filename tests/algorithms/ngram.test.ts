@@ -274,6 +274,31 @@ describe('packed storage', () => {
     expect(profileOfElements([0x1_f600, 97, 98], 2).storage.kind).toBe('packed')
   })
 
+  it('refuses an element a rolling window meets late as readily as one it meets first', () => {
+    // Depths 2 and 3 carry the window forward rather than reading every element
+    // through a digit array, so *where* an unpackable element sits decides which
+    // read finds it — the seeding reads before the loop, the loop's own read, or
+    // the final iteration's. A generic path that validated everything up front
+    // could not tell these apart; this one has to.
+    for (const gramSize of [2, 3, 4]) {
+      for (const bad of [Number.NaN, -1, Number.POSITIVE_INFINITY, 1.5, {}, 'bc']) {
+        for (let position = 0; position < 6; position++) {
+          const elements: unknown[] = [10, 11, 12, 13, 14, 15]
+          elements[position] = bad
+          expect(
+            profileOfElements(elements, gramSize).storage.kind,
+            `gramSize ${gramSize}, ${String(bad)} at ${position}`,
+          ).toBe('trie')
+        }
+      }
+    }
+    // The last element belongs to no gram at depth 6 over six elements minus
+    // one — every element is read regardless, because a sequence packs whole.
+    expect(profileOfElements([10, 11, 12, 13, 14, Number.NaN], 5).storage.kind).toBe(
+      'trie',
+    )
+  })
+
   it('refuses a character the narrow radices cannot hold', () => {
     // Depth 4 and up pack at 0x100, so a Latin-1 letter fits and `ā` does not —
     // the char domain's own radix boundary, which the number domain reaches
