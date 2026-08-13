@@ -50,18 +50,19 @@ import {
  * ```
  *
  * On 10,000 `node_modules` file paths at `gramSize: 3`, searching for a path
- * that exists or one with a typo in it: **45–63x faster** per query, retaining
- * **235 bytes a choice against 18,049** — 77x less. Construction is **faster
- * too**, about 0.6x, because the index reads each choice's grams once instead
- * of building a profile per choice and keeping it.
+ * that exists or one with a typo in it: **11–13x faster** per query, retaining
+ * **256 bytes a choice against 1,282** — 5x less.
  *
- * Two things to weigh before reaching for it:
+ * Three things to weigh before reaching for it:
  *
  * - **It is not uniformly faster, and can be slower.** The win comes from a
  *   query's grams naming few choices. On that same corpus a query of
- *   `'node_modules/'` — grams nearly every choice shares — measured **1x** for
- *   Dice, and a two-letter alphabet loses outright. Cosine keeps its lead there
- *   because its exhaustive path has no length bound to prune with.
+ *   `'node_modules/'` — grams nearly every choice shares — measured **0.7x**,
+ *   slower than scoring every choice, and a two-letter alphabet loses
+ *   outright.
+ * - **Construction costs more**, about 1.2x, where a prepared collection packs
+ *   each choice's grams into two typed arrays and the index has a corpus-wide
+ *   structure to assemble. It is a per-query win paid for up front.
  * - **`searchIter` settles which choices qualify before yielding the first**,
  *   where `createMatcher` scores lazily. Same values, same order; a caller who
  *   breaks out early saves the scoring it would have skipped there, and only

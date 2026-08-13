@@ -304,13 +304,13 @@ matcher.search('src/algorthms/dice.ts', { limit: 5, threshold: 0.5 })
 ```
 
 Every member behaves the same and the scores are exact. On 10,000 file paths a
-query measured **45-63x faster**, retaining **235 bytes a choice against
-18,049**, and construction is faster too. It is not uniformly faster: a query
-made of grams nearly every choice shares reaches everything anyway and measured
-**1x** for Dice. Only `dice.similarity` and `cosine.similarity` offer one —
-anything else throws at construction, a distance scorer is a compile error, and
-`searchIter` settles which choices qualify before yielding the first rather
-than scoring lazily.
+query measured **11-13x faster**, retaining **256 bytes a choice against
+1,282**, against construction costing about 1.2x more. It is not uniformly
+faster: a query made of grams nearly every choice shares reaches everything
+anyway and measured **0.7x**. Only `dice.similarity` and `cosine.similarity`
+offer one — anything else throws at construction, a distance scorer is a
+compile error, and `searchIter` settles which choices qualify before yielding
+the first rather than scoring lazily.
 
 ## Reusable prepared choices
 

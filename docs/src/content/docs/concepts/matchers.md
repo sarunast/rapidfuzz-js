@@ -125,17 +125,19 @@ have returned, to the bit.
 
 On 10,000 `node_modules` file paths at `gramSize: 3`:
 
-| Query                     | Indexed |  Matcher |     |
-| ------------------------- | ------: | -------: | --: |
-| a path that exists        | 0.21 ms | 12.20 ms | 57x |
-| the same path with a typo | 0.21 ms | 12.89 ms | 61x |
-| `'node_modules/'`         | 0.17 ms |  0.14 ms |  1x |
-| a rare fragment           | 0.06 ms |  0.14 ms |  2x |
+| Query                     | Indexed | Matcher |      |
+| ------------------------- | ------: | ------: | ---: |
+| a path that exists        | 0.20 ms | 2.23 ms |  11x |
+| the same path with a typo | 0.20 ms | 2.52 ms |  13x |
+| `'node_modules/'`         | 0.16 ms | 0.11 ms | 0.7x |
+| a rare fragment           | 0.11 ms | 0.11 ms | 1.0x |
 
-Retained memory is **235 bytes a choice against 18,049** — 77x less — and
-construction is about **0.6x**, because the index reads each choice's grams once
-rather than building a profile per choice and keeping it. It is less of both,
-which is not the usual index trade.
+Retained memory is **256 bytes a choice against 1,282** — 5x less — against
+construction costing about **1.2x** more, since a prepared collection packs each
+choice's grams into two typed arrays where the index has a corpus-wide
+structure to assemble. Both figures used to be far larger: a prepared choice
+held a trie of `Map`s and cost 18,049 bytes, which made the index look 57x
+faster and 77x smaller than it is against today's representation.
 
 ### When not to reach for it
 
