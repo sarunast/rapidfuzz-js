@@ -9,9 +9,10 @@ import {
   optionalThreshold,
   qualifies,
   trustedKernelThreshold,
-  trustedOptimum,
+  knownOptimum,
   validateThreshold,
 } from '../../src/core/threshold.js'
+import { bestMatch, createMatcher, search, searchIter } from '../../src/index.js'
 
 // Every assertion is an exact boundary. The two functions differ only in strict
 // versus inclusive comparisons, and a `>` that becomes a `>=` skips an
@@ -96,7 +97,7 @@ describe('what a compilation concludes about a threshold', () => {
     expect(impossibleThreshold(trusted, null)).toBe(false)
     expect(kernelThreshold(trusted, 0)).toBeNull()
     expect(kernelThreshold(trusted, 0.5)).toBe(0.5)
-    expect(trustedOptimum(trusted)).toBe(1)
+    expect(knownOptimum(trusted)).toBe(1)
   })
 
   test('a custom one concludes nothing, whatever bounds it declared', () => {
@@ -107,12 +108,45 @@ describe('what a compilation concludes about a threshold', () => {
     expect(kernelThreshold(custom, 0.5)).toBe(0.5)
     expect(kernelThreshold(custom, null)).toBeNull()
     // No score is known to be unbeatable, so no scan may stop early.
-    expect(trustedOptimum(custom)).toBeNull()
+    expect(knownOptimum(custom)).toBeNull()
   })
 
   test('a trusted distance reads the other end of its bounds', () => {
     const distance = scorerCompilation(createScorer(levenshtein.distance))
-    expect(trustedOptimum(distance)).toBe(0)
+    expect(knownOptimum(distance)).toBe(0)
     expect(impossibleThreshold(distance, -1)).toBe(true)
+  })
+
+  // The helpers being right is not the same as the searches asking them. The
+  // failure this guards is someone later reaching past `impossibleThreshold`
+  // for `impossibleTrustedThreshold`, which would silently skip a custom
+  // scorer's own kernel — the one place its declared bounds get checked.
+  test('every search still runs a custom scorer under an impossible threshold', () => {
+    let calls = 0
+    const scorer = createScorer(
+      () => {
+        calls++
+        return 1
+      },
+      { direction: 'similarity', bounds: [0, 1], symmetric: true },
+    )
+    // Each of these finds nothing, which is the right answer — a score of 1
+    // does not clear a threshold of 2. What is being asserted is that the
+    // scorer was asked, rather than skipped on the strength of bounds it merely
+    // claimed. A trusted scorer with these bounds would answer without running.
+    // Both choices are scored every time: with no known optimum, no scan may
+    // stop early either.
+    const run = (query: () => unknown, empty: unknown): void => {
+      calls = 0
+      expect(query()).toEqual(empty)
+      expect(calls).toBe(2)
+    }
+    const matcher = createMatcher(['a', 'b'], { scorer })
+    run(() => matcher.best('x', { threshold: 2 }), undefined)
+    run(() => matcher.search('x', { threshold: 2 }), [])
+    run(() => [...matcher.searchIter('x', { threshold: 2 })], [])
+    run(() => bestMatch('x', ['a', 'b'], { scorer, threshold: 2 }), undefined)
+    run(() => search('x', ['a', 'b'], { scorer, threshold: 2, limit: 2 }), [])
+    run(() => [...searchIter('x', ['a', 'b'], { scorer, threshold: 2 })], [])
   })
 })

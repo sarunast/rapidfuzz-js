@@ -3,8 +3,9 @@ import { scorerCompilation } from '../core/scorer.js'
 import {
   impossibleThreshold,
   kernelThreshold,
+  knownOptimum,
   optionalThreshold,
-  trustedOptimum,
+  passesThreshold,
 } from '../core/threshold.js'
 import type { Direction, MaybeSequence } from '../core/types.js'
 import type { ChoiceTable } from './choiceTable.js'
@@ -15,15 +16,14 @@ import { bestSimilarity } from './internal/bestSimilarity.js'
 import { topDistance } from './internal/topDistance.js'
 import { topSimilarity } from './internal/topSimilarity.js'
 import type { ScoredId } from './internal/types.js'
-import type { Match } from './results.js'
 import {
   CALL_BEST_KEYS,
   CALL_SEARCH_KEYS,
   MATCHER_OPTION_KEYS,
-  choiceReader,
-  normalizeQuery,
   resultLimit,
-} from './snapshot.js'
+} from './options.js'
+import { choiceReader, normalizeQuery } from './readers.js'
+import type { Match } from './results.js'
 import type {
   AnyMatcherOptions,
   ResolvedMatcherOptions,
@@ -142,7 +142,7 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
   // Fixed for the matcher's lifetime: direction and bounds belong to the
   // scorer, and only the threshold changes from one call to the next.
   const direction = compilation.direction
-  const optimal = trustedOptimum(compilation)
+  const optimal = knownOptimum(compilation)
   // A copy, so a caller who mutates their options object afterwards cannot
   // change a matcher that has already read them. The properties are declared
   // as `| undefined`, so naming an absent one costs nothing.
@@ -252,13 +252,9 @@ export function createMatcher<TItem, TDirection extends Direction, TBrand>(
       if (impossibleThreshold(compilation, threshold)) return
       const activeThreshold = kernelThreshold(compilation, threshold)
       const score = compilation.prepareQuery(normalized)
-      const similarity = direction === 'similarity'
       for (let id = 0; id < prepared.length; id++) {
         const value = score(prepared[id], activeThreshold)
-        if (
-          threshold === null ||
-          (similarity ? value >= threshold : value <= threshold)
-        ) {
+        if (passesThreshold(direction, value, threshold)) {
           yield matchAt(table, id, value)
         }
       }

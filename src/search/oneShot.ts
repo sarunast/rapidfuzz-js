@@ -4,21 +4,17 @@ import { scorerCompilation } from '../core/scorer.js'
 import {
   impossibleThreshold,
   kernelThreshold,
+  knownOptimum,
   optionalThreshold,
-  trustedOptimum,
+  passesThreshold,
 } from '../core/threshold.js'
 import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
 import { assertCollection, collectionEntries } from './collection.js'
+import type { SourceEntry } from './collection.js'
 import { pushHeap, replaceHeapRoot } from './internal/heap.js'
+import { BEST_OPTION_KEYS, SEARCH_OPTION_KEYS, resultLimit } from './options.js'
+import { choiceReader, normalizeQuery, type ChoiceReader } from './readers.js'
 import type { Match } from './results.js'
-import {
-  BEST_OPTION_KEYS,
-  SEARCH_OPTION_KEYS,
-  choiceReader,
-  normalizeQuery,
-  resultLimit,
-  type ChoiceReader,
-} from './snapshot.js'
 import type {
   BestOptions,
   ItemIterable,
@@ -64,17 +60,6 @@ function better(direction: Direction, score: number, current: number): boolean {
   return direction === 'similarity' ? score > current : score < current
 }
 
-function qualifies(
-  direction: Direction,
-  score: number,
-  threshold: number | null,
-): boolean {
-  return (
-    threshold === null ||
-    (direction === 'similarity' ? score >= threshold : score <= threshold)
-  )
-}
-
 function worse<TItem, TKey>(
   direction: Direction,
   left: ScoredEntry<TItem, TKey>,
@@ -97,6 +82,30 @@ function orderedResults<TItem, TKey>(
 
 function arrayItemsOf<TItem>(items: Items<TItem>): readonly TItem[] | null {
   return Array.isArray(items) ? items : null
+}
+
+/**
+ * Every choice that has text to score, in collection order.
+ *
+ * The walk a query with no text of its own takes: nothing is scored, so what a
+ * result needs is only whether the choice was there. Cold by construction —
+ * every caller of this has already settled that the query is empty.
+ */
+function* presentEntries<TItem>(
+  items: Items<TItem>,
+  choices: ChoiceReader<TItem>,
+): Generator<SourceEntry<TItem>> {
+  const arrayItems = arrayItemsOf(items)
+  if (arrayItems !== null) {
+    for (let key = 0; key < arrayItems.length; key++) {
+      const item = arrayItems[key]
+      if (choices.present(item)) yield { item, key }
+    }
+    return
+  }
+  for (const entry of collectionEntries(items)) {
+    if (choices.present(entry.item)) yield entry
+  }
 }
 
 // Array `searchIter` callers often stop after only a handful of matches.
@@ -206,20 +215,9 @@ function bestOfCollection<TItem, TDirection extends Direction, TBrand>(
 
   if (normalized === null) {
     const score = compilation.score(query, '', threshold)
-    if (!qualifies('similarity', score, threshold)) return undefined
-    if (arrayItems !== null) {
-      for (let key = 0; key < arrayItems.length; key++) {
-        const item = arrayItems[key]
-        if (choices.present(item)) {
-          return { item, key, score }
-        }
-      }
-      return undefined
-    }
-    for (const entry of collectionEntries(items)) {
-      if (choices.present(entry.item)) {
-        return { item: entry.item, key: entry.key, score }
-      }
+    if (!passesThreshold('similarity', score, threshold)) return undefined
+    for (const { item, key } of presentEntries(items, choices)) {
+      return { item, key, score }
     }
     return undefined
   }
@@ -228,7 +226,7 @@ function bestOfCollection<TItem, TDirection extends Direction, TBrand>(
   const activeThreshold = kernelThreshold(compilation, threshold)
 
   const prepared = compilation.prepareQuery(normalized)
-  const optimal = trustedOptimum(compilation)
+  const optimal = knownOptimum(compilation)
   let found: Match<TItem, unknown> | undefined
   let cutoff = activeThreshold
 
@@ -238,7 +236,7 @@ function bestOfCollection<TItem, TDirection extends Direction, TBrand>(
       const choice = choices.read(item)
       if (choice === null) continue
       const score = prepared(choice, cutoff)
-      if (!qualifies(compilation.direction, score, activeThreshold)) continue
+      if (!passesThreshold(compilation.direction, score, activeThreshold)) continue
       if (found === undefined || better(compilation.direction, score, found.score)) {
         found = { item, key, score }
         cutoff = score
@@ -252,7 +250,7 @@ function bestOfCollection<TItem, TDirection extends Direction, TBrand>(
     const choice = choices.read(entry.item)
     if (choice === null) continue
     const score = prepared(choice, cutoff)
-    if (!qualifies(compilation.direction, score, activeThreshold)) continue
+    if (!passesThreshold(compilation.direction, score, activeThreshold)) continue
     if (found === undefined || better(compilation.direction, score, found.score)) {
       found = { item: entry.item, key: entry.key, score }
       cutoff = score
@@ -344,23 +342,11 @@ export function search<TItem, TDirection extends Direction, TBrand>(
 
   if (normalized === null) {
     const score = compilation.score(query, '', threshold)
-    if (!qualifies('similarity', score, threshold)) return []
+    if (!passesThreshold('similarity', score, threshold)) return []
     const results: Match<TItem, unknown>[] = []
-    if (arrayItems !== null) {
-      for (let key = 0; key < arrayItems.length; key++) {
-        const item = arrayItems[key]
-        if (choices.present(item)) {
-          results.push({ item, key, score })
-          if (limit !== null && results.length === limit) break
-        }
-      }
-      return results
-    }
-    for (const entry of collectionEntries(items)) {
-      if (choices.present(entry.item)) {
-        results.push({ item: entry.item, key: entry.key, score })
-        if (limit !== null && results.length === limit) break
-      }
+    for (const { item, key } of presentEntries(items, choices)) {
+      results.push({ item, key, score })
+      if (limit !== null && results.length === limit) break
     }
     return results
   }
@@ -377,7 +363,7 @@ export function search<TItem, TDirection extends Direction, TBrand>(
   // Once a full heap holds nothing but optimal scores, later candidates can
   // only tie, and a tie loses on order — so the scan is finished. The Matcher
   // drivers stop on the same condition.
-  const optimal = trustedOptimum(compilation)
+  const optimal = knownOptimum(compilation)
   let cutoff = activeThreshold
 
   if (arrayItems !== null) {
@@ -388,7 +374,7 @@ export function search<TItem, TDirection extends Direction, TBrand>(
       const choice = choices.read(item)
       if (choice === null) continue
       const score = prepared(choice, cutoff)
-      if (qualifies(compilation.direction, score, activeThreshold)) {
+      if (passesThreshold(compilation.direction, score, activeThreshold)) {
         if (limit === null) {
           results.push({ item, key, score, order: key })
         } else if (results.length < limit) {
@@ -410,7 +396,7 @@ export function search<TItem, TDirection extends Direction, TBrand>(
       const choice = choices.read(entry.item)
       if (choice === null) continue
       const score = prepared(choice, cutoff)
-      if (qualifies(compilation.direction, score, activeThreshold)) {
+      if (passesThreshold(compilation.direction, score, activeThreshold)) {
         if (limit === null) {
           results.push({ item: entry.item, key: entry.key, score, order })
         } else if (results.length < limit) {
@@ -541,18 +527,9 @@ function* iterateMatches<TItem>(
 
   if (normalized === null) {
     const score = compilation.score(query, '', threshold)
-    if (!qualifies('similarity', score, threshold)) return
-    if (arrayItems !== null) {
-      for (let key = 0; key < arrayItems.length; key++) {
-        const item = arrayItems[key]
-        if (choices.present(item)) yield { item, key, score }
-      }
-      return
-    }
-    for (const entry of collectionEntries(items)) {
-      if (choices.present(entry.item)) {
-        yield { item: entry.item, key: entry.key, score }
-      }
+    if (!passesThreshold('similarity', score, threshold)) return
+    for (const { item, key } of presentEntries(items, choices)) {
+      yield { item, key, score }
     }
     return
   }
@@ -572,7 +549,7 @@ function* iterateMatches<TItem>(
       if (sequence === null) continue
       scored++
       const score = compilation.rawScore(normalized, sequence, activeThreshold)
-      if (qualifies(compilation.direction, score, threshold)) {
+      if (passesThreshold(compilation.direction, score, threshold)) {
         yield { item, key, score }
       }
     }
@@ -583,7 +560,7 @@ function* iterateMatches<TItem>(
       const sequence = sequences(item)
       if (sequence === null) continue
       const score = prepared(compilation.prepareChoice(sequence), activeThreshold)
-      if (qualifies(compilation.direction, score, threshold)) {
+      if (passesThreshold(compilation.direction, score, threshold)) {
         yield { item, key, score }
       }
     }
@@ -599,7 +576,7 @@ function* iterateMatches<TItem>(
       const item = arrayItems[key]
       const choice = choices.read(item)
       const score = prepared(choice, activeThreshold)
-      if (qualifies(compilation.direction, score, threshold)) {
+      if (passesThreshold(compilation.direction, score, threshold)) {
         yield { item, key, score }
       }
     }
@@ -609,7 +586,7 @@ function* iterateMatches<TItem>(
     const choice = choices.read(entry.item)
     if (choice === null) continue
     const score = prepared(choice, activeThreshold)
-    if (qualifies(compilation.direction, score, threshold)) {
+    if (passesThreshold(compilation.direction, score, threshold)) {
       yield { item: entry.item, key: entry.key, score }
     }
   }

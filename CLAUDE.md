@@ -83,6 +83,38 @@ Write `{@link name}` when the symbol is in the same file, and a plain
 `` `name` `` code span across modules. A code span is worth more than a broken
 link: the name is what a reader searches for, and the sidebar is one click away.
 
+## Clean code wins everywhere except a hot loop
+
+The default is the clearer shape: one function rather than six copies, a named
+helper rather than an inlined body, a rule stated once rather than re-derived at
+each call site. Duplication is what drifts, and a rule that exists in six places
+is a rule that will be wrong in one of them.
+
+Speed overrides that in exactly two cases:
+
+- **Inside a hot loop** — a body that runs once per candidate, per cell, per
+  character. `bestSimilarity` and `bestDistance` are two literal loops rather
+  than one comparator for that reason, and so are `topSimilarity`/`topDistance`
+  and the batch cell loops.
+- **A large, measured gain.** Large means it survives `pnpm bench:confirm` and
+  is worth writing in a commit message.
+
+Everything else loses to the cleaner shape, including a few percent. A `for`
+loop is not hot because it is a loop: `search/`'s option-and-threshold preamble,
+the missing-query walk, and construction bookkeeping all run once per call or
+once per collection, and belong in one place whatever they cost. Where a hot
+loop does keep a duplicated body, say in a comment what was measured — a reader
+must be able to tell a deliberate copy from an un-refactored one.
+
+Two habits follow from this:
+
+- **Measure before defending a duplicate, not after.** "It might be slower" is
+  not a reason; a confirmed number is. Most of these turn out to be neutral —
+  the shared threshold helpers moved 0 of 46 cases.
+- **Measure after removing one, too**, if it sits anywhere near a scan. A shared
+  walk that added one call per choice cost 5% of `createMatcher` construction,
+  which was worth paying and worth knowing.
+
 ## Code speaks for itself
 
 The default is no comment. A better name, a named intermediate, or an extracted
