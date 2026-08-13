@@ -115,6 +115,9 @@ export function bestOfCollection<TItem, TDirection extends Direction, TBrand>(
   if (normalized === null) {
     const score = compilation.score(query, '', threshold)
     if (!passesThreshold('similarity', score, threshold)) return undefined
+    // One iteration is the point: `presentEntries` is a generator, and this
+    // takes its first entry without walking the rest.
+    // oxlint-disable-next-line no-unreachable-loop
     for (const { item, key } of presentEntries(items, choices)) {
       return { item, key, score }
     }

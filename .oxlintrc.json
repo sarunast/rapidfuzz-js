@@ -1,6 +1,9 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "ignorePatterns": ["dist", "coverage"],
+  // `plugins` replaces the base set rather than adding to it, so the four
+  // defaults — eslint, unicorn, typescript, oxc — are relisted here.
+  "plugins": ["eslint", "unicorn", "typescript", "oxc", "import"],
   "rules": {
     // `new Array(n)` is deliberate: every use preallocates a known length and
     // fills it with the loop on the next line. The rule's alternative,
@@ -19,6 +22,117 @@
         "ts-nocheck": true,
         "ts-check": false
       }
+    ],
+    // Bug shapes the default `correctness` category does not cover. Each is at
+    // zero here, so they are guards against a future edit rather than a cleanup.
+    // `null: ignore` keeps `cutoff == null`, which is 63 of the 63 loose
+    // comparisons in this package and the one spelling that means "either".
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-unmodified-loop-condition": "error",
+    "array-callback-return": "error",
+    "no-constant-binary-expression": "error",
+    "no-sequences": "error",
+    "no-return-assign": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    // Both have exactly one deliberate site, disabled inline where the reason
+    // is: `AnyBrand` in `preparedChoice.ts`, and the first-entry walk in
+    // `bestMatch.ts`. Enabled so a second site has to argue for itself.
+    "typescript/no-explicit-any": "error",
+    "no-unreachable-loop": "error",
+
+    // The code half of the `@throws` rule the docs already carry: a guard that
+    // raises a plain `Error`, an `Error` with nothing to read, or a `Symbol`
+    // with no description, all reach a consumer as a worse diagnostic than the
+    // documentation promises.
+    "unicorn/prefer-type-error": "error",
+    "unicorn/error-message": "error",
+    "unicorn/throw-new-error": "error",
+    "symbol-description": "error",
+
+    // Spreading into a reduce accumulator is quadratic, which is worth a gate
+    // in a package whose point is the constant factor.
+    "oxc/no-accumulating-spread": "error",
+    // A type-only module must emit no `.js`, which is what `choiceIndex.ts`
+    // relies on.
+    "typescript/no-import-type-side-effects": "error",
+
+    "import/no-cycle": "error",
+    "import/no-self-import": "error",
+    "import/no-duplicates": "error",
+    "import/no-empty-named-blocks": "error",
+    "import/no-absolute-path": "error",
+    // Not `prefer-top-level`, which wants the type specifiers split out of every
+    // mixed import and flags 153 sites here. This mode asks for `import type`
+    // only where the import is types and nothing else, which is the rule
+    // CLAUDE.md states.
+    "import/consistent-type-specifier-style": [
+      "error",
+      "prefer-top-level-if-only-type-imports"
     ]
-  }
+  },
+  "overrides": [
+    {
+      // Only `src/` ships. `scripts/`, `bench/` and `tests/` are Node tooling
+      // and import `node:` freely.
+      "files": ["src/**"],
+      "rules": { "import/no-nodejs-modules": "error" }
+    },
+    {
+      // A plugin listed in an override adds to the base set rather than
+      // replacing it, so the four defaults still apply to these files.
+      "files": ["**/*.test.ts"],
+      "plugins": ["vitest"],
+      "rules": {
+        // The four the plugin turns on by default all read this suite's
+        // deliberate shapes as mistakes, so each is off for a stated reason
+        // rather than left to produce noise nobody reads.
+
+        // `expect(value, message)` is a real vitest signature, and 61 call
+        // sites pass the message to say which loop iteration failed. The rule
+        // is inherited from jest, where the second argument does not exist.
+        "vitest/valid-expect": "off",
+        // `tests/parity/` branches on which backend a divergence says is
+        // correct; the assertion it reaches is the point of the test.
+        "vitest/no-conditional-expect": "off",
+        // Titles come from the scorer tables these suites loop over, so `it`
+        // is called with a variable rather than a literal.
+        "vitest/valid-title": "off",
+        // `vi.fn((value: Sequence) => value)` types the mock through its
+        // implementation; the type parameter the rule asks for restates it.
+        "vitest/require-mock-type-parameters": "off",
+
+        // Kept on, and told where the assertions live: these three suites
+        // assert through helpers rather than inline.
+        "vitest/expect-expect": [
+          "error",
+          {
+            "assertFunctionNames": [
+              "expect",
+              "expectTypeOf",
+              "assert",
+              "assertType",
+              "expectBounded",
+              "expectExact",
+              "agree",
+              "same",
+              "fc.assert"
+            ]
+          }
+        ],
+
+        // The reason for the plugin: `coverage` is gated at 100%, and a
+        // stray `.only` or `.skip` would drop tests from the run while both
+        // the suite and the gate still pass.
+        "vitest/no-focused-tests": "error",
+        "vitest/no-disabled-tests": "error",
+        "vitest/no-commented-out-tests": "error",
+        "vitest/no-identical-title": "error",
+        "vitest/no-standalone-expect": "error",
+        "vitest/valid-describe-callback": "error",
+        "vitest/valid-expect-in-promise": "error",
+        "vitest/no-import-node-test": "error"
+      }
+    }
+  ]
 }

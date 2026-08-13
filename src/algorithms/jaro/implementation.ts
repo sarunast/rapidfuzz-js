@@ -124,12 +124,10 @@ function jaroSimilarityCore(
       scoreCutoff,
     )
   }
-  let pFlag: Uint32Array
-  let tFlag: Uint32Array
   patternFlags = grown(patternFlags, patternWords)
   textFlags = grown(textFlags, textWords)
-  pFlag = patternFlags
-  tFlag = textFlags
+  const pFlag = patternFlags
+  const tFlag = textFlags
   pFlag.fill(0, 0, patternWords)
   tFlag.fill(0, 0, textWords)
   // Claim the prefix positions on the pattern side so a later text element
