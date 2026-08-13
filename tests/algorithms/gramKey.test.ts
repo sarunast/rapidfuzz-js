@@ -32,6 +32,17 @@ describe('the radix ladder', () => {
     expect(canonicalRadix(7)).toBeNull()
   })
 
+  it('names the same rung the ladder would have chosen', () => {
+    // `canonicalRadix` spells its answers out rather than filtering the ladder,
+    // so nothing makes the two agree except this. A rung added to
+    // `RADIX_LADDER` without a matching case there fails here.
+    for (let gramSize = 1; gramSize <= 10; gramSize++) {
+      const radices = feasibleRadices(gramSize)
+      const widest = radices.length === 0 ? null : radices[radices.length - 1]
+      expect(canonicalRadix(gramSize), `gramSize ${gramSize}`).toBe(widest)
+    }
+  })
+
   it('keeps every canonical key inside a safe integer', () => {
     for (const gramSize of [1, 2, 3, 4, 5, 6]) {
       const radix = canonicalRadix(gramSize)

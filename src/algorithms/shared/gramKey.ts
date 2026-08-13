@@ -31,12 +31,17 @@ export function feasibleRadices(gramSize: number): readonly number[] {
  * per depth is what lets them compare keys at all — the same gram spelled at
  * two radices is two different numbers.
  *
- * Read from the end rather than by re-sorting: `feasibleRadices` is
- * narrowest-first because the index depends on that order.
+ * Spelled out rather than read off `feasibleRadices`, which allocates an array
+ * and raises three powers to reach a constant — this runs once per profile
+ * built and once per direct comparison. It agrees with the ladder by test
+ * rather than by construction, so a rung added there without a case here is a
+ * failure.
  */
 export function canonicalRadix(gramSize: number): number | null {
-  const radices = feasibleRadices(gramSize)
-  return radices.length === 0 ? null : radices[radices.length - 1]
+  if (gramSize <= 2) return 0x11_0000
+  if (gramSize === 3) return 0x1_0000
+  if (gramSize <= 6) return 0x100
+  return null
 }
 
 /**
