@@ -772,6 +772,21 @@ describe('the transient direct counter', () => {
     expect(directSharedFrequency(refusingTail, [...'abcd'], 2)).toBeNull()
   })
 
+  it('spends every occurrence before it stops, not every distinct gram', () => {
+    // `aaaaabbb` is `aa` four times, `ab` once and `bb` twice — seven gram
+    // occurrences over three distinct grams. The larger side supplies them one
+    // at a time, separated by `c`, and its very last gram is the second `bb`.
+    //
+    // So the stop condition has to be counting occurrences: a walk that stopped
+    // once it had seen all three distinct grams would answer 3, and one that
+    // stopped a gram early would answer 6.
+    const small = 'aaaaabbb'
+    expect(directSharedFrequency(small, 'aacaacaacaacabcbbcbb', 2)).toBe(7)
+    // The same larger side one `bb` short, so the count never saturates and the
+    // walk runs to the end: six of the seven.
+    expect(directSharedFrequency(small, 'aacaacaacaacabcbb', 2)).toBe(6)
+  })
+
   it('declines every shape it cannot pack, leaving the profiles to answer', () => {
     // No rung reaches seven elements.
     expect(
