@@ -1367,6 +1367,22 @@ export function lcsLengthPreparedBounded(
     // As in {@link lcsLengthPrepared}: a string settles every per-element test
     // in advance, and this is the bounded form the prepared `process` paths
     // reach.
+    //
+    // The bound runs every eighth row rather than every one, the cadence the
+    // generic arm below already uses. A popcount per row is most of what this
+    // kernel does once the row itself is three instructions, and the exit it
+    // buys cannot repay that at these lengths: nothing reaches here with a long
+    // text, because a pattern of 32 elements or fewer against a long choice is
+    // refused by `required > prepared.length` above. Swept at 2, 4, 8 and 16 —
+    // 16 is erratic, and 2 through 8 all land together, so this follows the
+    // generic arm. 1.10-1.16x on prepared Indel search, and no case regressed.
+    //
+    // Which scorers those are is worth naming, because it is not the obvious
+    // set: no fuzz workload enters this arm at all. `ratioHeld` gates the
+    // bounded kernel on the two lengths summing to 128, which puts `required`
+    // out of reach of a one-word pattern, so it is the prepared LCS and Indel
+    // scorers that arrive here. Counted rather than assumed — 2000 calls from
+    // prepared Indel against 0 from every fuzz case.
     if (typeof text === 'string') {
       for (let i = 0; i < textLength; i++) {
         const symbol = text.charCodeAt(textStart + i)
@@ -1383,7 +1399,11 @@ export function lcsLengthPreparedBounded(
         const matches = base < 0 ? 0 : masks[base]
         const u = s & matches
         s = (s + u) | 0 | (s & ~u)
-        if (popcount(~s) + textLength - i - 1 < required) return -1
+        if (
+          ((i & 7) === 7 || i + 1 === textLength) &&
+          popcount(~s) + textLength - i - 1 < required
+        )
+          return -1
       }
       return popcount(~s)
     }
@@ -1414,7 +1434,11 @@ export function lcsLengthPreparedBounded(
       const matches = base < 0 ? 0 : masks[base]
       const u = s & matches
       s = (s + u) | 0 | (s & ~u)
-      if (popcount(~s) + textLength - i - 1 < required) return -1
+      if (
+        ((i & 7) === 7 || i + 1 === textLength) &&
+        popcount(~s) + textLength - i - 1 < required
+      )
+        return -1
     }
     return popcount(~s)
   }
