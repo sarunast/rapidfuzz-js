@@ -257,12 +257,17 @@ describe('what it refuses', () => {
   })
 
   it('has no getPrepared option at all', () => {
-    // Refused by the type for a TypeScript caller, and by name for anyone else:
-    // a prepared handle is the per-choice representation an index replaces, so
-    // it is not an option of this constructor rather than an invalid one.
+    // Refused by the type for a TypeScript caller — naming the key is the
+    // error, `undefined` included — and by name for anyone else: a prepared
+    // handle is the per-choice representation an index replaces, so it is not
+    // an option of this constructor rather than an invalid one. Reached the way
+    // every other option-key test reaches one, since the type is the point.
     const scorer = createScorer(diceSimilarity, { gramSize: 2 })
     expect(() =>
-      createIndexedMatcher(['abcd'], { scorer, getPrepared: undefined }),
+      Reflect.apply(createIndexedMatcher, undefined, [
+        ['abcd'],
+        { scorer, getPrepared: (item: string) => item },
+      ]),
     ).toThrow(/unknown createIndexedMatcher option 'getPrepared'/)
   })
 

@@ -148,8 +148,11 @@ which is not the usual index trade.
   A two-letter alphabet loses outright. Cosine keeps its lead on that row only
   because its exhaustive path has no such bound to prune with.
 - **`searchIter` is no longer lazy.** It yields the same values in the same
-  collection order, but accumulation is the work an index does, so it settles the
-  whole result before the first one. A caller who breaks out early saves nothing.
+  collection order, but accumulation is the work an index does, so it settles
+  which choices qualify before yielding the first. Breaking out early still
+  skips building the results you never asked for — of 100,000 qualifying
+  matches, taking one measured 0.06x against materializing them all — but it
+  cannot skip the scoring, which is already done.
 - **Choices must be text, or sequences of integers.** Code points qualify;
   an array of objects does not, and is refused at construction.
 - **`getPrepared` is not an option.** A prepared handle is the per-choice

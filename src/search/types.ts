@@ -110,8 +110,13 @@ export interface IndexedMatcherOptions<TItem, TBrand = AnyBrand> {
   readonly normalize?: Normalizer | undefined
   /** What to do with an item that has no text; `'skip'` by default. */
   readonly missingItems?: MissingItemsPolicy | undefined
-  /** Not supported: an index replaces the handles this would supply. */
-  readonly getPrepared?: undefined
+  /**
+   * Not supported: an index replaces the handles this would supply. `never`
+   * rather than `undefined`, so that naming the key at all is the type error —
+   * under `exactOptionalPropertyTypes` an `undefined`-typed optional still
+   * accepts `getPrepared: undefined`, which the constructor then throws on.
+   */
+  readonly getPrepared?: never
 }
 
 /**

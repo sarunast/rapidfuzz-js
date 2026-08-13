@@ -309,8 +309,8 @@ query measured **45-63x faster**, retaining **235 bytes a choice against
 made of grams nearly every choice shares reaches everything anyway and measured
 **1x** for Dice. Only `dice.similarity` and `cosine.similarity` offer one —
 anything else throws at construction, a distance scorer is a compile error, and
-`searchIter` settles its whole result before yielding rather than scoring
-lazily.
+`searchIter` settles which choices qualify before yielding the first rather
+than scoring lazily.
 
 ## Reusable prepared choices
 

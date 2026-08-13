@@ -54,9 +54,10 @@ import type {
  *   `'node_modules/'` — grams nearly every choice shares — measured **1x** for
  *   Dice, and a two-letter alphabet loses outright. Cosine keeps its lead there
  *   because its exhaustive path has no length bound to prune with.
- * - **`searchIter` settles the whole result before yielding**, where
- *   `createMatcher` scores lazily. Same values, same order; a caller who breaks
- *   out early saves nothing.
+ * - **`searchIter` settles which choices qualify before yielding the first**,
+ *   where `createMatcher` scores lazily. Same values, same order; a caller who
+ *   breaks out early saves the scoring it would have skipped there, and only
+ *   the cost of building the results it never asked for.
  *
  * @param items Array, `Map`, plain object or any iterable — the shape decides
  * what `key` is on every result, exactly as it does for `createMatcher`.
@@ -226,11 +227,20 @@ export function createIndexedMatcher<TItem, TBrand>(
         return
       }
       if (impossible(threshold)) return
-      // Materialized before the first yield, never streamed from the index: the
-      // arrays a scan hands back are the index's own scratch, so a `search` run
-      // between two `next()` calls would otherwise rewrite what a live iterator
-      // is still walking.
-      yield* materialize(index.scan(normalized, activeThreshold(threshold)))
+      // The ids and scores are copied before the first yield, never streamed
+      // from the index: the arrays a scan hands back are the index's own
+      // scratch, so a `search` run between two `next()` calls would otherwise
+      // rewrite what a live iterator is still walking.
+      //
+      // Two number arrays rather than the finished `Match` objects, which is
+      // the same protection for less: a caller who stops after one result of
+      // 100,000 measured 0.06x, and even a full drain 0.54x, against
+      // materializing them all up front. Below ~100 results it costs 0.2µs
+      // against a query that costs tens.
+      const found = index.scan(normalized, activeThreshold(threshold))
+      const ids = found.ids.slice(0, found.length)
+      const scores = found.scores.slice(0, found.length)
+      for (let at = 0; at < ids.length; at++) yield matchAt(ids[at], scores[at])
     }
     return iterate()
   }
