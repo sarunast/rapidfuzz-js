@@ -1,5 +1,5 @@
 import { COMPILE, type MetricCompilation } from '../../core/scoring/compilation.js'
-import { type Metric, type NoConfiguration } from '../../core/scoring/metric.js'
+import type { Metric, NoConfiguration } from '../../core/scoring/metric.js'
 import { snapshotSequence, validatePair, validateSequence } from '../../core/sequence.js'
 import type {
   Direction,

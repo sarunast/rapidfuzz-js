@@ -26,6 +26,7 @@ export let resolvePreparedChoice: (
  * all. `any` is the wildcard the widening spellings need, and it gives up
  * nothing a caller could act on: the class has no member to reach.
  */
+// oxlint-disable-next-line typescript/no-explicit-any -- the block above is the reason
 export type AnyBrand = any
 
 /**

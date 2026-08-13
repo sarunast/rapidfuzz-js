@@ -23,8 +23,7 @@ import {
   searchIter,
 } from '../../src/index.js'
 import type { Match, PreparedChoiceOf, Scorer, Sequence } from '../../src/index.js'
-import type { AnyMatcherOptions } from '../../src/search/types.js'
-import type { ItemIterable } from '../../src/search/types.js'
+import type { AnyMatcherOptions, ItemIterable } from '../../src/search/types.js'
 
 describe('one-shot search and Matcher', () => {
   const scorer = createScorer(fuzz.similarity)
