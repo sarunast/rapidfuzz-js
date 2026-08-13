@@ -76,6 +76,11 @@ interface SealedIndex<TNorm extends Float64Array | null> {
   readonly gramCount: Uint32Array
   /** The largest of `gramCount`, which is what bounds a Cosine dot product. */
   readonly maxGramCount: number
+  /**
+   * The largest of `squaredNorm`, which is the other thing a Cosine score has
+   * to keep inside the exact integers — see `assertCosineNormsExact`.
+   */
+  readonly maxSquaredNorm: number
   /** Cosine's denominator; `null` on a Dice index, which has no use for it. */
   readonly squaredNorm: TNorm
   /** Ascending by id, because ids are the order the choices arrived in. */
@@ -169,9 +174,41 @@ export function assertQueryIndexable(gramCount: number): void {
  * takes ~100-million-gram sequences on both sides to reach.
  */
 export function assertCosineExact(queryGrams: number, maxChoiceGrams: number): void {
-  if (queryGrams * maxChoiceGrams >= Number.MAX_SAFE_INTEGER) {
+  if (queryGrams * maxChoiceGrams > Number.MAX_SAFE_INTEGER) {
     throw new RangeError(
       'a cosine query of this many grams cannot be scored exactly against a choice this long',
+    )
+  }
+}
+
+/**
+ * The other half of Cosine's denominator, and a second boundary since prepared
+ * profiles began packing their grams: `Σ count²` is summed here as `2c + 1` per
+ * occurrence, and by a packed profile as `c²` per distinct gram, because
+ * counting a run of sorted keys is where its counts come from. Both are exact
+ * while every squared norm is a safe integer, so both sides answer alike.
+ *
+ * Above it neither is exact and they need not agree — one gram repeated
+ * 268,435,459 times puts them 16 apart, one ulp at that magnitude — while a
+ * merely large norm usually survives: the same pair agrees at 200,000,001.
+ * Agreement up there is luck rather than a property, so the bound is the one
+ * that can be proved.
+ *
+ * A norm rather than a length, deliberately. `Σ count² ≤ gramCount²` would make
+ * `gramCount ≤ 94,906,265` a sufficient test, and it would refuse a
+ * 100-million-gram query of distinct grams whose norm is nowhere near the
+ * boundary. What decides this is repetition, so repetition is what it reads.
+ */
+export function assertCosineNormsExact(
+  querySquaredNorm: number,
+  maxSquaredNorm: number,
+): void {
+  if (
+    querySquaredNorm > Number.MAX_SAFE_INTEGER ||
+    maxSquaredNorm > Number.MAX_SAFE_INTEGER
+  ) {
+    throw new RangeError(
+      'a cosine query with grams repeated this often cannot be scored exactly against this corpus',
     )
   }
 }
@@ -460,6 +497,7 @@ class NGramIndexBuilder<TNorm extends Float64Array | null> implements ChoiceInde
   private readonly counts: number[] = []
   private entries = 0
   private maxGramCount = 0
+  private maxSquaredNorm = 0
 
   constructor(
     private readonly gramSize: number,
@@ -503,6 +541,7 @@ class NGramIndexBuilder<TNorm extends Float64Array | null> implements ChoiceInde
         )
         this.gramCount.push(total)
         if (total > this.maxGramCount) this.maxGramCount = total
+        if (squaredNorm > this.maxSquaredNorm) this.maxSquaredNorm = squaredNorm
         this.squaredNorm.push(squaredNorm)
         this.record(postings, id)
         return
@@ -560,6 +599,7 @@ class NGramIndexBuilder<TNorm extends Float64Array | null> implements ChoiceInde
       postings: compact(postings, choiceCount),
       gramCount: Uint32Array.from(this.gramCount),
       maxGramCount: this.maxGramCount,
+      maxSquaredNorm: this.maxSquaredNorm,
       squaredNorm: this.norms(this.squaredNorm),
       gramless: this.gramless,
     })
@@ -955,6 +995,9 @@ class DiceIndex implements ChoiceIndex {
    * which only duplication removes.
    */
   private top(queryGrams: number, threshold: number | null, room: number): number {
+    // A caller may ask for nothing, and then there is no result array to insert
+    // into: `room - 1` would read off the front of one.
+    if (room === 0) return 0
     const sealed = this.sealed
     const state = this.state
     const touched = state.touched
@@ -1064,6 +1107,7 @@ class CosineIndex implements ChoiceIndex {
       state.keys,
       state.counts,
     )
+    assertCosineNormsExact(queryNorm, sealed.maxSquaredNorm)
     this.accumulate()
     const room = roomFor(limit, sealed.choiceCount)
     state.reserve(room)
@@ -1103,6 +1147,7 @@ class CosineIndex implements ChoiceIndex {
       state.keys,
       state.counts,
     )
+    assertCosineNormsExact(queryNorm, sealed.maxSquaredNorm)
     this.accumulate()
     const everyChoice = state.scannedAll || zeroesQualify(threshold)
     const source = everyChoice ? null : ascending ? sortedTouched(state) : state.touched
@@ -1190,6 +1235,9 @@ class CosineIndex implements ChoiceIndex {
   }
 
   private top(queryNorm: number, threshold: number | null, room: number): number {
+    // A caller may ask for nothing, and then there is no result array to insert
+    // into: `room - 1` would read off the front of one.
+    if (room === 0) return 0
     const sealed = this.sealed
     const state = this.state
     const touched = state.touched
