@@ -1,6 +1,6 @@
 import type { PreparedKernel } from '../../../core/protocol.js'
-import { bestDistance } from './bestDistance.js'
 import { pushHeap, replaceHeapRoot } from '../../shared/heap.js'
+import { bestDistance } from './bestDistance.js'
 import type { ScoredId } from './types.js'
 
 function worse(left: ScoredId, right: ScoredId): boolean {

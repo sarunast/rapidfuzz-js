@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ChoiceTable } from '../../../src/search/matcher/choiceTable.js'
-import { buildChoiceTable, keyAt, matchAt } from '../../../src/search/matcher/choiceTable.js'
+import {
+  buildChoiceTable,
+  keyAt,
+  matchAt,
+} from '../../../src/search/matcher/choiceTable.js'
 import type { Items } from '../../../src/search/types.js'
 
 /** Keeps everything but the literal `'skip'`, recording what it retained. */

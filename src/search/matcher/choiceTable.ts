@@ -1,5 +1,5 @@
-import { collectionEntries } from '../shared/collection.js'
 import type { Match } from '../results.js'
+import { collectionEntries } from '../shared/collection.js'
 import type { Items } from '../types.js'
 
 /**

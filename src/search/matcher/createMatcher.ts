@@ -8,18 +8,8 @@ import {
   passesThreshold,
 } from '../../core/threshold.js'
 import type { Direction, MaybeSequence } from '../../core/types.js'
-import { buildChoiceTable, matchAt } from './choiceTable.js'
+import type { Match } from '../results.js'
 import { assertCollection } from '../shared/collection.js'
-import { bestDistance } from './scan/bestDistance.js'
-import { bestSimilarity } from './scan/bestSimilarity.js'
-import { topDistance } from './scan/topDistance.js'
-import { topSimilarity } from './scan/topSimilarity.js'
-import type { ScoredId } from './scan/types.js'
-import {
-  missingSimilarityBest,
-  missingSimilarityMatches,
-  missingSimilarityTop,
-} from './missingQuery.js'
 import {
   CALL_BEST_KEYS,
   CALL_SEARCH_KEYS,
@@ -27,7 +17,6 @@ import {
   resultLimit,
 } from '../shared/options.js'
 import { choiceReader, normalizeQuery } from '../shared/readers.js'
-import type { Match } from '../results.js'
 import type {
   AnyMatcherOptions,
   ResolvedMatcherOptions,
@@ -37,6 +26,17 @@ import type {
   Matcher,
   SearchOptions,
 } from '../types.js'
+import { buildChoiceTable, matchAt } from './choiceTable.js'
+import {
+  missingSimilarityBest,
+  missingSimilarityMatches,
+  missingSimilarityTop,
+} from './missingQuery.js'
+import { bestDistance } from './scan/bestDistance.js'
+import { bestSimilarity } from './scan/bestSimilarity.js'
+import { topDistance } from './scan/topDistance.js'
+import { topSimilarity } from './scan/topSimilarity.js'
+import type { ScoredId } from './scan/types.js'
 
 /**
  * Prepare a collection once and query it many times.

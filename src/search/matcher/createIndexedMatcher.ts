@@ -7,13 +7,8 @@ import {
   optionalThreshold,
 } from '../../core/threshold.js'
 import type { MaybeSequence } from '../../core/types.js'
-import { buildChoiceTable, matchAt } from './choiceTable.js'
+import type { Match } from '../results.js'
 import { assertCollection } from '../shared/collection.js'
-import {
-  missingSimilarityBest,
-  missingSimilarityMatches,
-  missingSimilarityTop,
-} from './missingQuery.js'
 import {
   CALL_BEST_KEYS,
   CALL_SEARCH_KEYS,
@@ -21,7 +16,6 @@ import {
   resultLimit,
 } from '../shared/options.js'
 import { normalizeQuery, sequenceReader } from '../shared/readers.js'
-import type { Match } from '../results.js'
 import type {
   BestOptions,
   IndexedMatcherOptions,
@@ -30,6 +24,12 @@ import type {
   Matcher,
   SearchOptions,
 } from '../types.js'
+import { buildChoiceTable, matchAt } from './choiceTable.js'
+import {
+  missingSimilarityBest,
+  missingSimilarityMatches,
+  missingSimilarityTop,
+} from './missingQuery.js'
 
 /**
  * Prepare a collection into one searchable index and query it many times.
