@@ -72,6 +72,20 @@ const astralThroughout = long.map(([a, b]): [string, string] => [
   a.replaceAll(/(.{9})./gu, '$1😀'),
   b.replaceAll(/(.{9})./gu, '$1😀'),
 ])
+// The same refusal past the transient counter's threshold, where it stops being
+// free: the counter packs both sides before the profiles do, so a refusing
+// element is now met twice. Where it sits decides the cost — a leading one
+// abandons the attempt immediately, a trailing one is reached only after nearly
+// everything has been scanned, at 6.9-9.2%. `trigrams, 1024 chars, similar`
+// above is this shape packed, and the gap to it is what these two guard.
+const astralLeadingLarge = large.map(([a, b]): [string, string] => [
+  `😀${a.slice(2)}`,
+  `😀${b.slice(2)}`,
+])
+const astralTrailingLarge = large.map(([a, b]): [string, string] => [
+  `${a.slice(0, -2)}😀`,
+  `${b.slice(0, -2)}😀`,
+])
 // Lengths alone put these out of reach of a high cutoff, which is the case the
 // gram-count bound exists to answer without building either trie.
 const lengthSkewed = words(100, 512, 0x0ba7_d101).map((value, index) =>
@@ -242,6 +256,12 @@ describe('dice packing fallback', () => {
   })
   measure('trigrams, 128 chars, astral throughout', () => {
     for (const [a, b] of astralThroughout) trigrams.score(a, b)
+  })
+  measure('trigrams, 1024 chars, astral at the start', () => {
+    for (const [a, b] of astralLeadingLarge) trigrams.score(a, b)
+  })
+  measure('trigrams, 1024 chars, astral at the end', () => {
+    for (const [a, b] of astralTrailingLarge) trigrams.score(a, b)
   })
 })
 
