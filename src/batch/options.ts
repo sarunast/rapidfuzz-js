@@ -7,11 +7,16 @@ import {
 import type { Direction, Normalizer } from '../core/types.js'
 import type { ScoreArrayKind } from './storage.js'
 
-/** Shared by {@link scoreMatrix} and {@link scorePairs}. */
+/** Shared by `scoreMatrix` and `scorePairs`. */
 export interface BatchOptions<
   TDirection extends Direction,
   TKind extends ScoreArrayKind = 'f64',
 > {
+  /**
+   * What every pair is measured with, from `createScorer`. Its direction and
+   * its scale are what {@link threshold} is read against, and what a rejected
+   * pair is stored as.
+   */
   readonly scorer: Scorer<TDirection>
 
   /** Element type the scores are stored as. Defaults to `'f64'`. */

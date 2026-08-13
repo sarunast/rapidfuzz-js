@@ -34,7 +34,7 @@ function normalizeInputs(
  * // Float64Array [85.71…, 85.71…]
  * ```
  *
- * The element-wise counterpart to {@link scoreMatrix}: use this when the two
+ * The element-wise counterpart to `scoreMatrix`: use this when the two
  * arrays are already paired up, and the matrix when you need the cross product.
  * Both write into one typed array with no per-score allocation.
  *
