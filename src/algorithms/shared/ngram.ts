@@ -293,6 +293,65 @@ function domainOf(elements: ArrayLike<unknown>): ElementDomain {
 }
 
 /**
+ * `Σ min(a_g, b_g)` for one comparison, without building a profile of either
+ * side, or `null` where the pair cannot be packed and the profiles have to
+ * answer instead.
+ *
+ * A prepared profile sorts its grams so that later queries can merge against
+ * it. A direct comparison has no later query, so it is paying `O(n log n)` to
+ * order something it reads once: this tallies the smaller side into a `Map` and
+ * spends the larger against those counts, which is `O(n + m)`. Decrementing as
+ * it goes is what makes one map enough — a gram runs out exactly when the
+ * smaller side's count of it does, so the walk never needs the larger side's
+ * own frequencies. Cosine gets no such shortcut, because `Σ b_g²` needs them.
+ *
+ * Answers any depth with a canonical radix, and is worth calling on far fewer:
+ * Dice's direct path owns that policy and states what was measured.
+ */
+export function directSharedFrequency(
+  a: ArrayLike<unknown>,
+  b: ArrayLike<unknown>,
+  gramSize: number,
+): number | null {
+  const radix = canonicalRadix(gramSize)
+  if (radix === null) return null
+  const gramsA = gramsIn(a, gramSize)
+  const gramsB = gramsIn(b, gramSize)
+  if (gramsA === 0 || gramsB === 0) return null
+  const domain = domainOf(a)
+  // Two first elements in different domains cannot share one packed key space,
+  // where `'b'` and `98` would become the same key. They may still share later
+  // grams — `['x', 1, 2]` and `[9, 1, 2]` both hold `[1, 2]` — so this defers to
+  // the profile path, which answers such a pair exactly. Never `0`.
+  if (domainOf(b) !== domain) return null
+
+  // The smaller side is the one tallied, so the `Map` stays as small as the
+  // pair allows and the larger side's walk is lookups rather than insertions.
+  const aFirst = gramsA <= gramsB
+  const smallCount = aFirst ? gramsA : gramsB
+  const largeCount = aFirst ? gramsB : gramsA
+  const smallKeys = packedKeys(aFirst ? a : b, gramSize, smallCount, radix, domain)
+  if (smallKeys === null) return null
+  const largeKeys = packedKeys(aFirst ? b : a, gramSize, largeCount, radix, domain)
+  if (largeKeys === null) return null
+
+  const counts = new Map<number, number>()
+  for (let index = 0; index < smallCount; index++) {
+    const key = smallKeys[index]
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  let shared = 0
+  for (let index = 0; index < largeCount; index++) {
+    const key = largeKeys[index]
+    const remaining = counts.get(key)
+    if (remaining === undefined || remaining === 0) continue
+    counts.set(key, remaining - 1)
+    shared++
+  }
+  return shared
+}
+
+/**
  * The grams as sorted distinct keys, or `null` where the input cannot be packed
  * — an object element, a negative, `NaN`, an element past the canonical radix,
  * a mixed domain, or a `gramSize` with no rung at all.

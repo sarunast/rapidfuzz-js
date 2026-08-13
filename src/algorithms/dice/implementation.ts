@@ -1,6 +1,7 @@
 import type { PreparedKernel } from '../../core/protocol.js'
 import {
   buildProfile,
+  directSharedFrequency,
   elementsEqual,
   parseGramSize,
   preparedProfile,
@@ -44,6 +45,37 @@ function similarityBound(gramsA: number, gramsB: number): number {
 }
 
 /**
+ * The larger side's gram count from which a transient counter beats building
+ * two profiles, and the depths that were measured.
+ *
+ * Below it the sort a profile pays is cheaper than the `Map` the counter fills.
+ * The crossover moves with the **alphabet**, not only the length: at 127 grams
+ * bigrams run +22% over a 4-letter alphabet, +5-8% over Latin and -15% over
+ * 500 or 2,000 CJK characters, because what the counter pays for is distinct
+ * grams. 512 is the first count with no regression in any of those (+0.5% at
+ * the symmetric worst case, +45-52% where one side is short), and skewed pairs
+ * are where it earns most — a 32-character query against a 4096-character
+ * choice sorts 4,000 keys it never needed ordered.
+ *
+ * Depths 2 and 3 only, listed rather than bounded: `directSharedFrequency`
+ * answers depths 1 to 6, and `gramSize <= 3` would route depth 1 along with
+ * them. Depth 1 swings from -19% to +57% on the alphabet alone, 4 wins from 128
+ * grams, and 5-6 cross near 512 as 3 does — four depths, four answers, so only
+ * the two that were measured are named.
+ *
+ * What this does lose is text with almost no distinct grams — under about 9
+ * bigrams or 64 trigrams, where sorting thousands of equal keys is nearly free
+ * and a map operation each is not. One repeated gram costs 44-56%, and
+ * `bench/ngram.bench.ts`'s `4096 chars, one repeated gram` is what holds that
+ * number still. It is a trade rather than an oversight: nothing sees gram
+ * diversity before doing the work, it needs *both* sides long — the same
+ * repetitive choice against a short query still gains 9-71% — and ordinary
+ * text of that length gains 90-120%.
+ */
+const COUNTER_GRAMS = 512
+const COUNTER_GRAM_SIZES: readonly number[] = [2, 3]
+
+/**
  * The gram counts come from the converted elements, never from a string's
  * `length`: `'😀'.length` is 2 and its code-point length is 1, so a UTF-16
  * count overstates the bound's denominator and can reject a candidate that
@@ -66,10 +98,19 @@ function directSimilarity(
     return similarity >= scoreCutoff ? similarity : 0
   }
   if (similarityBound(gramsA, gramsB) < scoreCutoff) return 0
-  const shared = sharedFrequency(
-    profileOfElements(a, gramSize),
-    profileOfElements(b, gramSize),
-  )
+  // The counter declines anything it cannot pack — an astral trigram, a mixed
+  // domain, an object element — and then the profiles answer, packing a second
+  // time before giving up. What that costs depends on where the offending
+  // element sits: an early one is free, since the counter abandons at once, and
+  // a trailing one costs 6.9-9.2%, having scanned nearly everything first.
+  // Against 30-96% won when the same shape does pack.
+  const counted =
+    COUNTER_GRAM_SIZES.includes(gramSize) && Math.max(gramsA, gramsB) >= COUNTER_GRAMS
+      ? directSharedFrequency(a, b, gramSize)
+      : null
+  const shared =
+    counted ??
+    sharedFrequency(profileOfElements(a, gramSize), profileOfElements(b, gramSize))
   const similarity = (2 * shared) / (gramsA + gramsB)
   return similarity >= scoreCutoff ? similarity : 0
 }

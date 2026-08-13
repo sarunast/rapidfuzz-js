@@ -6,6 +6,7 @@ import { diceSimilarity } from '../../src/algorithms/dice/implementation.js'
 import { canonicalRadix } from '../../src/algorithms/shared/gramKey.js'
 import {
   buildProfile,
+  directSharedFrequency,
   dotProduct,
   dotProductKernel,
   elementsEqual,
@@ -679,6 +680,116 @@ describe('the two storages answer alike', () => {
         },
       ),
       { numRuns: 2000 },
+    )
+  })
+})
+
+describe('the transient direct counter', () => {
+  // The counter returns a *count*, so it is checked against the profiles as an
+  // integer rather than through a score within a tolerance: a rounding-sized
+  // disagreement would be a wrong multiset, and `toBe` is what says so.
+  const packableNumbers = fc.array(fc.integer({ min: 0, max: 0xff }), { maxLength: 24 })
+  const packableChars = fc.array(fc.constantFrom('a', 'b', 'c', 'd'), { maxLength: 24 })
+
+  it('counts exactly what the two profiles intersect to', () => {
+    fc.assert(
+      fc.property(
+        fc.oneof(packableNumbers, packableChars),
+        fc.oneof(packableNumbers, packableChars),
+        fc.integer({ min: 1, max: 6 }),
+        (left, right, gramSize) => {
+          const counted = directSharedFrequency(left, right, gramSize)
+          if (counted === null) return
+          expect(counted).toBe(
+            sharedFrequency(
+              profileOfElements(left, gramSize),
+              profileOfElements(right, gramSize),
+            ),
+          )
+          // Symmetric, and the tally side is chosen by length rather than by
+          // argument order — so both orientations must reach one number.
+          expect(directSharedFrequency(right, left, gramSize)).toBe(counted)
+        },
+      ),
+      { numRuns: 4000 },
+    )
+  })
+
+  it('declines a pair of mixed domains that still shares a gram, rather than answering zero', () => {
+    // The domains come from the *first* element of each side, so a pair can be
+    // refused here and still have grams in common: both of these hold `[1, 2]`.
+    // Turning this decline into a `0` — which a fully homogeneous mixed pair
+    // would deserve — silently loses that gram.
+    const withChar = ['x', 1, 2]
+    const withNumber = [9, 1, 2]
+    expect(directSharedFrequency(withChar, withNumber, 2)).toBeNull()
+    expect(directSharedFrequency(withNumber, withChar, 2)).toBeNull()
+    expect(
+      sharedFrequency(profileOfElements(withChar, 2), profileOfElements(withNumber, 2)),
+    ).toBe(1)
+    expect(Dice.similarity(withChar, withNumber, { gramSize: 2 })).toBeCloseTo(0.5, 12)
+  })
+
+  it('counts a repeated gram only as often as the smaller side holds it', () => {
+    // `min(3, 7)`: the larger side keeps meeting a gram whose count has already
+    // run out, which is the decrement's whole purpose.
+    expect(directSharedFrequency('aaaa', 'aaaaaaaa', 2)).toBe(3)
+    expect(directSharedFrequency('aaaaaaaa', 'aaaa', 2)).toBe(3)
+    // And a gram the smaller side never held at all.
+    expect(directSharedFrequency('abab', 'cdcdcdcd', 2)).toBe(0)
+  })
+
+  it('declines every shape it cannot pack, leaving the profiles to answer', () => {
+    // No rung reaches seven elements.
+    expect(
+      directSharedFrequency([1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7], 7),
+    ).toBeNull()
+    // Nothing to count on one side or the other.
+    expect(directSharedFrequency([1], [1, 2, 3], 2)).toBeNull()
+    expect(directSharedFrequency([1, 2, 3], [1], 2)).toBeNull()
+    // Two domains: `'b'` and `98` would become one key.
+    expect(directSharedFrequency(['a', 'b', 'c'], [97, 98, 99], 2)).toBeNull()
+    expect(directSharedFrequency([97, 98, 99], ['a', 'b', 'c'], 2)).toBeNull()
+    // An unpackable element, on the side that is tallied and on the side that is
+    // spent — the two sides are packed by separate calls.
+    const long = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+    const short = ['a', '😀', 'c']
+    expect(directSharedFrequency(short, long, 3)).toBeNull()
+    expect(directSharedFrequency(long, short, 3)).toBeNull()
+    expect(directSharedFrequency(long.concat(short), long, 3)).toBeNull()
+  })
+
+  it('is invisible to the public score, on either side of the threshold', () => {
+    // 512 grams is where Dice routes bigrams and trigrams to the counter, and
+    // every other depth stays on the profiles however long the input is. The
+    // score may not notice either way, so all six are checked at a length past
+    // the threshold — which depth is routed is a benchmark's business.
+    for (const gramSize of [1, 2, 3, 4, 5, 6]) {
+      for (const length of [511, 512, 513, 700]) {
+        const text = 'abcdefghij'.repeat(Math.ceil(length / 10)).slice(0, length)
+        const edited = `${text.slice(0, 100)}z${text.slice(101)}`
+        expect(
+          Dice.similarity(text, edited, { gramSize }),
+          `gramSize ${gramSize}, ${length} chars`,
+        ).toBe(
+          (2 *
+            sharedFrequency(
+              profileOfElements(Array.from(text), gramSize),
+              profileOfElements(Array.from(edited), gramSize),
+            )) /
+            (text.length - gramSize + 1 + (edited.length - gramSize + 1)),
+        )
+      }
+    }
+    // Above the threshold and unpackable: the counter declines and the profiles
+    // answer, which the score cannot tell from never having tried.
+    const astral = `${'ab'.repeat(400)}😀`
+    expect(Dice.similarity(astral, astral, { gramSize: 3 })).toBe(1)
+    // 801 code points, so 799 trigrams, and only the last of them reaches the
+    // emoji: the other 798 all match, against 798 on the plain side.
+    expect(Dice.similarity(astral, 'ab'.repeat(400), { gramSize: 3 })).toBeCloseTo(
+      (2 * 798) / (799 + 798),
+      12,
     )
   })
 })
