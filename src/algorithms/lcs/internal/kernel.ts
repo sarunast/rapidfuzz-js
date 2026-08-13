@@ -441,6 +441,28 @@ function lcsManyWordsBanded(
       }
     }
 
+    // The abandonment {@link lcsPreparedBanded} makes, which this kernel went
+    // without: the cutoff was applied once, at the end, so a candidate that had
+    // already become unreachable still scanned the rest of its band. Everything
+    // above `lastWord` is untouched and all-ones, so it adds nothing and the
+    // whole row need not be read. Answering `0` rather than a length is the
+    // understatement {@link lcsLengthRange} allows once the budget is exceeded,
+    // and the same one the final `count >= required` already makes.
+    //
+    // Every sixty-fourth row, where the prepared twin checks every sixteenth.
+    // The trade is the same in shape and different in size: this kernel walks a
+    // band of 7 to 11 words where that one walks 3 to 8, so the bound's popcount
+    // is a larger share of the row it interrupts. Swept at 16, 32, 64 and 128
+    // over four cutoff shapes — at 16 the candidates that *clear* the cutoff pay
+    // 1.10x for a bound that rarely fires, and at 128 the rejection win falls
+    // from 1.40x to 1.34x without buying the passing side anything. 64 keeps the
+    // win and costs 1.04x.
+    if ((i & 63) === 63) {
+      let possible = textLength - i - 1
+      for (let word = 0; word < lastWord; word++) possible += popcount(~row[word])
+      if (possible < required) return 0
+    }
+
     if (i > right) firstWord = Math.floor((i - right) / WORD_BITS)
     // The window for the *next* row, whose highest reachable pattern position
     // is `i + 1 + left` — so the last word is the one that position falls in,
