@@ -649,8 +649,10 @@ complete workload in each row, not for one string pair.
 | `tokenSetSimilarity`, 200 sentence pairs  |         548 µs |           286 µs | ❌ 1.91× slower           |
 | `fuzzySimilarity`, 200 sentence pairs     |         790 µs |           404 µs | ❌ 1.96× slower           |
 
-RapidFuzz's `QRatio` has no spelling in this API and is not measured. Its work
-is `normalizeText` followed by `similarity`, both of which are.
+RapidFuzz's `QRatio` has no spelling in this API and is not measured. It is
+upstream's own `fuzz.ratio` with one difference: two empty strings score `0`
+rather than `100`. Its processor is opt-in and defaults to none, so no
+normalization is involved — the scorer it delegates to is the first row above.
 
 ### Search and batch scoring
 

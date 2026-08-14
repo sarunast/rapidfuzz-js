@@ -457,7 +457,8 @@ it is refused when a score actually arrives that does not fit, not up front.
 | RapidFuzz                      | rapidfuzz-js                                                  |
 | ------------------------------ | ------------------------------------------------------------- |
 | `fuzz.ratio`                   | `similarity`                                                  |
-| `fuzz.WRatio`                  | `weightedSimilarity` (`QRatio` has no counterpart)            |
+| `fuzz.WRatio`                  | `weightedSimilarity`                                          |
+| `fuzz.QRatio`                  | none — see below                                              |
 | `process.extractOne`           | `bestMatch`                                                   |
 | `process.extract`              | `search`                                                      |
 | `process.extract_iter`         | `searchIter`                                                  |
@@ -470,6 +471,13 @@ it is refused when a score actually arrives that does not fit, not up front.
 
 For everything RapidFuzz spells differently — extraction, cutoffs, scorer
 configuration, prepared reuse — the table above is the whole translation.
+
+`fuzz.QRatio` is deliberately absent. It is upstream's own `fuzz.ratio` with one
+difference: two empty strings score `0` rather than `100`. Its processor is
+opt-in and defaults to none, so it does no normalization — the name is a
+fuzzywuzzy inheritance rather than a separate algorithm, and `fuzzball`, the
+JavaScript port of fuzzywuzzy, does not ship it either. Callers who want that
+empty-string rule can write it in a line.
 
 ## Missing and invalid values
 
