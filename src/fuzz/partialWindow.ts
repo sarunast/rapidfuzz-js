@@ -158,7 +158,7 @@ export function ratioHeld(
 ): number {
   // No pair scores above 100, so a cutoff past it rejects everything — including
   // the empty pair, whose perfect score is awarded below without a comparison.
-  // `wRatio` divides its cutoff by a scale factor and so does ask for more.
+  // `weightedRatio` divides its cutoff by a scale factor and so does ask for more.
   if (scoreCutoff > 100) return 0
 
   const cutoff = scoreCutoff / 100
@@ -511,7 +511,7 @@ function partialRatioScan(
 
   // No normalised similarity can exceed 1, so a cutoff past it rejects every
   // window — but only after each one has been scored, because the rejection
-  // happens inside `indelNormSimHeld`'s ceiling test. `wRatio` asks for exactly
+  // happens inside `indelNormSimHeld`'s ceiling test. `weightedRatio` asks for exactly
   // this: it divides the running best by 0.9 or 0.6 before the partial branch,
   // so a base score over 90 arrives here as a cutoff above 1.
   //
@@ -761,7 +761,7 @@ function partialRatioScan(
   //
   // It also decides which of two equally-scoring alignments is reported, since
   // only a strictly better window replaces the one held. `partialRatio` returns
-  // a score, which no order can change; `partialRatioAlignment` returns the
+  // a score, which no order can change; `partialRatioAlignment_impl` returns the
   // positions, and there upstream's Python order is the one to match.
   //
   // {@link scanInterior} stops one short of the last full-length window, at
@@ -805,7 +805,7 @@ function swapAlignment(a: ScoreAlignment): ScoreAlignment {
  * Returns `null` when either input is missing, or when the score is below
  * `scoreCutoff`.
  */
-export function partialRatioAlignment(
+export function partialRatioAlignment_impl(
   s1: FuzzInput,
   s2: FuzzInput,
   options: FuzzOptions = {},
@@ -830,7 +830,7 @@ export function partialAlignmentConverted(
 ): ScoreAlignment | null {
   // No alignment can score above 100, so a cutoff past it rejects every pair —
   // including two empty inputs, whose perfect score is awarded below without
-  // ever reaching the comparison at the end. `wRatio` divides its cutoff by a
+  // ever reaching the comparison at the end. `weightedRatio` divides its cutoff by a
   // scale factor and so does ask for more than 100; every other path already
   // answered 0 by way of the length ceiling, which is why this only shows up on
   // the empty pair.
@@ -900,7 +900,7 @@ export function partialRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  // Same work as `partialRatioAlignment`, minus its obligation to report *which*
+  // Same work as `partialRatioAlignment_impl`, minus its obligation to report *which*
   // alignment won — which is what lets the scan visit the windows in the order
   // that prunes best. See `partialRatioScan`.
   const [a, b] = convPair(asSequence(s1), asSequence(s2))

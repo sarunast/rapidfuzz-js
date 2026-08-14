@@ -9,7 +9,7 @@ import { prepareFuzz } from '../preparation.js'
 import type { FuzzOptions } from '../types.js'
 import { partialTokenSetRatio_impl } from './tokenSet.js'
 
-export const partialTokenSetRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
+export const fuzzPartialTokenSetRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(
     partialTokenSetRatio_impl,
     FUZZ_FLAGS,
@@ -33,4 +33,4 @@ export const partialTokenSetRatio: MaybeSequenceMetricImplementation<FuzzOptions
 export const partialTokenSetSimilarity: BuiltInMetric<
   'fuzz.partialTokenSetSimilarity',
   'similarity'
-> = /* @__PURE__ */ fuzzMetric(partialTokenSetRatio)
+> = /* @__PURE__ */ fuzzMetric(fuzzPartialTokenSetRatio)

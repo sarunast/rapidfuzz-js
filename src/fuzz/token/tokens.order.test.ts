@@ -14,7 +14,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { convSequence } from '../../algorithms/shared/scorerSupport.js'
-import { tokenRatio } from './tokenRatio.js'
+import { fuzzTokenRatio } from './tokenRatio.js'
 import {
   difference,
   intersects,
@@ -24,8 +24,8 @@ import {
   uniqueOf,
   type UniqueTokenSet,
 } from './tokens.js'
-import { tokenSetRatio } from './tokenSetRatio.js'
-import { tokenSortRatio } from './tokenSortRatio.js'
+import { fuzzTokenSetRatio } from './tokenSetRatio.js'
+import { fuzzTokenSortRatio } from './tokenSortRatio.js'
 
 /** Everything observable about a token set, in an order-free form. */
 function snapshot(set: UniqueTokenSet): { size: number; tokens: string[] } {
@@ -105,9 +105,9 @@ describe('split carries no ordering contract', () => {
 describe('token scorers agree regardless of which forms they build', () => {
   it.each(texts)('scores %j consistently against every other text', (text) => {
     for (const other of texts) {
-      const set = tokenSetRatio(text, other)
-      const sort = tokenSortRatio(text, other)
-      const both = tokenRatio(text, other)
+      const set = fuzzTokenSetRatio(text, other)
+      const sort = fuzzTokenSortRatio(text, other)
+      const both = fuzzTokenRatio(text, other)
 
       // `tokenRatio` is defined as the larger of the two, so this is the
       // relationship that an order-dependent split would break.

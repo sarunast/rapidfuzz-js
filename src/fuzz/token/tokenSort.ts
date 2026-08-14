@@ -34,7 +34,7 @@ export function tokenSortRatioConverted(
 ): number {
   // Before the sorted forms are built, not after. These used to be default
   // parameter values, which JavaScript evaluates ahead of the body — so the
-  // guard sat behind the very work it exists to skip. `wRatio` reaches a cutoff
+  // guard sat behind the very work it exists to skip. `weightedRatio` reaches a cutoff
   // above 100 whenever its base ratio clears 95, by dividing the running best by
   // 0.95, and that is the common case in best-match search rather than a corner one.
   if (scoreCutoff > 100) return 0

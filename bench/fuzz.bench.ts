@@ -1,9 +1,9 @@
-import { partialRatio } from '../src/fuzz/partialRatio.js'
-import { ratio } from '../src/fuzz/ratio.js'
-import { partialTokenSetRatio } from '../src/fuzz/token/partialTokenSetRatio.js'
-import { tokenSetRatio } from '../src/fuzz/token/tokenSetRatio.js'
-import { tokenSortRatio } from '../src/fuzz/token/tokenSortRatio.js'
-import { wRatio } from '../src/fuzz/weightedRatio.js'
+import { fuzzPartialRatio } from '../src/fuzz/partialRatio.js'
+import { fuzzRatio } from '../src/fuzz/ratio.js'
+import { fuzzPartialTokenSetRatio } from '../src/fuzz/token/partialTokenSetRatio.js'
+import { fuzzTokenSetRatio } from '../src/fuzz/token/tokenSetRatio.js'
+import { fuzzTokenSortRatio } from '../src/fuzz/token/tokenSortRatio.js'
+import { fuzzWeightedRatio } from '../src/fuzz/weightedRatio.js'
 import { pairs, sentences, similarPairs } from './tooling/corpus.js'
 import { describe, measure } from './tooling/harness.js'
 
@@ -66,70 +66,70 @@ const nearHaystacks = partialHaystacksFew.map((haystack) => {
 // V8's inline caches live on the function literal, so one helper would leave
 // every scorer here sharing a megamorphic call site.
 
-describe('ratio', () => {
+describe('fuzzRatio', () => {
   measure('8 chars', () => {
-    for (const [a, b] of shortPairs) ratio(a, b)
+    for (const [a, b] of shortPairs) fuzzRatio(a, b)
   })
   measure('32 chars', () => {
-    for (const [a, b] of mediumPairs) ratio(a, b)
+    for (const [a, b] of mediumPairs) fuzzRatio(a, b)
   })
   measure('128 chars', () => {
-    for (const [a, b] of longPairs) ratio(a, b)
+    for (const [a, b] of longPairs) fuzzRatio(a, b)
   })
   measure('128 chars, BMP', () => {
-    for (const [a, b] of bmpPairs) ratio(a, b)
+    for (const [a, b] of bmpPairs) fuzzRatio(a, b)
   })
   measure('128 chars, astral', () => {
-    for (const [a, b] of astralPairs) ratio(a, b)
+    for (const [a, b] of astralPairs) fuzzRatio(a, b)
   })
 })
 
 describe('partialRatio', () => {
   measure('32 chars', () => {
-    for (const [a, b] of mediumPairs) partialRatio(a, b)
+    for (const [a, b] of mediumPairs) fuzzPartialRatio(a, b)
   })
   measure('128 chars', () => {
-    for (const [a, b] of longPairs) partialRatio(a, b)
+    for (const [a, b] of longPairs) fuzzPartialRatio(a, b)
   })
   measure('sentences', () => {
-    for (const [a, b] of sentencePairs) partialRatio(a, b)
+    for (const [a, b] of sentencePairs) fuzzPartialRatio(a, b)
   })
   measure('128 chars in long haystack', () => {
-    for (const haystack of partialHaystacksFew) partialRatio(partialNeedle, haystack)
+    for (const haystack of partialHaystacksFew) fuzzPartialRatio(partialNeedle, haystack)
   })
   measure('128 chars in long haystack, cutoff 90', () => {
     for (const haystack of partialHaystacksFew) {
-      partialRatio(partialNeedle, haystack, { scoreCutoff: 90 })
+      fuzzPartialRatio(partialNeedle, haystack, { scoreCutoff: 90 })
     }
   })
   measure('128 chars planted in long haystack', () => {
-    for (const haystack of plantedHaystacks) partialRatio(partialNeedle, haystack)
+    for (const haystack of plantedHaystacks) fuzzPartialRatio(partialNeedle, haystack)
   })
   measure('128 chars near-matched in long haystack', () => {
-    for (const haystack of nearHaystacks) partialRatio(partialNeedle, haystack)
+    for (const haystack of nearHaystacks) fuzzPartialRatio(partialNeedle, haystack)
   })
 })
 
 describe('token scorers', () => {
   measure('tokenSortRatio, sentences', () => {
-    for (const [a, b] of sentencePairs) tokenSortRatio(a, b)
+    for (const [a, b] of sentencePairs) fuzzTokenSortRatio(a, b)
   })
   measure('tokenSetRatio, sentences', () => {
-    for (const [a, b] of sentencePairs) tokenSetRatio(a, b)
+    for (const [a, b] of sentencePairs) fuzzTokenSetRatio(a, b)
   })
   measure('partialTokenSetRatio, sentences', () => {
-    for (const [a, b] of sentencePairs) partialTokenSetRatio(a, b)
+    for (const [a, b] of sentencePairs) fuzzPartialTokenSetRatio(a, b)
   })
 })
 
 // Adaptive fuzzy similarity is a common search scorer, so it is the single hottest
 // path in the library for anyone using it as intended.
-describe('wRatio', () => {
+describe('weightedRatio', () => {
   measure('32 chars', () => {
-    for (const [a, b] of mediumPairs) wRatio(a, b)
+    for (const [a, b] of mediumPairs) fuzzWeightedRatio(a, b)
   })
   measure('sentences', () => {
-    for (const [a, b] of sentencePairs) wRatio(a, b)
+    for (const [a, b] of sentencePairs) fuzzWeightedRatio(a, b)
   })
 })
 
@@ -142,15 +142,15 @@ describe('partialRatio window scan', () => {
   const longHaystack = partialHaystacks[0] ?? ''
 
   measure('16 interior windows', () => {
-    for (let i = 0; i < 200; i++) partialRatio(needle, shortHaystack)
+    for (let i = 0; i < 200; i++) fuzzPartialRatio(needle, shortHaystack)
   })
   measure('16 interior windows, cutoff 90', () => {
     for (let i = 0; i < 200; i++) {
-      partialRatio(needle, shortHaystack, { scoreCutoff: 90 })
+      fuzzPartialRatio(needle, shortHaystack, { scoreCutoff: 90 })
     }
   })
   measure('many interior windows', () => {
-    for (let i = 0; i < 32; i++) partialRatio(needle, longHaystack)
+    for (let i = 0; i < 32; i++) fuzzPartialRatio(needle, longHaystack)
   })
   // The bisection's book-keeping is sized on the haystack while the search
   // reads a handful of windows, so a long haystack whose first window is a
@@ -161,7 +161,7 @@ describe('partialRatio window scan', () => {
   const plantedAtStart = needle + 'z'.repeat(8_000)
 
   measure('perfect first window in an 8k haystack', () => {
-    for (let i = 0; i < 32; i++) partialRatio(needle, plantedAtStart)
+    for (let i = 0; i < 32; i++) fuzzPartialRatio(needle, plantedAtStart)
   })
 })
 
@@ -172,7 +172,7 @@ describe('partialRatio, two-word needle', () => {
   const needle = partialNeedle.slice(0, 48)
 
   measure('48-char needle in long haystacks', () => {
-    for (const haystack of partialHaystacksSome) partialRatio(needle, haystack)
+    for (const haystack of partialHaystacksSome) fuzzPartialRatio(needle, haystack)
   })
 })
 
@@ -183,6 +183,6 @@ describe('partialRatio, three-word needle', () => {
   const needle = partialNeedle.slice(0, 80)
 
   measure('80-char needle in long haystacks', () => {
-    for (const haystack of partialHaystacksSome) partialRatio(needle, haystack)
+    for (const haystack of partialHaystacksSome) fuzzPartialRatio(needle, haystack)
   })
 })

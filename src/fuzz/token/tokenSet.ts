@@ -7,8 +7,8 @@ import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
  *
  * Each scorer comes in two: a public `*_impl` that validates its inputs and
  * converts them, and a `*Converted` core over the converted sequences. The
- * composite scorers — `wRatio`, `tokenRatio`, `partialTokenRatio` — call the
- * cores, so one `wRatio` of two strings expands them into code points once
+ * composite scorers — `weightedRatio`, `tokenRatio`, `partialTokenRatio` — call the
+ * cores, so one `weightedRatio` of two strings expands them into code points once
  * rather than once per component scorer. That expansion was the single largest
  * cost in repeated adaptive-fuzzy search.
  *
@@ -226,7 +226,7 @@ export function tokenRatioConverted(
 ): number {
   // The whole combination is unreachable above 100 — token-set answers 0 at its
   // own guard and token-sort at its length ceiling — so this returns before any
-  // splitting, hashing, sorting or joining. `wRatio` asks for exactly this
+  // splitting, hashing, sorting or joining. `weightedRatio` asks for exactly this
   // whenever its base ratio clears 95.
   if (scoreCutoff > 100) return 0
 

@@ -16,10 +16,10 @@ import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
  * `partialWindow.ts`, `token/tokens.ts` and `token/tokenSet.ts`. None of them may import this
  * one, which is what keeps the graph acyclic.
  *
- * `weightedSimilarity.ts` is deliberately **not** among them. Its `wRatio_impl`, like every
+ * `weightedSimilarity.ts` is deliberately **not** among them. Its `weightedRatio_impl`, like every
  * other public scorer's implementation, validates and converts raw input — the
  * work already done by the time a branch below runs — so the composite strategy
- * is reproduced here over prepared state rather than called. The `wRatio` branch
+ * is reproduced here over prepared state rather than called. The `weightedRatio` branch
  * mirrors that ladder of length-ratio tests and 0.95/0.9/0.6 scalings against
  * held state. The two must be kept in step by hand; a change to one is a change
  * to both, and `tests/fuzz/preparedParity.test.ts` is what says so out loud.
@@ -69,7 +69,7 @@ import type { PreparedFuzzKind } from './types.js'
  *
  * This used to be a table of *which* forms each scorer might read, so the
  * preparer could build exactly those up front. Per-scorer is one branch too
- * coarse — `wRatio` may read all three but on a given pair usually reads one —
+ * coarse — `weightedRatio` may read all three but on a given pair usually reads one —
  * so the choice is now made per access instead. See {@link PreparedTokenChoice}.
  */
 function tokenisesInput(kind: PreparedFuzzKind): boolean {
@@ -81,7 +81,7 @@ function tokenisesInput(kind: PreparedFuzzKind): boolean {
     case 'partialTokenSetRatio':
     case 'tokenRatio':
     case 'partialTokenRatio':
-    case 'wRatio':
+    case 'weightedRatio':
       return true
   }
 }
@@ -102,8 +102,8 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
     const heldQuery =
       queryTokenChoice === null ? scorerSequence(query) : queryTokenChoice.sequence
     const a = heldQuery
-    // Built on first use rather than up front: `partialRatio` and `wRatio` are
-    // the only kinds that score through the query's own LCS masks, and `wRatio`
+    // Built on first use rather than up front: `partialRatio` and `weightedRatio` are
+    // the only kinds that score through the query's own LCS masks, and `weightedRatio`
     // reaches them only on some inputs.
     let lcsPattern: PatternMask | null = null
     const patternOf = (): PatternMask =>
@@ -129,7 +129,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
     // Masks for the token-sorted query. Token-sort scoring reaches the same
     // kernel as `ratio` but with a different left-hand sequence, so it needs
     // masks of its own; without them every choice rebuilt the sorted query's.
-    // Lazy for the same reason as `patternOf`: `wRatio` reaches token-sort only
+    // Lazy for the same reason as `patternOf`: `weightedRatio` reaches token-sort only
     // on some inputs, and `tokenSetRatio` never does.
     let sortedPattern: PatternMask | null = null
     const sortedPatternOf = (): PatternMask => {
@@ -261,7 +261,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
             sortedCharSetOf,
           )
         }
-        case 'wRatio': {
+        case 'weightedRatio': {
           const preparedTokens = preparedTokenChoice(rawChoice)
           const b = preparedTokens.sequence
           if (a.length === 0 || b.length === 0 || cutoff > 100) return 0
@@ -271,7 +271,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
           let result = ratioHeld(patternOf(), a.length, b, dynamicCutoff)
 
           if (lenRatio < 1.5) {
-            // Raised ahead of the whitespace tests, exactly as `wRatio_impl`
+            // Raised ahead of the whitespace tests, exactly as `weightedRatio_impl`
             // does: every scorer below answers 0 to a cutoff above 100, so this
             // returns the same number without asking either side for its tokens.
             dynamicCutoff = Math.max(dynamicCutoff, result) / unbaseScale
@@ -287,7 +287,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
             // never splits it — so a candidate that takes this shortcut is now
             // never tokenised at all, where before it had been split, deduped,
             // sorted and joined by the preparer before scoring even began.
-            // `wRatio` tokenises, so `queryView` is always there — a query that
+            // `weightedRatio` tokenises, so `queryView` is always there — a query that
             // is not a sequence threw above. The fallback still reads the
             // sequence rather than answering `false`, because `false` is the
             // answer that *takes* the shortcut: if that invariant ever changed,
@@ -300,7 +300,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
               result,
               tokenRatioConverted(
                 a,
-                // Not through `tokenForm`, unlike `wRatio_impl`: a token kind
+                // Not through `tokenForm`, unlike `weightedRatio_impl`: a token kind
                 // prepares its choices with `prepareTokenChoice`, which converts
                 // unconditionally, so both sides are already the code points a
                 // token set has to be compared in. The raw path needs the
@@ -364,7 +364,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
   }
   // Token-set only. Its 100 *is* containment, so the proof describes exactly
   // its perfect matches. `tokenRatio` reaches 100 through a `Math.max` and
-  // `wRatio` scales every component, so neither is claimed here without tests
+  // `weightedRatio` scales every component, so neither is claimed here without tests
   // of its own — a proof that is right for the wrong reason is still a wrong
   // answer waiting for an input nobody tried.
   const proveOptimum = kind === 'tokenSetRatio' ? tokenContainmentProof : undefined

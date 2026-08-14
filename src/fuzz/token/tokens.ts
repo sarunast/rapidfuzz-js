@@ -166,7 +166,7 @@ export function stringContainsWhitespace(s: string): boolean {
  * a query and a candidate must arrive here in the *same* form or their token
  * sets would never intersect.
  *
- * Expanding on the way into a token scorer is what lets `wRatio` leave a pair
+ * Expanding on the way into a token scorer is what lets `weightedRatio` leave a pair
  * alone for the whitespace-free majority that never gets here. A sequence that
  * is not a string was converted when it was formed, so this is a no-op for it —
  * never a second copy.
@@ -611,7 +611,7 @@ export function uniqueTokens(tokens: readonly unknown[][]): UniqueTokenSet {
  * being built.
  *
  * The forms used to be built up front, from a per-scorer table of what that
- * scorer might read. That is one branch too coarse. `wRatio` may ask for the
+ * scorer might read. That is one branch too coarse. `weightedRatio` may ask for the
  * unique set, the sorted form *and* the whitespace flag, but on any given pair
  * it takes one route through its ladder and usually wants far less: two inputs
  * of similar length with no whitespace need only `hasWhitespace`, and never
@@ -653,7 +653,7 @@ export function uniqueOf(choice: PreparedTokenChoice): UniqueTokenSet {
  * would have been applied to.
  *
  * Whichever form is already built answers instead of the scan: this is reached
- * once per candidate, and a `wRatio` that already split for the token-set half
+ * once per candidate, and a `weightedRatio` that already split for the token-set half
  * would otherwise pay a second pass over the same input.
  */
 export function canonicalLengthOf(choice: PreparedTokenChoice): number {
@@ -724,7 +724,7 @@ export function sortedOf(choice: PreparedTokenChoice): unknown[] {
 /**
  * Whether `choice` holds any whitespace, tested on first use.
  *
- * Reads the sequence rather than the split, so `wRatio`'s shortcut past the
+ * Reads the sequence rather than the split, so `weightedRatio`'s shortcut past the
  * token scorers costs one pass and no tokenisation. `??=` is right even though
  * this memo is a boolean: `false` is not nullish, so a negative answer sticks.
  */

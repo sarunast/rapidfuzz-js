@@ -27,8 +27,8 @@ import { levenshteinEditops } from '../../src/algorithms/levenshtein/editops.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../../src/algorithms/osa/implementation.js'
 import type { Sequence } from '../../src/algorithms/shared/scorerSupport.js'
-import { partialRatio } from '../../src/fuzz/partialRatio.js'
-import { ratio } from '../../src/fuzz/ratio.js'
+import { fuzzPartialRatio } from '../../src/fuzz/partialRatio.js'
+import { fuzzRatio } from '../../src/fuzz/ratio.js'
 import { prepareScorerOf } from '../../testing/prepareScorer.js'
 
 /** Textbook Levenshtein, O(n*m). */
@@ -324,13 +324,13 @@ describe('every mask region, at every pattern width', () => {
     for (const { what, s1, s2 } of PAIRS) {
       const maximum = s1.length + s2.length
       const expected = (1 - (maximum - 2 * lcsReference(s1, s2)) / maximum) * 100
-      expect(ratio(s1, s2), what).toBeCloseTo(expected, 9)
+      expect(fuzzRatio(s1, s2), what).toBeCloseTo(expected, 9)
       // The window scan is its own alignment, so it is not bounded by `ratio`;
       // what it must be is symmetric and inside the range a score can take.
-      const partial = partialRatio(s1, s2)
+      const partial = fuzzPartialRatio(s1, s2)
       expect(partial, what).toBeGreaterThanOrEqual(0)
       expect(partial, what).toBeLessThanOrEqual(100)
-      expect(partialRatio(s2, s1), what).toBeCloseTo(partial, 9)
+      expect(fuzzPartialRatio(s2, s1), what).toBeCloseTo(partial, 9)
     }
   })
 
@@ -366,12 +366,15 @@ describe('every mask region, at every pattern width', () => {
     }
   })
 
-  it('scores a held ratio pattern the same', () => {
-    const prepare = prepareScorerOf(ratio)
-    const preparePartial = prepareScorerOf(partialRatio)
+  it('scores a held fuzzRatio pattern the same', () => {
+    const prepare = prepareScorerOf(fuzzRatio)
+    const preparePartial = prepareScorerOf(fuzzPartialRatio)
     for (const { what, s1, s2 } of PAIRS) {
-      expect(prepare(s1, {})(s2, null), what).toBeCloseTo(ratio(s1, s2), 9)
-      expect(preparePartial(s1, {})(s2, null), what).toBeCloseTo(partialRatio(s1, s2), 9)
+      expect(prepare(s1, {})(s2, null), what).toBeCloseTo(fuzzRatio(s1, s2), 9)
+      expect(preparePartial(s1, {})(s2, null), what).toBeCloseTo(
+        fuzzPartialRatio(s1, s2),
+        9,
+      )
     }
   })
 })
@@ -488,10 +491,10 @@ describe('every mask region, with a held pattern under a cutoff', () => {
 
   // `ratio` takes the bounded held kernel only above a cutoff of 70 and a
   // combined length of 128, which no unbounded sweep reaches.
-  it('scores a held ratio exactly inside the bound', () => {
-    const prepare = prepareScorerOf(ratio)
+  it('scores a held fuzzRatio exactly inside the bound', () => {
+    const prepare = prepareScorerOf(fuzzRatio)
     for (const { what, s1, s2 } of PAIRS) {
-      const exact = ratio(s1, s2)
+      const exact = fuzzRatio(s1, s2)
       const score = prepare(s1, {})
       for (const cutoff of [0, 25, 70, 90, 100]) {
         expect(score(s2, cutoff), `${what} at ${cutoff}`).toBeCloseTo(

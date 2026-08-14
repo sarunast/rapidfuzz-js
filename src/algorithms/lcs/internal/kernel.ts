@@ -90,7 +90,7 @@ function lcsOneWordStamped(
   // answered in advance and the `NaN` arm has nothing to catch — one compare
   // against `limit` is all that is left.
   //
-  // This is the loop `ratio` and `wRatio` spend most of their time in, which is
+  // This is the loop `ratio` and `weightedRatio` spend most of their time in, which is
   // what earns it the duplication — see the note on the generic arm below.
   if (typeof text === 'string') {
     for (let i = 0; i < textLength; i++) {

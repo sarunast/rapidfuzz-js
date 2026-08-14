@@ -57,8 +57,9 @@ import {
   rowBitSet,
   shiftedRowBitSet,
 } from '../../src/algorithms/shared/bitParallel.js'
-import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partialRatio.js'
-import { ratio } from '../../src/fuzz/ratio.js'
+import { fuzzPartialRatio } from '../../src/fuzz/partialRatio.js'
+import { partialRatioAlignment_impl } from '../../src/fuzz/partialWindow.js'
+import { fuzzRatio } from '../../src/fuzz/ratio.js'
 import { editopTuples } from '../../testing/editopTuples.js'
 import { prepareScorerOf } from '../../testing/prepareScorer.js'
 
@@ -1153,9 +1154,9 @@ describe('the score-cutoff prune never changes a result', () => {
         smallAlphabet,
         fc.double({ min: 0, max: 100, noNaN: true }),
         (a, b, cutoff) => {
-          const unpruned = ratio(a, b)
+          const unpruned = fuzzRatio(a, b)
           const expected = unpruned >= cutoff ? unpruned : 0
-          expect(ratio(a, b, { scoreCutoff: cutoff })).toBe(expected)
+          expect(fuzzRatio(a, b, { scoreCutoff: cutoff })).toBe(expected)
         },
       ),
       { numRuns: 1000 },
@@ -1169,8 +1170,8 @@ describe('the score-cutoff prune never changes a result', () => {
         smallAlphabet,
         fc.double({ min: 0, max: 100, noNaN: true }),
         (a, b, cutoff) => {
-          const pruned = ratio(a, b, { scoreCutoff: cutoff })
-          expect(pruned === 0 || pruned === ratio(a, b)).toBe(true)
+          const pruned = fuzzRatio(a, b, { scoreCutoff: cutoff })
+          expect(pruned === 0 || pruned === fuzzRatio(a, b)).toBe(true)
         },
       ),
       { numRuns: 1000 },
@@ -1186,9 +1187,10 @@ describe('the score-cutoff prune never changes a result', () => {
         fc.string({ minLength: 0, maxLength: 4 }),
         fc.string({ minLength: 20, maxLength: 60 }),
         (a, b) => {
-          const score = ratio(a, b)
-          if (score > 0.5) expect(ratio(a, b, { scoreCutoff: score - 0.5 })).toBe(score)
-          expect(ratio(a, b, { scoreCutoff: score + 0.5 })).toBe(0)
+          const score = fuzzRatio(a, b)
+          if (score > 0.5)
+            expect(fuzzRatio(a, b, { scoreCutoff: score - 0.5 })).toBe(score)
+          expect(fuzzRatio(a, b, { scoreCutoff: score + 0.5 })).toBe(0)
         },
       ),
       { numRuns: 500 },
@@ -1206,10 +1208,10 @@ describe('scoreCutoff scaling matches upstream, including where it is lossy', ()
     // Verified against upstream's pure-Python backend, which returns 0 here
     // too. Pinned because it looks like a bug and must not be "fixed" into a
     // difference from RapidFuzz.
-    const score = ratio('baaaa', 'cbbaaaa')
+    const score = fuzzRatio('baaaa', 'cbbaaaa')
 
     expect(score).toBe(83.33333333333334)
-    expect(ratio('baaaa', 'cbbaaaa', { scoreCutoff: score })).toBe(0)
+    expect(fuzzRatio('baaaa', 'cbbaaaa', { scoreCutoff: score })).toBe(0)
   })
 })
 
@@ -1732,18 +1734,20 @@ describe('the prepared window decision at its exact edges', () => {
   })
 })
 
-// `partialRatio` and `partialRatioAlignment` do the same search, but only the
+// `partialRatio` and `partialRatioAlignment_impl` do the same search, but only the
 // second has to report which window won — so the first is free to visit them in
 // the order that prunes best, and does. Only a strictly better window replaces
 // the one held, so a different order can pick a different window out of several
 // that tie. It must never pick a different score.
-describe('the partial-ratio scan orders agree on the score', () => {
+describe('the partial-fuzzRatio scan orders agree on the score', () => {
   const text = fc.stringMatching(/^[abc ]{0,80}$/)
 
   it('on inputs of every relative length', () => {
     fc.assert(
       fc.property(text, text, (s1, s2) => {
-        expect(partialRatio(s1, s2)).toBe(partialRatioAlignment(s1, s2)?.score ?? 0)
+        expect(fuzzPartialRatio(s1, s2)).toBe(
+          partialRatioAlignment_impl(s1, s2)?.score ?? 0,
+        )
       }),
       { numRuns: 400 },
     )
@@ -1753,8 +1757,8 @@ describe('the partial-ratio scan orders agree on the score', () => {
     fc.assert(
       fc.property(text, text, fc.integer({ min: 0, max: 100 }), (s1, s2, cutoff) => {
         const options = { scoreCutoff: cutoff }
-        expect(partialRatio(s1, s2, options)).toBe(
-          partialRatioAlignment(s1, s2, options)?.score ?? 0,
+        expect(fuzzPartialRatio(s1, s2, options)).toBe(
+          partialRatioAlignment_impl(s1, s2, options)?.score ?? 0,
         )
       }),
       { numRuns: 400 },
@@ -1773,8 +1777,8 @@ describe('the partial-ratio scan orders agree on the score', () => {
         fc.stringMatching(/^[a-p]{0,120}$/),
         (head, tail) => {
           const haystack = head + needle + tail
-          expect(partialRatio(needle, haystack)).toBe(
-            partialRatioAlignment(needle, haystack)?.score ?? 0,
+          expect(fuzzPartialRatio(needle, haystack)).toBe(
+            partialRatioAlignment_impl(needle, haystack)?.score ?? 0,
           )
         },
       ),

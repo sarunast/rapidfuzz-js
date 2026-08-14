@@ -46,7 +46,7 @@ export function prepareTokenSort(): PreparationFactory {
   return () => ({ prepareQuery, prepareChoice: choicePreparer })
 }
 
-export const tokenSortRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
+export const fuzzTokenSortRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(tokenSortRatio_impl, FUZZ_FLAGS, prepareTokenSort())
 
 /**
@@ -69,4 +69,4 @@ export const tokenSortRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
 export const tokenSortSimilarity: BuiltInMetric<
   'fuzz.tokenSortSimilarity',
   'similarity'
-> = /* @__PURE__ */ fuzzMetric(tokenSortRatio)
+> = /* @__PURE__ */ fuzzMetric(fuzzTokenSortRatio)

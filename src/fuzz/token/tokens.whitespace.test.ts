@@ -26,12 +26,12 @@
 // of them are invisible, and one of them would end the line.
 import { describe, expect, it } from 'vitest'
 
-import { tokenSortRatio } from './tokenSortRatio.js'
+import { fuzzTokenSortRatio } from './tokenSortRatio.js'
 
 /** Splits iff the separator is whitespace: sorting then makes the two equal. */
 function splitsOn(cp: number): boolean {
   const separator = String.fromCodePoint(cp)
-  return tokenSortRatio(`b${separator}a`, `a${separator}b`) === 100
+  return fuzzTokenSortRatio(`b${separator}a`, `a${separator}b`) === 100
 }
 
 const SPLITS: ReadonlyArray<readonly [string, number]> = [
@@ -75,28 +75,28 @@ describe('token splitting follows Python str.isspace(), not the C++ string path'
   it('answers a single-character element the same way as the code point', () => {
     for (const cp of [0x1c, 0x85, 0xa0, 0xfeff, 0x200b, 0x20]) {
       const separator = String.fromCodePoint(cp)
-      const asString = tokenSortRatio(`b${separator}a`, `a${separator}b`)
-      const asList = tokenSortRatio(['b', separator, 'a'], ['a', separator, 'b'])
+      const asString = fuzzTokenSortRatio(`b${separator}a`, `a${separator}b`)
+      const asList = fuzzTokenSortRatio(['b', separator, 'a'], ['a', separator, 'b'])
       expect(asList).toBe(asString)
     }
   })
 
   it('treats an all-whitespace multi-character element as a separator', () => {
-    expect(tokenSortRatio(['b', '  ', 'a'], ['a', '  ', 'b'])).toBe(100)
+    expect(fuzzTokenSortRatio(['b', '  ', 'a'], ['a', '  ', 'b'])).toBe(100)
     const tabThenNextLine = String.fromCodePoint(0x09, 0x85)
-    expect(tokenSortRatio(['b', tabThenNextLine, 'a'], ['a', tabThenNextLine, 'b'])).toBe(
-      100,
-    )
+    expect(
+      fuzzTokenSortRatio(['b', tabThenNextLine, 'a'], ['a', tabThenNextLine, 'b']),
+    ).toBe(100)
   })
 
   it('does not treat a partly-whitespace element as a separator', () => {
-    expect(tokenSortRatio(['b', ' x ', 'a'], ['a', ' x ', 'b'])).toBeLessThan(100)
+    expect(fuzzTokenSortRatio(['b', ' x ', 'a'], ['a', ' x ', 'b'])).toBeLessThan(100)
   })
 
   // An empty element holds no whitespace, so it is an ordinary element inside a
   // token rather than a separator. `splitSequence` drops empty *tokens* — runs
   // of whitespace — which is a different thing.
   it('does not treat an empty element as a separator', () => {
-    expect(tokenSortRatio(['b', '', 'a'], ['a', '', 'b'])).toBeLessThan(100)
+    expect(fuzzTokenSortRatio(['b', '', 'a'], ['a', '', 'b'])).toBeLessThan(100)
   })
 })

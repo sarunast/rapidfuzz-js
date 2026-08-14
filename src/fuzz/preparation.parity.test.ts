@@ -12,15 +12,15 @@
 // enough to make `extract` disagree with `ratio`.
 import { describe, expect, it } from 'vitest'
 
-import { partialRatio } from './partialRatio.js'
+import { fuzzPartialRatio } from './partialRatio.js'
 import { prepareFuzz } from './preparation.js'
-import { prepareSimilarity, ratio } from './ratio.js'
-import { tokenRatio } from './token/tokenRatio.js'
-import { tokenSetRatio } from './token/tokenSetRatio.js'
-import { wRatio } from './weightedRatio.js'
+import { prepareRatio, fuzzRatio } from './ratio.js'
+import { fuzzTokenRatio } from './token/tokenRatio.js'
+import { fuzzTokenSetRatio } from './token/tokenSetRatio.js'
+import { fuzzWeightedRatio } from './weightedRatio.js'
 
 const preparedScore = (
-  factory: ReturnType<typeof prepareSimilarity>,
+  factory: ReturnType<typeof prepareRatio>,
   query: string,
   choice: string,
   cutoff: number,
@@ -31,11 +31,11 @@ const preparedScore = (
 
 describe('prepared scorers agree with raw ones', () => {
   it('accepts and rejects the same score at a cutoff of its own value', () => {
-    const factory = prepareSimilarity()
+    const factory = prepareRatio()
     // The pair that found this: six characters each, sharing five of them.
-    const score = ratio('ceaece', 'caecec')
+    const score = fuzzRatio('ceaece', 'caecec')
     expect(score).toBe(83.33333333333334)
-    expect(ratio('ceaece', 'caecec', { scoreCutoff: score })).toBe(0)
+    expect(fuzzRatio('ceaece', 'caecec', { scoreCutoff: score })).toBe(0)
     expect(preparedScore(factory, 'ceaece', 'caecec', score)).toBe(0)
   })
 
@@ -46,19 +46,19 @@ describe('prepared scorers agree with raw ones', () => {
   // diverging into two disjoint alphabets pins the LCS at exactly `k`, so this
   // walks every such pair up to length 24 instead of hoping to draw one. Random
   // sampling does find them, but rarely: one draw in twenty thousand.
-  it('matches the raw ratio at a cutoff of the score itself, for every score', () => {
-    const factory = prepareSimilarity()
+  it('matches the raw fuzzRatio at a cutoff of the score itself, for every score', () => {
+    const factory = prepareRatio()
 
     for (let lengthA = 1; lengthA <= 24; lengthA++) {
       for (let lengthB = 1; lengthB <= 24; lengthB++) {
         for (let shared = 0; shared <= Math.min(lengthA, lengthB); shared++) {
           const a = 'a'.repeat(shared) + 'b'.repeat(lengthA - shared)
           const b = 'a'.repeat(shared) + 'c'.repeat(lengthB - shared)
-          const base = ratio(a, b)
+          const base = fuzzRatio(a, b)
 
           for (const cutoff of [0, base - 1e-13, base, base + 1e-13, 100]) {
             expect(preparedScore(factory, a, b, cutoff), `${a} / ${b} @ ${cutoff}`).toBe(
-              ratio(a, b, { scoreCutoff: cutoff }),
+              fuzzRatio(a, b, { scoreCutoff: cutoff }),
             )
           }
         }
@@ -66,7 +66,7 @@ describe('prepared scorers agree with raw ones', () => {
     }
   })
 
-  // The length ratios wRatio branches on — under 1.5, exactly 1.5, up to 8 and
+  // The length ratios weightedRatio branches on — under 1.5, exactly 1.5, up to 8 and
   // past it — crossed with the cutoffs its scale factors turn into impossible
   // ones. A cutoff of 90 divided by the 0.9 partial scale is exactly 100, and
   // one of 95 divided by the 0.95 token scale is exactly 100: both sit on the
@@ -91,10 +91,10 @@ describe('prepared scorers agree with raw ones', () => {
     ]
     const cutoffs = [0, 60, 90, 90 + 1e-13, 95, 95 + 1e-13, 100, 100 + 1e-13]
     const scorers = [
-      ['wRatio', wRatio, prepareFuzz('wRatio')],
-      ['partialRatio', partialRatio, prepareFuzz('partialRatio')],
-      ['tokenRatio', tokenRatio, prepareFuzz('tokenRatio')],
-      ['tokenSetRatio', tokenSetRatio, prepareFuzz('tokenSetRatio')],
+      ['weightedRatio', fuzzWeightedRatio, prepareFuzz('weightedRatio')],
+      ['partialRatio', fuzzPartialRatio, prepareFuzz('partialRatio')],
+      ['tokenRatio', fuzzTokenRatio, prepareFuzz('tokenRatio')],
+      ['tokenSetRatio', fuzzTokenSetRatio, prepareFuzz('tokenSetRatio')],
     ] as const
 
     for (const [name, raw, factory] of scorers) {
@@ -105,7 +105,7 @@ describe('prepared scorers agree with raw ones', () => {
             preparedScore(factory, a, b, cutoff),
             `${name}: ${a} / ${b} @ ${cutoff}`,
           ).toBe(expected)
-          // Both orders: wRatio's branches are asymmetric in which side is the
+          // Both orders: weightedRatio's branches are asymmetric in which side is the
           // needle, and the prepared path holds only one of the two.
           expect(
             preparedScore(factory, b, a, cutoff),

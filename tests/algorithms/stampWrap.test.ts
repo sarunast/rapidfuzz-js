@@ -22,8 +22,11 @@ import { indelDistance } from '../../src/algorithms/indel/implementation.js'
 import { lcsSeqNormalizedSimilarity } from '../../src/algorithms/lcs/implementation.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { resetBitVectorScratch } from '../../src/algorithms/shared/bitmask/blockMasks.js'
-import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partialRatio.js'
-import { resetPartialRatioScratch } from '../../src/fuzz/partialWindow.js'
+import { fuzzPartialRatio } from '../../src/fuzz/partialRatio.js'
+import {
+  partialRatioAlignment_impl,
+  resetPartialRatioScratch,
+} from '../../src/fuzz/partialWindow.js'
 
 /** One before the counter's ceiling, so the next build but one wraps it. */
 const NEAR_LIMIT = 0x7fff_fffd
@@ -121,8 +124,8 @@ describe('the window bisection across its stamp wrap', () => {
     // Four passes, so comparisons land either side of the wrap and a haystack
     // scored before it is scored again after.
     for (let pass = 0; pass < 4; pass++) {
-      expect(partialRatio(needle, planted)).toBe(100)
-      expect(partialRatio(needle, nearby)).toBeCloseTo(93.75, 5)
+      expect(fuzzPartialRatio(needle, planted)).toBe(100)
+      expect(fuzzPartialRatio(needle, nearby)).toBeCloseTo(93.75, 5)
     }
 
     resetPartialRatioScratch()
@@ -130,12 +133,12 @@ describe('the window bisection across its stamp wrap', () => {
 
   it('does not carry a scored window across the wrap', () => {
     resetPartialRatioScratch(NEAR_LIMIT)
-    const beforeWrap = partialRatioAlignment(needle, nearby)
+    const beforeWrap = partialRatioAlignment_impl(needle, nearby)
     // The second bisection is the one that turns the counter over.
-    const afterWrap = partialRatioAlignment(needle, nearby)
+    const afterWrap = partialRatioAlignment_impl(needle, nearby)
 
     resetPartialRatioScratch()
-    expect(afterWrap).toEqual(partialRatioAlignment(needle, nearby))
+    expect(afterWrap).toEqual(partialRatioAlignment_impl(needle, nearby))
     expect(beforeWrap).toEqual(afterWrap)
   })
 
@@ -146,7 +149,7 @@ describe('the window bisection across its stamp wrap', () => {
     resetPartialRatioScratch(NEAR_LIMIT)
     const huge = needle + 'z'.repeat(70_000)
 
-    expect(partialRatio(needle, huge)).toBe(100)
+    expect(fuzzPartialRatio(needle, huge)).toBe(100)
 
     resetPartialRatioScratch()
   })

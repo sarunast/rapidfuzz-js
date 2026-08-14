@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { preparePattern } from '../algorithms/shared/bitmask/pattern.js'
 import {
   indelNormSimHeld,
-  partialRatioAlignment,
+  partialRatioAlignment_impl,
   partialRatioImpl,
 } from './partialWindow.js'
 import { prepareFuzz } from './preparation.js'
-import { prepareSimilarity } from './ratio.js'
+import { prepareRatio } from './ratio.js'
 import {
   preparedTokenChoice,
   sortTokens,
@@ -18,8 +18,8 @@ import { partialTokenRatioConverted } from './token/tokenSet.js'
 import { prepareTokenSort } from './token/tokenSortRatio.js'
 
 describe('fuzz preparation invariants', () => {
-  it('covers ratio preparation cutoffs and bounds', () => {
-    const preparation = prepareSimilarity()({})
+  it('covers fuzzRatio preparation cutoffs and bounds', () => {
+    const preparation = prepareRatio()({})
     const empty = preparation.prepareQuery('')
     expect(empty(preparation.prepareChoice(''), null)).toBe(100)
     expect(empty(preparation.prepareChoice(''), 101)).toBe(0)
@@ -48,7 +48,7 @@ describe('fuzz preparation invariants', () => {
       ['partialTokenSortRatio', 'alpha beta', 'beta alpha gamma'],
       ['partialTokenSetRatio', 'alpha beta', 'beta gamma'],
       ['partialTokenRatio', 'a a', 'b b'],
-      ['wRatio', 'new york', 'new york city'],
+      ['weightedRatio', 'new york', 'new york city'],
     ] as const
 
     for (const [kind, query, choice] of cases) {
@@ -58,7 +58,7 @@ describe('fuzz preparation invariants', () => {
       expect(score(preparation.prepareChoice(choice), 101)).toBe(0)
     }
 
-    const wPreparation = prepareFuzz('wRatio')({})
+    const wPreparation = prepareFuzz('weightedRatio')({})
     const close = wPreparation.prepareQuery('abc')
     expect(close(wPreparation.prepareChoice('abd'), 0)).toBeGreaterThan(0)
     expect(close(wPreparation.prepareChoice('abc'), 70)).toBe(100)
@@ -87,7 +87,7 @@ describe('fuzz preparation invariants', () => {
     // that. No caller asks for one — each scales a percentage in first — but the
     // helper is exported, so it answers for itself rather than for them.
     expect(indelNormSimHeld(preparePattern('', 0, 0), 0, '', 0, 0, 1.1)).toBe(0)
-    expect(partialRatioAlignment('abc', 'zabc', { scoreCutoff: 101 })).toBeNull()
+    expect(partialRatioAlignment_impl('abc', 'zabc', { scoreCutoff: 101 })).toBeNull()
     expect(partialRatioImpl('abc', 'zabc', 1.1)).toEqual({
       score: 0,
       srcStart: 0,

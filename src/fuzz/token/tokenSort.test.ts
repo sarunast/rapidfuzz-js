@@ -12,34 +12,36 @@ import { describe, expect, it } from 'vitest'
 import { convSequence } from '../../algorithms/shared/scorerSupport.js'
 import { tokenViewOf } from './tokens.js'
 import { tokenSortRatioConverted } from './tokenSort.js'
-import { tokenSortRatio } from './tokenSortRatio.js'
+import { fuzzTokenSortRatio } from './tokenSortRatio.js'
 
 describe('tokenSortRatio and the canonical length ceiling', () => {
   it('refuses a pair too differently sized to meet the cutoff', () => {
-    expect(tokenSortRatio('aa bb', 'aa bb cc dd ee ff gg')).toBe(40)
-    expect(tokenSortRatio('aa bb', 'aa bb cc dd ee ff gg', { scoreCutoff: 60 })).toBe(0)
+    expect(fuzzTokenSortRatio('aa bb', 'aa bb cc dd ee ff gg')).toBe(40)
+    expect(fuzzTokenSortRatio('aa bb', 'aa bb cc dd ee ff gg', { scoreCutoff: 60 })).toBe(
+      0,
+    )
   })
 
   it('does not refuse one that meets it exactly', () => {
-    expect(tokenSortRatio('abc', 'abc def')).toBe(60)
-    expect(tokenSortRatio('abc', 'abc def', { scoreCutoff: 60 })).toBe(60)
-    expect(tokenSortRatio('abc', 'abc def', { scoreCutoff: 90 })).toBe(0)
+    expect(fuzzTokenSortRatio('abc', 'abc def')).toBe(60)
+    expect(fuzzTokenSortRatio('abc', 'abc def', { scoreCutoff: 60 })).toBe(60)
+    expect(fuzzTokenSortRatio('abc', 'abc def', { scoreCutoff: 90 })).toBe(0)
   })
 
   // Both canonical lengths are 0, so the ceiling has no denominator. Two empty
   // inputs are identical, and a whitespace-only input tokenises to nothing.
   it('scores two empty canonical forms as identical, under a cutoff too', () => {
-    expect(tokenSortRatio('', '')).toBe(100)
-    expect(tokenSortRatio('', '', { scoreCutoff: 50 })).toBe(100)
-    expect(tokenSortRatio('   ', '   ', { scoreCutoff: 50 })).toBe(100)
-    expect(tokenSortRatio('', '   ', { scoreCutoff: 100 })).toBe(100)
+    expect(fuzzTokenSortRatio('', '')).toBe(100)
+    expect(fuzzTokenSortRatio('', '', { scoreCutoff: 50 })).toBe(100)
+    expect(fuzzTokenSortRatio('   ', '   ', { scoreCutoff: 50 })).toBe(100)
+    expect(fuzzTokenSortRatio('', '   ', { scoreCutoff: 100 })).toBe(100)
   })
 
   // One side tokenises to nothing while the other does not: the ceiling is 0,
   // so any positive cutoff refuses it — which is the score anyway.
   it('scores an empty side against a non-empty one as 0', () => {
-    expect(tokenSortRatio('   ', 'abc')).toBe(0)
-    expect(tokenSortRatio('   ', 'abc', { scoreCutoff: 50 })).toBe(0)
+    expect(fuzzTokenSortRatio('   ', 'abc')).toBe(0)
+    expect(fuzzTokenSortRatio('   ', 'abc', { scoreCutoff: 50 })).toBe(0)
   })
 
   // The canonical length is counted off whatever the sequence holds, so an
@@ -50,10 +52,10 @@ describe('tokenSortRatio and the canonical length ceiling', () => {
   it('measures a sequence of arbitrary elements', () => {
     const left = ['alpha', 'beta']
     const right = ['beta', 'alpha']
-    expect(tokenSortRatio(left, right)).toBe(50)
-    expect(tokenSortRatio(left, right, { scoreCutoff: 90 })).toBe(0)
-    expect(tokenSortRatio(left, right, { scoreCutoff: 50 })).toBe(50)
-    expect(tokenSortRatio(['alpha'], right, { scoreCutoff: 90 })).toBe(0)
+    expect(fuzzTokenSortRatio(left, right)).toBe(50)
+    expect(fuzzTokenSortRatio(left, right, { scoreCutoff: 90 })).toBe(0)
+    expect(fuzzTokenSortRatio(left, right, { scoreCutoff: 50 })).toBe(50)
+    expect(fuzzTokenSortRatio(['alpha'], right, { scoreCutoff: 90 })).toBe(0)
   })
 
   // A prepared query is held across candidates while the running cutoff climbs

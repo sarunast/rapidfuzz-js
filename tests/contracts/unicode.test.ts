@@ -18,7 +18,7 @@ import {
   similarity as prefixSimilarity,
 } from '../../src/algorithms/prefix/index.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
-import { ratio } from '../../src/fuzz/ratio.js'
+import { fuzzRatio } from '../../src/fuzz/ratio.js'
 import { editopTuples } from '../../testing/editopTuples.js'
 
 interface UnicodeCase {
@@ -27,7 +27,7 @@ interface UnicodeCase {
   readonly s2: string
   readonly levenshtein: number
   readonly indel: number
-  readonly ratio: number
+  readonly fuzzRatio: number
   readonly editops: ReadonlyArray<readonly [string, number, number]>
 }
 
@@ -38,7 +38,7 @@ const cases: readonly UnicodeCase[] = [
     s2: '\u{1F601}',
     levenshtein: 1,
     indel: 2,
-    ratio: 0,
+    fuzzRatio: 0,
     editops: [['replace', 0, 0]],
   },
   {
@@ -47,7 +47,7 @@ const cases: readonly UnicodeCase[] = [
     s2: 'ab',
     levenshtein: 1,
     indel: 1,
-    ratio: 80,
+    fuzzRatio: 80,
     editops: [['delete', 1, 1]],
   },
   {
@@ -58,7 +58,7 @@ const cases: readonly UnicodeCase[] = [
     s2: '\u{1F468}',
     levenshtein: 4,
     indel: 4,
-    ratio: 33.333333333333336,
+    fuzzRatio: 33.333333333333336,
     editops: [
       ['delete', 1, 1],
       ['delete', 2, 1],
@@ -72,7 +72,7 @@ const cases: readonly UnicodeCase[] = [
     s2: '\u{1F1E9}\u{1F1EA}',
     levenshtein: 2,
     indel: 4,
-    ratio: 0,
+    fuzzRatio: 0,
     editops: [
       ['replace', 0, 0],
       ['replace', 1, 1],
@@ -85,7 +85,7 @@ const cases: readonly UnicodeCase[] = [
     s2: 'é',
     levenshtein: 2,
     indel: 3,
-    ratio: 0,
+    fuzzRatio: 0,
     editops: [
       ['replace', 0, 0],
       ['delete', 1, 1],
@@ -97,7 +97,7 @@ const cases: readonly UnicodeCase[] = [
     s2: '\u{1F44D}',
     levenshtein: 1,
     indel: 1,
-    ratio: 66.66666666666667,
+    fuzzRatio: 66.66666666666667,
     editops: [['delete', 1, 1]],
   },
   {
@@ -106,7 +106,7 @@ const cases: readonly UnicodeCase[] = [
     s2: 'cafe \u{1F600}',
     levenshtein: 1,
     indel: 2,
-    ratio: 83.33333333333334,
+    fuzzRatio: 83.33333333333334,
     editops: [['replace', 3, 3]],
   },
 ]
@@ -120,8 +120,8 @@ describe.each(cases)('$name', (c) => {
     expect(indelDistance(c.s1, c.s2)).toBe(c.indel)
   })
 
-  it('matches upstream ratio', () => {
-    expect(ratio(c.s1, c.s2)).toBe(c.ratio)
+  it('matches upstream fuzzRatio', () => {
+    expect(fuzzRatio(c.s1, c.s2)).toBe(c.fuzzRatio)
   })
 
   it('matches upstream levenshteinEditops', () => {
@@ -134,7 +134,7 @@ describe.each(cases)('$name', (c) => {
 it('splitting a string by code point compares equal to the string', () => {
   const emoji = 'a\u{1F600}b'
   expect(levenshteinDistance(emoji, [...emoji])).toBe(0)
-  expect(ratio(emoji, [...emoji])).toBe(100)
+  expect(fuzzRatio(emoji, [...emoji])).toBe(100)
 })
 
 // `apply` reconstructs the destination by walking positions that count code

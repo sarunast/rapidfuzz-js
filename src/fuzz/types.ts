@@ -78,4 +78,4 @@ export type PreparedFuzzKind =
   | 'partialTokenSortRatio'
   | 'partialTokenSetRatio'
   | 'partialTokenRatio'
-  | 'wRatio'
+  | 'weightedRatio'

@@ -5,11 +5,11 @@ import {
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
 import { fuzzMetric } from './metric.js'
-import { partialRatioAlignment, partialRatio_impl } from './partialWindow.js'
+import { partialRatioAlignment_impl, partialRatio_impl } from './partialWindow.js'
 import { prepareFuzz } from './preparation.js'
 import type { FuzzInput, FuzzOptions, ScoreAlignment } from './types.js'
 
-export const partialRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
+export const fuzzPartialRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(
     partialRatio_impl,
     FUZZ_FLAGS,
@@ -36,7 +36,7 @@ export const partialRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
  * RapidFuzz calls it `partial_ratio`.
  */
 export const partialSimilarity: BuiltInMetric<'fuzz.partialSimilarity', 'similarity'> =
-  /* @__PURE__ */ fuzzMetric(partialRatio)
+  /* @__PURE__ */ fuzzMetric(fuzzPartialRatio)
 
 /**
  * {@link partialSimilarity} with the window it chose — the score plus the
@@ -51,7 +51,5 @@ export function partialSimilarityAlignment(
   a: FuzzInput,
   b: FuzzInput,
 ): ScoreAlignment | null {
-  return partialRatioAlignment(a, b)
+  return partialRatioAlignment_impl(a, b)
 }
-
-export { partialRatioAlignment }

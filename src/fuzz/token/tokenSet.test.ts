@@ -13,9 +13,9 @@
 // 2026-08-13, not from this implementation.
 import { describe, expect, it } from 'vitest'
 
-import { wRatio } from '../weightedRatio.js'
-import { tokenRatio } from './tokenRatio.js'
-import { tokenSetRatio } from './tokenSetRatio.js'
+import { fuzzWeightedRatio } from '../weightedRatio.js'
+import { fuzzTokenRatio } from './tokenRatio.js'
+import { fuzzTokenSetRatio } from './tokenSetRatio.js'
 
 describe('tokenSetRatio when the differences cannot be compared', () => {
   // Shared section of 11 elements against differences of 1 and 20, so the
@@ -25,39 +25,39 @@ describe('tokenSetRatio when the differences cannot be compared', () => {
   const long = 'aa bb cc dd yyyyyyyyyyyyyyyyyyyy'
 
   it('reports the section ratio', () => {
-    expect(tokenSetRatio(short, long)).toBeCloseTo(91.66666666666667, 12)
+    expect(fuzzTokenSetRatio(short, long)).toBeCloseTo(91.66666666666667, 12)
   })
 
   it('reports it whichever way round the sides arrive', () => {
-    expect(tokenSetRatio(long, short)).toBeCloseTo(tokenSetRatio(short, long), 12)
+    expect(fuzzTokenSetRatio(long, short)).toBeCloseTo(fuzzTokenSetRatio(short, long), 12)
   })
 
   it('is unchanged by a cutoff below the answer', () => {
-    expect(tokenSetRatio(short, long, { scoreCutoff: 50 })).toBeCloseTo(
+    expect(fuzzTokenSetRatio(short, long, { scoreCutoff: 50 })).toBeCloseTo(
       91.66666666666667,
       12,
     )
   })
 
   it('still answers 0 to a cutoff above the answer', () => {
-    expect(tokenSetRatio(short, long, { scoreCutoff: 95 })).toBe(0)
+    expect(fuzzTokenSetRatio(short, long, { scoreCutoff: 95 })).toBe(0)
   })
 
   it('carries through the scorers built on it', () => {
-    expect(tokenRatio(short, long)).toBeCloseTo(91.66666666666667, 12)
-    expect(wRatio(short, long)).toBeCloseTo(86.4, 12)
+    expect(fuzzTokenRatio(short, long)).toBeCloseTo(91.66666666666667, 12)
+    expect(fuzzWeightedRatio(short, long)).toBeCloseTo(86.4, 12)
   })
 
   // No shared section, so nothing raises the cutoff — but a caller-supplied one
   // still closes the gate. RapidFuzz scores this pair 33.33…, which a cutoff of
   // 90 rejects either way.
   it('answers 0 when only the caller cutoff closes the gate', () => {
-    expect(tokenSetRatio('a b c', 'c d eeeeeeeeeeeeeeeeeeee')).toBeCloseTo(
+    expect(fuzzTokenSetRatio('a b c', 'c d eeeeeeeeeeeeeeeeeeee')).toBeCloseTo(
       33.33333333333333,
       12,
     )
-    expect(tokenSetRatio('a b c', 'c d eeeeeeeeeeeeeeeeeeee', { scoreCutoff: 90 })).toBe(
-      0,
-    )
+    expect(
+      fuzzTokenSetRatio('a b c', 'c d eeeeeeeeeeeeeeeeeeee', { scoreCutoff: 90 }),
+    ).toBe(0)
   })
 })

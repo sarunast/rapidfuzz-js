@@ -9,7 +9,7 @@ import { prepareFuzz } from '../preparation.js'
 import type { FuzzOptions } from '../types.js'
 import { tokenSetRatio_impl } from './tokenSet.js'
 
-export const tokenSetRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
+export const fuzzTokenSetRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   /* @__PURE__ */ withPreparedFlags(
     tokenSetRatio_impl,
     FUZZ_FLAGS,
@@ -48,4 +48,4 @@ export const tokenSetRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
  * RapidFuzz calls it `token_set_ratio`.
  */
 export const tokenSetSimilarity: BuiltInMetric<'fuzz.tokenSetSimilarity', 'similarity'> =
-  /* @__PURE__ */ fuzzMetric(tokenSetRatio)
+  /* @__PURE__ */ fuzzMetric(fuzzTokenSetRatio)

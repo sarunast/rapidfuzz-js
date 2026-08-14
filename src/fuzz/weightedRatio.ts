@@ -1,6 +1,6 @@
 import type { BuiltInMetric } from '../algorithms/shared/metricAdapter.js'
 /**
- * `wRatio` picks a strategy rather than defining a new comparison algorithm.
+ * `weightedRatio` picks a strategy rather than defining a new comparison algorithm.
  *
  * It chooses among `ratio`, `tokenRatio`,
  * `partialRatio` and `partialTokenRatio` from the length ratio of its two
@@ -38,7 +38,7 @@ import type { FuzzInput, FuzzOptions } from './types.js'
  * ratio of the two inputs. Misordered full matches are scaled by 0.95, and
  * partial matches by 0.9 up to an eightfold length difference and 0.6 past it.
  */
-export function wRatio_impl(
+export function weightedRatio_impl(
   s1: FuzzInput,
   s2: FuzzInput,
   options: FuzzOptions = {},
@@ -149,8 +149,12 @@ export function wRatio_impl(
   )
 }
 
-export const wRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
-  /* @__PURE__ */ withPreparedFlags(wRatio_impl, FUZZ_FLAGS, prepareFuzz('wRatio'))
+export const fuzzWeightedRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
+  /* @__PURE__ */ withPreparedFlags(
+    weightedRatio_impl,
+    FUZZ_FLAGS,
+    prepareFuzz('weightedRatio'),
+  )
 
 /**
  * Picks the strategies that suit the pair, scales each by how much it can be
@@ -188,4 +192,4 @@ export const wRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
  * RapidFuzz calls it `WRatio`.
  */
 export const weightedSimilarity: BuiltInMetric<'fuzz.weightedSimilarity', 'similarity'> =
-  /* @__PURE__ */ fuzzMetric(wRatio)
+  /* @__PURE__ */ fuzzMetric(fuzzWeightedRatio)

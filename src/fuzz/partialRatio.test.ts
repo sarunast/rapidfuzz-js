@@ -16,8 +16,9 @@
 // `partialRatioScan` makes it right on purpose, and these assertions keep it so.
 import { describe, expect, it } from 'vitest'
 
-import { partialRatio, partialRatioAlignment } from './partialRatio.js'
-import { ratio } from './ratio.js'
+import { fuzzPartialRatio } from './partialRatio.js'
+import { partialRatioAlignment_impl } from './partialWindow.js'
+import { fuzzRatio } from './ratio.js'
 
 // The windows `partialRatioScan` is defined over: every prefix and every suffix
 // shorter than the needle, plus every full-length window between them. Sliced by
@@ -48,7 +49,7 @@ const bestWindow = (s1: string, s2: string): number => {
   let best = 0
 
   for (const window of windowsOf(needle, haystack)) {
-    const score = ratio(needle, window)
+    const score = fuzzRatio(needle, window)
     if (score > best) best = score
   }
 
@@ -59,12 +60,12 @@ const LONG = 'x'.repeat(200)
 
 describe('partialRatio with an empty input', () => {
   it('scores an empty needle against a long haystack as 0', () => {
-    expect(partialRatio('', LONG)).toBe(0)
-    expect(partialRatio(LONG, '')).toBe(0)
+    expect(fuzzPartialRatio('', LONG)).toBe(0)
+    expect(fuzzPartialRatio(LONG, '')).toBe(0)
   })
 
   it('reports the degenerate alignment for an empty needle', () => {
-    expect(partialRatioAlignment('', LONG)).toEqual({
+    expect(partialRatioAlignment_impl('', LONG)).toEqual({
       score: 0,
       srcStart: 0,
       srcEnd: 0,
@@ -74,8 +75,8 @@ describe('partialRatio with an empty input', () => {
   })
 
   it('scores two empty inputs as a perfect match', () => {
-    expect(partialRatio('', '')).toBe(100)
-    expect(partialRatioAlignment('', '')).toEqual({
+    expect(fuzzPartialRatio('', '')).toBe(100)
+    expect(partialRatioAlignment_impl('', '')).toEqual({
       score: 100,
       srcStart: 0,
       srcEnd: 0,
@@ -88,12 +89,12 @@ describe('partialRatio with an empty input', () => {
   // would have taken the bisection with a `NaN` bound.
   it('does not depend on how long the haystack is', () => {
     for (const length of [1, 63, 64, 65, 200, 5000]) {
-      expect(partialRatio('', 'y'.repeat(length))).toBe(0)
+      expect(fuzzPartialRatio('', 'y'.repeat(length))).toBe(0)
     }
   })
 
   it('still answers null when a cutoff rejects the empty alignment', () => {
-    expect(partialRatioAlignment('', LONG, { scoreCutoff: 1 })).toBeNull()
+    expect(partialRatioAlignment_impl('', LONG, { scoreCutoff: 1 })).toBeNull()
   })
 })
 
@@ -128,7 +129,10 @@ describe('the window scan against every window, scored directly', () => {
 
   it('finds the same best window as scoring all of them', () => {
     for (const haystack of HAYSTACKS) {
-      expect(partialRatio(NEEDLE, haystack)).toBeCloseTo(bestWindow(NEEDLE, haystack), 10)
+      expect(fuzzPartialRatio(NEEDLE, haystack)).toBeCloseTo(
+        bestWindow(NEEDLE, haystack),
+        10,
+      )
     }
   })
 
@@ -138,9 +142,9 @@ describe('the window scan against every window, scored directly', () => {
   // rounding up could skip the window that meets the cutoff exactly.
   it('answers the same score under every cutoff it should pass', () => {
     for (const haystack of HAYSTACKS) {
-      const best = partialRatio(NEEDLE, haystack)
+      const best = fuzzPartialRatio(NEEDLE, haystack)
       for (const cutoff of [0, 1, 25, 50, 75, 90, 99, best, best + 1e-9, 100]) {
-        const scored = partialRatio(NEEDLE, haystack, { scoreCutoff: cutoff })
+        const scored = fuzzPartialRatio(NEEDLE, haystack, { scoreCutoff: cutoff })
         if (cutoff <= best) expect(scored).toBeCloseTo(best, 10)
         else expect(scored).toBe(0)
       }
@@ -152,11 +156,11 @@ describe('the window scan against every window, scored directly', () => {
   // a skipped window that ties would be invisible in the score and visible here.
   it('reports the same alignment with and without a cutoff it passes', () => {
     for (const haystack of HAYSTACKS) {
-      const plain = partialRatioAlignment(NEEDLE, haystack)
+      const plain = partialRatioAlignment_impl(NEEDLE, haystack)
       expect(plain).not.toBeNull()
       if (plain === null) continue
       expect(
-        partialRatioAlignment(NEEDLE, haystack, { scoreCutoff: plain.score }),
+        partialRatioAlignment_impl(NEEDLE, haystack, { scoreCutoff: plain.score }),
       ).toEqual(plain)
     }
   })
@@ -197,13 +201,16 @@ describe('the pruning table across scripts', () => {
   ]
 
   it.each(CASES)('prunes %s without changing the answer', (_name, needle, haystack) => {
-    expect(partialRatio(needle, haystack)).toBeCloseTo(bestWindow(needle, haystack), 10)
+    expect(fuzzPartialRatio(needle, haystack)).toBeCloseTo(
+      bestWindow(needle, haystack),
+      10,
+    )
   })
 
   it('answers the same score however many times the set is reused', () => {
     for (const [, needle, haystack] of CASES) {
-      const once = partialRatio(needle, haystack)
-      for (let i = 0; i < 3; i++) expect(partialRatio(needle, haystack)).toBe(once)
+      const once = fuzzPartialRatio(needle, haystack)
+      for (let i = 0; i < 3; i++) expect(fuzzPartialRatio(needle, haystack)).toBe(once)
     }
   })
 })

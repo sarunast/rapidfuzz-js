@@ -5,16 +5,17 @@ import { callUntyped } from '../../testing/untyped.js'
 import { normalizeText as defaultProcess } from '../core/normalize.js'
 import { createScorer } from '../core/scoring/scorer.js'
 import * as publicFuzz from './index.js'
-import { partialRatio, partialRatioAlignment } from './partialRatio.js'
-import { ratio } from './ratio.js'
-import { partialTokenRatio } from './token/partialTokenRatio.js'
-import { partialTokenSetRatio } from './token/partialTokenSetRatio.js'
-import { partialTokenSortRatio } from './token/partialTokenSortRatio.js'
-import { tokenRatio } from './token/tokenRatio.js'
-import { tokenSetRatio } from './token/tokenSetRatio.js'
-import { tokenSortRatio } from './token/tokenSortRatio.js'
+import { fuzzPartialRatio } from './partialRatio.js'
+import { partialRatioAlignment_impl } from './partialWindow.js'
+import { fuzzRatio } from './ratio.js'
+import { fuzzPartialTokenRatio } from './token/partialTokenRatio.js'
+import { fuzzPartialTokenSetRatio } from './token/partialTokenSetRatio.js'
+import { fuzzPartialTokenSortRatio } from './token/partialTokenSortRatio.js'
+import { fuzzTokenRatio } from './token/tokenRatio.js'
+import { fuzzTokenSetRatio } from './token/tokenSetRatio.js'
+import { fuzzTokenSortRatio } from './token/tokenSortRatio.js'
 import type { FuzzInput, FuzzOptions } from './types.js'
-import { wRatio } from './weightedRatio.js'
+import { fuzzWeightedRatio } from './weightedRatio.js'
 
 /**
  * Upstream wraps every call in `symmetric_scorer_tester`, which asserts the
@@ -32,55 +33,55 @@ function symmetric(scorer: Scorer): Scorer {
 }
 
 const fuzz = {
-  ratio: symmetric(ratio),
-  partialRatio: symmetric(partialRatio),
-  tokenSortRatio: symmetric(tokenSortRatio),
-  tokenSetRatio: symmetric(tokenSetRatio),
-  tokenRatio: symmetric(tokenRatio),
-  partialTokenSortRatio: symmetric(partialTokenSortRatio),
-  partialTokenSetRatio: symmetric(partialTokenSetRatio),
-  partialTokenRatio: symmetric(partialTokenRatio),
-  wRatio: symmetric(wRatio),
+  fuzzRatio: symmetric(fuzzRatio),
+  fuzzPartialRatio: symmetric(fuzzPartialRatio),
+  fuzzTokenSortRatio: symmetric(fuzzTokenSortRatio),
+  fuzzTokenSetRatio: symmetric(fuzzTokenSetRatio),
+  fuzzTokenRatio: symmetric(fuzzTokenRatio),
+  fuzzPartialTokenSortRatio: symmetric(fuzzPartialTokenSortRatio),
+  fuzzPartialTokenSetRatio: symmetric(fuzzPartialTokenSetRatio),
+  fuzzPartialTokenRatio: symmetric(fuzzPartialTokenRatio),
+  fuzzWeightedRatio: symmetric(fuzzWeightedRatio),
 }
 
 const SCORERS: ReadonlyArray<readonly [string, Scorer]> = Object.entries(fuzz)
 
 it('is case sensitive without normalization', () => {
-  expect(fuzz.ratio('new york mets', 'new york mets')).toBe(100)
-  expect(fuzz.ratio('new york mets', 'new YORK mets')).not.toBe(100)
+  expect(fuzz.fuzzRatio('new york mets', 'new york mets')).toBe(100)
+  expect(fuzz.fuzzRatio('new york mets', 'new YORK mets')).not.toBe(100)
 })
 
-it('scores a substring as a perfect partial ratio', () => {
-  expect(fuzz.partialRatio('new york mets', 'the wonderful new york mets')).toBe(100)
+it('scores a substring as a perfect partial fuzzRatio', () => {
+  expect(fuzz.fuzzPartialRatio('new york mets', 'the wonderful new york mets')).toBe(100)
 })
 
-it('scores identical strings as a perfect token sort ratio', () => {
-  expect(fuzz.tokenSortRatio('new york mets', 'new york mets')).toBe(100)
+it('scores identical strings as a perfect token sort fuzzRatio', () => {
+  expect(fuzz.fuzzTokenSortRatio('new york mets', 'new york mets')).toBe(100)
 })
 
-it('scores reordered tokens as a perfect partial token sort ratio', () => {
-  expect(fuzz.partialTokenSortRatio('new york mets', 'new york mets')).toBe(100)
+it('scores reordered tokens as a perfect partial token sort fuzzRatio', () => {
+  expect(fuzz.fuzzPartialTokenSortRatio('new york mets', 'new york mets')).toBe(100)
   expect(
-    fuzz.partialTokenSortRatio(
+    fuzz.fuzzPartialTokenSortRatio(
       'new york mets vs atlanta braves',
       'atlanta braves vs new york mets',
     ),
   ).toBe(100)
 })
 
-it('scores reordered and subset tokens as a perfect token set ratio', () => {
+it('scores reordered and subset tokens as a perfect token set fuzzRatio', () => {
   expect(
-    fuzz.tokenSetRatio(
+    fuzz.fuzzTokenSetRatio(
       'new york mets vs atlanta braves',
       'atlanta braves vs new york mets',
     ),
   ).toBe(100)
-  expect(fuzz.tokenSetRatio('js', 'vue js')).toBe(100)
+  expect(fuzz.fuzzTokenSetRatio('js', 'vue js')).toBe(100)
 })
 
-it('scores reordered tokens as a perfect partial token set ratio', () => {
+it('scores reordered tokens as a perfect partial token set fuzzRatio', () => {
   expect(
-    fuzz.partialTokenSetRatio(
+    fuzz.fuzzPartialTokenSetRatio(
       'new york mets vs atlanta braves',
       'atlanta braves vs new york mets',
     ),
@@ -89,64 +90,75 @@ it('scores reordered tokens as a perfect partial token set ratio', () => {
 
 it('scores an equal WRatio as 100', () => {
   expect(
-    fuzz.wRatio(defaultProcess('new york mets'), defaultProcess('new york mets')),
+    fuzz.fuzzWeightedRatio(
+      defaultProcess('new york mets'),
+      defaultProcess('new york mets'),
+    ),
   ).toBe(100)
 })
 
 it('accepts text normalized before scoring', () => {
   expect(
-    fuzz.wRatio(defaultProcess('new york mets'), defaultProcess('new YORK mets')),
+    fuzz.fuzzWeightedRatio(
+      defaultProcess('new york mets'),
+      defaultProcess('new YORK mets'),
+    ),
   ).toBe(100)
 })
 
 it('scales a WRatio partial match by 0.9', () => {
-  expect(fuzz.wRatio('new york mets', 'the wonderful new york mets')).toBe(90)
+  expect(fuzz.fuzzWeightedRatio('new york mets', 'the wonderful new york mets')).toBe(90)
 })
 
 it('scales a WRatio misordered full match by 0.95', () => {
   expect(
-    fuzz.wRatio('new york mets vs atlanta braves', 'atlanta braves vs new york mets'),
+    fuzz.fuzzWeightedRatio(
+      'new york mets vs atlanta braves',
+      'atlanta braves vs new york mets',
+    ),
   ).toBe(95)
 })
 
 it('scores an identical WRatio as 100', () => {
-  expect(fuzz.wRatio('new york mets', 'new york mets')).toBe(100)
+  expect(fuzz.fuzzWeightedRatio('new york mets', 'new york mets')).toBe(100)
 })
 
 it('scales a long partial match by 0.9 (issue 452)', () => {
-  expect(fuzz.wRatio('hello', 'hello' + 'abcde'.repeat(7))).toBeCloseTo(90, 6)
+  expect(fuzz.fuzzWeightedRatio('hello', 'hello' + 'abcde'.repeat(7))).toBeCloseTo(90, 6)
 })
 
 it('finds the optimal partial alignment (issue 76)', () => {
-  expect(fuzz.partialRatio('physics 2 vid', 'study physics physics 2')).toBeCloseTo(
+  expect(fuzz.fuzzPartialRatio('physics 2 vid', 'study physics physics 2')).toBeCloseTo(
     81.81818,
     4,
   )
-  expect(fuzz.partialRatio('physics 2 vid', 'study physics physics 2 video')).toBe(100)
+  expect(fuzz.fuzzPartialRatio('physics 2 vid', 'study physics physics 2 video')).toBe(
+    100,
+  )
 })
 
 it('finds the optimal partial alignment (issue 90)', () => {
-  expect(fuzz.partialRatio('ax b', 'a b a c b')).toBeCloseTo(85.71428, 4)
+  expect(fuzz.fuzzPartialRatio('ax b', 'a b a c b')).toBeCloseTo(85.71428, 4)
 })
 
 it('handles a needle longer than 64 characters (issue 138)', () => {
   const str1 = 'a'.repeat(65)
   const str2 = 'a' + String.fromCharCode(256) + 'a'.repeat(63)
-  expect(fuzz.partialRatio(str1, str2)).toBeCloseTo(99.22481, 4)
+  expect(fuzz.fuzzPartialRatio(str1, str2)).toBeCloseTo(99.22481, 4)
 })
 
 it('reports the alignment of the partial match', () => {
   const a = 'a certain string'
   const s = 'certain'
 
-  expect(partialRatioAlignment(s, a)).toEqual({
+  expect(partialRatioAlignment_impl(s, a)).toEqual({
     score: 100,
     srcStart: 0,
     srcEnd: s.length,
     destStart: 2,
     destEnd: 2 + s.length,
   })
-  expect(partialRatioAlignment(a, s)).toEqual({
+  expect(partialRatioAlignment_impl(a, s)).toEqual({
     score: 100,
     srcStart: 2,
     srcEnd: 2 + s.length,
@@ -154,21 +166,25 @@ it('reports the alignment of the partial match', () => {
     destEnd: s.length,
   })
 
-  expect(partialRatioAlignment(null, 'test')).toBeNull()
-  expect(partialRatioAlignment('test', null)).toBeNull()
-  expect(partialRatioAlignment('test', 'tesx', { scoreCutoff: 90 })).toBeNull()
+  expect(partialRatioAlignment_impl(null, 'test')).toBeNull()
+  expect(partialRatioAlignment_impl('test', null)).toBeNull()
+  expect(partialRatioAlignment_impl('test', 'tesx', { scoreCutoff: 90 })).toBeNull()
 })
 
 it('applies score_cutoff to WRatio (issue 196)', () => {
-  expect(fuzz.wRatio('South Korea', 'North Korea')).toBeCloseTo(81.81818, 4)
-  expect(fuzz.wRatio('South Korea', 'North Korea', { scoreCutoff: 85.4 })).toBe(0)
-  expect(fuzz.wRatio('South Korea', 'North Korea', { scoreCutoff: 85.5 })).toBe(0)
+  expect(fuzz.fuzzWeightedRatio('South Korea', 'North Korea')).toBeCloseTo(81.81818, 4)
+  expect(
+    fuzz.fuzzWeightedRatio('South Korea', 'North Korea', { scoreCutoff: 85.4 }),
+  ).toBe(0)
+  expect(
+    fuzz.fuzzWeightedRatio('South Korea', 'North Korea', { scoreCutoff: 85.5 }),
+  ).toBe(0)
 })
 
 it('does not return WRatio scores below score_cutoff when scaled above 100', () => {
-  expect(fuzz.wRatio('b', ' b daadabbb')).toBe(60)
-  expect(fuzz.wRatio('b', ' b daadabbb', { scoreCutoff: 59.9 })).toBe(60)
-  expect(fuzz.wRatio('b', ' b daadabbb', { scoreCutoff: 61 })).toBe(0)
+  expect(fuzz.fuzzWeightedRatio('b', ' b daadabbb')).toBe(60)
+  expect(fuzz.fuzzWeightedRatio('b', ' b daadabbb', { scoreCutoff: 59.9 })).toBe(60)
+  expect(fuzz.fuzzWeightedRatio('b', ' b daadabbb', { scoreCutoff: 61 })).toBe(0)
 })
 
 describe('a score_cutoff above 100 can never be reached', () => {
@@ -194,21 +210,21 @@ describe('a score_cutoff above 100 rejects two empty inputs too', () => {
   // Whitespace-only inputs reach the partial scorers as empty token sequences,
   // which is how they get there without being empty themselves.
   it('including inputs that tokenise to nothing', () => {
-    expect(partialTokenSortRatio('   ', '  ', { scoreCutoff: 100.1 })).toBe(0)
-    expect(partialTokenSortRatio('   ', '  ')).toBe(100)
+    expect(fuzzPartialTokenSortRatio('   ', '  ', { scoreCutoff: 100.1 })).toBe(0)
+    expect(fuzzPartialTokenSortRatio('   ', '  ')).toBe(100)
   })
 })
 
-it('partialRatioAlignment respects a score_cutoff above 100 on empty inputs', () => {
-  expect(partialRatioAlignment('', '')).toEqual({
+it('partialRatioAlignment_impl respects a score_cutoff above 100 on empty inputs', () => {
+  expect(partialRatioAlignment_impl('', '')).toEqual({
     score: 100,
     srcStart: 0,
     srcEnd: 0,
     destStart: 0,
     destEnd: 0,
   })
-  expect(partialRatioAlignment('', '', { scoreCutoff: 100 })).not.toBeNull()
-  expect(partialRatioAlignment('', '', { scoreCutoff: 100.1 })).toBeNull()
+  expect(partialRatioAlignment_impl('', '', { scoreCutoff: 100 })).not.toBeNull()
+  expect(partialRatioAlignment_impl('', '', { scoreCutoff: 100.1 })).toBeNull()
 })
 
 it('reports the alignment for a long partial match (issue 231)', () => {
@@ -217,7 +233,7 @@ it('reports the alignment for a long partial match (issue 231)', () => {
   const str2 =
     'ils marktkonformen, teils dirigistischen maßnahmen. an der schwelle zum 19. jahrhundert entstand ein neu'
 
-  const alignment = partialRatioAlignment(str1, str2)
+  const alignment = partialRatioAlignment_impl(str1, str2)
 
   expect(alignment?.srcStart).toBe(0)
   expect(alignment?.srcEnd).toBe(103)
@@ -227,21 +243,21 @@ it('reports the alignment for a long partial match (issue 231)', () => {
 
 it('treats two empty strings as a perfect match or as no match, per scorer', () => {
   // perfect match
-  expect(fuzz.ratio('', '')).toBe(100)
-  expect(fuzz.partialRatio('', '')).toBe(100)
-  expect(fuzz.tokenSortRatio('', '')).toBe(100)
-  expect(fuzz.partialTokenSortRatio('', '')).toBe(100)
-  expect(fuzz.tokenRatio('', '')).toBe(100)
-  expect(fuzz.partialTokenRatio('', '')).toBe(100)
+  expect(fuzz.fuzzRatio('', '')).toBe(100)
+  expect(fuzz.fuzzPartialRatio('', '')).toBe(100)
+  expect(fuzz.fuzzTokenSortRatio('', '')).toBe(100)
+  expect(fuzz.fuzzPartialTokenSortRatio('', '')).toBe(100)
+  expect(fuzz.fuzzTokenRatio('', '')).toBe(100)
+  expect(fuzz.fuzzPartialTokenRatio('', '')).toBe(100)
 
   // no match
-  expect(fuzz.wRatio('', '')).toBe(0)
-  expect(fuzz.tokenSetRatio('', '')).toBe(0)
-  expect(fuzz.partialTokenSetRatio('', '')).toBe(0)
+  expect(fuzz.fuzzWeightedRatio('', '')).toBe(0)
+  expect(fuzz.fuzzTokenSetRatio('', '')).toBe(0)
+  expect(fuzz.fuzzPartialTokenSetRatio('', '')).toBe(0)
 
   // no match when there are no words
-  expect(fuzz.tokenSetRatio('    ', '    ')).toBe(0)
-  expect(fuzz.partialTokenSetRatio('    ', '    ')).toBe(0)
+  expect(fuzz.fuzzTokenSetRatio('    ', '    ')).toBe(0)
+  expect(fuzz.fuzzPartialTokenSetRatio('    ', '    ')).toBe(0)
 })
 
 // The split above is FuzzyWuzzy's, kept by RapidFuzz (issue 110), and the
@@ -302,10 +318,10 @@ it('resolves mixed-token hash collisions using strict element equality', () => {
   const secondObject = {}
 
   for (const scorer of [
-    tokenSetRatio,
-    tokenRatio,
-    partialTokenSetRatio,
-    partialTokenRatio,
+    fuzzTokenSetRatio,
+    fuzzTokenRatio,
+    fuzzPartialTokenSetRatio,
+    fuzzPartialTokenRatio,
   ]) {
     expect(scorer(packedElements, embeddedSeparator)).toBe(0)
     expect(scorer([firstObject], [secondObject])).toBe(0)
@@ -349,7 +365,7 @@ describe('simple unicode comparisons', () => {
 })
 
 it('remains case sensitive without normalization', () => {
-  expect(fuzz.ratio('new york mets', 'new YORK mets')).not.toBe(100)
+  expect(fuzz.fuzzRatio('new york mets', 'new YORK mets')).not.toBe(100)
 })
 
 describe('score_cutoff just below the score still returns it (issue 206)', () => {
@@ -368,6 +384,6 @@ it('finds the optimal partial alignment on a long repetitive input (issue 257)',
   const s1 = 'aaaaaaaaaaaaaaaaaaaaaaaabacaaaaaaaabaaabaaaaaaaababbbbbbbbbbabbcb'
   const s2 = 'aaaaaaaaaaaaaaaaaaaaaaaababaaaaaaaabaaabaaaaaaaababbbbbbbbbbabbcb'
 
-  expect(fuzz.partialRatio(s1, s2)).toBeCloseTo(98.46153846153847, 6)
-  expect(fuzz.partialRatio(s2, s1)).toBeCloseTo(98.46153846153847, 6)
+  expect(fuzz.fuzzPartialRatio(s1, s2)).toBeCloseTo(98.46153846153847, 6)
+  expect(fuzz.fuzzPartialRatio(s2, s1)).toBeCloseTo(98.46153846153847, 6)
 })

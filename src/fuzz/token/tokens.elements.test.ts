@@ -9,9 +9,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { matrixScores } from '../../../testing/scoreMatrix.js'
-import { wRatio } from '../weightedRatio.js'
-import { tokenSetRatio } from './tokenSetRatio.js'
-import { tokenSortRatio } from './tokenSortRatio.js'
+import { fuzzWeightedRatio } from '../weightedRatio.js'
+import { fuzzTokenSetRatio } from './tokenSetRatio.js'
+import { fuzzTokenSortRatio } from './tokenSortRatio.js'
 
 describe('tokens holding objects', () => {
   // Regression: the hash used to be `String(x)`, which runs the caller's
@@ -25,7 +25,7 @@ describe('tokens holding objects', () => {
       },
     }
 
-    expect(tokenSetRatio([shifty, ' ', shifty], [shifty])).toBe(100)
+    expect(fuzzTokenSetRatio([shifty, ' ', shifty], [shifty])).toBe(100)
   })
 
   // Regression: `String(Object.create(null))` throws `TypeError: Cannot convert
@@ -33,8 +33,8 @@ describe('tokens holding objects', () => {
   it('accepts an element with no prototype', () => {
     const bare: object = Object.create(null)
 
-    expect(tokenSetRatio([bare], [bare])).toBe(100)
-    expect(tokenSetRatio([bare], [{}])).toBe(0)
+    expect(fuzzTokenSetRatio([bare], [bare])).toBe(100)
+    expect(fuzzTokenSetRatio([bare], [{}])).toBe(0)
   })
 
   it('keeps two distinct objects distinct even when their text matches', () => {
@@ -50,16 +50,16 @@ describe('tokens holding objects', () => {
     }
 
     // Two tokens on the left, one on the right, and the right one is shared.
-    expect(tokenSetRatio([text, ' ', twin], [text])).toBe(100)
+    expect(fuzzTokenSetRatio([text, ' ', twin], [text])).toBe(100)
     // Nothing shared: distinct identities must not collapse onto one bucket.
-    expect(tokenSetRatio([text], [twin])).toBe(0)
+    expect(fuzzTokenSetRatio([text], [twin])).toBe(0)
   })
 
   it('sorts a bag of objects into the same order whichever way it is given', () => {
     const x = {}
     const y = {}
 
-    expect(tokenSortRatio([x, ' ', y], [y, ' ', x])).toBe(100)
+    expect(fuzzTokenSortRatio([x, ' ', y], [y, ' ', x])).toBe(100)
   })
 
   it('does not run a getter or coercion hook while hashing', () => {
@@ -75,7 +75,7 @@ describe('tokens holding objects', () => {
       },
     }
 
-    tokenSetRatio([watched, ' ', watched], [watched])
+    fuzzTokenSetRatio([watched, ' ', watched], [watched])
     expect(coercions).toBe(0)
   })
 })
@@ -85,15 +85,15 @@ describe('tokens holding symbols', () => {
     const a = Symbol('dup')
     const b = Symbol('dup')
 
-    expect(tokenSetRatio([a], [b])).toBe(0)
-    expect(tokenSetRatio([a], [a])).toBe(100)
+    expect(fuzzTokenSetRatio([a], [b])).toBe(0)
+    expect(fuzzTokenSetRatio([a], [a])).toBe(100)
   })
 
   it('sorts symbols into a stable order', () => {
     const a = Symbol('dup')
     const b = Symbol('dup')
 
-    expect(tokenSortRatio([a, ' ', b], [b, ' ', a])).toBe(100)
+    expect(fuzzTokenSortRatio([a, ' ', b], [b, ' ', a])).toBe(100)
   })
 
   // Descriptions separate two symbols where they differ; identity is only the
@@ -102,7 +102,7 @@ describe('tokens holding symbols', () => {
     const early = Symbol('aaa')
     const late = Symbol('zzz')
 
-    expect(tokenSortRatio([early, ' ', late], [late, ' ', early])).toBe(100)
+    expect(fuzzTokenSortRatio([early, ' ', late], [late, ' ', early])).toBe(100)
   })
 })
 
@@ -147,13 +147,13 @@ describe('ordering tokens of every element type', () => {
   }
 
   it('sorts the same bag into the same order whichever way it arrives', () => {
-    expect(tokenSortRatio(tokens(BAG), tokens([...BAG].reverse()))).toBe(100)
-    expect(tokenSetRatio(tokens(BAG), tokens([...BAG].reverse()))).toBe(100)
+    expect(fuzzTokenSortRatio(tokens(BAG), tokens([...BAG].reverse()))).toBe(100)
+    expect(fuzzTokenSetRatio(tokens(BAG), tokens([...BAG].reverse()))).toBe(100)
   })
 
   it('orders two tokens by the first element that differs', () => {
     expect(
-      tokenSortRatio([OBJ, OBJ, SPACE, OBJ, OTHER], [OBJ, OTHER, SPACE, OBJ, OBJ]),
+      fuzzTokenSortRatio([OBJ, OBJ, SPACE, OBJ, OTHER], [OBJ, OTHER, SPACE, OBJ, OBJ]),
     ).toBe(100)
   })
 
@@ -187,15 +187,19 @@ describe('ordering tokens of every element type', () => {
       Number.NaN,
     ]
 
-    expect(tokenSortRatio(forward, backward)).toBe(tokenSortRatio(backward, forward))
-    expect(tokenSetRatio(forward, backward)).toBe(tokenSetRatio(backward, forward))
+    expect(fuzzTokenSortRatio(forward, backward)).toBe(
+      fuzzTokenSortRatio(backward, forward),
+    )
+    expect(fuzzTokenSetRatio(forward, backward)).toBe(
+      fuzzTokenSetRatio(backward, forward),
+    )
   })
 
   // The whitespace scan reads an element that is not a code point through its
   // general form rather than the numeric one.
   it('finds no whitespace among elements that are not code points', () => {
-    expect(wRatio([OBJ, OTHER], [OBJ, OTHER])).toBe(100)
-    expect(wRatio([OBJ, OTHER], [OBJ, SYM])).toBeLessThan(100)
+    expect(fuzzWeightedRatio([OBJ, OTHER], [OBJ, OTHER])).toBe(100)
+    expect(fuzzWeightedRatio([OBJ, OTHER], [OBJ, SYM])).toBeLessThan(100)
   })
 })
 
@@ -203,5 +207,7 @@ describe('ordering tokens of every element type', () => {
 // has to hand back anything that is not a sequence untouched for the scorer to
 // answer for.
 it('passes a missing choice through the token preparer', () => {
-  expect(matrixScores(['fuzzy wuzzy'], [null], { scorer: tokenSortRatio })).toEqual([[0]])
+  expect(matrixScores(['fuzzy wuzzy'], [null], { scorer: fuzzTokenSortRatio })).toEqual([
+    [0],
+  ])
 })

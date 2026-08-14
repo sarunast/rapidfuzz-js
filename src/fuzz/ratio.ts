@@ -16,7 +16,7 @@ import { ratioHeld, ratio_impl } from './partialWindow.js'
 import type { FuzzOptions } from './types.js'
 
 /** Narrow prepared-query implementation for the basic fuzz similarity. */
-export function prepareSimilarity(): PreparationFactory {
+export function prepareRatio(): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const held = scorerSequence(query)
     const pattern = prepareLcsPattern(held, 0, held.length)
@@ -29,8 +29,8 @@ export function prepareSimilarity(): PreparationFactory {
   return () => ({ prepareQuery, prepareChoice: prepareChoiceSequence })
 }
 
-export const ratio: MaybeSequenceMetricImplementation<FuzzOptions> =
-  /* @__PURE__ */ withPreparedFlags(ratio_impl, FUZZ_FLAGS, prepareSimilarity())
+export const fuzzRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
+  /* @__PURE__ */ withPreparedFlags(ratio_impl, FUZZ_FLAGS, prepareRatio())
 
 /**
  * The baseline of the family: normalized Indel similarity scaled to `0..100`.
@@ -53,4 +53,4 @@ export const ratio: MaybeSequenceMetricImplementation<FuzzOptions> =
  * RapidFuzz calls it `ratio`.
  */
 export const similarity: BuiltInMetric<'fuzz.similarity', 'similarity'> =
-  /* @__PURE__ */ fuzzMetric(ratio)
+  /* @__PURE__ */ fuzzMetric(fuzzRatio)
