@@ -18,9 +18,9 @@ Import a metric and call it. This one scores similarity from 0 (nothing in
 common) to 100 (identical):
 
 ```ts
-import { similarity } from 'rapidfuzz-js/fuzz'
+import { ratio } from 'rapidfuzz-js/fuzz'
 
-similarity('this is a test', 'this is a test!')
+ratio('this is a test', 'this is a test!')
 // 96.55 — nearly identical, one extra character
 ```
 
@@ -43,16 +43,16 @@ This is the "did you mean?" pattern. Wrap a metric in a scorer, then ask:
 
 ```ts
 import { bestMatch, createScorer } from 'rapidfuzz-js'
-import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(weightedSimilarity)
+const scorer = createScorer(weightedRatio)
 const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 bestMatch('new york jet', teams, { scorer })
 // { item: 'New York Jets', key: 1, score: ... }
 ```
 
-`weightedSimilarity` is the "just make it work" metric — it tries several
+`weightedRatio` is the "just make it work" metric — it tries several
 strategies per pair and reports the best. Every result carries the matched
 `item`, its position (`key`), and its `score`.
 
@@ -74,9 +74,9 @@ each query only pays for itself:
 
 ```ts
 import { createMatcher, createScorer, normalizeText } from 'rapidfuzz-js'
-import { tokenSortSimilarity } from 'rapidfuzz-js/fuzz'
+import { tokenSortRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(tokenSortSimilarity)
+const scorer = createScorer(tokenSortRatio)
 
 const products = [
   { title: 'Wireless mechanical keyboard' },
@@ -97,7 +97,7 @@ Three things happened there worth naming:
 
 - `getText` — the items are objects, so we point at the text to search.
 - `normalize: normalizeText` — case and punctuation stop mattering.
-- `tokenSortSimilarity` — word order stops mattering too.
+- `tokenSortRatio` — word order stops mattering too.
 
 Each is optional, and each is explained where it belongs:
 [Matchers](/concepts/matchers/), [Preprocessing](/guides/preprocessing/),

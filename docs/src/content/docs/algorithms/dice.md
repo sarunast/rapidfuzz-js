@@ -138,5 +138,5 @@ The trap is the same as its strength — position is gone entirely. `aba` and
 than its size suggests: `similarity('recieve', 'receive')` is `0.5` where
 Levenshtein `normalizedSimilarity` says `0.714`. For plain typos reach for
 [Levenshtein](/algorithms/levenshtein/) or fuzz `similarity`; for reordered
-_words_ specifically, fuzz `tokenSortSimilarity` scores that pair a flat
+_words_ specifically, fuzz `tokenSortRatio` scores that pair a flat
 `100`.

@@ -21,54 +21,55 @@ structural mismatch.
 
 ## The metrics, by the problem they solve
 
-**Whole strings are comparable** → `similarity`. The baseline: normalized
+**Whole strings are comparable** → `ratio`. The baseline: normalized
 Indel scaled to 0–100.
 
 ```ts
-import { similarity } from 'rapidfuzz-js/fuzz'
-similarity('this is a test', 'this is a test!') // 96.55
+import { ratio } from 'rapidfuzz-js/fuzz'
+ratio('this is a test', 'this is a test!') // 96.55
 ```
 
-**One string may contain the other** → `partialSimilarity`. Slides the
+**One string may contain the other** → `partialRatio`. Slides the
 shorter string over the longer and reports the best window — so a substring
 scores ~100 even when the surrounding text differs wildly.
 
-**Same words, different order** → `tokenSortSimilarity`. Splits into words,
+**Same words, different order** → `tokenSortRatio`. Splits into words,
 sorts them, compares — word order stops mattering entirely.
 
 ```ts
-import { tokenSortSimilarity } from 'rapidfuzz-js/fuzz'
-tokenSortSimilarity('fuzzy wuzzy was a bear', 'wuzzy fuzzy was a bear') // 100
+import { tokenSortRatio } from 'rapidfuzz-js/fuzz'
+tokenSortRatio('fuzzy wuzzy was a bear', 'wuzzy fuzzy was a bear') // 100
 ```
 
-**Overlapping words, different amounts of extra** → `tokenSetSimilarity`.
+**Overlapping words, different amounts of extra** → `tokenSetRatio`.
 Compares the word _sets_, factoring out the words both sides share — one
 side having extra words hurts far less — far enough less that containment
 scores a flat `100`:
 
 ```ts
-tokenSetSimilarity('data engineer', 'data engineer cloud platform') // 100
-tokenSortSimilarity('data engineer', 'data engineer cloud platform') // 63.41
+tokenSetRatio('data engineer', 'data engineer cloud platform') // 100
+tokenSortRatio('data engineer', 'data engineer cloud platform') // 63.41
 ```
 
 That's the right opinion for a company name and the wrong one for a job
 title. [Matching records](/guides/matching-records/) works through the
 difference.
 
-**Combinations** — `tokenSimilarity` takes the better of sort/set;
-`partialTokenSortSimilarity`, `partialTokenSetSimilarity`, and
-`partialTokenSimilarity` apply the token strategies over the best partial
+**Combinations** — `tokenRatio` takes the better of sort/set;
+`partialTokenSortRatio`, `partialTokenSetRatio`, and
+`partialTokenRatio` apply the token strategies over the best partial
 window.
 
-**Just handle it** → `weightedSimilarity`. Tries the appropriate strategies
+**Just handle it** → `weightedRatio`. Tries the appropriate strategies
 per pair, weights them by how the lengths compare, and reports the best —
 the port of RapidFuzz's famous `WRatio`. **This is the right default**:
 start here, inspect real mismatches, and only pin a specific metric when
-you can name what `weightedSimilarity` gets wrong.
+you can name what `weightedRatio` gets wrong.
 
-Coming from Python RapidFuzz? The mapping is mechanical: `ratio` →
-`similarity`, `partial_ratio` → `partialSimilarity`, `token_sort_ratio` →
-`tokenSortSimilarity`, `WRatio` → `weightedSimilarity`, and so on.
+Coming from Python RapidFuzz? The names are the same ones, in camelCase:
+`ratio`, `partial_ratio` → `partialRatio`, `token_sort_ratio` →
+`tokenSortRatio`. The one that is not a transliteration is `WRatio`, which
+here is `weightedRatio`; `QRatio` has no counterpart at all.
 
 ## Empty inputs: the family disagrees on purpose
 
@@ -76,11 +77,11 @@ Compare two empty strings and the answer depends on which fuzz metric you
 asked:
 
 ```ts
-similarity('', '') // 100
-tokenSortSimilarity('', '') // 100
-tokenSetSimilarity('', '') // 0
-partialTokenSetSimilarity('', '') // 0
-weightedSimilarity('', '') // 0
+ratio('', '') // 100
+tokenSortRatio('', '') // 100
+tokenSetRatio('', '') // 0
+partialTokenSetRatio('', '') // 0
+weightedRatio('', '') // 0
 ```
 
 The set-based scorers intersect _sets of tokens_, and a side with no tokens
@@ -90,9 +91,9 @@ accident: FuzzyWuzzy answered `0` here, RapidFuzz kept it deliberately
 (upstream issue 110), and this port matches so that scores stay comparable
 across all three.
 
-Whitespace-only input is where `weightedSimilarity` splits from the two set
-scorers — `weightedSimilarity('   ', '   ')` is `100`, while
-`tokenSetSimilarity('   ', '   ')` stays `0`.
+Whitespace-only input is where `weightedRatio` splits from the two set
+scorers — `weightedRatio('   ', '   ')` is `100`, while
+`tokenSetRatio('   ', '   ')` stays `0`.
 
 If empty values are meaningful in your data, filter them before scoring
 rather than reasoning about which scorer does what.
@@ -105,7 +106,7 @@ rather than reasoning about which scorer does what.
   [`normalizeText`](/guides/preprocessing/) to get upstream's
   `default_process` behaviour.
 - **Explain.** They return a score, not the why. The one exception:
-  `partialSimilarityAlignment` reveals where the best partial window sat —
+  `partialRatioAlignment` reveals where the best partial window sat —
   `{ score, srcStart, srcEnd, destStart, destEnd }` — for highlighting what
   matched.
 

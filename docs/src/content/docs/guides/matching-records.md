@@ -19,11 +19,11 @@ one concatenated blob — title, company, location, and the boilerplate every
 posting carries:
 
 ```ts
-import { tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
+import { tokenSetRatio } from 'rapidfuzz-js/fuzz'
 
 // 'AI Software Engineer' + shared company, location, and benefits blurb
 // vs 'Head of Strategic Finance Projects' + the same shared text
-tokenSetSimilarity(blendedA, blendedB) // 94.25
+tokenSetRatio(blendedA, blendedB) // 94.25
 ```
 
 94 out of 100 for two unrelated roles. Compare the titles alone — the only
@@ -35,7 +35,7 @@ Two things went wrong, and they compound:
   location and the benefits blurb — identical on both sides — drown out the
   title. The more text two records share by convention, the more similar
   every pair looks.
-- **`tokenSetSimilarity` returns 100 on containment.** It factors out the
+- **`tokenSetRatio` returns 100 on containment.** It factors out the
   words both sides share, so whenever one token set _contains_ the other,
   the score is a perfect 100 regardless of how much extra the longer side
   carries.
@@ -43,13 +43,13 @@ Two things went wrong, and they compound:
 That second property is worth seeing on its own, because it's the trap:
 
 ```ts
-import { tokenSetSimilarity, tokenSortSimilarity } from 'rapidfuzz-js/fuzz'
+import { tokenSetRatio, tokenSortRatio } from 'rapidfuzz-js/fuzz'
 
-tokenSetSimilarity('data engineer', 'data engineer cloud platform') // 100
-tokenSortSimilarity('data engineer', 'data engineer cloud platform') // 63.41
+tokenSetRatio('data engineer', 'data engineer cloud platform') // 100
+tokenSortRatio('data engineer', 'data engineer cloud platform') // 63.41
 ```
 
-`tokenSetSimilarity` isn't broken — containment is exactly what you want for
+`tokenSetRatio` isn't broken — containment is exactly what you want for
 _some_ fields. It's the wrong opinion for a job title, where the extra words
 are the difference between two openings.
 
@@ -58,10 +58,10 @@ are the difference between two openings.
 The fix is to stop blending and give each field the measure its noise
 deserves:
 
-| Field   | Scorer                | Because                                                                 |
-| ------- | --------------------- | ----------------------------------------------------------------------- |
-| Title   | `tokenSortSimilarity` | Length-aware: extra words lower the score, which is what you want       |
-| Company | `tokenSetSimilarity`  | Containment is correct: "Hoval Schweiz" and "Hoval AG" are one employer |
+| Field   | Scorer           | Because                                                                 |
+| ------- | ---------------- | ----------------------------------------------------------------------- |
+| Title   | `tokenSortRatio` | Length-aware: extra words lower the score, which is what you want       |
+| Company | `tokenSetRatio`  | Containment is correct: "Hoval Schweiz" and "Hoval AG" are one employer |
 
 Each field then gets its own threshold, and a pair is a duplicate only when
 **every** field agrees. One field's confidence can no longer paper over
@@ -105,10 +105,10 @@ drives the search; the company confirms the survivors:
 
 ```ts
 import { createScorer, normalizeText, searchIter } from 'rapidfuzz-js'
-import { tokenSetSimilarity, tokenSortSimilarity } from 'rapidfuzz-js/fuzz'
+import { tokenSetRatio, tokenSortRatio } from 'rapidfuzz-js/fuzz'
 
-const titleScorer = createScorer(tokenSortSimilarity)
-const companyScorer = createScorer(tokenSetSimilarity)
+const titleScorer = createScorer(tokenSortRatio)
+const companyScorer = createScorer(tokenSetRatio)
 
 const TITLE_THRESHOLD = 80
 const COMPANY_THRESHOLD = 85

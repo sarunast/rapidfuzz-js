@@ -8,9 +8,9 @@ of valid values, find the one they meant.
 
 ```ts
 import { bestMatch, createScorer } from 'rapidfuzz-js'
-import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(weightedSimilarity)
+const scorer = createScorer(weightedRatio)
 const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 bestMatch('new york jet', teams, { scorer })
@@ -39,7 +39,7 @@ maximum — always in the scorer's own units.
 
 There's no universal right number. Log real queries with their scores for a
 day, look at where good and bad matches separate, and put the line there.
-As a starting point for `weightedSimilarity`, `70` is conservative and `60`
+As a starting point for `weightedRatio`, `70` is conservative and `60`
 permissive.
 
 ## Answering many queries

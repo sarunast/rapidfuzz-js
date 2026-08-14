@@ -35,7 +35,7 @@ The recorded comparison shows that `rapidfuzz-js`:
 - is close to the fastest specialized JavaScript Levenshtein libraries on
   short strings and faster on longer strings;
 - is 2.9–19.5× faster than `fuzzball` for the measured Levenshtein workloads;
-- is about 16× faster than `fuzzball` for `similarity` and 5× faster for
+- is about 16× faster than `fuzzball` for `ratio` and 5× faster for
   best-match search;
 - computes Dice 1.22–1.45× faster than the other multiset implementations and
   Cosine 2.57–3.39× faster than the only comparable one, losing only to
@@ -108,8 +108,8 @@ and widened the lead as input length increased.
 
 | Workload                             | Compared with                   | Result for `rapidfuzz-js` |
 | ------------------------------------ | ------------------------------- | ------------------------- |
-| `similarity`, 200 sentence pairs     | `fuzzball`                      | ✅ **16.11× faster**      |
-| `similarity`, 200 sentence pairs     | `string-similarity`             | ✅ **27.99× faster**      |
+| `ratio`, 200 sentence pairs          | `fuzzball`                      | ✅ **16.11× faster**      |
+| `ratio`, 200 sentence pairs          | `string-similarity`             | ✅ **27.99× faster**      |
 | Best of 2,000 choices for 20 queries | `fuzzball`                      | ✅ **5.29× faster**       |
 | Best of 2,000 choices for 20 queries | `string-similarity`             | ✅ **22.27× faster**      |
 | Best of 2,000 choices for 20 queries | `fuse.js` with a prebuilt index | ✅ **61.61× faster**      |
@@ -250,16 +250,16 @@ searched many times and when its scorer performs expensive token or mask setup.
 The internal suite pairs each one-shot search with the `Matcher` search that
 replaces it, over the same queries, choices and scorer:
 
-| Workload                                         | One-shot | `Matcher` | Result              |
-| ------------------------------------------------ | -------: | --------: | ------------------- |
-| 30 queries × 2,000 choices, `similarity`         |  5.09 ms |   3.53 ms | ✅ **1.44× faster** |
-| 30 queries × 2,000 titles, `tokenSortSimilarity` |  64.4 ms |   9.71 ms | ✅ **6.63× faster** |
+| Workload                                    | One-shot | `Matcher` | Result              |
+| ------------------------------------------- | -------: | --------: | ------------------- |
+| 30 queries × 2,000 choices, `ratio`         |  5.09 ms |   3.53 ms | ✅ **1.44× faster** |
+| 30 queries × 2,000 titles, `tokenSortRatio` |  64.4 ms |   9.71 ms | ✅ **6.63× faster** |
 
 Construction is what buys that, and it is paid once: 0.058 ms for the 2,000
 single-word choices, and 0.939 ms for the 2,000 five-word titles with
 normalization. The token-sort case gains most because tokenizing and sorting
 2,000 titles is repeated for every query in the one-shot loop and done once for
-the `Matcher`. Plain `similarity` gains least because its reusable setup is a
+the `Matcher`. Plain `ratio` gains least because its reusable setup is a
 smaller share of the total work.
 
 See [`bench/process.bench.ts`](bench/process.bench.ts) for the paired cases and
@@ -287,7 +287,7 @@ The pinned library versions in this benchmark expose these reuse options:
 This does not mean every comparison table should be multiplied by the `Matcher`
 speedups. The cross-library Levenshtein cases score independent pairs, where
 there is no reusable operand. The similarity and search comparison uses raw
-`similarity` inputs with preprocessing disabled, while the largest `Matcher`
+`ratio` inputs with preprocessing disabled, while the largest `Matcher`
 gains come from repeated token scoring. Those are different workloads.
 
 Fuse is also not an unindexed comparison: its index is built before the timed
@@ -641,13 +641,13 @@ complete workload in each row, not for one string pair.
 
 ### Fuzzy scorers
 
-| Workload                                  | `rapidfuzz-js` | Python RapidFuzz | Result for `rapidfuzz-js` |
-| ----------------------------------------- | -------------: | ---------------: | ------------------------- |
-| `similarity`, 200 sentence pairs          |        42.0 µs |          47.9 µs | ✅ **1.14× faster**       |
-| `partialSimilarity`, 200 sentence pairs   |         884 µs |           413 µs | ❌ 2.14× slower           |
-| `tokenSortSimilarity`, 200 sentence pairs |         341 µs |           230 µs | ❌ 1.48× slower           |
-| `tokenSetSimilarity`, 200 sentence pairs  |         548 µs |           286 µs | ❌ 1.91× slower           |
-| `fuzzySimilarity`, 200 sentence pairs     |         790 µs |           404 µs | ❌ 1.96× slower           |
+| Workload                             | `rapidfuzz-js` | Python RapidFuzz | Result for `rapidfuzz-js` |
+| ------------------------------------ | -------------: | ---------------: | ------------------------- |
+| `ratio`, 200 sentence pairs          |        42.0 µs |          47.9 µs | ✅ **1.14× faster**       |
+| `partialRatio`, 200 sentence pairs   |         884 µs |           413 µs | ❌ 2.14× slower           |
+| `tokenSortRatio`, 200 sentence pairs |         341 µs |           230 µs | ❌ 1.48× slower           |
+| `tokenSetRatio`, 200 sentence pairs  |         548 µs |           286 µs | ❌ 1.91× slower           |
+| `weightedRatio`, 200 sentence pairs  |         790 µs |           404 µs | ❌ 1.96× slower           |
 
 RapidFuzz's `QRatio` has no spelling in this API and is not measured. It is
 upstream's own `fuzz.ratio` with one difference: two empty strings score `0`
@@ -656,14 +656,14 @@ normalization is involved — the scorer it delegates to is the first row above.
 
 ### Search and batch scoring
 
-| Workload                                                   | `rapidfuzz-js` | Python RapidFuzz | Result for `rapidfuzz-js` |
-| ---------------------------------------------------------- | -------------: | ---------------: | ------------------------- |
-| `bestMatch` + `similarity`, 20 queries × 2,000 choices     |        2.99 ms |          1.54 ms | ❌ 1.95× slower           |
-| `bestMatch` + `tokenSortSimilarity`, 20 × 2,000 raw titles |        31.6 ms |          19.3 ms | ❌ 1.64× slower           |
-| `Matcher` + `tokenSortSimilarity`, 20 × 2,000 titles       |        5.67 ms |          19.3 ms | ✅ **3.40× faster**       |
-| `scoreMatrix` + `similarity`, 50 × 200                     |         642 µs |           235 µs | ❌ 2.74× slower           |
-| `scoreMatrix` + `tokenSortSimilarity`, 50 × 200            |        1.77 ms |          4.30 ms | ✅ **2.43× faster**       |
-| `scorePairs` + `similarity`, 200 pairs                     |        44.6 µs |          24.2 µs | ❌ 1.85× slower           |
+| Workload                                              | `rapidfuzz-js` | Python RapidFuzz | Result for `rapidfuzz-js` |
+| ----------------------------------------------------- | -------------: | ---------------: | ------------------------- |
+| `bestMatch` + `ratio`, 20 queries × 2,000 choices     |        2.99 ms |          1.54 ms | ❌ 1.95× slower           |
+| `bestMatch` + `tokenSortRatio`, 20 × 2,000 raw titles |        31.6 ms |          19.3 ms | ❌ 1.64× slower           |
+| `Matcher` + `tokenSortRatio`, 20 × 2,000 titles       |        5.67 ms |          19.3 ms | ✅ **3.40× faster**       |
+| `scoreMatrix` + `ratio`, 50 × 200                     |         642 µs |           235 µs | ❌ 2.74× slower           |
+| `scoreMatrix` + `tokenSortRatio`, 50 × 200            |        1.77 ms |          4.30 ms | ✅ **2.43× faster**       |
+| `scorePairs` + `ratio`, 200 pairs                     |        44.6 µs |          24.2 µs | ❌ 1.85× slower           |
 
 ### Edit operations
 
@@ -674,7 +674,7 @@ normalization is involved — the scorer it delegates to is the first row above.
 
 ### What the expanded comparison shows
 
-`rapidfuzz-js` wins the smallest Levenshtein workload, `similarity`, the
+`rapidfuzz-js` wins the smallest Levenshtein workload, `ratio`, the
 token-sort matrix, and `Matcher` search. Postfix scanning is effectively tied at
 this scale. Python RapidFuzz leads the longer Levenshtein cases, most other
 distance metrics, the more complex fuzzy scorers, one-shot search, plain
@@ -688,8 +688,8 @@ the Levenshtein crossover occurs between 8 and 32 characters; that boundary is
 specific to these inputs and this machine.
 
 The advantage is not uniform across batch operations. Python is 2.74× faster
-for a plain `similarity` matrix, while `rapidfuzz-js` is 2.43× faster for the
-multiword `tokenSortSimilarity` matrix. Different scorers move different amounts
+for a plain `ratio` matrix, while `rapidfuzz-js` is 2.43× faster for the
+multiword `tokenSortRatio` matrix. Different scorers move different amounts
 of normalization, tokenization, and reusable setup into the batch path.
 
 ### A Matcher changes the result

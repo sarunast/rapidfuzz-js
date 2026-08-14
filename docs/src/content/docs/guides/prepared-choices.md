@@ -17,9 +17,9 @@ would re-prepare every candidate on every query prepares nothing:
 
 ```ts
 import { createScorer, normalizeText, searchIter } from 'rapidfuzz-js'
-import { tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
+import { tokenSetRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(tokenSetSimilarity)
+const scorer = createScorer(tokenSetRatio)
 const companies = records.map((record) => ({
   record,
   prepared: scorer.prepareChoice(record.name, { normalize: normalizeText }),
@@ -87,7 +87,7 @@ two preparations equivalent:
 | a scorer with configuration the metric records | that scorer alone                      |
 | a custom metric's scorer                       | that scorer alone                      |
 
-So two separately created `createScorer(weightedSimilarity)` scorers share
+So two separately created `createScorer(weightedRatio)` scorers share
 their handles; treat a configured or custom scorer as owning the handles it
 made. Anything else throws — a handle from the wrong scorer is refused as
 incompatible, a value that never was a handle as invalid.
@@ -133,8 +133,8 @@ two modes never disagree about what they scored.
 
 What preparation is worth depends entirely on how much setup your scorer
 does: the recorded `Matcher` figures — which remove the same per-query work
-by the same means — range from **1.44×** on plain `similarity` to **6.63×**
-on `tokenSortSimilarity`, where tokenizing and sorting every choice is the
+by the same means — range from **1.44×** on plain `ratio` to **6.63×**
+on `tokenSortRatio`, where tokenizing and sorting every choice is the
 bulk of the cost ([Benchmarks](/benchmarks/)). Expect the token scorers to
 gain most and the cheap character kernels least. See
 [Performance](/guides/performance/) for where this sits among the other

@@ -43,16 +43,16 @@ goes wrong:
 | ---------------------------------------- | ------------------------------------------- |
 | Typos, small edits                       | `levenshtein`, or fuzz `similarity`         |
 | Swapped adjacent letters (`teh` → `the`) | [`osa`](/algorithms/osa/)                   |
-| Word order (`"Smith, John"`)             | fuzz `tokenSortSimilarity`                  |
-| One contains the other                   | fuzz `partialSimilarity`                    |
-| Extra words on one side                  | fuzz `tokenSetSimilarity`                   |
+| Word order (`"Smith, John"`)             | fuzz `tokenSortRatio`                       |
+| One contains the other                   | fuzz `partialRatio`                         |
+| Extra words on one side                  | fuzz `tokenSetRatio`                        |
 | Shuffled or missing words, short text    | [`dice`](/algorithms/dice/)                 |
 | They're names of people or places        | [`jaro-winkler`](/algorithms/jaro-winkler/) |
-| A bit of everything / not sure yet       | fuzz `weightedSimilarity`                   |
+| A bit of everything / not sure yet       | fuzz `weightedRatio`                        |
 
 Two habits worth forming:
 
-- **Start with `weightedSimilarity`**, look at real mismatches, then
+- **Start with `weightedRatio`**, look at real mismatches, then
   specialize. Guessing the perfect metric up front rarely survives contact
   with real data.
 - **Normalize first.** Half of "the score is too low" cases are case and
@@ -93,9 +93,9 @@ score into a single typed array with no per-score allocation:
 
 ```ts
 import { createScorer, scoreMatrix, scorePairs } from 'rapidfuzz-js'
-import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(weightedSimilarity)
+const scorer = createScorer(weightedRatio)
 
 // Element-wise: [score(cat,cats), score(dog,dogs)]
 scorePairs(['cat', 'dog'], ['cats', 'dogs'], { scorer })

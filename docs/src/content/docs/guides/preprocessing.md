@@ -44,9 +44,9 @@ cleaned strings:
 
 ```ts
 import { createMatcher, createScorer, normalizeText } from 'rapidfuzz-js'
-import { tokenSortSimilarity } from 'rapidfuzz-js/fuzz'
+import { tokenSortRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(tokenSortSimilarity)
+const scorer = createScorer(tokenSortRatio)
 
 const matcher = createMatcher(['Wireless-Mechanical KEYBOARD'], {
   scorer,
@@ -103,5 +103,5 @@ Bare metrics and scorers apply no preprocessing at all. Comparing pairs by
 hand? Normalize both sides yourself:
 
 ```ts
-similarity(normalizeText(a), normalizeText(b))
+ratio(normalizeText(a), normalizeText(b))
 ```

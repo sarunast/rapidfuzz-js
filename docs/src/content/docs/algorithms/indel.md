@@ -26,7 +26,7 @@ distance(a, b) = len(a) + len(b) − 2 × lcs(a, b)
 That "shared content" view of similarity turns out to be the right basis for
 comparing _text_ (as opposed to codes or identifiers), which is why the
 whole [fuzz family](/algorithms/fuzz/) — `similarity`, the token metrics,
-`weightedSimilarity` — is normalized Indel scaled to 0–100.
+`weightedRatio` — is normalized Indel scaled to 0–100.
 
 ## Seeing the edits
 

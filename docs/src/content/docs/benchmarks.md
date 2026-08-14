@@ -37,8 +37,8 @@ ahead at 32 characters and widens the lead as inputs grow.
 
 | Workload                             | Compared with                   | Result for `rapidfuzz-js` |
 | ------------------------------------ | ------------------------------- | ------------------------- |
-| `similarity`, 200 sentence pairs     | `fuzzball`                      | ✅ **16.11× faster**      |
-| `similarity`, 200 sentence pairs     | `string-similarity`             | ✅ **27.99× faster**      |
+| `ratio`, 200 sentence pairs          | `fuzzball`                      | ✅ **16.11× faster**      |
+| `ratio`, 200 sentence pairs          | `string-similarity`             | ✅ **27.99× faster**      |
 | Best of 2,000 choices for 20 queries | `fuzzball`                      | ✅ **5.29× faster**       |
 | Best of 2,000 choices for 20 queries | `string-similarity`             | ✅ **22.27× faster**      |
 | Best of 2,000 choices for 20 queries | `fuse.js` with a prebuilt index | ✅ **61.61× faster**      |
@@ -119,16 +119,16 @@ and [`createMatcher`](/concepts/matchers/) moves that preparation to
 construction. Pairing each one-shot search with the `Matcher` search that
 replaces it, over the same queries, choices and scorer:
 
-| Workload                                         | One-shot | `Matcher` | Result              |
-| ------------------------------------------------ | -------: | --------: | ------------------- |
-| 30 queries × 2,000 choices, `similarity`         |  5.09 ms |   3.53 ms | ✅ **1.44× faster** |
-| 30 queries × 2,000 titles, `tokenSortSimilarity` |  64.4 ms |   9.71 ms | ✅ **6.63× faster** |
+| Workload                                    | One-shot | `Matcher` | Result              |
+| ------------------------------------------- | -------: | --------: | ------------------- |
+| 30 queries × 2,000 choices, `ratio`         |  5.09 ms |   3.53 ms | ✅ **1.44× faster** |
+| 30 queries × 2,000 titles, `tokenSortRatio` |  64.4 ms |   9.71 ms | ✅ **6.63× faster** |
 
 Construction is what buys that, and it is paid once — 0.058 ms for the 2,000
 single-word choices, 0.939 ms for the 2,000 normalized five-word titles. The
 token-sort case gains most because tokenizing and sorting 2,000 titles
 happens per query in the one-shot loop and once for the `Matcher`; plain
-`similarity` gains least because its reusable setup is a smaller share of
+`ratio` gains least because its reusable setup is a smaller share of
 the work.
 
 None of the compared JavaScript libraries expose a prepared-operand

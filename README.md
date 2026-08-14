@@ -28,9 +28,9 @@ npm install rapidfuzz-js
 Comparing two values needs no setup — metrics are plain functions:
 
 ```ts
-import { similarity } from 'rapidfuzz-js/fuzz'
+import { ratio } from 'rapidfuzz-js/fuzz'
 
-similarity('this is a test', 'this is a test!') // 96.55…
+ratio('this is a test', 'this is a test!') // 96.55…
 ```
 
 The rest of the API builds on one composition model:
@@ -44,9 +44,9 @@ root:
 
 ```ts
 import { createMatcher, createScorer, normalizeText } from 'rapidfuzz-js'
-import { tokenSortSimilarity } from 'rapidfuzz-js/fuzz'
+import { tokenSortRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(tokenSortSimilarity)
+const scorer = createScorer(tokenSortRatio)
 
 const products = [
   { title: 'Wireless mechanical keyboard' },
@@ -71,14 +71,14 @@ query, use the standalone `bestMatch`, `search`, or `searchIter` instead.
 Metrics are directly callable:
 
 ```ts
-import { similarity } from 'rapidfuzz-js/fuzz'
+import { ratio } from 'rapidfuzz-js/fuzz'
 import {
   distance as levenshteinDistance,
   normalizedSimilarity as levenshteinNormalizedSimilarity,
   similarity as levenshteinSimilarity,
 } from 'rapidfuzz-js/levenshtein'
 
-similarity('this is a test', 'this is a test!')
+ratio('this is a test', 'this is a test!')
 // 96.55172413793103 (0–100)
 
 levenshteinDistance('lewenstein', 'levenshtein')
@@ -196,14 +196,14 @@ choices or a `Matcher` are what let it apply.
 The `fuzz` subpath is the exception: it exports similarity scorers only. Two
 of them are easy to mix up:
 
-- `similarity` compares the two strings exactly as given, in one pass.
-- `weightedSimilarity` also tries substring and word-reordering comparisons and
+- `ratio` compares the two strings exactly as given, in one pass.
+- `weightedRatio` also tries substring and word-reordering comparisons and
   returns the best weighted score.
 
-`weightedSimilarity` is the general-purpose choice: it stays high where
-`similarity` drops — reordered words, one string contained in the other, large
-length differences. Reach for the other fuzz scorers (`partialSimilarity`,
-`tokenSortSimilarity`, `tokenSetSimilarity`, …) when you want exactly one of
+`weightedRatio` is the general-purpose choice: it stays high where
+`ratio` drops — reordered words, one string contained in the other, large
+length differences. Reach for the other fuzz scorers (`partialRatio`,
+`tokenSortRatio`, `tokenSetRatio`, …) when you want exactly one of
 those strategies.
 
 ## Scorers
@@ -248,9 +248,9 @@ One-shot search streams its input and does not retain the collection:
 
 ```ts
 import { bestMatch, createScorer, search, searchIter } from 'rapidfuzz-js'
-import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(weightedSimilarity)
+const scorer = createScorer(weightedRatio)
 const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 bestMatch('new york jet', teams, { scorer })
@@ -320,9 +320,9 @@ return it from `getPrepared`, and searches skip preparation entirely:
 
 ```ts
 import { createScorer, normalizeText, searchIter } from 'rapidfuzz-js'
-import { tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
+import { tokenSetRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(tokenSetSimilarity)
+const scorer = createScorer(tokenSetRatio)
 const companies = records.map((record) => ({
   record,
   prepared: scorer.prepareChoice(record.name, { normalize: normalizeText }),
@@ -396,16 +396,16 @@ equivalent:
 | a scorer with configuration the metric records | that scorer alone                      |
 | a custom metric's scorer                       | that scorer alone                      |
 
-Two separately created `createScorer(fuzz.similarity)` scorers share handles;
+Two separately created `createScorer(fuzz.ratio)` scorers share handles;
 a configured or custom scorer owns the handles it made.
 
 Anything else throws: an incompatible handle is refused, and a value that is
 not a handle at all is refused as invalid. Built-in metrics carry their
 identity in the type, so most of these mistakes are compile errors first.
 Spell a stored handle's type as `PreparedChoiceOf<typeof scorer>` and a stored
-scorer's as `ScorerOf<typeof tokenSetSimilarity>`. The identity is the
+scorer's as `ScorerOf<typeof tokenSetRatio>`. The identity is the
 metric's own id literal — declaration emit spells it
-`Scorer<'similarity', 'fuzz.tokenSetSimilarity'>` without importing anything
+`Scorer<'similarity', 'fuzz.tokenSetRatio'>` without importing anything
 from this package. Widening to `Scorer<'similarity'>` drops the metric from
 the type, leaving only the runtime check.
 
@@ -456,8 +456,8 @@ it is refused when a score actually arrives that does not fit, not up front.
 
 | RapidFuzz                      | rapidfuzz-js                                                  |
 | ------------------------------ | ------------------------------------------------------------- |
-| `fuzz.ratio`                   | `similarity`                                                  |
-| `fuzz.WRatio`                  | `weightedSimilarity`                                          |
+| `fuzz.ratio`                   | `ratio`                                                       |
+| `fuzz.WRatio`                  | `weightedRatio`                                               |
 | `fuzz.QRatio`                  | none — see below                                              |
 | `process.extractOne`           | `bestMatch`                                                   |
 | `process.extract`              | `search`                                                      |
@@ -485,7 +485,7 @@ Only `null` and `undefined` count as missing. Similarity scorers return `0`
 for a missing operand by default:
 
 ```ts
-const strict = createScorer(weightedSimilarity, { missing: 'throw' })
+const strict = createScorer(weightedRatio, { missing: 'throw' })
 strict.score(null, 'text') // throws TypeError
 ```
 
@@ -498,14 +498,14 @@ Numbers (including `NaN`), booleans, and objects without a valid array-like
 `length` are invalid.
 
 Empty inputs are where the fuzz scorers disagree with each other, and
-deliberately so — `tokenSetSimilarity`, `partialTokenSetSimilarity` and
-`weightedSimilarity` answer `0` for two empty inputs where `similarity` and the
+deliberately so — `tokenSetRatio`, `partialTokenSetRatio` and
+`weightedRatio` answer `0` for two empty inputs where `ratio` and the
 sort-based scorers answer `100`. FuzzyWuzzy returns `0` there and RapidFuzz
 keeps it (issue 110), so this port does too.
 
 Whitespace-only inputs split the three: the two token-set scorers still answer
 `0`, because a side that tokenizes to nothing has no set to intersect, while
-`weightedSimilarity` sees two non-empty strings and scores identical whitespace
+`weightedRatio` sees two non-empty strings and scores identical whitespace
 `100`.
 
 Options objects — for searches, Matcher methods, `scoreMatrix`, `scorePairs`,

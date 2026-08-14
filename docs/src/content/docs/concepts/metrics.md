@@ -100,7 +100,7 @@ rapidfuzz-js/prefix                common prefix length
 rapidfuzz-js/postfix               common suffix length
 ```
 
-If you're unsure, start with `weightedSimilarity` from `rapidfuzz-js/fuzz` and
+If you're unsure, start with `weightedRatio` from `rapidfuzz-js/fuzz` and
 only specialize when you can say what's wrong with its answers. The
 [Algorithms](/algorithms/levenshtein/) section gives each metric a plain
 explanation and a "when to use it".

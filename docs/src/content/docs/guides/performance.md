@@ -21,8 +21,8 @@ One-shot calls rebuild them for the whole collection on every query; a
 
 The [benchmarks](/benchmarks/) put numbers on it: over 30 queries against
 2,000 choices, a `Matcher` measured **6.63×** faster than the one-shot
-search it replaces on a `tokenSortSimilarity` workload, and **1.44×** on
-plain `similarity`. If you remember one thing from this page: _can you name
+search it replaces on a `tokenSortRatio` workload, and **1.44×** on
+plain `ratio`. If you remember one thing from this page: _can you name
 a second query? Build a Matcher._
 
 When a Matcher can't own the collection — you filter it per query, grow it,

@@ -13,9 +13,9 @@ every query after that only pays for itself.
 
 ```ts
 import { createMatcher, createScorer } from 'rapidfuzz-js'
-import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(weightedSimilarity)
+const scorer = createScorer(weightedRatio)
 const teams = ['Atlanta Falcons', 'New York Jets', 'New York Giants']
 
 const matcher = createMatcher(teams, { scorer }) // preparation happens here

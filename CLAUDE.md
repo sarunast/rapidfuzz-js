@@ -85,9 +85,9 @@ it.
 
 ## `{@link}` names a symbol, never a module path
 
-`{@link import('./tokenSort.js').tokenSortSimilarity}` does not resolve.
+`{@link import('./tokenSort.js').tokenSortRatio}` does not resolve.
 TypeDoc renders it verbatim, so the published reference reads
-"The higher of import('./tokenSort.js').tokenSortSimilarity and …" — a relative
+"The higher of import('./tokenSort.js').tokenSortRatio and …" — a relative
 path into our source, shown to someone who imported a package.
 
 Write `{@link name}` when the symbol is in the same file, and a plain

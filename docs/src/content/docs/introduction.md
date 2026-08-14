@@ -69,7 +69,7 @@ the Matcher and just scan a collection directly.
 
 ## Do I need to understand the algorithms?
 
-Not to get started. `weightedSimilarity` from `rapidfuzz-js/fuzz` picks a
+Not to get started. `weightedRatio` from `rapidfuzz-js/fuzz` picks a
 sensible strategy automatically, and the
 [Getting started](/getting-started/) page will have you matching in a
 minute.

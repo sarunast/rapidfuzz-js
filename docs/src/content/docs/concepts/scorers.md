@@ -80,9 +80,9 @@ similarity scorers treat a missing operand as "matches nothing":
 
 ```ts
 import { createScorer } from 'rapidfuzz-js'
-import { weightedSimilarity } from 'rapidfuzz-js/fuzz'
+import { weightedRatio } from 'rapidfuzz-js/fuzz'
 
-const scorer = createScorer(weightedSimilarity)
+const scorer = createScorer(weightedRatio)
 scorer.score(null, 'text') // 0
 ```
 
@@ -99,7 +99,7 @@ naturally scoring at the bottom. If a `null` reaching the scorer means a bug
 upstream, opt into strictness:
 
 ```ts
-const strict = createScorer(weightedSimilarity, { missing: 'throw' })
+const strict = createScorer(weightedRatio, { missing: 'throw' })
 strict.score(null, 'text') // throws TypeError
 ```
 
