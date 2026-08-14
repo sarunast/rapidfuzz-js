@@ -54,19 +54,17 @@ export const fuzzTokenSortRatio: MaybeSequenceMetricImplementation<FuzzOptions> 
  * `0..100` — so word order stops mattering while extra words still count.
  *
  * ```ts
- * tokenSortSimilarity('smith john', 'john smith') // 100
- * tokenSortSimilarity('data engineer', 'data engineer cloud platform') // 63.41…
+ * tokenSortRatio('smith john', 'john smith') // 100
+ * tokenSortRatio('data engineer', 'data engineer cloud platform') // 63.41…
  * ```
  *
- * That second line is the reason to choose this over `tokenSetSimilarity`: it
+ * That second line is the reason to choose this over `tokenSetRatio`: it
  * stays length-aware, so a longer string with extra words is *not* a perfect
  * match. For a job title or a
  * product name, where the extra words are the difference, that is the behaviour
  * you want.
  *
- * RapidFuzz calls it `token_sort_ratio`.
+ * RapidFuzz spells it `token_sort_ratio`.
  */
-export const tokenSortSimilarity: BuiltInMetric<
-  'fuzz.tokenSortSimilarity',
-  'similarity'
-> = /* @__PURE__ */ fuzzMetric(fuzzTokenSortRatio)
+export const tokenSortRatio: BuiltInMetric<'fuzz.tokenSortRatio', 'similarity'> =
+  /* @__PURE__ */ fuzzMetric(fuzzTokenSortRatio)

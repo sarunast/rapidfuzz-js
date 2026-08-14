@@ -26,7 +26,7 @@ import type { Match, PreparedChoiceOf, Scorer, Sequence } from '../index.js'
 import type { AnyMatcherOptions, ItemIterable } from './types.js'
 
 describe('one-shot search and Matcher', () => {
-  const scorer = createScorer(fuzz.similarity)
+  const scorer = createScorer(fuzz.ratio)
   // One object, so preparation and search name the same function: the handle
   // check compares normalizers by identity.
   const normalizing = { normalize: normalizeText }
@@ -307,15 +307,15 @@ describe('one-shot search and Matcher', () => {
 
   test('every fuzzy scorer supports prepared repeated search', () => {
     const metrics = [
-      fuzz.similarity,
-      fuzz.partialSimilarity,
-      fuzz.tokenSortSimilarity,
-      fuzz.tokenSetSimilarity,
-      fuzz.tokenSimilarity,
-      fuzz.partialTokenSortSimilarity,
-      fuzz.partialTokenSetSimilarity,
-      fuzz.partialTokenSimilarity,
-      fuzz.weightedSimilarity,
+      fuzz.ratio,
+      fuzz.partialRatio,
+      fuzz.tokenSortRatio,
+      fuzz.tokenSetRatio,
+      fuzz.tokenRatio,
+      fuzz.partialTokenSortRatio,
+      fuzz.partialTokenSetRatio,
+      fuzz.partialTokenRatio,
+      fuzz.weightedRatio,
     ]
     for (const metric of metrics) {
       const prepared = createMatcher(
@@ -726,7 +726,7 @@ describe('one-shot search and Matcher', () => {
   })
 
   test('a prepared choice is accepted by any scorer that prepares it the same way', () => {
-    const rows = [{ prepared: createScorer(fuzz.similarity).prepareChoice('alpha') }]
+    const rows = [{ prepared: createScorer(fuzz.ratio).prepareChoice('alpha') }]
     const read = (row: (typeof rows)[number]) => row.prepared
     // A second default scorer of the same metric compiles to the same
     // preparation, so it accepts the first one's choices.
@@ -752,7 +752,7 @@ describe('one-shot search and Matcher', () => {
     // weighting does, and its choices belong to that scorer alone.
     expect(
       bestMatch('alpha', rows, {
-        scorer: createScorer(fuzz.similarity, { missing: 'throw' }),
+        scorer: createScorer(fuzz.ratio, { missing: 'throw' }),
         getPrepared: read,
       })?.score,
     ).toBe(100)
@@ -778,7 +778,7 @@ describe('one-shot search and Matcher', () => {
         { scorer: configured, getPrepared: read },
       ]),
     ).toThrow('prepared choice is incompatible with this scorer')
-    const otherMetric = createScorer(fuzz.tokenSetSimilarity)
+    const otherMetric = createScorer(fuzz.tokenSetRatio)
     expect(
       () =>
         bestMatch('alpha', rows, {

@@ -889,75 +889,75 @@
       "left": "",
       "right": "",
       "scores": {
-        "similarity": 100.0,
-        "partialSimilarity": 100.0,
-        "tokenSortSimilarity": 100.0,
-        "tokenSetSimilarity": 0.0,
-        "tokenSimilarity": 100.0,
-        "partialTokenSortSimilarity": 100.0,
-        "partialTokenSetSimilarity": 0.0,
-        "partialTokenSimilarity": 100.0,
-        "weightedSimilarity": 0.0
+        "ratio": 100.0,
+        "partialRatio": 100.0,
+        "tokenSortRatio": 100.0,
+        "tokenSetRatio": 0.0,
+        "tokenRatio": 100.0,
+        "partialTokenSortRatio": 100.0,
+        "partialTokenSetRatio": 0.0,
+        "partialTokenRatio": 100.0,
+        "weightedRatio": 0.0
       }
     },
     {
       "left": "new york mets",
       "right": "new YORK mets",
       "scores": {
-        "similarity": 69.23076923076923,
-        "partialSimilarity": 69.23076923076923,
-        "tokenSortSimilarity": 61.53846153846154,
-        "tokenSetSimilarity": 76.19047619047619,
-        "tokenSimilarity": 76.19047619047619,
-        "partialTokenSortSimilarity": 76.19047619047619,
-        "partialTokenSetSimilarity": 100.0,
-        "partialTokenSimilarity": 100.0,
-        "weightedSimilarity": 72.38095238095238
+        "ratio": 69.23076923076923,
+        "partialRatio": 69.23076923076923,
+        "tokenSortRatio": 61.53846153846154,
+        "tokenSetRatio": 76.19047619047619,
+        "tokenRatio": 76.19047619047619,
+        "partialTokenSortRatio": 76.19047619047619,
+        "partialTokenSetRatio": 100.0,
+        "partialTokenRatio": 100.0,
+        "weightedRatio": 72.38095238095238
       }
     },
     {
       "left": "fuzzy was a bear",
       "right": "fuzzy fuzzy was a bear",
       "scores": {
-        "similarity": 84.21052631578947,
-        "partialSimilarity": 100.0,
-        "tokenSortSimilarity": 84.21052631578947,
-        "tokenSetSimilarity": 100.0,
-        "tokenSimilarity": 100.0,
-        "partialTokenSortSimilarity": 89.65517241379311,
-        "partialTokenSetSimilarity": 100.0,
-        "partialTokenSimilarity": 100.0,
-        "weightedSimilarity": 95.0
+        "ratio": 84.21052631578947,
+        "partialRatio": 100.0,
+        "tokenSortRatio": 84.21052631578947,
+        "tokenSetRatio": 100.0,
+        "tokenRatio": 100.0,
+        "partialTokenSortRatio": 89.65517241379311,
+        "partialTokenSetRatio": 100.0,
+        "partialTokenRatio": 100.0,
+        "weightedRatio": 95.0
       }
     },
     {
       "left": "alpha beta",
       "right": "beta alpha",
       "scores": {
-        "similarity": 50.0,
-        "partialSimilarity": 66.66666666666667,
-        "tokenSortSimilarity": 100.0,
-        "tokenSetSimilarity": 100.0,
-        "tokenSimilarity": 100.0,
-        "partialTokenSortSimilarity": 100.0,
-        "partialTokenSetSimilarity": 100.0,
-        "partialTokenSimilarity": 100.0,
-        "weightedSimilarity": 95.0
+        "ratio": 50.0,
+        "partialRatio": 66.66666666666667,
+        "tokenSortRatio": 100.0,
+        "tokenSetRatio": 100.0,
+        "tokenRatio": 100.0,
+        "partialTokenSortRatio": 100.0,
+        "partialTokenSetRatio": 100.0,
+        "partialTokenRatio": 100.0,
+        "weightedRatio": 95.0
       }
     },
     {
       "left": "😀 alpha",
       "right": "alpha 😀",
       "scores": {
-        "similarity": 71.42857142857143,
-        "partialSimilarity": 83.33333333333334,
-        "tokenSortSimilarity": 100.0,
-        "tokenSetSimilarity": 100.0,
-        "tokenSimilarity": 100.0,
-        "partialTokenSortSimilarity": 100.0,
-        "partialTokenSetSimilarity": 100.0,
-        "partialTokenSimilarity": 100.0,
-        "weightedSimilarity": 95.0
+        "ratio": 71.42857142857143,
+        "partialRatio": 83.33333333333334,
+        "tokenSortRatio": 100.0,
+        "tokenSetRatio": 100.0,
+        "tokenRatio": 100.0,
+        "partialTokenSortRatio": 100.0,
+        "partialTokenSetRatio": 100.0,
+        "partialTokenRatio": 100.0,
+        "weightedRatio": 95.0
       }
     }
   ],
@@ -4308,7 +4308,7 @@
   "divergences": [
     {
       "id": "token-split-u0085",
-      "surface": "fuzz.tokenSortSimilarity",
+      "surface": "fuzz.tokenSortRatio",
       "cpp": 66.66666666666667,
       "py": 100.0,
       "correct": "py",
@@ -4342,7 +4342,7 @@
     },
     {
       "id": "token-split-u00a0",
-      "surface": "fuzz.tokenSortSimilarity",
+      "surface": "fuzz.tokenSortRatio",
       "cpp": 66.66666666666667,
       "py": 100.0,
       "correct": "py",
@@ -4424,7 +4424,7 @@
     },
     {
       "id": "multi-character-element",
-      "surface": "fuzz.tokenSortSimilarity",
+      "surface": "fuzz.tokenSortRatio",
       "cpp": 33.333333333333336,
       "py": null,
       "correct": "ours",
@@ -4613,7 +4613,7 @@
         "pairs": [0.0, 0.0, 1.0]
       },
       {
-        "metric": "fuzz.similarity",
+        "metric": "fuzz.ratio",
         "threshold": 90,
         "pairs": [0.0, 0.0, 100.0]
       }

@@ -54,11 +54,11 @@ import { distance as osaDistance } from '../../dist/algorithms/osa/index.js'
 import { distance as postfixDistance } from '../../dist/algorithms/postfix/index.js'
 import { distance as prefixDistance } from '../../dist/algorithms/prefix/index.js'
 import {
-  weightedSimilarity,
-  partialSimilarity,
-  similarity as fuzzSimilarity,
-  tokenSetSimilarity,
-  tokenSortSimilarity,
+  weightedRatio,
+  partialRatio,
+  ratio as fuzzRatio,
+  tokenSetRatio,
+  tokenSortRatio,
 } from '../../dist/fuzz/index.js'
 import {
   bestMatch,
@@ -147,8 +147,8 @@ const fixedLevenshteinChoices = corpus.pairs['128'].map(([, choice]) => choice)
 // collection is held by a `Matcher`, which prepares every choice at
 // construction and reuses them for every later query.
 const levenshteinScorer = createScorer(levenshteinDistance)
-const fuzzScorer = createScorer(fuzzSimilarity)
-const tokenSortScorer = createScorer(tokenSortSimilarity)
+const fuzzScorer = createScorer(fuzzRatio)
+const tokenSortScorer = createScorer(tokenSortRatio)
 const titleMatcher = createMatcher(corpus.titles, { scorer: tokenSortScorer })
 
 /**
@@ -196,7 +196,7 @@ function checkAgreement() {
   }
 
   for (const [first, second] of corpus.sentences) {
-    const rounded = Math.round(fuzzSimilarity(first, second))
+    const rounded = Math.round(fuzzRatio(first, second))
     const theirs = fuzzball.ratio(first, second, RAW)
     if (theirs !== rounded) {
       problems.push(`fuzzball ratio: ${theirs} vs ${rounded} on "${first}"`)
@@ -386,7 +386,7 @@ contest(
   `sentences, ${corpus.sentences.length} pairs`,
   'fuzzball',
   () => {
-    for (const [a, b] of corpus.sentences) fuzzSimilarity(a, b)
+    for (const [a, b] of corpus.sentences) fuzzRatio(a, b)
   },
   () => {
     for (const [a, b] of corpus.sentences) fuzzball.ratio(a, b, RAW)
@@ -397,7 +397,7 @@ contest(
   `sentences, ${corpus.sentences.length} pairs`,
   'string-similarity',
   () => {
-    for (const [a, b] of corpus.sentences) fuzzSimilarity(a, b)
+    for (const [a, b] of corpus.sentences) fuzzRatio(a, b)
   },
   () => {
     for (const [a, b] of corpus.sentences) compareTwoStrings(a, b)
@@ -796,9 +796,9 @@ if (pythonPath !== null) {
   }
   againstPython.push([
     'ratio-sentences',
-    'fuzz.similarity, sentences',
+    'fuzz.ratio, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) fuzzSimilarity(a, b)
+      for (const [a, b] of corpus.sentences) fuzzRatio(a, b)
     },
   ])
   againstPython.push([
@@ -876,30 +876,30 @@ if (pythonPath !== null) {
   ])
   againstPython.push([
     'partial-ratio-sentences',
-    'fuzz.partialSimilarity, sentences',
+    'fuzz.partialRatio, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) partialSimilarity(a, b)
+      for (const [a, b] of corpus.sentences) partialRatio(a, b)
     },
   ])
   againstPython.push([
     'token-sort-ratio-sentences',
-    'fuzz.tokenSortSimilarity, sentences',
+    'fuzz.tokenSortRatio, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) tokenSortSimilarity(a, b)
+      for (const [a, b] of corpus.sentences) tokenSortRatio(a, b)
     },
   ])
   againstPython.push([
     'token-set-ratio-sentences',
-    'fuzz.tokenSetSimilarity, sentences',
+    'fuzz.tokenSetRatio, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) tokenSetSimilarity(a, b)
+      for (const [a, b] of corpus.sentences) tokenSetRatio(a, b)
     },
   ])
   againstPython.push([
     'w-ratio-sentences',
-    'fuzz.weightedSimilarity, sentences',
+    'fuzz.weightedRatio, sentences',
     () => {
-      for (const [a, b] of corpus.sentences) weightedSimilarity(a, b)
+      for (const [a, b] of corpus.sentences) weightedRatio(a, b)
     },
   ])
   againstPython.push([

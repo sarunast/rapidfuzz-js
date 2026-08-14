@@ -1,6 +1,6 @@
 import process from 'node:process'
 
-import { tokenSortSimilarity } from '../../dist/fuzz/index.js'
+import { tokenSortRatio } from '../../dist/fuzz/index.js'
 import { createMatcher, createScorer } from '../../dist/index.js'
 
 const count = Number(process.argv[2] ?? 50_000)
@@ -14,7 +14,7 @@ if (globalThis.gc === undefined) {
 const items = Array.from({ length: count }, (_, index) => ({
   title: `catalog item ${index} alpha beta gamma`,
 }))
-const scorer = createScorer(tokenSortSimilarity)
+const scorer = createScorer(tokenSortRatio)
 
 function collect() {
   globalThis.gc?.()

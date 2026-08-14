@@ -187,8 +187,8 @@ function isScoreArrayKind(value: string): value is ScoreArrayKind {
 
 function batchScorer(metric: string): Scorer<Direction> {
   switch (metric) {
-    case 'fuzz.similarity':
-      return createScorer(fuzz.similarity)
+    case 'fuzz.ratio':
+      return createScorer(fuzz.ratio)
     case 'levenshtein.distance':
       return createScorer(levenshtein.distance)
     case 'levenshtein.normalizedSimilarity':
@@ -200,24 +200,24 @@ function batchScorer(metric: string): Scorer<Direction> {
 
 function fuzzScore(name: string, left: string, right: string): number {
   switch (name) {
-    case 'similarity':
-      return fuzz.similarity(left, right)
-    case 'partialSimilarity':
-      return fuzz.partialSimilarity(left, right)
-    case 'tokenSortSimilarity':
-      return fuzz.tokenSortSimilarity(left, right)
-    case 'tokenSetSimilarity':
-      return fuzz.tokenSetSimilarity(left, right)
-    case 'tokenSimilarity':
-      return fuzz.tokenSimilarity(left, right)
-    case 'partialTokenSortSimilarity':
-      return fuzz.partialTokenSortSimilarity(left, right)
-    case 'partialTokenSetSimilarity':
-      return fuzz.partialTokenSetSimilarity(left, right)
-    case 'partialTokenSimilarity':
-      return fuzz.partialTokenSimilarity(left, right)
-    case 'weightedSimilarity':
-      return fuzz.weightedSimilarity(left, right)
+    case 'ratio':
+      return fuzz.ratio(left, right)
+    case 'partialRatio':
+      return fuzz.partialRatio(left, right)
+    case 'tokenSortRatio':
+      return fuzz.tokenSortRatio(left, right)
+    case 'tokenSetRatio':
+      return fuzz.tokenSetRatio(left, right)
+    case 'tokenRatio':
+      return fuzz.tokenRatio(left, right)
+    case 'partialTokenSortRatio':
+      return fuzz.partialTokenSortRatio(left, right)
+    case 'partialTokenSetRatio':
+      return fuzz.partialTokenSetRatio(left, right)
+    case 'partialTokenRatio':
+      return fuzz.partialTokenRatio(left, right)
+    case 'weightedRatio':
+      return fuzz.weightedRatio(left, right)
     default:
       throw new TypeError(`unknown fuzz oracle ${name}`)
   }
@@ -342,7 +342,7 @@ describe(`RapidFuzz ${fixture.rapidfuzzVersion} parity`, () => {
   test('matches partial similarity alignment', () => {
     for (const entry of fixture.alignmentCases) {
       const label = `alignment ${JSON.stringify([entry.left, entry.right])}`
-      const alignment = fuzz.partialSimilarityAlignment(entry.left, entry.right)
+      const alignment = fuzz.partialRatioAlignment(entry.left, entry.right)
       if (alignment === null) throw new TypeError(`${label} produced no alignment`)
 
       expect(alignment.score, `${label} score`).toBeCloseTo(entry.alignment.score, 12)
@@ -391,7 +391,7 @@ describe(`RapidFuzz ${fixture.rapidfuzzVersion} parity`, () => {
     // `limit` belongs to `search` alone: each entry point takes the keys it
     // defines, and one carrying a key another ignores is refused.
     const options = {
-      scorer: createScorer(fuzz.similarity),
+      scorer: createScorer(fuzz.ratio),
       threshold: fixture.search.threshold,
     }
     expect(search(fixture.search.query, choices, { ...options, limit: null })).toEqual(
@@ -407,7 +407,7 @@ describe(`RapidFuzz ${fixture.rapidfuzzVersion} parity`, () => {
   test('matches a search that normalizes text before scoring', () => {
     const entry = fixture.search.normalized
     const options = {
-      scorer: createScorer(fuzz.similarity),
+      scorer: createScorer(fuzz.ratio),
       normalize: normalizeText,
       threshold: entry.threshold,
     }
@@ -418,7 +418,7 @@ describe(`RapidFuzz ${fixture.rapidfuzzVersion} parity`, () => {
   })
 
   test('matches ranked and streaming process results', () => {
-    const scorer = createScorer(fuzz.similarity)
+    const scorer = createScorer(fuzz.ratio)
     const options = { scorer, threshold: fixture.search.threshold }
     expect(bestMatch(fixture.search.query, fixture.search.choices, options)).toEqual(
       fixture.search.best,

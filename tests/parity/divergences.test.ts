@@ -61,8 +61,8 @@ function optionalField(entry: object, key: string): unknown {
 
 /** What this port answers for the surface an entry names. */
 function observe(entry: object, surface: string): Observed {
-  if (surface === 'fuzz.tokenSortSimilarity') {
-    return fuzz.tokenSortSimilarity(
+  if (surface === 'fuzz.tokenSortRatio') {
+    return fuzz.tokenSortRatio(
       sequenceField(entry, 'left'),
       sequenceField(entry, 'right'),
     )

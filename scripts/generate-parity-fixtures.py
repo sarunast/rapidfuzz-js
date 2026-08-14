@@ -178,15 +178,15 @@ metric_cases.extend(
 )
 
 fuzz_scorers = {
-    "similarity": fuzz.ratio,
-    "partialSimilarity": fuzz.partial_ratio,
-    "tokenSortSimilarity": fuzz.token_sort_ratio,
-    "tokenSetSimilarity": fuzz.token_set_ratio,
-    "tokenSimilarity": fuzz.token_ratio,
-    "partialTokenSortSimilarity": fuzz.partial_token_sort_ratio,
-    "partialTokenSetSimilarity": fuzz.partial_token_set_ratio,
-    "partialTokenSimilarity": fuzz.partial_token_ratio,
-    "weightedSimilarity": fuzz.WRatio,
+    "ratio": fuzz.ratio,
+    "partialRatio": fuzz.partial_ratio,
+    "tokenSortRatio": fuzz.token_sort_ratio,
+    "tokenSetRatio": fuzz.token_set_ratio,
+    "tokenRatio": fuzz.token_ratio,
+    "partialTokenSortRatio": fuzz.partial_token_sort_ratio,
+    "partialTokenSetRatio": fuzz.partial_token_set_ratio,
+    "partialTokenRatio": fuzz.partial_token_ratio,
+    "weightedRatio": fuzz.WRatio,
 }
 fuzz_inputs = [
     ["", ""],
@@ -345,7 +345,7 @@ batch_rejection_cases = [
         ("levenshtein.distance", Levenshtein.distance, 2),
         ("levenshtein.distance", Levenshtein.distance, 0),
         ("levenshtein.normalizedSimilarity", Levenshtein.normalized_similarity, 0.9),
-        ("fuzz.similarity", fuzz.ratio, 90),
+        ("fuzz.ratio", fuzz.ratio, 90),
     ]
 ]
 
@@ -436,7 +436,7 @@ def token_divergence(id, separator, name):
     ]
     return divergence(
         id,
-        "fuzz.tokenSortSimilarity",
+        "fuzz.tokenSortRatio",
         fuzz.token_sort_ratio(left, right),
         fuzz_py.token_sort_ratio(left, right),
         "py",
@@ -532,7 +532,7 @@ except Exception as error:  # noqa: BLE001 - the refusal is the finding
 divergences.append(
     divergence(
         "multi-character-element",
-        "fuzz.tokenSortSimilarity",
+        "fuzz.tokenSortRatio",
         fuzz.token_sort_ratio(multichar_left, multichar_right),
         multichar_py,
         "ours",

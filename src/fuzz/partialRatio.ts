@@ -21,25 +21,25 @@ export const fuzzPartialRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
  * `0..100` — so a substring scores `100` however different the surrounding text.
  *
  * ```ts
- * partialSimilarity('new york jets', 'the new york jets play tonight') // 100
+ * partialRatio('new york jets', 'the new york jets play tonight') // 100
  * similarity('new york jets', 'the new york jets play tonight') // 60.46…
  * ```
  *
  * Use it when one side may be contained in the other: a search box query against a
  * full title, a name against a sentence. It says nothing about word *order* within
- * the window — `partialSimilarity('smith john', 'john smith')` is only `66.67` —
+ * the window — `partialRatio('smith john', 'john smith')` is only `66.67` —
  * so pair it with a token strategy when both problems are present.
  *
- * {@link partialSimilarityAlignment} returns the same score plus where the window
+ * {@link partialRatioAlignment} returns the same score plus where the window
  * sat.
  *
- * RapidFuzz calls it `partial_ratio`.
+ * RapidFuzz spells it `partial_ratio`.
  */
-export const partialSimilarity: BuiltInMetric<'fuzz.partialSimilarity', 'similarity'> =
+export const partialRatio: BuiltInMetric<'fuzz.partialRatio', 'similarity'> =
   /* @__PURE__ */ fuzzMetric(fuzzPartialRatio)
 
 /**
- * {@link partialSimilarity} with the window it chose — the score plus the
+ * {@link partialRatio} with the window it chose — the score plus the
  * `[srcStart, srcEnd)` and `[destStart, destEnd)` ranges it aligned, for
  * highlighting what actually matched.
  *
@@ -47,9 +47,6 @@ export const partialSimilarity: BuiltInMetric<'fuzz.partialSimilarity', 'similar
  *
  * @returns `null` when either input is missing.
  */
-export function partialSimilarityAlignment(
-  a: FuzzInput,
-  b: FuzzInput,
-): ScoreAlignment | null {
+export function partialRatioAlignment(a: FuzzInput, b: FuzzInput): ScoreAlignment | null {
   return partialRatioAlignment_impl(a, b)
 }

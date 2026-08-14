@@ -17,14 +17,14 @@ export const fuzzTokenRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
   )
 
 /**
- * The higher of `tokenSortSimilarity` and `tokenSetSimilarity`, `0..100`.
+ * The higher of `tokenSortRatio` and `tokenSetRatio`, `0..100`.
  *
  * For text that may differ in word order *or* in how much extra one side
  * carries, without your having to decide which up front. Because it takes the
  * maximum it inherits token-set's blind spot — containment scores `100` — so
  * where precision matters, name the strategy you actually want instead.
  *
- * RapidFuzz calls it `token_ratio`.
+ * RapidFuzz spells it `token_ratio`.
  */
-export const tokenSimilarity: BuiltInMetric<'fuzz.tokenSimilarity', 'similarity'> =
+export const tokenRatio: BuiltInMetric<'fuzz.tokenRatio', 'similarity'> =
   /* @__PURE__ */ fuzzMetric(fuzzTokenRatio)

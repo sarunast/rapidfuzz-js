@@ -38,7 +38,7 @@ export type AnyBrand = any
  * A built-in brand is the metric's own id literal, `'levenshtein.distance'`,
  * not a wrapper type: the brand is phantom and invariant, forgery is already
  * refused at runtime by `#owner`, and a bare literal is what lets a consumer's
- * own declaration emit name `Scorer<'similarity', 'fuzz.tokenSetSimilarity'>`
+ * own declaration emit name `Scorer<'similarity', 'fuzz.tokenSetRatio'>`
  * without importing anything of ours.
  */
 export class PreparedChoice<TBrand = AnyBrand> {

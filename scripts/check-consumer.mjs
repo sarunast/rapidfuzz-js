@@ -28,12 +28,12 @@ const source = `import {
   searchIter,
 } from 'rapidfuzz-js'
 import type { PreparedChoice, PreparedChoiceOf, Scorer, ScorerOf } from 'rapidfuzz-js'
-import { similarity, tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
+import { ratio, tokenSetRatio } from 'rapidfuzz-js/fuzz'
 import { distance } from 'rapidfuzz-js/levenshtein'
 import { distance as jaroWinklerDistance } from 'rapidfuzz-js/jaro-winkler'
 import { similarity as diceSimilarity } from 'rapidfuzz-js/dice'
 
-const scorer = createScorer(tokenSetSimilarity)
+const scorer = createScorer(tokenSetRatio)
 
 export interface Stored {
   readonly name: string
@@ -68,8 +68,8 @@ export const indexedBest = indexed.best('alpha', { threshold: 0.5 })
 // of any metric, which is what most annotations want.
 export const held: Scorer<'distance'> = createScorer(distance)
 export const many: Scorer<'similarity'>[] = [
-  createScorer(similarity),
-  createScorer(tokenSetSimilarity),
+  createScorer(ratio),
+  createScorer(tokenSetRatio),
 ]
 export const scoreWith = (held: Scorer<'similarity'>) => held.score('a', 'b')
 
@@ -89,8 +89,8 @@ export const gramHandle = (name: string): PreparedChoiceOf<typeof grams> =>
 
 // A scorer's exact type is nameable from the metric alone, brand included —
 // the annotation a stored scorer wants without \`typeof\` gymnastics.
-export const titled: ScorerOf<typeof tokenSetSimilarity> =
-  createScorer(tokenSetSimilarity)
+export const titled: ScorerOf<typeof tokenSetRatio> =
+  createScorer(tokenSetRatio)
 
 // Both spellings of a handle's type are nameable from outside the package.
 export type Handle = PreparedChoiceOf<typeof scorer>
@@ -106,10 +106,10 @@ export const keysOf = (prepared: Handle): string[] => Object.keys(prepared)
 // one too, which is how the difference is detected.
 const CROSSED_LINE = 13
 const crossed = `import { bestMatch, createScorer } from 'rapidfuzz-js'
-import { tokenSetSimilarity } from 'rapidfuzz-js/fuzz'
+import { tokenSetRatio } from 'rapidfuzz-js/fuzz'
 import { distance } from 'rapidfuzz-js/levenshtein'
 
-const titles = createScorer(tokenSetSimilarity)
+const titles = createScorer(tokenSetRatio)
 const companies = createScorer(distance)
 const rows = [{ prepared: titles.prepareChoice('a') }]
 
@@ -244,7 +244,7 @@ try {
       `the consumer's declarations deep-import into the package:\n${emitted}`,
     )
   }
-  if (!emitted.includes(`"fuzz.tokenSetSimilarity"`)) {
+  if (!emitted.includes(`"fuzz.tokenSetRatio"`)) {
     throw new Error(
       `expected the emitted declarations to spell the brand as a literal:\n${emitted}`,
     )

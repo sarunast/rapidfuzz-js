@@ -18,9 +18,20 @@ canonical lowercase algorithm subpaths, no legacy aggregate namespaces.
   comment naming the source file. Port the assertions faithfully, including the
   regression tests named after upstream issue numbers — the number is the reason
   the test exists.
-- **Naming is camelCase and describes this API**: `similarity`,
-  `partialSimilarity`, `weightedSimilarity`, `createScorer`, `createMatcher`. Never
-  restore `WRatio`, `QRatio`, or `extractOne`.
+- **Naming is camelCase, and the algorithms use RapidFuzz's vocabulary**: the
+  fuzz scorers are `ratio`, `partialRatio`, `tokenSortRatio`, `tokenSetRatio`,
+  `weightedRatio`, matching what upstream computes under `fuzz.*`. The casing is
+  still ours: never restore the spellings `WRatio`, `QRatio` or `extractOne`, and
+  `weightedRatio` is deliberately not a transliteration of `WRatio`.
+  Orchestration keeps its own names — `createScorer`, `createMatcher`,
+  `bestMatch`, `search`, `normalizeText` — because it describes this API rather
+  than an upstream algorithm.
+- **`QRatio` is deliberately absent, and stays absent.** It is upstream's `ratio`
+  with one difference — two empty strings score `0` rather than `100` — because
+  its processor became opt-in in RapidFuzz v3 and left the fuzzywuzzy
+  empty-string rule behind. It is a compatibility shim rather than an algorithm,
+  and `fuzzball` does not ship it either. Do not re-litigate this without new
+  evidence.
 - **Correctness before speed.** A straightforward DP matching a bit-parallel or
   SIMD upstream kernel is acceptable; optimise later, behind the ported tests.
 

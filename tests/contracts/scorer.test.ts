@@ -31,7 +31,7 @@ describe('Metric and Scorer contracts', () => {
   })
 
   test('algorithm families keep their natural scales', () => {
-    expect(fuzz.similarity('abc', 'axc')).toBeCloseTo(200 / 3)
+    expect(fuzz.ratio('abc', 'axc')).toBeCloseTo(200 / 3)
     for (const metric of [
       levenshtein.normalizedSimilarity,
       indel.normalizedSimilarity,
@@ -59,22 +59,22 @@ describe('Metric and Scorer contracts', () => {
     expect(levenshtein.similarity('abc', 'axc')).toBe(2)
     expect(indel.similarity('abc', 'axc')).toBe(4)
     for (const metric of [
-      fuzz.partialSimilarity,
-      fuzz.tokenSortSimilarity,
-      fuzz.tokenSetSimilarity,
-      fuzz.tokenSimilarity,
-      fuzz.partialTokenSortSimilarity,
-      fuzz.partialTokenSetSimilarity,
-      fuzz.partialTokenSimilarity,
-      fuzz.weightedSimilarity,
+      fuzz.partialRatio,
+      fuzz.tokenSortRatio,
+      fuzz.tokenSetRatio,
+      fuzz.tokenRatio,
+      fuzz.partialTokenSortRatio,
+      fuzz.partialTokenSetRatio,
+      fuzz.partialTokenRatio,
+      fuzz.weightedRatio,
     ]) {
       expect(metric('new york mets', 'new york mets')).toBeGreaterThanOrEqual(0)
     }
-    expect(fuzz.partialSimilarityAlignment('abc', 'zabc')?.score).toBe(100)
+    expect(fuzz.partialRatioAlignment('abc', 'zabc')?.score).toBe(100)
   })
 
   test('scorer metadata, configuration, freezing, and thresholds are scale aware', () => {
-    const fuzzy = createScorer(fuzz.weightedSimilarity)
+    const fuzzy = createScorer(fuzz.weightedRatio)
     const normalized = createScorer(levenshtein.normalizedSimilarity, {
       weights: { insertion: 1, deletion: 2, substitution: 1 },
     })
@@ -131,7 +131,7 @@ describe('Metric and Scorer contracts', () => {
         TypeError,
       )
     }
-    expect(() => Reflect.apply(fuzz.similarity, undefined, [Number.NaN, 'abc'])).toThrow(
+    expect(() => Reflect.apply(fuzz.ratio, undefined, [Number.NaN, 'abc'])).toThrow(
       TypeError,
     )
     expect(compatible.score('', '')).toBe(1)
@@ -418,7 +418,7 @@ describe('Metric and Scorer contracts', () => {
   })
 
   test('prepareChoice validates its argument and hides what it holds', () => {
-    const scorer = createScorer(fuzz.tokenSetSimilarity)
+    const scorer = createScorer(fuzz.tokenSetRatio)
     const handle = scorer.prepareChoice('new york mets')
     expect(Object.isFrozen(scorer)).toBe(true)
     expect(Object.keys(handle)).toEqual([])
@@ -437,7 +437,7 @@ describe('Metric and Scorer contracts', () => {
   })
 
   test('prepareChoice normalizes what it prepares, and records that it did', () => {
-    const scorer = createScorer(fuzz.tokenSetSimilarity)
+    const scorer = createScorer(fuzz.tokenSetRatio)
     const normalizing = { normalize: normalizeText }
     const handle = scorer.prepareChoice('New York Mets!', normalizing)
     // Normalized where it was prepared, so the handle holds the same text a

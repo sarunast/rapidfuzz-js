@@ -164,10 +164,10 @@ export const fuzzWeightedRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
  * base, then picks what else to try from the ratio of the two lengths:
  *
  * - **below 1.5** — the inputs are comparable, so it also tries
- *   `tokenSimilarity`, scaled by `0.95`. With no whitespace on either side there
+ *   `tokenRatio`, scaled by `0.95`. With no whitespace on either side there
  *   are no tokens to reorder, and it stops at the base.
- * - **1.5 and above** — one side is much longer, so it tries `partialSimilarity`
- *   and `partialTokenSimilarity` instead, scaled by `0.9` — or by `0.6` once the
+ * - **1.5 and above** — one side is much longer, so it tries `partialRatio`
+ *   and `partialTokenRatio` instead, scaled by `0.9` — or by `0.6` once the
  *   longer side is more than eight times the shorter, where a best window means
  *   much less.
  *
@@ -176,9 +176,9 @@ export const fuzzWeightedRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
  * whole-string score by more than a tenth before it can win.
  *
  * ```ts
- * weightedSimilarity('smith john', 'john smith') // 95
- * weightedSimilarity('new york jets', 'the new york jets play tonight') // 90
- * weightedSimilarity('this is a test', 'this is a test!') // 96.55…
+ * weightedRatio('smith john', 'john smith') // 95
+ * weightedRatio('new york jets', 'the new york jets play tonight') // 90
+ * weightedRatio('this is a test', 'this is a test!') // 96.55…
  * ```
  *
  * Start here, look at the pairs it gets wrong on your data, and only pin a
@@ -189,7 +189,7 @@ export const fuzzWeightedRatio: MaybeSequenceMetricImplementation<FuzzOptions> =
  * RapidFuzz (issue 110). Whitespace-only inputs still have length, so those
  * reach the ordinary strategy and score `100`.
  *
- * RapidFuzz calls it `WRatio`.
+ * RapidFuzz spells it `WRatio`.
  */
-export const weightedSimilarity: BuiltInMetric<'fuzz.weightedSimilarity', 'similarity'> =
+export const weightedRatio: BuiltInMetric<'fuzz.weightedRatio', 'similarity'> =
   /* @__PURE__ */ fuzzMetric(fuzzWeightedRatio)

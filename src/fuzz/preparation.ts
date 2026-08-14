@@ -16,7 +16,7 @@ import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
  * `partialWindow.ts`, `token/tokens.ts` and `token/tokenSet.ts`. None of them may import this
  * one, which is what keeps the graph acyclic.
  *
- * `weightedSimilarity.ts` is deliberately **not** among them. Its `weightedRatio_impl`, like every
+ * `weightedRatio.ts` is deliberately **not** among them. Its `weightedRatio_impl`, like every
  * other public scorer's implementation, validates and converts raw input — the
  * work already done by the time a branch below runs — so the composite strategy
  * is reproduced here over prepared state rather than called. The `weightedRatio` branch

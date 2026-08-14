@@ -266,29 +266,26 @@ it('treats two empty strings as a perfect match or as no match, per scorer', () 
 // inconsistency — fails as the compatibility break it would be.
 it('carries the empty-input split through to the public scorers', () => {
   const scorers = [
-    [publicFuzz.similarity, 100],
-    [publicFuzz.partialSimilarity, 100],
-    [publicFuzz.tokenSimilarity, 100],
-    [publicFuzz.tokenSortSimilarity, 100],
-    [publicFuzz.partialTokenSimilarity, 100],
-    [publicFuzz.partialTokenSortSimilarity, 100],
-    [publicFuzz.weightedSimilarity, 0],
-    [publicFuzz.tokenSetSimilarity, 0],
-    [publicFuzz.partialTokenSetSimilarity, 0],
+    [publicFuzz.ratio, 100],
+    [publicFuzz.partialRatio, 100],
+    [publicFuzz.tokenRatio, 100],
+    [publicFuzz.tokenSortRatio, 100],
+    [publicFuzz.partialTokenRatio, 100],
+    [publicFuzz.partialTokenSortRatio, 100],
+    [publicFuzz.weightedRatio, 0],
+    [publicFuzz.tokenSetRatio, 0],
+    [publicFuzz.partialTokenSetRatio, 0],
   ] as const
 
   for (const [metric, expected] of scorers) {
     expect(createScorer(metric).score('', '')).toBe(expected)
   }
-  for (const metric of [
-    publicFuzz.tokenSetSimilarity,
-    publicFuzz.partialTokenSetSimilarity,
-  ]) {
+  for (const metric of [publicFuzz.tokenSetRatio, publicFuzz.partialTokenSetRatio]) {
     expect(createScorer(metric).score('    ', '    ')).toBe(0)
   }
-  // Whitespace splits the three: `weightedSimilarity`'s zero is for an empty
+  // Whitespace splits the three: `weightedRatio`'s zero is for an empty
   // side, and whitespace is not one — RapidFuzz answers 100 here too.
-  expect(createScorer(publicFuzz.weightedSimilarity).score('    ', '    ')).toBe(100)
+  expect(createScorer(publicFuzz.weightedRatio).score('    ', '    ')).toBe(100)
 })
 
 describe('invalid input throws', () => {

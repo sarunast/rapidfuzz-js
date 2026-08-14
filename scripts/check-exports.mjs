@@ -22,16 +22,16 @@ const EXPECTED = {
     'normalizeText',
   ],
   './fuzz': [
-    'similarity',
-    'partialSimilarity',
-    'partialSimilarityAlignment',
-    'tokenSortSimilarity',
-    'tokenSetSimilarity',
-    'tokenSimilarity',
-    'partialTokenSortSimilarity',
-    'partialTokenSetSimilarity',
-    'partialTokenSimilarity',
-    'weightedSimilarity',
+    'ratio',
+    'partialRatio',
+    'partialRatioAlignment',
+    'tokenSortRatio',
+    'tokenSetRatio',
+    'tokenRatio',
+    'partialTokenSortRatio',
+    'partialTokenSetRatio',
+    'partialTokenRatio',
+    'weightedRatio',
   ],
   './levenshtein': [
     'distance',
@@ -95,9 +95,19 @@ const REMOVED = [
   'prepareChoice',
   'matchScore',
   'defaultProcess',
-  'ratio',
   'wRatio',
   'qRatio',
+  // Retired in 0.12.0, when the fuzz scorers took RapidFuzz's ratio vocabulary.
+  // `similarity` is deliberately absent: every algorithm subpath exports one.
+  'partialSimilarity',
+  'partialSimilarityAlignment',
+  'tokenSimilarity',
+  'tokenSortSimilarity',
+  'tokenSetSimilarity',
+  'partialTokenSimilarity',
+  'partialTokenSortSimilarity',
+  'partialTokenSetSimilarity',
+  'weightedSimilarity',
 ]
 
 const REMOVED_SUBPATHS = [

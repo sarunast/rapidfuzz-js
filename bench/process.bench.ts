@@ -5,11 +5,7 @@ import {
   normalizedSimilarity as levenshteinNormalizedSimilarity,
   similarity as levenshteinSimilarity,
 } from '../src/algorithms/levenshtein/index.js'
-import {
-  weightedSimilarity,
-  similarity as fuzzSimilarity,
-  tokenSortSimilarity,
-} from '../src/fuzz/index.js'
+import { weightedRatio, ratio as fuzzRatio, tokenSortRatio } from '../src/fuzz/index.js'
 import {
   bestMatch,
   createMatcher,
@@ -31,9 +27,9 @@ const titles = sentences(2_000, 5)
 const titleQueries = sentences(30, 5, 0x1122_3344)
 const titleQuery = 'alpha bravo charlie delta echo'
 
-const fuzzy = createScorer(fuzzSimilarity)
-const adaptive = createScorer(weightedSimilarity)
-const tokenSort = createScorer(tokenSortSimilarity)
+const fuzzy = createScorer(fuzzRatio)
+const adaptive = createScorer(weightedRatio)
+const tokenSort = createScorer(tokenSortRatio)
 const rawDistance = createScorer(levenshteinDistance)
 const rawSimilarity = createScorer(levenshteinSimilarity)
 const normalizedDistance = createScorer(levenshteinNormalizedDistance)
@@ -60,7 +56,7 @@ const preparedTitles = titles.map((text) => ({
 
 describe('direct Metric and Scorer calls', () => {
   measure('2000 pairs, fuzzy metric', () => {
-    for (const choice of choices) fuzzSimilarity(query, choice)
+    for (const choice of choices) fuzzRatio(query, choice)
   })
   measure('2000 pairs, fuzzy scorer', () => {
     for (const choice of choices) fuzzy.score(query, choice)

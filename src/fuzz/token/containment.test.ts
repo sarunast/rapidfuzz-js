@@ -1,7 +1,7 @@
 // Not ported from RapidFuzz — upstream has no index, and this proves an
 // optimisation upstream does not make.
 //
-// `tokenSetSimilarity` answers 100 exactly when one non-empty token set
+// `tokenSetRatio` answers 100 exactly when one non-empty token set
 // contains the other, so `tokenContainmentProof` can name every perfect match
 // without scoring a pair. The risk it carries is a plausible wrong answer: an
 // id that is not the earliest, or a match reported where the scorer would have
@@ -13,9 +13,9 @@ import { describe, expect, it } from 'vitest'
 
 import { createScorer } from '../../core/scoring/scorer.js'
 import { createMatcher } from '../../search/matcher/createMatcher.js'
-import { tokenSetSimilarity } from './tokenSetRatio.js'
+import { tokenSetRatio } from './tokenSetRatio.js'
 
-const scorer = createScorer(tokenSetSimilarity)
+const scorer = createScorer(tokenSetRatio)
 
 interface Expected {
   readonly key: number
