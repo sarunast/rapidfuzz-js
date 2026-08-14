@@ -479,6 +479,30 @@ fuzzywuzzy inheritance rather than a separate algorithm, and `fuzzball`, the
 JavaScript port of fuzzywuzzy, does not ship it either. Callers who want that
 empty-string rule can write it in a line.
 
+### Upgrading from 0.11
+
+Every `rapidfuzz-js/fuzz` export was renamed in 0.12.0, so that the scorers carry
+RapidFuzz's own vocabulary. Nothing else moved: the package root and the distance
+subpaths are unchanged, and no score changed with the names.
+
+| 0.11                         | 0.12                    |
+| ---------------------------- | ----------------------- |
+| `similarity`                 | `ratio`                 |
+| `partialSimilarity`          | `partialRatio`          |
+| `partialSimilarityAlignment` | `partialRatioAlignment` |
+| `tokenSimilarity`            | `tokenRatio`            |
+| `tokenSortSimilarity`        | `tokenSortRatio`        |
+| `tokenSetSimilarity`         | `tokenSetRatio`         |
+| `partialTokenSimilarity`     | `partialTokenRatio`     |
+| `partialTokenSortSimilarity` | `partialTokenSortRatio` |
+| `partialTokenSetSimilarity`  | `partialTokenSetRatio`  |
+| `weightedSimilarity`         | `weightedRatio`         |
+
+The metric brands moved with them, so a stored type such as
+`Scorer<'similarity', 'fuzz.tokenSetSimilarity'>` becomes
+`Scorer<'similarity', 'fuzz.tokenSetRatio'>`. The first argument there is the
+score direction and is unrelated to the rename.
+
 ## Missing and invalid values
 
 Only `null` and `undefined` count as missing. Similarity scorers return `0`

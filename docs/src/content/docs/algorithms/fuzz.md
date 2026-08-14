@@ -71,6 +71,13 @@ Coming from Python RapidFuzz? The names are the same ones, in camelCase:
 `tokenSortRatio`. The one that is not a transliteration is `WRatio`, which
 here is `weightedRatio`; `QRatio` has no counterpart at all.
 
+Coming from rapidfuzz-js 0.11? These scorers were called `similarity`,
+`tokenSortSimilarity`, `weightedSimilarity` and so on until 0.12.0, which gave
+the whole subpath RapidFuzz's vocabulary. Replace `…Similarity` with `…Ratio`,
+and plain `similarity` with `ratio`; the metric brands changed to match, and no
+score moved. The [README](https://github.com/sarunast/rapidfuzz-js#upgrading-from-011)
+has the full table.
+
 ## Empty inputs: the family disagrees on purpose
 
 Compare two empty strings and the answer depends on which fuzz metric you
