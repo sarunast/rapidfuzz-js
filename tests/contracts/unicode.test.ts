@@ -18,7 +18,7 @@ import {
   similarity as prefixSimilarity,
 } from '../../src/algorithms/prefix/index.js'
 import { normalizeText as defaultProcess } from '../../src/core/normalize.js'
-import { ratio } from '../../src/fuzz/similarity.js'
+import { ratio } from '../../src/fuzz/ratio.js'
 import { editopTuples } from '../../testing/editopTuples.js'
 
 interface UnicodeCase {

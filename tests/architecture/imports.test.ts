@@ -352,29 +352,29 @@ describe('dependency direction', () => {
     expect(shippedEntries(directory)).toEqual([
       'index.ts',
       'metric.ts',
-      'partialSimilarity.ts',
+      'partialRatio.ts',
       'partialWindow.ts',
       'preparation.ts',
-      'similarity.ts',
+      'ratio.ts',
       'token',
       'types.ts',
-      'weightedSimilarity.ts',
+      'weightedRatio.ts',
     ])
     expect(shippedEntries(family)).toEqual([
       'containment.ts',
-      'partialTokenSetSimilarity.ts',
-      'partialTokenSimilarity.ts',
-      'partialTokenSortSimilarity.ts',
+      'partialTokenRatio.ts',
+      'partialTokenSetRatio.ts',
+      'partialTokenSortRatio.ts',
+      'tokenRatio.ts',
       'tokenSet.ts',
-      'tokenSetSimilarity.ts',
-      'tokenSimilarity.ts',
+      'tokenSetRatio.ts',
       'tokenSort.ts',
-      'tokenSortSimilarity.ts',
+      'tokenSortRatio.ts',
       'tokens.ts',
     ])
-    for (const name of ['similarity.ts', 'partialSimilarity.ts']) {
+    for (const name of ['ratio.ts', 'partialRatio.ts']) {
       expect(readFileSync(join(directory, name), 'utf8')).not.toMatch(
-        /from ['"][^'"]*(token|weightedSimilarity)/,
+        /from ['"][^'"]*(token|weightedRatio)/,
       )
     }
     for (const name of shippedEntries(family)) {
@@ -391,7 +391,7 @@ describe('dependency direction', () => {
       /from ['"][^'"]*token/,
     )
     expect(readFileSync(join(directory, 'preparation.ts'), 'utf8')).not.toMatch(
-      /from ['"][^'"]*[Ss]imilarity\.js/,
+      /from ['"][^'"]*[Rr]atio\.js/,
     )
   })
 })

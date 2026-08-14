@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createScorer } from '../../core/scoring/scorer.js'
 import { createMatcher } from '../../search/matcher/createMatcher.js'
-import { tokenSetSimilarity } from './tokenSetSimilarity.js'
+import { tokenSetSimilarity } from './tokenSetRatio.js'
 
 const scorer = createScorer(tokenSetSimilarity)
 

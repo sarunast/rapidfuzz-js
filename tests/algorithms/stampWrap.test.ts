@@ -22,7 +22,7 @@ import { indelDistance } from '../../src/algorithms/indel/implementation.js'
 import { lcsSeqNormalizedSimilarity } from '../../src/algorithms/lcs/implementation.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
 import { resetBitVectorScratch } from '../../src/algorithms/shared/bitmask/blockMasks.js'
-import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partialSimilarity.js'
+import { partialRatio, partialRatioAlignment } from '../../src/fuzz/partialRatio.js'
 import { resetPartialRatioScratch } from '../../src/fuzz/partialWindow.js'
 
 /** One before the counter's ceiling, so the next build but one wraps it. */

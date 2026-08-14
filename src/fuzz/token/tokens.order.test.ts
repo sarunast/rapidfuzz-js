@@ -14,6 +14,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { convSequence } from '../../algorithms/shared/scorerSupport.js'
+import { tokenRatio } from './tokenRatio.js'
 import {
   difference,
   intersects,
@@ -23,9 +24,8 @@ import {
   uniqueOf,
   type UniqueTokenSet,
 } from './tokens.js'
-import { tokenSetRatio } from './tokenSetSimilarity.js'
-import { tokenRatio } from './tokenSimilarity.js'
-import { tokenSortRatio } from './tokenSortSimilarity.js'
+import { tokenSetRatio } from './tokenSetRatio.js'
+import { tokenSortRatio } from './tokenSortRatio.js'
 
 /** Everything observable about a token set, in an order-free form. */
 function snapshot(set: UniqueTokenSet): { size: number; tokens: string[] } {

@@ -13,9 +13,9 @@
 // 2026-08-13, not from this implementation.
 import { describe, expect, it } from 'vitest'
 
-import { wRatio } from '../weightedSimilarity.js'
-import { tokenSetRatio } from './tokenSetSimilarity.js'
-import { tokenRatio } from './tokenSimilarity.js'
+import { wRatio } from '../weightedRatio.js'
+import { tokenRatio } from './tokenRatio.js'
+import { tokenSetRatio } from './tokenSetRatio.js'
 
 describe('tokenSetRatio when the differences cannot be compared', () => {
   // Shared section of 11 elements against differences of 1 and 20, so the

@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
 import { convSequence } from '../../algorithms/shared/scorerSupport.js'
 import { tokenViewOf } from './tokens.js'
 import { tokenSortRatioConverted } from './tokenSort.js'
-import { tokenSortRatio } from './tokenSortSimilarity.js'
+import { tokenSortRatio } from './tokenSortRatio.js'
 
 describe('tokenSortRatio and the canonical length ceiling', () => {
   it('refuses a pair too differently sized to meet the cutoff', () => {

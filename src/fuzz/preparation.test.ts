@@ -7,7 +7,7 @@ import {
   partialRatioImpl,
 } from './partialWindow.js'
 import { prepareFuzz } from './preparation.js'
-import { prepareSimilarity } from './similarity.js'
+import { prepareSimilarity } from './ratio.js'
 import {
   preparedTokenChoice,
   sortTokens,
@@ -15,7 +15,7 @@ import {
   tokenChoicePreparer,
 } from './token/tokens.js'
 import { partialTokenRatioConverted } from './token/tokenSet.js'
-import { prepareTokenSort } from './token/tokenSortSimilarity.js'
+import { prepareTokenSort } from './token/tokenSortRatio.js'
 
 describe('fuzz preparation invariants', () => {
   it('covers ratio preparation cutoffs and bounds', () => {
