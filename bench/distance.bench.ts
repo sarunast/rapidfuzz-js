@@ -1,9 +1,14 @@
 import { damerauLevenshteinDistance } from '../src/algorithms/damerauLevenshtein/implementation.js'
 import {
+  hammingDistance,
+  hammingNormalizedSimilarity,
+} from '../src/algorithms/hamming/implementation.js'
+import {
   indelDistance,
   indelNormalizedSimilarity,
 } from '../src/algorithms/indel/implementation.js'
 import { jaroSimilarity } from '../src/algorithms/jaro/implementation.js'
+import { jaroWinklerSimilarity } from '../src/algorithms/jaroWinkler/implementation.js'
 import {
   lcsSeqEditops,
   lcsSeqNormalizedSimilarity,
@@ -15,6 +20,14 @@ import {
   levenshteinSimilarity,
 } from '../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../src/algorithms/osa/implementation.js'
+import {
+  postfixNormalizedSimilarity,
+  postfixSimilarity,
+} from '../src/algorithms/postfix/implementation.js'
+import {
+  prefixNormalizedSimilarity,
+  prefixSimilarity,
+} from '../src/algorithms/prefix/implementation.js'
 import {
   editedPairs,
   LATIN1,
@@ -46,6 +59,11 @@ const dissimilar = pairs(words(200, 32))
 // elements to walk before it can conclude what the lengths already said.
 const lengthSkewed = words(100, 1024, 0x0ba7_d101).map((value, index) =>
   index % 2 === 0 ? [value, value.slice(0, 256)] : [value.slice(0, 256), value],
+)
+// The mirror of `lengthSkewed`: the shorter side is a *suffix* of the longer,
+// which is the shape the postfix scan pays for.
+const suffixSkewed = words(100, 1024, 0x0ba7_d101).map((value, index) =>
+  index % 2 === 0 ? [value, value.slice(-256)] : [value.slice(-256), value],
 )
 const weightedDissimilar = pairs(words(8, 512, 0x2718_2818))
 
@@ -208,7 +226,25 @@ describe('jaroSimilarity', () => {
   })
 })
 
+describe('jaroWinklerSimilarity', () => {
+  measure('8 chars, similar', () => {
+    for (const [a, b] of short) jaroWinklerSimilarity(a, b)
+  })
+  measure('32 chars, similar', () => {
+    for (const [a, b] of medium) jaroWinklerSimilarity(a, b)
+  })
+  measure('128 chars, similar', () => {
+    for (const [a, b] of long) jaroWinklerSimilarity(a, b)
+  })
+  measure('32 chars, cutoff 0.92, half rejected', () => {
+    for (const [a, b] of medium) jaroWinklerSimilarity(a, b, { scoreCutoff: 0.92 })
+  })
+})
+
 describe('osaDistance', () => {
+  measure('8 chars, similar', () => {
+    for (const [a, b] of short) osaDistance(a, b)
+  })
   measure('32 chars, similar', () => {
     for (const [a, b] of medium) osaDistance(a, b)
   })
@@ -404,5 +440,79 @@ describe('editops, Latin-1 alphabet', () => {
   })
   measure('32 chars, similar, LCS', () => {
     for (const [a, b] of mediumWide) lcsSeqEditops(a, b)
+  })
+})
+
+// The three cheapest scorers in the package. They matter here out of
+// proportion to their cost: the whole operation is a single scan, so anything
+// wrapped around one — a closure, an extra `Math.max`, a subtraction — is a
+// measurable fraction of it rather than noise against a kernel. Nothing
+// covered these before, which meant a shared distance-family helper could have
+// regressed them silently.
+describe('hammingDistance', () => {
+  measure('8 chars, similar', () => {
+    for (const [a, b] of short) hammingDistance(a, b)
+  })
+  measure('32 chars, similar', () => {
+    for (const [a, b] of medium) hammingDistance(a, b)
+  })
+  measure('1024 chars, similar', () => {
+    for (const [a, b] of veryLong) hammingDistance(a, b)
+  })
+})
+
+describe('hammingNormalizedSimilarity', () => {
+  measure('8 chars, similar', () => {
+    for (const [a, b] of short) hammingNormalizedSimilarity(a, b)
+  })
+  measure('32 chars, similar', () => {
+    for (const [a, b] of medium) hammingNormalizedSimilarity(a, b)
+  })
+})
+
+describe('prefixSimilarity', () => {
+  measure('8 chars, similar', () => {
+    for (const [a, b] of short) prefixSimilarity(a, b)
+  })
+  measure('32 chars, similar', () => {
+    for (const [a, b] of medium) prefixSimilarity(a, b)
+  })
+  // 256 shared elements before the two sides part, which is the shape the
+  // scan actually costs something on.
+  measure('1024 vs 256 chars, long shared prefix', () => {
+    for (const [a, b] of lengthSkewed) prefixSimilarity(a, b)
+  })
+})
+
+describe('prefixNormalizedSimilarity', () => {
+  measure('8 chars, similar', () => {
+    for (const [a, b] of short) prefixNormalizedSimilarity(a, b)
+  })
+  measure('32 chars, similar', () => {
+    for (const [a, b] of medium) prefixNormalizedSimilarity(a, b)
+  })
+})
+
+describe('postfixSimilarity', () => {
+  measure('8 chars, similar', () => {
+    for (const [a, b] of short) postfixSimilarity(a, b)
+  })
+  measure('32 chars, similar', () => {
+    for (const [a, b] of medium) postfixSimilarity(a, b)
+  })
+  measure('1024 vs 256 chars, long shared suffix', () => {
+    for (const [a, b] of suffixSkewed) postfixSimilarity(a, b)
+  })
+})
+
+describe('postfixNormalizedSimilarity', () => {
+  measure('8 chars, similar', () => {
+    for (const [a, b] of short) postfixNormalizedSimilarity(a, b)
+  })
+  measure('32 chars, similar', () => {
+    for (const [a, b] of medium) postfixNormalizedSimilarity(a, b)
+  })
+  measure('1024 vs 256 chars, long shared suffix', () => {
+    for (const [a, b] of suffixSkewed) postfixNormalizedSimilarity(a, b)
   })
 })

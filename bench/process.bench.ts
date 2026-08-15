@@ -1,10 +1,16 @@
+import {
+  distance as damerauDistance,
+  normalizedSimilarity as damerauNormalizedSimilarity,
+} from '../src/algorithms/damerauLevenshtein/index.js'
 import { normalizedSimilarity as indelNormalizedSimilarity } from '../src/algorithms/indel/index.js'
+import { normalizedSimilarity as lcsNormalizedSimilarity } from '../src/algorithms/lcs/index.js'
 import {
   distance as levenshteinDistance,
   normalizedDistance as levenshteinNormalizedDistance,
   normalizedSimilarity as levenshteinNormalizedSimilarity,
   similarity as levenshteinSimilarity,
 } from '../src/algorithms/levenshtein/index.js'
+import { normalizedSimilarity as osaNormalizedSimilarity } from '../src/algorithms/osa/index.js'
 import { weightedRatio, ratio as fuzzRatio, tokenSortRatio } from '../src/fuzz/index.js'
 import {
   bestMatch,
@@ -35,6 +41,10 @@ const rawSimilarity = createScorer(levenshteinSimilarity)
 const normalizedDistance = createScorer(levenshteinNormalizedDistance)
 const normalized = createScorer(levenshteinNormalizedSimilarity)
 const preparedIndel = createScorer(indelNormalizedSimilarity)
+const preparedLcs = createScorer(lcsNormalizedSimilarity)
+const preparedOsa = createScorer(osaNormalizedSimilarity)
+const preparedDamerau = createScorer(damerauNormalizedSimilarity)
+const preparedDamerauDistance = createScorer(damerauDistance)
 const asymmetricNormalized = createScorer(levenshteinNormalizedSimilarity, {
   weights: { insertion: 1, deletion: 2, substitution: 1 },
 })
@@ -323,5 +333,34 @@ describe('prepared band, 256-char queries', () => {
       scorer: preparedIndel,
       threshold: 0.95,
     })
+  })
+})
+
+// The prepared side of the three distance families that had no coverage here.
+// `prepared Indel` above is the only prepared non-Levenshtein case in the file,
+// so a change to the shared distance-family policy could have moved LCS, OSA or
+// Damerau with nothing to notice. Both a thresholded scan and a limited search,
+// because the cutoff-to-distance conversion those families duplicate is only
+// exercised when a threshold is present.
+describe('prepared distance families, one-word queries', () => {
+  measure('2000 choices, LCS normalized threshold 0.8', () => {
+    bestMatch(query, choices, { scorer: preparedLcs, threshold: 0.8 })
+  })
+  measure('2000 choices, OSA normalized threshold 0.8', () => {
+    bestMatch(query, choices, { scorer: preparedOsa, threshold: 0.8 })
+  })
+  measure('2000 choices, Damerau normalized threshold 0.8', () => {
+    bestMatch(query, choices, { scorer: preparedDamerau, threshold: 0.8 })
+  })
+  measure('2000 choices, LCS search limit 5, threshold 0.7', () => {
+    search(query, choices, { scorer: preparedLcs, threshold: 0.7, limit: 5 })
+  })
+  measure('2000 choices, OSA search limit 5, threshold 0.7', () => {
+    search(query, choices, { scorer: preparedOsa, threshold: 0.7, limit: 5 })
+  })
+  // No threshold, so every candidate is scored and the conversion runs on the
+  // unbounded path instead of the rejecting one.
+  measure('2000 choices, Damerau raw distance, no threshold', () => {
+    bestMatch(query, choices, { scorer: preparedDamerauDistance })
   })
 })
