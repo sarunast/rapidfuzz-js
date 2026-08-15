@@ -7,13 +7,14 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+import { CONTROL_FILE } from '../harness/discovery.ts'
 import type { CaseRecord } from './baseline.ts'
-import { CONTROL_FILE, environment, fileOf, fingerprint, isControl } from './baseline.ts'
+import { environment, fileOf, fingerprint, isControl } from './baseline.ts'
 import {
   geometricMedian,
   machineRatio,
@@ -26,7 +27,6 @@ import { dim, out } from './terminal.ts'
 
 const REGRESSION_DIR = dirname(fileURLToPath(import.meta.url))
 const BENCH_DIR = dirname(REGRESSION_DIR)
-const SUITES_DIR = join(BENCH_DIR, 'suites')
 const PROJECT_DIR = dirname(BENCH_DIR)
 
 /** The measurement child: bundles with esbuild, measures in bare node. */
@@ -107,52 +107,6 @@ export interface RunOptions {
   name: string | null
   verbose: boolean
   bundleDir: string
-}
-
-/**
- * The bench files a pass should measure — everything asked for, never the
- * controls.
- *
- * Resolved to real paths, rather than passed through. A positional argument is
- * a *substring* to the runner, so `compare.ts fuzz` runs `bench/suites/fuzz.bench.ts`
- * perfectly well — and then every later use of that argument is comparing the
- * string "fuzz" against a stored case named `bench/suites/fuzz.bench.ts > …`, which
- * matches nothing. Recording is where that bites: the entries the re-record
- * exists to replace would be kept, because they did not look like they
- * belonged to the file being recorded. Matching the filter against the
- * directory here means one namespace downstream, the same one the stored names
- * are in.
- *
- * The controls are timed on their own either side of the pass rather than
- * inside it, so they are never in this list.
- */
-export function suiteFiles(filters: readonly string[]): string[] {
-  const all = readdirSync(SUITES_DIR)
-    .filter((entry) => entry.endsWith('.bench.ts'))
-    // Interpolated, not `join`ed. What is being built here is an identity — the
-    // same string the runner puts in a case's name and `baseline.json` stores — and
-    // identities do not have a platform. `join` would spell it
-    // `bench\suites\fuzz.bench.ts` on Windows, where it would match neither
-    // {@link CONTROL_FILE} on the next line, so the anchor would be measured as
-    // a subject, nor anything {@link canonicalFile} produced, so a filter naming
-    // a real file would be rejected as matching none.
-    .map((entry) => `bench/suites/${entry}`)
-    .filter((file) => file !== CONTROL_FILE)
-
-  if (all.length === 0) {
-    throw new Error(`nothing to measure: ${CONTROL_FILE} is the anchor, not a subject`)
-  }
-  if (filters.length === 0) return all
-
-  const chosen = all.filter((file) => filters.some((filter) => file.includes(filter)))
-  // Reported here rather than as an empty run: a filter matching no file would
-  // otherwise surface minutes later as a report with no cases in it.
-  if (chosen.length === 0) {
-    throw new Error(
-      `no benchmark file matched ${filters.join(', ')}. Known files: ${all.join(', ')}`,
-    )
-  }
-  return chosen
 }
 
 /**

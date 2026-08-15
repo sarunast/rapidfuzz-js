@@ -35,50 +35,21 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+import { discoverSuiteFiles } from './discovery.ts'
+
 const HARNESS_DIR = dirname(fileURLToPath(import.meta.url))
 const BENCH_DIR = dirname(HARNESS_DIR)
-const SUITES_DIR = join(BENCH_DIR, 'suites')
 const PROJECT_DIR = dirname(BENCH_DIR)
-
-/** Every bench file, project-relative with forward slashes. */
-function allBenchFiles(): string[] {
-  return readdirSync(SUITES_DIR)
-    .filter((name) => name.endsWith('.bench.ts'))
-    .map((name) => `bench/suites/${name}`)
-    .sort()
-}
-
-function chooseFiles(filters: readonly string[]): string[] {
-  const all = allBenchFiles()
-  if (filters.length === 0) return all
-  const chosen = all.filter((file) =>
-    filters.some((filter) => {
-      // `resolve`, so an absolute path, a `./bench/…` and a bare `fuzz` all
-      // land in the one spelling the stored names use.
-      const canonical = relative(PROJECT_DIR, resolve(PROJECT_DIR, filter))
-        .split(sep)
-        .join('/')
-      return file.includes(canonical) || file.includes(filter)
-    }),
-  )
-  if (chosen.length === 0) {
-    throw new Error(
-      `no benchmark file matched ${filters.join(', ')}. Known files: ${all.join(', ')}`,
-    )
-  }
-  return chosen
-}
 
 /**
  * The generated entry for ONE bench file: name it, import it, run what
@@ -289,7 +260,7 @@ async function main(): Promise<number> {
     }
   }
 
-  const files = chooseFiles(options.files)
+  const files = discoverSuiteFiles(options.files)
 
   // A shared `--bundleDir` belongs to the caller and is left in place — that
   // is the whole point of it. Without one, each invocation bundles into its

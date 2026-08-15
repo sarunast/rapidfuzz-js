@@ -14,6 +14,7 @@ import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+import { CONTROL_FILE } from '../harness/discovery.ts'
 import { out, yellow } from './terminal.ts'
 
 const REGRESSION_DIR = dirname(fileURLToPath(import.meta.url))
@@ -66,12 +67,15 @@ export interface Baseline {
  * Everything a case's timing depends on besides `src` and its own bench file.
  *
  * `bench/harness/runner.ts` is in here because the bundling options are decided
- * there, and changing any of them changes what a stored number means
- * without touching a benchmark. `MEASUREMENT_VERSION` covers a deliberate
- * change of method; this covers forgetting to bump it.
+ * there, and `discovery.ts` because the set and order of files it returns
+ * decides which definitions produced a stored number. Changing either changes
+ * what a stored number means without touching a benchmark.
+ * `MEASUREMENT_VERSION` covers a deliberate change of method; this covers
+ * forgetting to bump it.
  */
 export const SHARED_SOURCES = [
   'bench/harness/corpus.ts',
+  'bench/harness/discovery.ts',
   'bench/harness/harness.ts',
   'bench/harness/runner.ts',
 ]
@@ -112,9 +116,6 @@ export function fingerprint(benchFile: string): string {
 export function fileOf(name: string): string {
   return name.slice(0, name.indexOf(' > '))
 }
-
-/** The file whose cases anchor every other case. See its header. */
-export const CONTROL_FILE = 'bench/suites/control.bench.ts'
 
 /**
  * What a stored number means.

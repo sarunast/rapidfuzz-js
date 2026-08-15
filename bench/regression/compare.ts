@@ -68,10 +68,11 @@
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+import { canonicalFile, discoverSuiteFiles } from '../harness/discovery.ts'
 import type { Baseline, CaseRecord } from './baseline.ts'
 import {
   checkEnvironment,
@@ -82,13 +83,11 @@ import {
   writeBaseline,
 } from './baseline.ts'
 import type { Pass } from './measurement.ts'
-import { aggregate, prebundle, runPass, suiteFiles } from './measurement.ts'
+import { aggregate, prebundle, runPass } from './measurement.ts'
 import { FLOOR, report, reportMeasurement, QUICK_FLOOR } from './report.ts'
 import { dim, out, percent, red, yellow } from './terminal.ts'
 
 const REGRESSION_DIR = dirname(fileURLToPath(import.meta.url))
-const BENCH_DIR = dirname(REGRESSION_DIR)
-const PROJECT_DIR = dirname(BENCH_DIR)
 const DEFAULT_BASELINE = join(REGRESSION_DIR, 'baseline.json')
 
 interface Options {
@@ -141,24 +140,6 @@ const USAGE = `
 
   For the edit loop, \`pnpm bench:quick\` skips the comparison entirely.
 `
-
-/**
- * A path argument in the one spelling everything downstream compares against.
- *
- * Stored case names begin with the path the runner reports — `bench/suites/fuzz.bench.ts`,
- * project-relative and slash-separated — and that string is the identity behind
- * three separate things: which baseline entries a partial `--record` replaces,
- * which ones `candidates` considers, and which file gets fingerprinted. Left
- * raw, `./bench/suites/fuzz.bench.ts` and an absolute path each name the same file and
- * match none of them, so a re-record would quietly keep the stale entries it
- * was run to remove. Normalising here means there is only ever one namespace.
- */
-function canonicalFile(arg: string): string {
-  // Resolved against the project, not the process's cwd: `bench/suites/fuzz.bench.ts`
-  // has to name the same file whichever directory the command was typed in,
-  // and the runner canonicalises its own arguments the same way.
-  return relative(PROJECT_DIR, resolve(PROJECT_DIR, arg)).split(sep).join('/')
-}
 
 function parseArgs(argv: readonly string[]): Options {
   // `repeats` is the one field that is not final until parsing is done: its
@@ -306,7 +287,7 @@ function main(): number {
   // Resolved first, because everything after it is keyed by the exact paths
   // this returns rather than by what was typed — and because a filter that
   // matches no file should say so now, not after the baseline has been read.
-  const files = suiteFiles(options.files)
+  const files = discoverSuiteFiles(options.files, { excludeControl: true })
 
   // Read the baseline, and check what this run could compare against, before
   // spending minutes measuring.

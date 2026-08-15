@@ -15,7 +15,7 @@
       "batch": 8,
       "sample": 0.1606045,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -23,7 +23,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > fuzzRatio > 32 chars": {
       "normalised": 0.06751525892289889,
@@ -40,7 +40,7 @@
       "batch": 3,
       "sample": 0.181458,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -48,7 +48,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > fuzzRatio > 128 chars": {
       "normalised": 0.1984812403084813,
@@ -65,7 +65,7 @@
       "batch": 1,
       "sample": 0.174875,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -73,7 +73,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > fuzzRatio > 128 chars, BMP": {
       "normalised": 0.2229508852697441,
@@ -90,7 +90,7 @@
       "batch": 1,
       "sample": 0.210813,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -98,7 +98,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > fuzzRatio > 128 chars, astral": {
       "normalised": 0.3579561417350345,
@@ -115,7 +115,7 @@
       "batch": 1,
       "sample": 0.32395850000000004,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -123,7 +123,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio > 32 chars": {
       "normalised": 0.548081133812029,
@@ -140,7 +140,7 @@
       "batch": 1,
       "sample": 0.496021,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -148,7 +148,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio > 128 chars": {
       "normalised": 3.873663840597918,
@@ -165,7 +165,7 @@
       "batch": 1,
       "sample": 3.579459,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -173,7 +173,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio > sentences": {
       "normalised": 1.2763183529576594,
@@ -190,7 +190,7 @@
       "batch": 1,
       "sample": 1.162312,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -198,7 +198,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio > 128 chars in long haystack": {
       "normalised": 1.0878584894846093,
@@ -215,7 +215,7 @@
       "batch": 1,
       "sample": 0.9939585,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -223,7 +223,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio > 128 chars in long haystack, cutoff 90": {
       "normalised": 0.25868346826712935,
@@ -240,7 +240,7 @@
       "batch": 1,
       "sample": 0.22610449999999999,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -248,7 +248,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio > 128 chars planted in long haystack": {
       "normalised": 0.12176825294895936,
@@ -265,7 +265,7 @@
       "batch": 1,
       "sample": 0.107208,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -273,7 +273,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio > 128 chars near-matched in long haystack": {
       "normalised": 0.6434351279073407,
@@ -290,7 +290,7 @@
       "batch": 1,
       "sample": 0.532417,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -298,7 +298,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > token scorers > tokenSortRatio, sentences": {
       "normalised": 0.5106545964729614,
@@ -315,7 +315,7 @@
       "batch": 1,
       "sample": 0.4474165,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -323,7 +323,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > token scorers > tokenSetRatio, sentences": {
       "normalised": 0.9412934074953903,
@@ -340,7 +340,7 @@
       "batch": 1,
       "sample": 0.832875,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -348,7 +348,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > token scorers > partialTokenSetRatio, sentences": {
       "normalised": 2.3406133756252023,
@@ -365,7 +365,7 @@
       "batch": 1,
       "sample": 1.960563,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -373,7 +373,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > weightedRatio > 32 chars": {
       "normalised": 0.10298286377893859,
@@ -390,7 +390,7 @@
       "batch": 1,
       "sample": 0.089125,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -398,7 +398,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > weightedRatio > sentences": {
       "normalised": 1.4039549773026843,
@@ -415,7 +415,7 @@
       "batch": 1,
       "sample": 1.2607295,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -423,7 +423,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio window scan > 16 interior windows": {
       "normalised": 0.283346237451782,
@@ -440,7 +440,7 @@
       "batch": 1,
       "sample": 0.265084,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -448,7 +448,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio window scan > 16 interior windows, cutoff 90": {
       "normalised": 0.3029345377493576,
@@ -465,7 +465,7 @@
       "batch": 1,
       "sample": 0.26914550000000004,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -473,7 +473,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio window scan > many interior windows": {
       "normalised": 1.3237514847610103,
@@ -490,7 +490,7 @@
       "batch": 1,
       "sample": 1.170041,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -498,7 +498,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio window scan > perfect first window in an 8k haystack": {
       "normalised": 0.05131373835901917,
@@ -515,7 +515,7 @@
       "batch": 3,
       "sample": 0.17175,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -523,7 +523,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio, two-word needle > 48-char needle in long haystacks": {
       "normalised": 0.6015573614116796,
@@ -540,7 +540,7 @@
       "batch": 1,
       "sample": 0.501958,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -548,7 +548,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/fuzz.bench.ts > partialRatio, three-word needle > 80-char needle in long haystacks": {
       "normalised": 1.1215497018791547,
@@ -565,7 +565,7 @@
       "batch": 1,
       "sample": 0.928084,
       "repeats": 2,
-      "source": "7b84fca891da",
+      "source": "971204e78d68",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -573,7 +573,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 4 chars, similar": {
       "normalised": 0.08610822947089866,
@@ -590,7 +590,7 @@
       "batch": 1,
       "sample": 0.109417,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -598,7 +598,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 6 chars, similar": {
       "normalised": 0.10610387584977343,
@@ -615,7 +615,7 @@
       "batch": 1,
       "sample": 0.129916,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -623,7 +623,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 8 chars, similar": {
       "normalised": 0.12840590485524866,
@@ -640,7 +640,7 @@
       "batch": 1,
       "sample": 0.105959,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -648,7 +648,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 32 chars, similar": {
       "normalised": 0.7441448484840589,
@@ -665,7 +665,7 @@
       "batch": 1,
       "sample": 0.659209,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -673,7 +673,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 32 chars, unrelated": {
       "normalised": 0.6703760892644604,
@@ -690,7 +690,7 @@
       "batch": 1,
       "sample": 0.665167,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -698,7 +698,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 128 chars, similar": {
       "normalised": 1.353841470790428,
@@ -715,7 +715,7 @@
       "batch": 1,
       "sample": 1.321125,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -723,7 +723,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 512 chars, similar": {
       "normalised": 1.0819437959405156,
@@ -740,7 +740,7 @@
       "batch": 1,
       "sample": 1.0605625,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -748,7 +748,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 1024 chars, similar": {
       "normalised": 0.8967930651855827,
@@ -765,7 +765,7 @@
       "batch": 1,
       "sample": 0.896,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -773,7 +773,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 4096 chars, similar": {
       "normalised": 1.5858969992943854,
@@ -790,7 +790,7 @@
       "batch": 1,
       "sample": 1.5800835,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -798,7 +798,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 8192 chars, similar": {
       "normalised": 1.8258226943076497,
@@ -815,7 +815,7 @@
       "batch": 1,
       "sample": 1.816417,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -823,7 +823,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > 4096 chars, one repeated gram": {
       "normalised": 1.0443092137045231,
@@ -840,7 +840,7 @@
       "batch": 1,
       "sample": 1.0259999999999998,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -848,7 +848,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > trigrams, 4096 chars, one repeated gram": {
       "normalised": 1.2451859848647808,
@@ -865,7 +865,7 @@
       "batch": 1,
       "sample": 1.2439585,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -873,7 +873,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceSimilarity > trigrams, 128 chars, similar": {
       "normalised": 1.3041838110418817,
@@ -890,7 +890,7 @@
       "batch": 1,
       "sample": 1.302479,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -898,7 +898,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceDistance > 32 chars, similar": {
       "normalised": 0.6618296132744481,
@@ -915,7 +915,7 @@
       "batch": 1,
       "sample": 0.658208,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -923,7 +923,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > diceDistance > 128 chars, similar": {
       "normalised": 1.332102923733608,
@@ -940,7 +940,7 @@
       "batch": 1,
       "sample": 1.315584,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -948,7 +948,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineSimilarity > 8 chars, similar": {
       "normalised": 0.118051095674888,
@@ -965,7 +965,7 @@
       "batch": 1,
       "sample": 0.116209,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -973,7 +973,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineSimilarity > 32 chars, similar": {
       "normalised": 0.6638359195563086,
@@ -990,7 +990,7 @@
       "batch": 1,
       "sample": 0.659959,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -998,7 +998,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineSimilarity > 32 chars, unrelated": {
       "normalised": 0.6659964085356433,
@@ -1015,7 +1015,7 @@
       "batch": 1,
       "sample": 0.6624165,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1023,7 +1023,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineSimilarity > 128 chars, similar": {
       "normalised": 1.3152740476380007,
@@ -1040,7 +1040,7 @@
       "batch": 1,
       "sample": 1.3085624999999999,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1048,7 +1048,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineSimilarity > 512 chars, similar": {
       "normalised": 1.2801984829914792,
@@ -1065,7 +1065,7 @@
       "batch": 1,
       "sample": 1.255,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1073,7 +1073,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineSimilarity > 4096 chars, similar": {
       "normalised": 2.8708887789161444,
@@ -1090,7 +1090,7 @@
       "batch": 1,
       "sample": 2.831958,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1098,7 +1098,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineSimilarity > 4096 chars, one repeated gram": {
       "normalised": 0.7354038397725646,
@@ -1115,7 +1115,7 @@
       "batch": 1,
       "sample": 0.733125,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1123,7 +1123,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineSimilarity > trigrams, 128 chars, similar": {
       "normalised": 1.300161228602418,
@@ -1140,7 +1140,7 @@
       "batch": 1,
       "sample": 1.2753955000000001,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1148,7 +1148,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineDistance > 32 chars, similar": {
       "normalised": 0.6523421477605887,
@@ -1165,7 +1165,7 @@
       "batch": 1,
       "sample": 0.6355204999999999,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1173,7 +1173,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosineDistance > 128 chars, similar": {
       "normalised": 1.302946428170436,
@@ -1190,7 +1190,7 @@
       "batch": 1,
       "sample": 1.290083,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1198,7 +1198,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice direct, long and skewed > 32 vs 1024 chars": {
       "normalised": 0.5858611668895656,
@@ -1215,7 +1215,7 @@
       "batch": 1,
       "sample": 0.5468545,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1223,7 +1223,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice direct, long and skewed > 32 vs 4096 chars": {
       "normalised": 0.7816325528256872,
@@ -1240,7 +1240,7 @@
       "batch": 1,
       "sample": 0.721292,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1248,7 +1248,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice direct, long and skewed > 512 vs 4096 chars": {
       "normalised": 1.5528890656336225,
@@ -1265,7 +1265,7 @@
       "batch": 1,
       "sample": 1.4940835,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1273,7 +1273,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice direct, long and skewed > trigrams, 1024 chars, similar": {
       "normalised": 1.0424198741220616,
@@ -1290,7 +1290,7 @@
       "batch": 1,
       "sample": 1.0392295,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1298,7 +1298,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice direct, long and skewed > trigrams, 4096 chars, similar": {
       "normalised": 2.1622936062416374,
@@ -1315,7 +1315,7 @@
       "batch": 1,
       "sample": 2.147042,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1323,7 +1323,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice packing fallback > trigrams, 128 chars, ascii": {
       "normalised": 1.2793221633834801,
@@ -1340,7 +1340,7 @@
       "batch": 1,
       "sample": 1.262021,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1348,7 +1348,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice packing fallback > trigrams, 128 chars, astral at the end": {
       "normalised": 2.8449191074957003,
@@ -1365,7 +1365,7 @@
       "batch": 1,
       "sample": 2.8025625,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1373,7 +1373,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice packing fallback > trigrams, 128 chars, astral throughout": {
       "normalised": 2.6032759990856413,
@@ -1390,7 +1390,7 @@
       "batch": 1,
       "sample": 2.578375,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1398,7 +1398,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice packing fallback > trigrams, 1024 chars, astral at the start": {
       "normalised": 1.9810967955619927,
@@ -1415,7 +1415,7 @@
       "batch": 1,
       "sample": 1.9714165,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1423,7 +1423,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice packing fallback > trigrams, 1024 chars, astral at the end": {
       "normalised": 2.302458122041676,
@@ -1440,7 +1440,7 @@
       "batch": 1,
       "sample": 2.2874584999999996,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1448,7 +1448,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice packing fallback > trigrams, 1024 chars, astral throughout": {
       "normalised": 2.0774736672778147,
@@ -1465,7 +1465,7 @@
       "batch": 1,
       "sample": 2.068667,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1473,7 +1473,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice counter routing boundary > 511 grams, profiles": {
       "normalised": 1.2075810951679187,
@@ -1490,7 +1490,7 @@
       "batch": 1,
       "sample": 1.1996250000000002,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1498,7 +1498,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice counter routing boundary > 512 grams, counter": {
       "normalised": 0.8908914411574492,
@@ -1515,7 +1515,7 @@
       "batch": 1,
       "sample": 0.874333,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1523,7 +1523,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice counter routing boundary > trigrams, 511 grams, profiles": {
       "normalised": 1.098106057196393,
@@ -1540,7 +1540,7 @@
       "batch": 1,
       "sample": 1.089979,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1548,7 +1548,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice counter routing boundary > trigrams, 512 grams, counter": {
       "normalised": 1.028773842311597,
@@ -1565,7 +1565,7 @@
       "batch": 1,
       "sample": 1.0190415,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1573,7 +1573,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice gram-count bound > 512 vs 32 chars, cutoff 0.8": {
       "normalised": 0.004561414459579427,
@@ -1590,7 +1590,7 @@
       "batch": 31,
       "sample": 0.14945800000000004,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1598,7 +1598,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice gram-count bound > 512 vs 32 chars, no cutoff": {
       "normalised": 3.286357934192219,
@@ -1615,7 +1615,7 @@
       "batch": 1,
       "sample": 3.275417,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1623,7 +1623,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice gram-count bound > 128 chars similar, cutoff 0.8": {
       "normalised": 1.3010170562777015,
@@ -1640,7 +1640,7 @@
       "batch": 1,
       "sample": 1.30025,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1648,7 +1648,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice gram-count bound > cosine, 512 vs 32 chars, cutoff 0.8": {
       "normalised": 3.2236270753994543,
@@ -1665,7 +1665,7 @@
       "batch": 1,
       "sample": 3.174833,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1673,7 +1673,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice search > 1 query, 1000 choices": {
       "normalised": 0.8023569102743751,
@@ -1690,7 +1690,7 @@
       "batch": 1,
       "sample": 0.727438,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1698,7 +1698,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice search > 1 query, 1000 choices, matcher": {
       "normalised": 0.13252486820599188,
@@ -1715,7 +1715,7 @@
       "batch": 1,
       "sample": 0.130042,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1723,7 +1723,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice search > 1 query, 1000 prepared choices": {
       "normalised": 0.15059278403238857,
@@ -1740,7 +1740,7 @@
       "batch": 1,
       "sample": 0.148625,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1748,7 +1748,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice search > 100 queries, 1000 choices": {
       "normalised": 87.4083188629557,
@@ -1765,7 +1765,7 @@
       "batch": 1,
       "sample": 81.7231455,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1773,7 +1773,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice search > 100 queries, 1000 prepared choices": {
       "normalised": 19.84282681782254,
@@ -1790,7 +1790,7 @@
       "batch": 1,
       "sample": 19.742458,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1798,7 +1798,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice search > trigrams, 100 queries, 1000 prepared choices": {
       "normalised": 15.249434067777761,
@@ -1815,7 +1815,7 @@
       "batch": 1,
       "sample": 14.9715415,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1823,7 +1823,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice search > bestMatch, 2000 same-length choices": {
       "normalised": 1.475118284374652,
@@ -1840,7 +1840,7 @@
       "batch": 1,
       "sample": 1.3563749999999999,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1848,7 +1848,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice search > limit 5, 2000 same-length choices, threshold 0.5": {
       "normalised": 1.4748753856404693,
@@ -1865,7 +1865,7 @@
       "batch": 1,
       "sample": 1.336667,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1873,7 +1873,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > dice search > 32-char query, 1000 raw 512-char choices, threshold 0.8": {
       "normalised": 31.38142481321714,
@@ -1890,7 +1890,7 @@
       "batch": 1,
       "sample": 29.016542,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1898,7 +1898,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosine search > 1 query, 1000 choices": {
       "normalised": 0.880479157606308,
@@ -1915,7 +1915,7 @@
       "batch": 1,
       "sample": 0.878792,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1923,7 +1923,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosine search > 100 queries, 1000 choices": {
       "normalised": 105.52066910549303,
@@ -1940,7 +1940,7 @@
       "batch": 1,
       "sample": 98.756688,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1948,7 +1948,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosine search > 100 queries, 1000 prepared choices": {
       "normalised": 20.848520940954405,
@@ -1965,7 +1965,7 @@
       "batch": 1,
       "sample": 20.839584,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1973,7 +1973,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngram.bench.ts > cosine search > trigrams, 100 queries, 1000 prepared choices": {
       "normalised": 15.416793466427258,
@@ -1990,7 +1990,7 @@
       "batch": 1,
       "sample": 15.2302295,
       "repeats": 2,
-      "source": "f1307c7600f3",
+      "source": "efe0e852bdb0",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -1998,7 +1998,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > ngram index build > indexed, 1000 choices": {
       "normalised": 4.409365474870594,
@@ -2015,7 +2015,7 @@
       "batch": 1,
       "sample": 4.3812505,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2023,7 +2023,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > ngram index build > matcher, 1000 choices": {
       "normalised": 1.4980609318662292,
@@ -2040,7 +2040,7 @@
       "batch": 1,
       "sample": 1.475125,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2048,7 +2048,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > ngram index build > indexed, 10000 choices": {
       "normalised": 35.06511006313647,
@@ -2065,7 +2065,7 @@
       "batch": 1,
       "sample": 34.978104,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2073,7 +2073,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > ngram index build > matcher, 10000 choices": {
       "normalised": 16.12797648752602,
@@ -2090,7 +2090,7 @@
       "batch": 1,
       "sample": 15.5813955,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2098,7 +2098,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 1000 choices > indexed, 100 queries, threshold 0.5": {
       "normalised": 0.22355798699392698,
@@ -2115,7 +2115,7 @@
       "batch": 1,
       "sample": 0.220417,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2123,7 +2123,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 1000 choices > exhaustive, 100 queries, threshold 0.5": {
       "normalised": 19.47172101747137,
@@ -2140,7 +2140,7 @@
       "batch": 1,
       "sample": 18.74625,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2148,7 +2148,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 1000 choices > indexed, 100 queries, threshold 0.8": {
       "normalised": 0.22328601026262979,
@@ -2165,7 +2165,7 @@
       "batch": 1,
       "sample": 0.2205205,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2173,7 +2173,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 1000 choices > exhaustive, 100 queries, threshold 0.8": {
       "normalised": 10.783379830731239,
@@ -2190,7 +2190,7 @@
       "batch": 1,
       "sample": 10.739959,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2198,7 +2198,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 1000 choices > indexed, best, 100 queries": {
       "normalised": 0.22410370225651882,
@@ -2215,7 +2215,7 @@
       "batch": 1,
       "sample": 0.22075,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2223,7 +2223,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 1000 choices > exhaustive, best, 100 queries": {
       "normalised": 25.39181870649915,
@@ -2240,7 +2240,7 @@
       "batch": 1,
       "sample": 23.616875,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2248,7 +2248,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 choices > indexed, 100 hits, threshold 0.5": {
       "normalised": 0.4550445851238217,
@@ -2265,7 +2265,7 @@
       "batch": 1,
       "sample": 0.447583,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2273,7 +2273,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 choices > exhaustive, 100 hits, threshold 0.5": {
       "normalised": 186.83160801985076,
@@ -2290,7 +2290,7 @@
       "batch": 1,
       "sample": 181.3079795,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2298,7 +2298,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 choices > indexed, 100 misses, threshold 0.5": {
       "normalised": 0.4642124086966516,
@@ -2315,7 +2315,7 @@
       "batch": 1,
       "sample": 0.4338955,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2323,7 +2323,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 choices > exhaustive, 100 misses, threshold 0.5": {
       "normalised": 189.21663780972995,
@@ -2340,7 +2340,7 @@
       "batch": 1,
       "sample": 182.8886875,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2348,7 +2348,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 choices > indexed, best, 100 hits": {
       "normalised": 0.48325373195358157,
@@ -2365,7 +2365,7 @@
       "batch": 1,
       "sample": 0.473479,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2373,7 +2373,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 choices > exhaustive, best, 100 hits": {
       "normalised": 1.4676852761724501,
@@ -2390,7 +2390,7 @@
       "batch": 1,
       "sample": 1.36825,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2398,7 +2398,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 choices > indexed, searchIter, 100 hits": {
       "normalised": 2.6848457022978085,
@@ -2415,7 +2415,7 @@
       "batch": 1,
       "sample": 2.6683545,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2423,7 +2423,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 choices > exhaustive, searchIter, 100 hits": {
       "normalised": 188.71010044606373,
@@ -2440,7 +2440,7 @@
       "batch": 1,
       "sample": 181.7346665,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2448,7 +2448,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > cosine search, 10000 choices > indexed, 100 hits, threshold 0.5": {
       "normalised": 0.5181295483116053,
@@ -2465,7 +2465,7 @@
       "batch": 1,
       "sample": 0.5094164999999999,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2473,7 +2473,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > cosine search, 10000 choices > exhaustive, 100 hits, threshold 0.5": {
       "normalised": 256.6763501228415,
@@ -2490,7 +2490,7 @@
       "batch": 1,
       "sample": 255.548521,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2498,7 +2498,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 sentences > indexed, 100 hits, threshold 0.5": {
       "normalised": 0.6609969983995752,
@@ -2515,7 +2515,7 @@
       "batch": 1,
       "sample": 0.642771,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2523,7 +2523,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 sentences > exhaustive, 100 hits, threshold 0.5": {
       "normalised": 188.23109233848947,
@@ -2540,7 +2540,7 @@
       "batch": 1,
       "sample": 178.045625,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2548,7 +2548,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 sentences > indexed, 100 hits, threshold 0.8": {
       "normalised": 0.6591152686196009,
@@ -2565,7 +2565,7 @@
       "batch": 1,
       "sample": 0.634458,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2573,7 +2573,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 sentences > exhaustive, 100 hits, threshold 0.8": {
       "normalised": 104.08559518565193,
@@ -2590,7 +2590,7 @@
       "batch": 1,
       "sample": 100.5375,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2598,7 +2598,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, unlimited results > indexed, 100 queries, 1000 choices, threshold 0.5": {
       "normalised": 0.22229450375229934,
@@ -2615,7 +2615,7 @@
       "batch": 1,
       "sample": 0.221625,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2623,7 +2623,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, unlimited results > exhaustive, 100 queries, 1000 choices, threshold 0.5": {
       "normalised": 18.957505811342024,
@@ -2640,7 +2640,7 @@
       "batch": 1,
       "sample": 18.1306665,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2648,7 +2648,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, unlimited results > indexed, 20 queries, 10000 choices, threshold 0.5": {
       "normalised": 0.07847421113442715,
@@ -2665,7 +2665,7 @@
       "batch": 2,
       "sample": 0.14825,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2673,7 +2673,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, unlimited results > exhaustive, 20 queries, 10000 choices, threshold 0.5": {
       "normalised": 37.06920475731197,
@@ -2690,7 +2690,7 @@
       "batch": 1,
       "sample": 35.6058335,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2698,7 +2698,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, unlimited results > indexed, 5 queries, 10000 choices, no threshold": {
       "normalised": 2.2498455402966293,
@@ -2715,7 +2715,7 @@
       "batch": 1,
       "sample": 2.2422500000000003,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2723,7 +2723,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, unlimited results > exhaustive, 5 queries, 10000 choices, no threshold": {
       "normalised": 14.428972993373646,
@@ -2740,7 +2740,7 @@
       "batch": 1,
       "sample": 13.5581665,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2748,7 +2748,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 shared-prefix paths > indexed, common prefix query": {
       "normalised": 0.0527785952026741,
@@ -2765,7 +2765,7 @@
       "batch": 3,
       "sample": 0.157875,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2773,7 +2773,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 shared-prefix paths > exhaustive, common prefix query": {
       "normalised": 0.5394177648937286,
@@ -2790,7 +2790,7 @@
       "batch": 1,
       "sample": 0.516084,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2798,7 +2798,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 shared-prefix paths > indexed, whole path query": {
       "normalised": 0.09922817488028002,
@@ -2815,7 +2815,7 @@
       "batch": 1,
       "sample": 0.099792,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2823,7 +2823,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 shared-prefix paths > exhaustive, whole path query": {
       "normalised": 1.6047757977520716,
@@ -2840,7 +2840,7 @@
       "batch": 1,
       "sample": 1.598083,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2848,7 +2848,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 shared-prefix paths > indexed, rare fragment query": {
       "normalised": 0.0005250647702366676,
@@ -2865,7 +2865,7 @@
       "batch": 273,
       "sample": 0.145667,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2873,7 +2873,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 10000 shared-prefix paths > exhaustive, rare fragment query": {
       "normalised": 0.11766965351229394,
@@ -2890,7 +2890,7 @@
       "batch": 1,
       "sample": 0.139291,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2898,7 +2898,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 100000 choices > indexed, 1 query, threshold 0.5": {
       "normalised": 0.024064775750492384,
@@ -2915,7 +2915,7 @@
       "batch": 6,
       "sample": 0.1365,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2923,7 +2923,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 100000 choices > exhaustive, 1 query, threshold 0.5": {
       "normalised": 24.468494917694926,
@@ -2940,7 +2940,7 @@
       "batch": 1,
       "sample": 24.268416,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2948,7 +2948,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 100000 choices > indexed, 1 query, threshold 0.8": {
       "normalised": 0.02438687743816044,
@@ -2965,7 +2965,7 @@
       "batch": 6,
       "sample": 0.152834,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2973,7 +2973,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > dice search, 100000 choices > exhaustive, 1 query, threshold 0.8": {
       "normalised": 17.195235359031066,
@@ -2990,7 +2990,7 @@
       "batch": 1,
       "sample": 16.9465,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -2998,7 +2998,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/ngramIndex.bench.ts > control, matches bench/ngram.bench.ts > 100 queries, 1000 prepared choices": {
       "normalised": 20.42024452106048,
@@ -3015,7 +3015,7 @@
       "batch": 1,
       "sample": 19.636042,
       "repeats": 2,
-      "source": "7f43db9422d9",
+      "source": "2a65b93cf33f",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3023,7 +3023,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:37:48.147Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > indelDistance > 8 chars, similar": {
       "normalised": 0.014722852090546242,
@@ -3040,7 +3040,7 @@
       "batch": 11,
       "sample": 0.161125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3048,7 +3048,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > indelDistance > 32 chars, similar": {
       "normalised": 0.05972263360410674,
@@ -3065,7 +3065,7 @@
       "batch": 3,
       "sample": 0.179,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3073,7 +3073,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > indelDistance > 32 chars, unrelated": {
       "normalised": 0.08384914352008263,
@@ -3090,7 +3090,7 @@
       "batch": 2,
       "sample": 0.164667,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3098,7 +3098,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > indelDistance > 128 chars, similar": {
       "normalised": 0.18056056588000563,
@@ -3115,7 +3115,7 @@
       "batch": 1,
       "sample": 0.1780205,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3123,7 +3123,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > indelDistance > 1024 chars, similar": {
       "normalised": 1.0355407680181226,
@@ -3140,7 +3140,7 @@
       "batch": 1,
       "sample": 1.030833,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3148,7 +3148,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > indelNormalizedSimilarity > 128 chars, similar": {
       "normalised": 0.18422513906833055,
@@ -3165,7 +3165,7 @@
       "batch": 1,
       "sample": 0.182708,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3173,7 +3173,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > indelNormalizedSimilarity > 1024 chars, similar": {
       "normalised": 1.031947160117461,
@@ -3190,7 +3190,7 @@
       "batch": 1,
       "sample": 1.023666,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3198,7 +3198,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance > 8 chars, similar": {
       "normalised": 0.013708966990185596,
@@ -3215,7 +3215,7 @@
       "batch": 11,
       "sample": 0.156042,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3223,7 +3223,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance > 32 chars, similar": {
       "normalised": 0.06419720794502841,
@@ -3240,7 +3240,7 @@
       "batch": 3,
       "sample": 0.190292,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3248,7 +3248,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance > 32 chars, unrelated": {
       "normalised": 0.10534594204033873,
@@ -3265,7 +3265,7 @@
       "batch": 1,
       "sample": 0.105958,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3273,7 +3273,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance > 128 chars, similar": {
       "normalised": 0.24133924264066461,
@@ -3290,7 +3290,7 @@
       "batch": 1,
       "sample": 0.23995850000000002,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3298,7 +3298,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance > 1024 chars, similar": {
       "normalised": 1.908110896960196,
@@ -3315,7 +3315,7 @@
       "batch": 1,
       "sample": 1.8889585000000002,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3323,7 +3323,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance > 4096 chars, tight cutoff": {
       "normalised": 0.01961443932650044,
@@ -3340,7 +3340,7 @@
       "batch": 7,
       "sample": 0.131208,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3348,7 +3348,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance > 4096 chars, cutoff 16": {
       "normalised": 0.050545661200942865,
@@ -3365,7 +3365,7 @@
       "batch": 3,
       "sample": 0.1514795,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3373,7 +3373,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance, weighted > 32 chars, similar": {
       "normalised": 0.06832443845406894,
@@ -3390,7 +3390,7 @@
       "batch": 3,
       "sample": 0.193666,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3398,7 +3398,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance, weighted > 4096 chars, scaled Indel": {
       "normalised": 0.016837798165877806,
@@ -3415,7 +3415,7 @@
       "batch": 9,
       "sample": 0.148917,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3423,7 +3423,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance, weighted > 4096 chars, asymmetric generic": {
       "normalised": 0.01722809876690722,
@@ -3440,7 +3440,7 @@
       "batch": 8,
       "sample": 0.139416,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3448,7 +3448,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance, weighted > 512 chars, unrelated, asymmetric generic": {
       "normalised": 2.6000920812321597,
@@ -3465,7 +3465,7 @@
       "batch": 1,
       "sample": 2.34125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3473,7 +3473,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinDistance, weighted > 512 chars, unrelated, fractional weights": {
       "normalised": 1.358927878441012,
@@ -3490,7 +3490,7 @@
       "batch": 1,
       "sample": 1.357333,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3498,7 +3498,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqNormalizedSimilarity > 32 chars, similar": {
       "normalised": 0.060042392636718414,
@@ -3515,7 +3515,7 @@
       "batch": 3,
       "sample": 0.179792,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3523,7 +3523,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqNormalizedSimilarity > 128 chars, similar": {
       "normalised": 0.18237941933819551,
@@ -3540,7 +3540,7 @@
       "batch": 1,
       "sample": 0.18125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3548,7 +3548,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqNormalizedSimilarity > 4096 chars, cutoff 4000": {
       "normalised": 0.1721465405486287,
@@ -3565,7 +3565,7 @@
       "batch": 1,
       "sample": 0.172083,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3573,7 +3573,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqNormalizedSimilarity > 1024 vs 256 chars, cutoff rejects on length": {
       "normalised": 0.003070712427305062,
@@ -3590,7 +3590,7 @@
       "batch": 42,
       "sample": 0.1472085,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3598,7 +3598,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqNormalizedSimilarity, banded > 512 chars, cutoff 0.95, all rejected": {
       "normalised": 0.23712130885505084,
@@ -3615,7 +3615,7 @@
       "batch": 1,
       "sample": 0.23531249999999998,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3623,7 +3623,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqNormalizedSimilarity, banded > 1024 chars, cutoff 0.85, all accepted": {
       "normalised": 0.5669138506068321,
@@ -3640,7 +3640,7 @@
       "batch": 1,
       "sample": 0.565208,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3648,7 +3648,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqNormalizedSimilarity, banded > 1024 chars, cutoff 0.9, half rejected": {
       "normalised": 0.4627857942530664,
@@ -3665,7 +3665,7 @@
       "batch": 1,
       "sample": 0.4618955,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3673,7 +3673,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > jaroSimilarity > 32 chars, similar": {
       "normalised": 0.13113216905995873,
@@ -3690,7 +3690,7 @@
       "batch": 1,
       "sample": 0.129042,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3698,7 +3698,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > jaroSimilarity > 128 chars, similar": {
       "normalised": 0.3119505829044745,
@@ -3715,7 +3715,7 @@
       "batch": 1,
       "sample": 0.30825,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3723,7 +3723,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > jaroSimilarity > 1024 chars, similar": {
       "normalised": 0.8645783001641103,
@@ -3740,7 +3740,7 @@
       "batch": 1,
       "sample": 0.8542289999999999,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3748,7 +3748,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > jaroSimilarity > 8 vs 377 chars, length skewed": {
       "normalised": 0.002291049472443887,
@@ -3765,7 +3765,7 @@
       "batch": 66,
       "sample": 0.151041,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3773,7 +3773,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > jaroWinklerSimilarity > 8 chars, similar": {
       "normalised": 0.05957353443842818,
@@ -3790,7 +3790,7 @@
       "batch": 3,
       "sample": 0.175125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3798,7 +3798,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > jaroWinklerSimilarity > 32 chars, similar": {
       "normalised": 0.13548247180165507,
@@ -3815,7 +3815,7 @@
       "batch": 1,
       "sample": 0.134583,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3823,7 +3823,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > jaroWinklerSimilarity > 128 chars, similar": {
       "normalised": 0.31422241204530044,
@@ -3840,7 +3840,7 @@
       "batch": 1,
       "sample": 0.313542,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3848,7 +3848,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > jaroWinklerSimilarity > 32 chars, cutoff 0.92, half rejected": {
       "normalised": 0.13484535702268946,
@@ -3865,7 +3865,7 @@
       "batch": 1,
       "sample": 0.134542,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3873,7 +3873,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > osaDistance > 8 chars, similar": {
       "normalised": 0.013067219903892025,
@@ -3890,7 +3890,7 @@
       "batch": 11,
       "sample": 0.141208,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3898,7 +3898,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > osaDistance > 32 chars, similar": {
       "normalised": 0.06532610983992085,
@@ -3915,7 +3915,7 @@
       "batch": 3,
       "sample": 0.195458,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3923,7 +3923,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > osaDistance > 1024 chars, similar": {
       "normalised": 1.2885979168807313,
@@ -3940,7 +3940,7 @@
       "batch": 1,
       "sample": 1.286,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3948,7 +3948,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > osaDistance > 4096 chars, sparse substitutions": {
       "normalised": 2.730590938794739,
@@ -3965,7 +3965,7 @@
       "batch": 1,
       "sample": 2.0618955000000003,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3973,7 +3973,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > damerauLevenshteinDistance > 32 chars, similar": {
       "normalised": 0.7580559230308963,
@@ -3990,7 +3990,7 @@
       "batch": 1,
       "sample": 0.754625,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -3998,7 +3998,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > damerauLevenshteinDistance > 1024 chars, similar": {
       "normalised": 5.692226944499906,
@@ -4015,7 +4015,7 @@
       "batch": 1,
       "sample": 5.6685,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4023,7 +4023,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinEditops > 32 chars, similar": {
       "normalised": 0.21109184619519988,
@@ -4040,7 +4040,7 @@
       "batch": 1,
       "sample": 0.20875,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4048,7 +4048,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinEditops > 128 chars, similar": {
       "normalised": 0.7772204879257418,
@@ -4065,7 +4065,7 @@
       "batch": 1,
       "sample": 0.767875,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4073,7 +4073,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinEditops > 1024 chars, similar": {
       "normalised": 1.1450902807378247,
@@ -4090,7 +4090,7 @@
       "batch": 1,
       "sample": 1.1412705,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4098,7 +4098,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinEditops > 4096 chars, sparse substitutions": {
       "normalised": 2.0063313923808157,
@@ -4115,7 +4115,7 @@
       "batch": 1,
       "sample": 1.9893125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4123,7 +4123,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinEditops > 16384 chars, unrelated": {
       "normalised": 45.969421639219064,
@@ -4140,7 +4140,7 @@
       "batch": 1,
       "sample": 45.8596665,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4148,7 +4148,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqEditops > 32 chars, similar": {
       "normalised": 0.14173406886756396,
@@ -4165,7 +4165,7 @@
       "batch": 1,
       "sample": 0.140333,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4173,7 +4173,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqEditops > 128 chars, similar": {
       "normalised": 0.34158962461571624,
@@ -4190,7 +4190,7 @@
       "batch": 1,
       "sample": 0.3400835,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4198,7 +4198,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqEditops > 1024 chars, similar": {
       "normalised": 0.5962187050832499,
@@ -4215,7 +4215,7 @@
       "batch": 1,
       "sample": 0.5952705,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4223,7 +4223,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > lcsSeqEditops > 8192 chars, similar": {
       "normalised": 3.634611244568662,
@@ -4240,7 +4240,7 @@
       "batch": 1,
       "sample": 3.478042,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4248,7 +4248,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinSimilarity > 128 chars, cutoff 0": {
       "normalised": 0.2421452960478468,
@@ -4265,7 +4265,7 @@
       "batch": 1,
       "sample": 0.241542,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4273,7 +4273,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinSimilarity > 1024 chars, cutoff 0": {
       "normalised": 1.9133861646263899,
@@ -4290,7 +4290,7 @@
       "batch": 1,
       "sample": 1.8928755,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4298,7 +4298,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinSimilarity > 4096 chars, cutoff 0": {
       "normalised": 1.3733782954633207,
@@ -4315,7 +4315,7 @@
       "batch": 1,
       "sample": 1.36775,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4323,7 +4323,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinNormalizedSimilarity > 1024 chars, no cutoff": {
       "normalised": 1.8962436211491296,
@@ -4340,7 +4340,7 @@
       "batch": 1,
       "sample": 1.89125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4348,7 +4348,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinNormalizedSimilarity > 128 chars, cutoff 0": {
       "normalised": 0.24227953560290716,
@@ -4365,7 +4365,7 @@
       "batch": 1,
       "sample": 0.2413545,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4373,7 +4373,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinNormalizedSimilarity > 1024 chars, cutoff 0": {
       "normalised": 1.9037142477623732,
@@ -4390,7 +4390,7 @@
       "batch": 1,
       "sample": 1.888125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4398,7 +4398,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinNormalizedSimilarity > 1024 chars, cutoff 0.9": {
       "normalised": 0.5686835382571058,
@@ -4415,7 +4415,7 @@
       "batch": 1,
       "sample": 0.5632705,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4423,7 +4423,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > levenshteinNormalizedSimilarity > 4096 chars, cutoff 0": {
       "normalised": 1.3853251882344728,
@@ -4440,7 +4440,7 @@
       "batch": 1,
       "sample": 1.3706459999999998,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4448,7 +4448,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > editops, one word wide > 8 chars, similar, Levenshtein": {
       "normalised": 0.04459137854429462,
@@ -4465,7 +4465,7 @@
       "batch": 4,
       "sample": 0.174958,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4473,7 +4473,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > editops, one word wide > 8 chars, similar, LCS": {
       "normalised": 0.03282290589491384,
@@ -4490,7 +4490,7 @@
       "batch": 5,
       "sample": 0.161,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4498,7 +4498,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > editops, one word wide > 32 chars, unrelated, Levenshtein": {
       "normalised": 0.310313859425003,
@@ -4515,7 +4515,7 @@
       "batch": 1,
       "sample": 0.296916,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4523,7 +4523,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > editops, one word wide > 32 chars, unrelated, LCS": {
       "normalised": 0.24263841068246206,
@@ -4540,7 +4540,7 @@
       "batch": 1,
       "sample": 0.2187915,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4548,7 +4548,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries > 31 chars, Levenshtein": {
       "normalised": 1.0358170032833394,
@@ -4565,7 +4565,7 @@
       "batch": 1,
       "sample": 1.025604,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4573,7 +4573,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries > 32 chars, Levenshtein": {
       "normalised": 1.0323706676748095,
@@ -4590,7 +4590,7 @@
       "batch": 1,
       "sample": 1.029375,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4598,7 +4598,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries > 33 chars, Levenshtein": {
       "normalised": 0.800382938787321,
@@ -4615,7 +4615,7 @@
       "batch": 1,
       "sample": 0.7958125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4623,7 +4623,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries > 63 chars, Levenshtein": {
       "normalised": 0.7011155580073887,
@@ -4640,7 +4640,7 @@
       "batch": 1,
       "sample": 0.7003539999999999,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4648,7 +4648,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries > 64 chars, Levenshtein": {
       "normalised": 0.7005990604057231,
@@ -4665,7 +4665,7 @@
       "batch": 1,
       "sample": 0.699916,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4673,7 +4673,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries > 65 chars, Levenshtein": {
       "normalised": 0.5230007880276744,
@@ -4690,7 +4690,7 @@
       "batch": 1,
       "sample": 0.51575,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4698,7 +4698,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries > 127 chars, Levenshtein": {
       "normalised": 0.37016618667436646,
@@ -4715,7 +4715,7 @@
       "batch": 1,
       "sample": 0.3661455,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4723,7 +4723,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries > 128 chars, Levenshtein": {
       "normalised": 0.3634394536918065,
@@ -4740,7 +4740,7 @@
       "batch": 1,
       "sample": 0.360021,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4748,7 +4748,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries > 129 chars, Levenshtein": {
       "normalised": 0.39664072500590297,
@@ -4765,7 +4765,7 @@
       "batch": 1,
       "sample": 0.3945,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4773,7 +4773,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries, editops > 31 chars, Levenshtein": {
       "normalised": 0.22028908604283204,
@@ -4790,7 +4790,7 @@
       "batch": 1,
       "sample": 0.218125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4798,7 +4798,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries, editops > 32 chars, Levenshtein": {
       "normalised": 0.21614845443788633,
@@ -4815,7 +4815,7 @@
       "batch": 1,
       "sample": 0.215541,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4823,7 +4823,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > word-width boundaries, editops > 33 chars, Levenshtein": {
       "normalised": 0.4572139058205485,
@@ -4840,7 +4840,7 @@
       "batch": 1,
       "sample": 0.452917,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4848,7 +4848,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > editops, Latin-1 alphabet > 8 chars, similar, Levenshtein": {
       "normalised": 0.04565876973370612,
@@ -4865,7 +4865,7 @@
       "batch": 3,
       "sample": 0.137417,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4873,7 +4873,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > editops, Latin-1 alphabet > 8 chars, similar, LCS": {
       "normalised": 0.035090830202473486,
@@ -4890,7 +4890,7 @@
       "batch": 5,
       "sample": 0.173875,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4898,7 +4898,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > editops, Latin-1 alphabet > 32 chars, similar, Levenshtein": {
       "normalised": 0.20847301844327076,
@@ -4915,7 +4915,7 @@
       "batch": 1,
       "sample": 0.206084,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4923,7 +4923,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > editops, Latin-1 alphabet > 32 chars, similar, LCS": {
       "normalised": 0.14378659321394824,
@@ -4940,7 +4940,7 @@
       "batch": 1,
       "sample": 0.142,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4948,7 +4948,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > hammingDistance > 8 chars, similar": {
       "normalised": 0.010191055451043114,
@@ -4965,7 +4965,7 @@
       "batch": 15,
       "sample": 0.149709,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4973,7 +4973,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > hammingDistance > 32 chars, similar": {
       "normalised": 0.029273770021044893,
@@ -4990,7 +4990,7 @@
       "batch": 5,
       "sample": 0.1475,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -4998,7 +4998,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > hammingDistance > 1024 chars, similar": {
       "normalised": 0.06734351850023551,
@@ -5015,7 +5015,7 @@
       "batch": 3,
       "sample": 0.201334,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5023,7 +5023,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > hammingNormalizedSimilarity > 8 chars, similar": {
       "normalised": 0.01049822942701409,
@@ -5040,7 +5040,7 @@
       "batch": 15,
       "sample": 0.155458,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5048,7 +5048,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > hammingNormalizedSimilarity > 32 chars, similar": {
       "normalised": 0.02979899775242603,
@@ -5065,7 +5065,7 @@
       "batch": 5,
       "sample": 0.147167,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5073,7 +5073,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > prefixSimilarity > 8 chars, similar": {
       "normalised": 0.0074151805889297664,
@@ -5090,7 +5090,7 @@
       "batch": 20,
       "sample": 0.146084,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5098,7 +5098,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > prefixSimilarity > 32 chars, similar": {
       "normalised": 0.009665961312214425,
@@ -5115,7 +5115,7 @@
       "batch": 16,
       "sample": 0.150875,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5123,7 +5123,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > prefixSimilarity > 1024 vs 256 chars, long shared prefix": {
       "normalised": 0.08212186780746478,
@@ -5140,7 +5140,7 @@
       "batch": 2,
       "sample": 0.161834,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5148,7 +5148,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > prefixNormalizedSimilarity > 8 chars, similar": {
       "normalised": 0.008068761692544835,
@@ -5165,7 +5165,7 @@
       "batch": 13,
       "sample": 0.102292,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5173,7 +5173,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > prefixNormalizedSimilarity > 32 chars, similar": {
       "normalised": 0.01023215546316357,
@@ -5190,7 +5190,7 @@
       "batch": 5,
       "sample": 0.054084,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5198,7 +5198,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > postfixSimilarity > 8 chars, similar": {
       "normalised": 0.007254778353348413,
@@ -5215,7 +5215,7 @@
       "batch": 20,
       "sample": 0.148125,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5223,7 +5223,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > postfixSimilarity > 32 chars, similar": {
       "normalised": 0.009236619195600655,
@@ -5240,7 +5240,7 @@
       "batch": 16,
       "sample": 0.151042,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5248,7 +5248,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > postfixSimilarity > 1024 vs 256 chars, long shared suffix": {
       "normalised": 0.07815274964791366,
@@ -5265,7 +5265,7 @@
       "batch": 2,
       "sample": 0.153833,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5273,7 +5273,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > postfixNormalizedSimilarity > 8 chars, similar": {
       "normalised": 0.007812137886685458,
@@ -5290,7 +5290,7 @@
       "batch": 17,
       "sample": 0.135333,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5298,7 +5298,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > postfixNormalizedSimilarity > 32 chars, similar": {
       "normalised": 0.010128033143451717,
@@ -5315,7 +5315,7 @@
       "batch": 13,
       "sample": 0.128042,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5323,7 +5323,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/distance.bench.ts > postfixNormalizedSimilarity > 1024 vs 256 chars, long shared suffix": {
       "normalised": 0.07996897873274497,
@@ -5340,7 +5340,7 @@
       "batch": 2,
       "sample": 0.159833,
       "repeats": 2,
-      "source": "64566344fbcf",
+      "source": "c53052aac531",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5348,7 +5348,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T10:49:52.399Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > direct Metric and Scorer calls > 2000 pairs, fuzzy metric": {
       "normalised": 0.3743613546251874,
@@ -5365,7 +5365,7 @@
       "batch": 1,
       "sample": 0.350333,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5373,7 +5373,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > direct Metric and Scorer calls > 2000 pairs, fuzzy scorer": {
       "normalised": 0.3954577394132418,
@@ -5390,7 +5390,7 @@
       "batch": 1,
       "sample": 0.384104,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5398,7 +5398,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > direct Metric and Scorer calls > 2000 pairs, fuzzy scorer threshold 80": {
       "normalised": 0.39079153208932804,
@@ -5415,7 +5415,7 @@
       "batch": 1,
       "sample": 0.374458,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5423,7 +5423,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > direct Metric and Scorer calls > 2000 pairs, normalized metric": {
       "normalised": 0.45342463543060835,
@@ -5440,7 +5440,7 @@
       "batch": 1,
       "sample": 0.415375,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5448,7 +5448,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > direct Metric and Scorer calls > 2000 pairs, normalized scorer": {
       "normalised": 0.4735996988136025,
@@ -5465,7 +5465,7 @@
       "batch": 1,
       "sample": 0.442125,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5473,7 +5473,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > direct Metric and Scorer calls > 2000 pairs, normalized scorer threshold 0.8": {
       "normalised": 0.23215317152978698,
@@ -5490,7 +5490,7 @@
       "batch": 1,
       "sample": 0.231166,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5498,7 +5498,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > direct Metric and Scorer calls > 2000 pairs, raw distance metric": {
       "normalised": 0.41371227604590355,
@@ -5515,7 +5515,7 @@
       "batch": 1,
       "sample": 0.391125,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5523,7 +5523,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > direct Metric and Scorer calls > 2000 pairs, raw similarity metric": {
       "normalised": 0.44752127922953283,
@@ -5540,7 +5540,7 @@
       "batch": 1,
       "sample": 0.427208,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5548,7 +5548,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > direct Metric and Scorer calls > 2000 pairs, normalized distance metric": {
       "normalised": 0.4569213029597086,
@@ -5565,7 +5565,7 @@
       "batch": 1,
       "sample": 0.425104,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5573,7 +5573,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > bestMatch, one query > 2000 choices, fuzzy": {
       "normalised": 0.12390544098589734,
@@ -5590,7 +5590,7 @@
       "batch": 1,
       "sample": 0.1155,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5598,7 +5598,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > bestMatch, one query > 2000 choices, fuzzy threshold 80": {
       "normalised": 0.1203948223945,
@@ -5615,7 +5615,7 @@
       "batch": 1,
       "sample": 0.113834,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5623,7 +5623,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > bestMatch, one query > 2000 choices, normalized": {
       "normalised": 0.24935539990883576,
@@ -5640,7 +5640,7 @@
       "batch": 1,
       "sample": 0.2475,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5648,7 +5648,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > bestMatch, one query > 2000 titles, adaptive fuzzy + normalize": {
       "normalised": 6.4312850983365415,
@@ -5665,7 +5665,7 @@
       "batch": 1,
       "sample": 5.9360625,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5673,7 +5673,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > search, one query > 2000 choices, fuzzy limit 1": {
       "normalised": 0.13270203852430545,
@@ -5690,7 +5690,7 @@
       "batch": 1,
       "sample": 0.132792,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5698,7 +5698,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > search, one query > 2000 choices, fuzzy limit 5": {
       "normalised": 0.132561548071725,
@@ -5715,7 +5715,7 @@
       "batch": 1,
       "sample": 0.123666,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5723,7 +5723,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > search, one query > 2000 choices, normalized limit 5": {
       "normalised": 0.26561796944579774,
@@ -5740,7 +5740,7 @@
       "batch": 1,
       "sample": 0.264333,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5748,7 +5748,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > search, one query > 2000 titles, token sort limit 5": {
       "normalised": 1.7368376830599739,
@@ -5765,7 +5765,7 @@
       "batch": 1,
       "sample": 1.673583,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5773,7 +5773,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > search, one query > 2000 choices, fuzzy unlimited": {
       "normalised": 0.38663010871219283,
@@ -5790,7 +5790,7 @@
       "batch": 1,
       "sample": 0.3840835,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5798,7 +5798,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > searchIter, one query > 2000 choices, fuzzy first 5": {
       "normalised": 0.0010765435650035371,
@@ -5815,7 +5815,7 @@
       "batch": 129,
       "sample": 0.143666,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5823,7 +5823,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > searchIter, one query > 2000 choices, fuzzy full": {
       "normalised": 0.15831766311889425,
@@ -5840,7 +5840,7 @@
       "batch": 1,
       "sample": 0.157875,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5848,7 +5848,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > createMatcher construction > 2000 choices, fuzzy": {
       "normalised": 0.056715168137447855,
@@ -5865,7 +5865,7 @@
       "batch": 3,
       "sample": 0.169333,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5873,7 +5873,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > createMatcher construction > 2000 choices, normalized": {
       "normalised": 0.05690088157627096,
@@ -5890,7 +5890,7 @@
       "batch": 3,
       "sample": 0.169167,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5898,7 +5898,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > createMatcher construction > 2000 titles, token sort + normalize": {
       "normalised": 0.9787549587961264,
@@ -5915,7 +5915,7 @@
       "batch": 1,
       "sample": 0.962875,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5923,7 +5923,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > repeated Matcher queries > 30 x 2000, fuzzy bestMatch one-shot": {
       "normalised": 4.442433929732952,
@@ -5940,7 +5940,7 @@
       "batch": 1,
       "sample": 4.4151875,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5948,7 +5948,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > repeated Matcher queries > 30 x 2000, fuzzy bestMatch prepared one-shot": {
       "normalised": 3.9639464529970976,
@@ -5965,7 +5965,7 @@
       "batch": 1,
       "sample": 3.87175,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5973,7 +5973,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > repeated Matcher queries > 30 x 2000, fuzzy Matcher best": {
       "normalised": 3.080418674585668,
@@ -5990,7 +5990,7 @@
       "batch": 1,
       "sample": 3.02025,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -5998,7 +5998,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > repeated Matcher queries > 30 x 2000, normalized Matcher best": {
       "normalised": 24.30633864783475,
@@ -6015,7 +6015,7 @@
       "batch": 1,
       "sample": 24.1892705,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6023,7 +6023,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > repeated Matcher queries > 30 x 2000, token sort search one-shot": {
       "normalised": 75.37542980194245,
@@ -6040,7 +6040,7 @@
       "batch": 1,
       "sample": 70.5613545,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6048,7 +6048,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > repeated Matcher queries > 30 x 2000, token sort search prepared one-shot": {
       "normalised": 9.386950813360656,
@@ -6065,7 +6065,7 @@
       "batch": 1,
       "sample": 8.882791000000001,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6073,7 +6073,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > repeated Matcher queries > 30 x 2000, token sort Matcher search": {
       "normalised": 8.60060886256078,
@@ -6090,7 +6090,7 @@
       "batch": 1,
       "sample": 8.415104,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6098,7 +6098,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > repeated Matcher queries > 30 x 2000, fuzzy Matcher search limit 1": {
       "normalised": 3.13170664453278,
@@ -6115,7 +6115,7 @@
       "batch": 1,
       "sample": 2.9840835,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6123,7 +6123,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > repeated Matcher queries > 30 x 2000, fuzzy Matcher searchIter": {
       "normalised": 2.8903670310435103,
@@ -6140,7 +6140,7 @@
       "batch": 1,
       "sample": 2.7435625000000003,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6148,7 +6148,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scorePairs with explicit Scorer > 2000 pairs, fuzzy": {
       "normalised": 0.405608902186379,
@@ -6165,7 +6165,7 @@
       "batch": 1,
       "sample": 0.404625,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6173,7 +6173,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scorePairs with explicit Scorer > 2000 pairs, normalized": {
       "normalised": 0.4861536956558971,
@@ -6190,7 +6190,7 @@
       "batch": 1,
       "sample": 0.47675,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6198,7 +6198,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scorePairs with explicit Scorer > 2000 pairs, fuzzy + normalize": {
       "normalised": 0.6695423020044028,
@@ -6215,7 +6215,7 @@
       "batch": 1,
       "sample": 0.660083,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6223,7 +6223,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scorePairs with explicit Scorer > 2000 pairs, normalized threshold": {
       "normalised": 0.22694846206608452,
@@ -6240,7 +6240,7 @@
       "batch": 1,
       "sample": 0.226042,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6248,7 +6248,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scorePairs with explicit Scorer > 2000 pairs, normalized multiplier": {
       "normalised": 0.4797287670219844,
@@ -6265,7 +6265,7 @@
       "batch": 1,
       "sample": 0.4775,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6273,7 +6273,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scorePairs with explicit Scorer > 2000 pairs, raw distance": {
       "normalised": 0.42661549340709654,
@@ -6290,7 +6290,7 @@
       "batch": 1,
       "sample": 0.426209,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6298,7 +6298,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scorePairs with explicit Scorer > 2000 pairs, raw similarity": {
       "normalised": 0.46870985135884036,
@@ -6315,7 +6315,7 @@
       "batch": 1,
       "sample": 0.4645,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6323,7 +6323,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scorePairs with explicit Scorer > 2000 pairs, normalized distance": {
       "normalised": 0.47806904045241094,
@@ -6340,7 +6340,7 @@
       "batch": 1,
       "sample": 0.469959,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6348,7 +6348,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scoreMatrix with explicit Scorer > 30 x 2000, fuzzy": {
       "normalised": 3.5347185804621626,
@@ -6365,7 +6365,7 @@
       "batch": 1,
       "sample": 3.4290830000000003,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6373,7 +6373,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scoreMatrix with explicit Scorer > 30 x 2000, normalized": {
       "normalised": 7.710820797622049,
@@ -6390,7 +6390,7 @@
       "batch": 1,
       "sample": 7.545833,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6398,7 +6398,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scoreMatrix with explicit Scorer > 30 x 2000, normalized threshold": {
       "normalised": 2.4554085623734476,
@@ -6415,7 +6415,7 @@
       "batch": 1,
       "sample": 2.214041,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6423,7 +6423,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scoreMatrix with explicit Scorer > 30 x 2000, normalized multiplier": {
       "normalised": 7.74304232890672,
@@ -6440,7 +6440,7 @@
       "batch": 1,
       "sample": 7.537125,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6448,7 +6448,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scoreMatrix with explicit Scorer > 200 x 200, symmetric normalized": {
       "normalised": 2.2897564042838727,
@@ -6465,7 +6465,7 @@
       "batch": 1,
       "sample": 2.246417,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6473,7 +6473,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > scoreMatrix with explicit Scorer > 30 x 2000, asymmetric normalized": {
       "normalised": 83.86387719342913,
@@ -6490,7 +6490,7 @@
       "batch": 1,
       "sample": 83.7522295,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6498,7 +6498,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared queries, two and three words > 2000 64-char choices, fuzzy": {
       "normalised": 0.600823221203793,
@@ -6515,7 +6515,7 @@
       "batch": 1,
       "sample": 0.570792,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6523,7 +6523,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared queries, two and three words > 2000 64-char choices, fuzzy threshold 80": {
       "normalised": 0.3558026395882986,
@@ -6540,7 +6540,7 @@
       "batch": 1,
       "sample": 0.351,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6548,7 +6548,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared queries, two and three words > 2000 80-char choices, fuzzy": {
       "normalised": 0.8176420847014625,
@@ -6565,7 +6565,7 @@
       "batch": 1,
       "sample": 0.797333,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6573,7 +6573,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared queries, two and three words > 2000 80-char choices, fuzzy threshold 80": {
       "normalised": 0.4804522511763794,
@@ -6590,7 +6590,7 @@
       "batch": 1,
       "sample": 0.473917,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6598,7 +6598,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared Indel, one-word queries > 2000 choices, normalized threshold 0.8": {
       "normalised": 0.13420965593668066,
@@ -6615,7 +6615,7 @@
       "batch": 1,
       "sample": 0.130416,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6623,7 +6623,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared Indel, one-word queries > 2000 choices, normalized threshold 0.5": {
       "normalised": 0.16021538360012152,
@@ -6640,7 +6640,7 @@
       "batch": 1,
       "sample": 0.155917,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6648,7 +6648,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared Indel, one-word queries > 2000 titles, 30-char query, normalized threshold 0.8": {
       "normalised": 0.19900068750366762,
@@ -6665,7 +6665,7 @@
       "batch": 1,
       "sample": 0.193875,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6673,7 +6673,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared Indel, one-word queries > 2000 choices, search limit 5, threshold 0.7": {
       "normalised": 0.1388070293894761,
@@ -6690,7 +6690,7 @@
       "batch": 1,
       "sample": 0.134542,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6698,7 +6698,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared band, 256-char queries > 2000 unrelated choices, fuzzy threshold 80": {
       "normalised": 2.110231181044078,
@@ -6715,7 +6715,7 @@
       "batch": 1,
       "sample": 2.102084,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6723,7 +6723,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared band, 256-char queries > 2000 similar choices, fuzzy threshold 90": {
       "normalised": 0.8590944863364549,
@@ -6740,7 +6740,7 @@
       "batch": 1,
       "sample": 0.835416,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6748,7 +6748,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared band, 256-char queries > 2000 similar choices, prepared Indel threshold 0.95": {
       "normalised": 0.6445890796741631,
@@ -6765,7 +6765,7 @@
       "batch": 1,
       "sample": 0.633917,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6773,7 +6773,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared distance families, one-word queries > 2000 choices, LCS normalized threshold 0.8": {
       "normalised": 0.13310028186257078,
@@ -6790,7 +6790,7 @@
       "batch": 1,
       "sample": 0.127771,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6798,7 +6798,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared distance families, one-word queries > 2000 choices, OSA normalized threshold 0.8": {
       "normalised": 0.23623764282258125,
@@ -6815,7 +6815,7 @@
       "batch": 1,
       "sample": 0.230292,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6823,7 +6823,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared distance families, one-word queries > 2000 choices, Damerau normalized threshold 0.8": {
       "normalised": 1.9861787317991162,
@@ -6840,7 +6840,7 @@
       "batch": 1,
       "sample": 1.9548329999999998,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6848,7 +6848,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared distance families, one-word queries > 2000 choices, LCS search limit 5, threshold 0.7": {
       "normalised": 0.13691169785214535,
@@ -6865,7 +6865,7 @@
       "batch": 1,
       "sample": 0.131666,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6873,7 +6873,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared distance families, one-word queries > 2000 choices, OSA search limit 5, threshold 0.7": {
       "normalised": 0.23687700702681264,
@@ -6890,7 +6890,7 @@
       "batch": 1,
       "sample": 0.236083,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6898,7 +6898,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > prepared distance families, one-word queries > 2000 choices, Damerau raw distance, no threshold": {
       "normalised": 1.989074192833367,
@@ -6915,7 +6915,7 @@
       "batch": 1,
       "sample": 1.908,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6923,7 +6923,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > token-set containment proof > 2000 sentences, proof settles": {
       "normalised": 0.0006166310913392848,
@@ -6940,7 +6940,7 @@
       "batch": 198,
       "sample": 0.12258299999999998,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6948,7 +6948,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     },
     "bench/suites/process.bench.ts > token-set containment proof > 2000 sentences, proof declines": {
       "normalised": 1.7136544154121527,
@@ -6965,7 +6965,7 @@
       "batch": 1,
       "sample": 1.6727919999999998,
       "repeats": 4,
-      "source": "6819be3e9d8f",
+      "source": "66e539e7867b",
       "node": "v26.7.0",
       "esbuild": "0.28.2",
       "platform": "darwin-arm64",
@@ -6973,7 +6973,7 @@
       "nodeOptions": "",
       "measurement": 3,
       "recordedAt": "2026-08-15T11:37:46.292Z",
-      "controls": "415ea83cecd8"
+      "controls": "131b0368081b"
     }
   }
 }
