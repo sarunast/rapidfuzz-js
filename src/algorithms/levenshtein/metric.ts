@@ -7,7 +7,8 @@ import {
   type ConfigurationCanonicalizer,
   type ConfigurationSymmetryResolver,
   type MetricImplementation,
-} from '../../core/scoring/builtIn/implementation.js'
+} from '#core/scoring/builtIn/implementation.js'
+
 import {
   levenshteinCosts,
   levenshteinDistanceImpl,

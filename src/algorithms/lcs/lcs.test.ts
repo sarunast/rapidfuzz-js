@@ -1,9 +1,10 @@
 // Ported from RapidFuzz tests/distance/test_LCSseq.py
 import { expect, it } from 'vitest'
 
+import { normalizeText as defaultProcess } from '#core/normalize.js'
+
 import { editopTuples, opcodeTuples } from '../../../testing/editopTuples.js'
 import { LCSseq } from '../../../testing/scorers.js'
-import { normalizeText as defaultProcess } from '../../core/normalize.js'
 import { lcsSeqEditops, lcsSeqOpcodes } from './implementation.js'
 
 it('handles the basic cases', () => {

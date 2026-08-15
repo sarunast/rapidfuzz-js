@@ -39,6 +39,13 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "imports": {
+    "#algorithms/*": "./src/algorithms/*",
+    "#batch/*": "./src/batch/*",
+    "#core/*": "./src/core/*",
+    "#fuzz/*": "./src/fuzz/*",
+    "#search/*": "./src/search/*"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

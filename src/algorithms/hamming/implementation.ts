@@ -3,7 +3,7 @@ import {
   type Editop,
   type Editops,
   type Opcodes,
-} from '../../core/editops/index.js'
+} from '#core/editops/index.js'
 import {
   distanceCutoffFor,
   distCutoff,
@@ -11,7 +11,7 @@ import {
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-} from '../../core/scoring/builtIn/cutoff.js'
+} from '#core/scoring/builtIn/cutoff.js'
 import {
   type MaybeSequenceMetricImplementation,
   type ConfigurationCanonicalizer,
@@ -20,11 +20,11 @@ import {
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
-} from '../../core/scoring/builtIn/implementation.js'
-import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
-import { prepareMetric } from '../../core/scoring/builtIn/preparation.js'
-import { validateSequence, convPair, maxSequenceLength } from '../../core/sequence.js'
-import type { MaybeSequence, Sequence } from '../../core/types.js'
+} from '#core/scoring/builtIn/implementation.js'
+import type { ScorerOptions } from '#core/scoring/builtIn/options.js'
+import { prepareMetric } from '#core/scoring/builtIn/preparation.js'
+import { validateSequence, convPair, maxSequenceLength } from '#core/sequence.js'
+import type { MaybeSequence, Sequence } from '#core/types.js'
 
 export interface HammingEditopsOptions {
   /** See {@link HammingOptions.pad}. Defaults to `true`. */

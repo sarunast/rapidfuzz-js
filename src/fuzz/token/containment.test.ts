@@ -11,8 +11,9 @@
 // descending score, then ascending id.
 import { describe, expect, it } from 'vitest'
 
-import { createScorer } from '../../core/scoring/scorer.js'
-import { createMatcher } from '../../search/matcher/createMatcher.js'
+import { createScorer } from '#core/scoring/scorer.js'
+import { createMatcher } from '#search/matcher/createMatcher.js'
+
 import { tokenSetRatio } from './tokenSetRatio.js'
 
 const scorer = createScorer(tokenSetRatio)

@@ -1,12 +1,13 @@
 // Ported from RapidFuzz tests/distance/test_JaroWinkler.py
 import { expect, it } from 'vitest'
 
+import { scoreMatrix } from '#batch/scoreMatrix.js'
+import { normalizeText as defaultProcess } from '#core/normalize.js'
+import { createScorer } from '#core/scoring/scorer.js'
+import { createMatcher } from '#search/index.js'
+
 import { prepareScorerOf } from '../../../testing/prepareScorer.js'
 import { JaroWinkler } from '../../../testing/scorers.js'
-import { scoreMatrix } from '../../batch/scoreMatrix.js'
-import { normalizeText as defaultProcess } from '../../core/normalize.js'
-import { createScorer } from '../../core/scoring/scorer.js'
-import { createMatcher } from '../../search/index.js'
 import { jaroWinklerSimilarity } from './implementation.js'
 import { similarity as jaroWinklerMetric } from './index.js'
 

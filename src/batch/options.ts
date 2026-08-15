@@ -1,10 +1,8 @@
-import type { MetricCompilation } from '../core/scoring/compilation.js'
-import type { Scorer } from '../core/scoring/scorer.js'
-import {
-  impossibleTrustedThreshold,
-  optionalThreshold,
-} from '../core/scoring/threshold.js'
-import type { Direction, Normalizer } from '../core/types.js'
+import type { MetricCompilation } from '#core/scoring/compilation.js'
+import type { Scorer } from '#core/scoring/scorer.js'
+import { impossibleTrustedThreshold, optionalThreshold } from '#core/scoring/threshold.js'
+import type { Direction, Normalizer } from '#core/types.js'
+
 import type { ScoreArrayKind } from './storage.js'
 
 /** Shared by `scoreMatrix` and `scorePairs`. */

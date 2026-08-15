@@ -4,7 +4,7 @@ import {
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-} from '../../core/scoring/builtIn/cutoff.js'
+} from '#core/scoring/builtIn/cutoff.js'
 import {
   withPreparedFlags,
   DISTANCE_FLAGS,
@@ -12,11 +12,12 @@ import {
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
   type MaybeSequenceMetricImplementation,
-} from '../../core/scoring/builtIn/implementation.js'
-import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
-import { prepareMetric } from '../../core/scoring/builtIn/preparation.js'
-import { convPair, validateSequence, maxSequenceLength } from '../../core/sequence.js'
-import type { MaybeSequence } from '../../core/types.js'
+} from '#core/scoring/builtIn/implementation.js'
+import type { ScorerOptions } from '#core/scoring/builtIn/options.js'
+import { prepareMetric } from '#core/scoring/builtIn/preparation.js'
+import { convPair, validateSequence, maxSequenceLength } from '#core/sequence.js'
+import type { MaybeSequence } from '#core/types.js'
+
 import { commonPrefix } from '../affix.js'
 
 function preparedPrefixDistance(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {

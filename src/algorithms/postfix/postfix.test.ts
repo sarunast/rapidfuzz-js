@@ -1,8 +1,9 @@
 // Ported from RapidFuzz tests/distance/test_Postfix.py
 import { expect, it } from 'vitest'
 
+import { normalizeText as defaultProcess } from '#core/normalize.js'
+
 import { Postfix } from '../../../testing/scorers.js'
-import { normalizeText as defaultProcess } from '../../core/normalize.js'
 
 it('handles the basic cases', () => {
   expect(Postfix.distance('', '')).toBe(0)

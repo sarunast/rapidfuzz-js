@@ -16,14 +16,15 @@ import {
   FUZZ_FLAGS,
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
-} from '../core/scoring/builtIn/implementation.js'
-import type { BuiltInMetric } from '../core/scoring/builtIn/metric.js'
+} from '#core/scoring/builtIn/implementation.js'
+import type { BuiltInMetric } from '#core/scoring/builtIn/metric.js'
 import {
   validateSequence,
   convSequence,
   hasSurrogatePair,
   isMissing,
-} from '../core/sequence.js'
+} from '#core/sequence.js'
+
 import { fuzzMetric } from './metric.js'
 import { partialRatioConverted, ratioConverted } from './partialWindow.js'
 import { prepareFuzz } from './preparation.js'

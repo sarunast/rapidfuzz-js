@@ -1,4 +1,5 @@
-import { builtInMetric, type BuiltInMetric } from '../../core/scoring/builtIn/metric.js'
+import { builtInMetric, type BuiltInMetric } from '#core/scoring/builtIn/metric.js'
+
 import { jaroDistance, jaroSimilarity } from './implementation.js'
 
 /** `1 − similarity`, on the same `0..1` scale. */

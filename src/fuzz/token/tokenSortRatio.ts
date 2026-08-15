@@ -1,14 +1,15 @@
-import type { PatternMask } from '../../algorithms/bitmask/pattern.js'
-import { prepareLcsPattern } from '../../algorithms/lcs/implementation.js'
+import type { PatternMask } from '#algorithms/bitmask/pattern.js'
+import { prepareLcsPattern } from '#algorithms/lcs/implementation.js'
 import {
   FUZZ_FLAGS,
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
-} from '../../core/scoring/builtIn/implementation.js'
-import type { BuiltInMetric } from '../../core/scoring/builtIn/metric.js'
-import type { PreparationFactory } from '../../core/scoring/builtIn/preparation.js'
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import type { Sequence } from '../../core/types.js'
+} from '#core/scoring/builtIn/implementation.js'
+import type { BuiltInMetric } from '#core/scoring/builtIn/metric.js'
+import type { PreparationFactory } from '#core/scoring/builtIn/preparation.js'
+import type { PreparedKernel } from '#core/scoring/compilation.js'
+import type { Sequence } from '#core/types.js'
+
 import { fuzzMetric } from '../metric.js'
 import type { FuzzOptions } from '../types.js'
 import { preparedTokenChoice, sortedOf, tokenChoicePreparer } from './tokens.js'

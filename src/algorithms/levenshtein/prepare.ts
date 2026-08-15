@@ -3,15 +3,16 @@ import {
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-} from '../../core/scoring/builtIn/cutoff.js'
+} from '#core/scoring/builtIn/cutoff.js'
 import {
   prepareChoiceSequence,
   preparedChoiceSequence,
   type PreparationFactory,
-} from '../../core/scoring/builtIn/preparation.js'
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import { alignRepresentation, scorerSequence } from '../../core/sequence.js'
-import type { Sequence } from '../../core/types.js'
+} from '#core/scoring/builtIn/preparation.js'
+import type { PreparedKernel } from '#core/scoring/compilation.js'
+import { alignRepresentation, scorerSequence } from '#core/sequence.js'
+import type { Sequence } from '#core/types.js'
+
 import { sharesWideAffix } from '../affix.js'
 import { wordCount } from '../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../bitmask/pattern.js'

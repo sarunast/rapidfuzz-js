@@ -1,6 +1,6 @@
-import type { ChoicePreparer } from '../../core/scoring/builtIn/preparation.js'
-import { convSequence } from '../../core/sequence.js'
-import type { Sequence } from '../../core/types.js'
+import type { ChoicePreparer } from '#core/scoring/builtIn/preparation.js'
+import { convSequence } from '#core/sequence.js'
+import type { Sequence } from '#core/types.js'
 
 const SPACE = 32
 

@@ -1,11 +1,8 @@
-import { resolvePreparedChoice } from '../../core/scoring/preparedChoice.js'
-import type { AnyBrand, PreparedChoice } from '../../core/scoring/preparedChoice.js'
-import {
-  normalizeSequence,
-  snapshotSequence,
-  validateSequence,
-} from '../../core/sequence.js'
-import type { MaybeSequence, Normalizer, Sequence } from '../../core/types.js'
+import { resolvePreparedChoice } from '#core/scoring/preparedChoice.js'
+import type { AnyBrand, PreparedChoice } from '#core/scoring/preparedChoice.js'
+import { normalizeSequence, snapshotSequence, validateSequence } from '#core/sequence.js'
+import type { MaybeSequence, Normalizer, Sequence } from '#core/types.js'
+
 import type { MissingItemsPolicy } from '../types.js'
 
 type SequenceReader<TItem> = (item: TItem) => Sequence | null

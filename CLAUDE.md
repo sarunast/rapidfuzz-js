@@ -75,6 +75,30 @@ Every type parameter is a `T`-prefixed noun saying what it holds — `TItem`,
 `.d.ts`, in editor tooltips and in the generated API reference, where `<T, D, B>`
 tells a consumer nothing.
 
+## A cross-subsystem import is a `#` alias; everything else stays relative
+
+Leaving your own top-level subsystem is written with the subpath alias, never
+by climbing: `#core/sequence.js`, not `../../core/sequence.js`. The five are
+`#algorithms/*`, `#batch/*`, `#core/*`, `#fuzz/*`, `#search/*`, declared once in
+`package.json` `imports` — TypeScript reads that map directly, so there is no
+`paths` entry to keep in step, and `tsdown` resolves it at build time, so no
+`#` specifier reaches `dist/`.
+
+**Inside a subsystem, stay relative.** `./matrix.js` and `../pattern.js` say
+"beside me" and "one layer up in my own subsystem", which the alias form throws
+away — `#algorithms/levenshtein/internal/matrix.js` is longer and tells a reader
+less. `src/index.ts` is relative for the same reason: it never climbs.
+
+Two consequences worth knowing:
+
+- **The architecture suite resolves aliases itself** (`resolveAlias` in
+  `imports.test.ts`). An alias it did not resolve would not fail anything — it
+  would silently drop an edge, and the cycle walk and the foundation-direction
+  rule would stop covering it. Any new alias prefix goes in that map too.
+- **`imports` maps into `./src/`, which is not published.** Nothing in `dist/`
+  references a `#` specifier, so the field is inert for a consumer; `check:pkg`
+  and `check:exports` both pass with it present.
+
 ## Type imports go at the top of the file
 
 `import type { Direction } from '../core/types.js'`, never inline as

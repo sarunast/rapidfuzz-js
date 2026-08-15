@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
-import * as levenshtein from '../../algorithms/levenshtein/index.js'
+import * as levenshtein from '#algorithms/levenshtein/index.js'
+
 import { bestMatch, createMatcher, search, searchIter } from '../../index.js'
 import { createScorer, scorerCompilation } from './scorer.js'
 import {

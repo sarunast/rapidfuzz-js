@@ -1,9 +1,10 @@
 // Ported from RapidFuzz tests/distance/test_Indel.py
 import { expect, it } from 'vitest'
 
+import { normalizeText as defaultProcess } from '#core/normalize.js'
+
 import { editopTuples } from '../../../testing/editopTuples.js'
 import { Indel } from '../../../testing/scorers.js'
-import { normalizeText as defaultProcess } from '../../core/normalize.js'
 import { indelEditops } from './implementation.js'
 
 it('handles the basic cases', () => {

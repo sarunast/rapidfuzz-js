@@ -5,9 +5,10 @@ import {
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-} from '../../../core/scoring/builtIn/cutoff.js'
-import { convPair, hasSurrogatePair, isSequence } from '../../../core/sequence.js'
-import type { Sequence } from '../../../core/types.js'
+} from '#core/scoring/builtIn/cutoff.js'
+import { convPair, hasSurrogatePair, isSequence } from '#core/sequence.js'
+import type { Sequence } from '#core/types.js'
+
 import { lcsLengthRange } from '../../lcs/internal/kernel.js'
 import type {
   LevenshteinCosts,

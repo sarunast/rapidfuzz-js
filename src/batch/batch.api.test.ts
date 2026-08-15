@@ -1,8 +1,9 @@
 import { describe, expect, test, vi } from 'vitest'
 
-import * as indel from '../algorithms/indel/index.js'
-import * as levenshtein from '../algorithms/levenshtein/index.js'
-import { scorerCompilation } from '../core/scoring/scorer.js'
+import * as indel from '#algorithms/indel/index.js'
+import * as levenshtein from '#algorithms/levenshtein/index.js'
+import { scorerCompilation } from '#core/scoring/scorer.js'
+
 import { createScorer, scoreMatrix, scorePairs } from '../index.js'
 import type { MaybeSequence, Sequence } from '../index.js'
 import { buildScoreMatrix } from './scoreMatrix.js'

@@ -1,6 +1,7 @@
-import type { AnyBrand, PreparedChoice } from '../core/scoring/preparedChoice.js'
-import type { Scorer } from '../core/scoring/scorer.js'
-import type { Direction, MaybeSequence, Normalizer } from '../core/types.js'
+import type { AnyBrand, PreparedChoice } from '#core/scoring/preparedChoice.js'
+import type { Scorer } from '#core/scoring/scorer.js'
+import type { Direction, MaybeSequence, Normalizer } from '#core/types.js'
+
 import type { Match } from './results.js'
 
 export type ItemIterable<TItem> = Iterable<TItem> & object

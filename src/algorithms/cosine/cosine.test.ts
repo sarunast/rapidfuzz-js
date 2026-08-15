@@ -1,10 +1,11 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
+import { createScorer } from '#core/scoring/scorer.js'
+import { bestMatch, createMatcher } from '#search/index.js'
+
 import { Cosine } from '../../../testing/scorers.js'
 import { callUntyped } from '../../../testing/untyped.js'
-import { createScorer } from '../../core/scoring/scorer.js'
-import { bestMatch, createMatcher } from '../../search/index.js'
 import { similarity as diceMetric } from '../dice/index.js'
 import { dotProduct } from '../ngram/compare.js'
 import { buildProfile } from '../ngram/profile.js'

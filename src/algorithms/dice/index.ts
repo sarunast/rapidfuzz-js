@@ -1,7 +1,8 @@
-import type { MaybeSequenceMetricImplementation } from '../../core/scoring/builtIn/implementation.js'
-import { builtInMetric, type BuiltInMetric } from '../../core/scoring/builtIn/metric.js'
-import type { Metric } from '../../core/scoring/metric.js'
-import type { Direction, SimilarityConfiguration } from '../../core/types.js'
+import type { MaybeSequenceMetricImplementation } from '#core/scoring/builtIn/implementation.js'
+import { builtInMetric, type BuiltInMetric } from '#core/scoring/builtIn/metric.js'
+import type { Metric } from '#core/scoring/metric.js'
+import type { Direction, SimilarityConfiguration } from '#core/types.js'
+
 import { diceDistance, diceSimilarity, type DiceOptions } from './implementation.js'
 
 /** Accepted by every Sørensen-Dice metric. */

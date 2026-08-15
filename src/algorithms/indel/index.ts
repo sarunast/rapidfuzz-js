@@ -1,4 +1,5 @@
-import { builtInMetric, type BuiltInMetric } from '../../core/scoring/builtIn/metric.js'
+import { builtInMetric, type BuiltInMetric } from '#core/scoring/builtIn/metric.js'
+
 import {
   indelDistance,
   indelEditops,

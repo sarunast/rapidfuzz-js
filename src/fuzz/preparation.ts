@@ -1,14 +1,15 @@
-import type { PatternMask } from '../algorithms/bitmask/pattern.js'
-import { prepareLcsPattern } from '../algorithms/lcs/implementation.js'
+import type { PatternMask } from '#algorithms/bitmask/pattern.js'
+import { prepareLcsPattern } from '#algorithms/lcs/implementation.js'
 import {
   prepareChoiceSequence,
   preparedChoiceSequence,
   type ChoicePreparer,
   type PreparationFactory,
-} from '../core/scoring/builtIn/preparation.js'
-import type { PreparedKernel } from '../core/scoring/compilation.js'
-import { alignRepresentation, convSequence, scorerSequence } from '../core/sequence.js'
-import type { Sequence } from '../core/types.js'
+} from '#core/scoring/builtIn/preparation.js'
+import type { PreparedKernel } from '#core/scoring/compilation.js'
+import { alignRepresentation, convSequence, scorerSequence } from '#core/sequence.js'
+import type { Sequence } from '#core/types.js'
+
 import {
   type CharSet,
   charSetOf,

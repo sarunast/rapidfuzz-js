@@ -1,13 +1,14 @@
-import { assertOptionKeys } from '../../core/options.js'
-import type { MetricCompilation, PreparedKernel } from '../../core/scoring/compilation.js'
-import { scorerCompilation } from '../../core/scoring/scorer.js'
+import { assertOptionKeys } from '#core/options.js'
+import type { MetricCompilation, PreparedKernel } from '#core/scoring/compilation.js'
+import { scorerCompilation } from '#core/scoring/scorer.js'
 import {
   impossibleThreshold,
   kernelThreshold,
   optionalThreshold,
   passesThreshold,
-} from '../../core/scoring/threshold.js'
-import type { Direction, MaybeSequence, Normalizer } from '../../core/types.js'
+} from '#core/scoring/threshold.js'
+import type { Direction, MaybeSequence, Normalizer } from '#core/types.js'
+
 import type { Match } from '../results.js'
 import { assertCollection, collectionEntries } from '../shared/collection.js'
 import { BEST_OPTION_KEYS } from '../shared/options.js'

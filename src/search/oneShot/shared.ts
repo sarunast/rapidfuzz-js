@@ -1,4 +1,5 @@
-import type { Direction, Normalizer } from '../../core/types.js'
+import type { Direction, Normalizer } from '#core/types.js'
+
 import { collectionEntries } from '../shared/collection.js'
 import type { SourceEntry } from '../shared/collection.js'
 import type { ChoiceReader, ReaderOptions } from '../shared/readers.js'

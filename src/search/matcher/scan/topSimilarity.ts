@@ -1,4 +1,5 @@
-import type { PreparedKernel } from '../../../core/scoring/compilation.js'
+import type { PreparedKernel } from '#core/scoring/compilation.js'
+
 import { pushHeap, replaceHeapRoot } from '../../shared/heap.js'
 import { bestSimilarity } from './bestSimilarity.js'
 import type { ScoredId } from './types.js'

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { createScorer, scorerCompilation } from '#core/scoring/scorer.js'
+
 import { exhaustive, METRICS, pairs } from '../../../../testing/invertedIndex.js'
-import { createScorer, scorerCompilation } from '../../../core/scoring/scorer.js'
 import {
   distance as cosineDistance,
   similarity as cosineSimilarity,

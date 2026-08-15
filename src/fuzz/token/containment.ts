@@ -1,5 +1,6 @@
-import type { OptimumProof } from '../../core/scoring/optimumProof.js'
-import type { Sequence } from '../../core/types.js'
+import type { OptimumProof } from '#core/scoring/optimumProof.js'
+import type { Sequence } from '#core/types.js'
+
 import { prepareTokenChoice, preparedTokenChoice, uniqueOf } from './tokens.js'
 
 const SUBSET_CAP = 12

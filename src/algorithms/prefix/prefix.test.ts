@@ -1,8 +1,9 @@
 // Ported from RapidFuzz tests/distance/test_Prefix.py
 import { expect, it } from 'vitest'
 
+import { normalizeText as defaultProcess } from '#core/normalize.js'
+
 import { Prefix } from '../../../testing/scorers.js'
-import { normalizeText as defaultProcess } from '../../core/normalize.js'
 
 it('handles the basic cases', () => {
   expect(Prefix.distance('', '')).toBe(0)

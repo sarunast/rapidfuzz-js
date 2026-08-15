@@ -1,24 +1,25 @@
-import { normDistCutoff, normSimCutoff } from '../../core/scoring/builtIn/cutoff.js'
+import { normDistCutoff, normSimCutoff } from '#core/scoring/builtIn/cutoff.js'
 import {
   type MaybeSequenceMetricImplementation,
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   withPreparedFlags,
-} from '../../core/scoring/builtIn/implementation.js'
-import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
+} from '#core/scoring/builtIn/implementation.js'
+import type { ScorerOptions } from '#core/scoring/builtIn/options.js'
 import {
   prepareChoiceSequence,
   preparedChoiceSequence,
   type PreparationFactory,
-} from '../../core/scoring/builtIn/preparation.js'
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
+} from '#core/scoring/builtIn/preparation.js'
+import type { PreparedKernel } from '#core/scoring/compilation.js'
 import {
   alignRepresentation,
   validateSequence,
   convPair,
   scorerSequence,
-} from '../../core/sequence.js'
-import type { MaybeSequence, Sequence } from '../../core/types.js'
+} from '#core/sequence.js'
+import type { MaybeSequence, Sequence } from '#core/types.js'
+
 import { wordCount } from '../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
 

@@ -3,7 +3,7 @@ import {
   type Editop,
   type Editops,
   type Opcodes,
-} from '../../core/editops/index.js'
+} from '#core/editops/index.js'
 import {
   canonicalRawCutoff,
   canonicalSimilarityCutoff,
@@ -15,7 +15,7 @@ import {
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-} from '../../core/scoring/builtIn/cutoff.js'
+} from '#core/scoring/builtIn/cutoff.js'
 import {
   DISTANCE_FLAGS,
   NORMALIZED_DISTANCE_FLAGS,
@@ -23,21 +23,22 @@ import {
   SIMILARITY_FLAGS,
   withPreparedFlags,
   type MetricImplementation,
-} from '../../core/scoring/builtIn/implementation.js'
-import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
+} from '#core/scoring/builtIn/implementation.js'
+import type { ScorerOptions } from '#core/scoring/builtIn/options.js'
 import {
   prepareChoiceSequence,
   preparedChoiceSequence,
   type PreparationFactory,
-} from '../../core/scoring/builtIn/preparation.js'
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
+} from '#core/scoring/builtIn/preparation.js'
+import type { PreparedKernel } from '#core/scoring/compilation.js'
 import {
   alignRepresentation,
   convPair,
   scorerSequence,
   maxSequenceLength,
-} from '../../core/sequence.js'
-import type { Sequence } from '../../core/types.js'
+} from '#core/sequence.js'
+import type { Sequence } from '#core/types.js'
+
 import { commonAffix, sharesAffix } from '../affix.js'
 import { UNBOUNDED_MISSES, wordCount } from '../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../bitmask/pattern.js'

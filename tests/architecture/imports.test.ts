@@ -42,6 +42,16 @@ function contents(directory: string): string {
     .join('\n')
 }
 
+// A cross-subsystem import is written `#core/sequence.js` rather than climbing
+// out with `../../`, so resolving those here is what keeps every rule below
+// seeing the whole graph. Skipping them instead would not fail anything
+// loudly — it would drop edges, and the cycle walk and the foundation rule
+// would quietly stop covering them.
+function resolveAlias(specifier: string): string | null {
+  const match = /^#([^/]+)\/(.+)$/.exec(specifier)
+  return match === null ? null : join(source, match[1] ?? '', match[2] ?? '')
+}
+
 // Both forms, because a side-effect `import './setup.js'` has no `from` and
 // would otherwise be invisible to every graph built here.
 function sourceImports(path: string): string[] {
@@ -53,6 +63,11 @@ function sourceImports(path: string): string[] {
   ]
   for (const match of specifiers) {
     const specifier = match[1]
+    const aliased = resolveAlias(specifier)
+    if (aliased !== null) {
+      imports.push(aliased.replace(/\.js$/, '.ts'))
+      continue
+    }
     if (!specifier.startsWith('.')) continue
     imports.push(resolve(dirname(path), specifier.replace(/\.js$/, '.ts')))
   }

@@ -1,8 +1,9 @@
 // Ported from RapidFuzz tests/distance/test_DamerauLevenshtein.py
 import { describe, expect, it } from 'vitest'
 
+import { normalizeText as defaultProcess } from '#core/normalize.js'
+
 import { DamerauLevenshtein } from '../../../testing/scorers.js'
-import { normalizeText as defaultProcess } from '../../core/normalize.js'
 import { resetDamerauScratch } from './implementation.js'
 
 const CASES: ReadonlyArray<readonly [string, string, number]> = [

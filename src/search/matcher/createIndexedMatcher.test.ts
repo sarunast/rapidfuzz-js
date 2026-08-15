@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { similarity as cosineSimilarity } from '../../algorithms/cosine/index.js'
-import { similarity as diceSimilarity } from '../../algorithms/dice/index.js'
-import { similarity as levenshteinSimilarity } from '../../algorithms/levenshtein/index.js'
+import { similarity as cosineSimilarity } from '#algorithms/cosine/index.js'
+import { similarity as diceSimilarity } from '#algorithms/dice/index.js'
+import { similarity as levenshteinSimilarity } from '#algorithms/levenshtein/index.js'
+
 import {
   createIndexedMatcher,
   createMatcher,

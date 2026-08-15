@@ -5,7 +5,7 @@
  * and this one imports only algorithm-runtime types. Keeping it free of runtime
  * logic is what lets the scorer families below it stay unaware of each other.
  */
-import type { MaybeSequence, SimilarityConfiguration } from '../core/types.js'
+import type { MaybeSequence, SimilarityConfiguration } from '#core/types.js'
 
 /**
  * What every fuzz scorer accepts through `createScorer`.

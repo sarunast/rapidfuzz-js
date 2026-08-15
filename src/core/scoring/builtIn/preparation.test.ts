@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest'
 
-import { prefixDistance } from '../../../algorithms/prefix/implementation.js'
+import { prefixDistance } from '#algorithms/prefix/implementation.js'
+
 import {
   PREPARE_SCORER,
   prepareChoiceSequence,

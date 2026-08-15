@@ -2,8 +2,9 @@ import {
   FUZZ_FLAGS,
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
-} from '../../core/scoring/builtIn/implementation.js'
-import type { BuiltInMetric } from '../../core/scoring/builtIn/metric.js'
+} from '#core/scoring/builtIn/implementation.js'
+import type { BuiltInMetric } from '#core/scoring/builtIn/metric.js'
+
 import { fuzzMetric } from '../metric.js'
 import { prepareFuzz } from '../preparation.js'
 import type { FuzzOptions } from '../types.js'

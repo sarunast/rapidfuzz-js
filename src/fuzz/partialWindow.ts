@@ -1,12 +1,13 @@
-import { checkedStartGeneration } from '../algorithms/bitmask/blockMasks.js'
-import type { PatternMask } from '../algorithms/bitmask/pattern.js'
+import { checkedStartGeneration } from '#algorithms/bitmask/blockMasks.js'
+import type { PatternMask } from '#algorithms/bitmask/pattern.js'
 import {
   lcsSeqLengthPrepared,
   lcsSeqLengthPreparedBounded,
   lcsSeqLengthRange,
   prepareLcsPattern,
-} from '../algorithms/lcs/implementation.js'
-import { validateSequence, convPair, isMissing } from '../core/sequence.js'
+} from '#algorithms/lcs/implementation.js'
+import { validateSequence, convPair, isMissing } from '#core/sequence.js'
+
 import type { FuzzInput, FuzzOptions, ScoreAlignment } from './types.js'
 
 function indelNormSim(

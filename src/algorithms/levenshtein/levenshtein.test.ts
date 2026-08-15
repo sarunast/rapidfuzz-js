@@ -3,11 +3,12 @@ import { createHash } from 'node:crypto'
 
 import { expect, it } from 'vitest'
 
+import { scoreMatrix } from '#batch/scoreMatrix.js'
+import { normalizeText as defaultProcess } from '#core/normalize.js'
+import { createScorer } from '#core/scoring/scorer.js'
+
 import { editopTuples, opcodeTuples } from '../../../testing/editopTuples.js'
 import { Levenshtein } from '../../../testing/scorers.js'
-import { scoreMatrix } from '../../batch/scoreMatrix.js'
-import { normalizeText as defaultProcess } from '../../core/normalize.js'
-import { createScorer } from '../../core/scoring/scorer.js'
 import { levenshteinEditops, levenshteinOpcodes } from './editops.js'
 import {
   distance as levenshteinDistanceMetric,

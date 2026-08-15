@@ -1,4 +1,5 @@
-import type { PreparedKernel } from '../../../core/scoring/compilation.js'
+import type { PreparedKernel } from '#core/scoring/compilation.js'
+
 import type { ScoredId } from './types.js'
 
 export function bestDistance(

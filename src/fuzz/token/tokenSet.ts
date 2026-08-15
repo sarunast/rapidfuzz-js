@@ -1,6 +1,7 @@
-import type { PatternMask } from '../../algorithms/bitmask/pattern.js'
-import { lcsSeqLengthRange } from '../../algorithms/lcs/implementation.js'
-import { validateSequence, isMissing } from '../../core/sequence.js'
+import type { PatternMask } from '#algorithms/bitmask/pattern.js'
+import { lcsSeqLengthRange } from '#algorithms/lcs/implementation.js'
+import { validateSequence, isMissing } from '#core/sequence.js'
+
 import {
   type CharSet,
   partialAlignmentConverted,

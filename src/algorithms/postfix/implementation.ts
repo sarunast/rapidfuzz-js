@@ -4,7 +4,7 @@ import {
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-} from '../../core/scoring/builtIn/cutoff.js'
+} from '#core/scoring/builtIn/cutoff.js'
 import {
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
@@ -12,11 +12,12 @@ import {
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
-} from '../../core/scoring/builtIn/implementation.js'
-import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
-import { prepareMetric } from '../../core/scoring/builtIn/preparation.js'
-import { validateSequence, convPair, maxSequenceLength } from '../../core/sequence.js'
-import type { MaybeSequence } from '../../core/types.js'
+} from '#core/scoring/builtIn/implementation.js'
+import type { ScorerOptions } from '#core/scoring/builtIn/options.js'
+import { prepareMetric } from '#core/scoring/builtIn/preparation.js'
+import { validateSequence, convPair, maxSequenceLength } from '#core/sequence.js'
+import type { MaybeSequence } from '#core/types.js'
+
 import { commonSuffix } from '../affix.js'
 
 function preparedPostfixDistance(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
