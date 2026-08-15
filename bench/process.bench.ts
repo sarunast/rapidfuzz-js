@@ -11,7 +11,12 @@ import {
   similarity as levenshteinSimilarity,
 } from '../src/algorithms/levenshtein/index.js'
 import { normalizedSimilarity as osaNormalizedSimilarity } from '../src/algorithms/osa/index.js'
-import { weightedRatio, ratio as fuzzRatio, tokenSortRatio } from '../src/fuzz/index.js'
+import {
+  weightedRatio,
+  ratio as fuzzRatio,
+  tokenSetRatio,
+  tokenSortRatio,
+} from '../src/fuzz/index.js'
 import {
   bestMatch,
   createMatcher,
@@ -362,5 +367,43 @@ describe('prepared distance families, one-word queries', () => {
   // unbounded path instead of the rejecting one.
   measure('2000 choices, Damerau raw distance, no threshold', () => {
     bestMatch(query, choices, { scorer: preparedDamerauDistance })
+  })
+})
+
+// The one thing correctness tests cannot see about `OptimumProof`: whether it
+// still fires. Token-set similarity scores exactly 100 when one non-empty token
+// set contains the other, so `createMatcher` answers from a token index instead
+// of scoring anything. A regression that made the proof always decline would
+// pass every test in the suite and show up only here.
+//
+// The two cases are the two halves of that, and both are load-bearing:
+//
+//   settles  — the containing choice is placed last, so a scan pays for all
+//              2000 candidates before reaching it. This is a constant-time
+//              index lookup, and reads three orders of magnitude below its
+//              sibling. If it ever climbs to meet the declining case, the
+//              proof stopped firing.
+//   declines — no choice holds both query tokens, so the proof gives up and the
+//              scan runs. This is the case that says declining stays free; if
+//              it moves, the proof started costing something on the corpora it
+//              cannot help.
+describe('token-set containment proof', () => {
+  const containmentChoices = sentences(2_000, 5, 0x630f_7a11)
+  // Sentinel tokens rather than words drawn from the corpus: the proof settles
+  // on the *earliest* containing choice, so a query whose tokens co-occur early
+  // by chance would measure a short scan instead of the shortcut.
+  containmentChoices[containmentChoices.length - 1] =
+    `zulu quebec ${containmentChoices[containmentChoices.length - 1] ?? ''}`
+  const containedQuery = 'zulu quebec'
+  const uncontainedQuery = 'sierra tango'
+  const containment = createMatcher(containmentChoices, {
+    scorer: createScorer(tokenSetRatio),
+  })
+
+  measure('2000 sentences, proof settles', () => {
+    containment.best(containedQuery)
+  })
+  measure('2000 sentences, proof declines', () => {
+    containment.best(uncontainedQuery)
   })
 })
