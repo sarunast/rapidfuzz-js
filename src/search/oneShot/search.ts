@@ -139,53 +139,35 @@ export function search<TItem, TDirection extends Direction, TBrand>(
   const optimal = knownOptimum(compilation)
   let cutoff = activeThreshold
 
+  const consider = (item: TItem, key: unknown, order: number): boolean => {
+    const choice = choices.read(item)
+    if (choice === null) return false
+    const score = prepared(choice, cutoff)
+    if (!passesThreshold(compilation.direction, score, activeThreshold)) return false
+    if (limit === null) {
+      results.push({ item, key, score, order })
+      return false
+    }
+    if (results.length < limit) {
+      pushHeap(results, { item, key, score, order }, heapWorse)
+      if (results.length < limit) return false
+    } else if (better(compilation.direction, score, results[0].score)) {
+      replaceHeapRoot(results, { item, key, score, order }, heapWorse)
+    } else {
+      return false
+    }
+    cutoff = results[0].score
+    return optimal !== null && cutoff === optimal
+  }
+
   if (arrayItems !== null) {
     for (let key = 0; key < arrayItems.length; key++) {
-      const item = arrayItems[key]
-      const choice = choices.read(item)
-      if (choice === null) continue
-      const score = prepared(choice, cutoff)
-      if (passesThreshold(compilation.direction, score, activeThreshold)) {
-        if (limit === null) {
-          results.push({ item, key, score, order: key })
-        } else if (results.length < limit) {
-          pushHeap(results, { item, key, score, order: key }, heapWorse)
-          if (results.length === limit) {
-            cutoff = results[0].score
-            if (optimal !== null && cutoff === optimal) break
-          }
-        } else if (better(compilation.direction, score, results[0].score)) {
-          replaceHeapRoot(results, { item, key, score, order: key }, heapWorse)
-          cutoff = results[0].score
-          if (optimal !== null && cutoff === optimal) break
-        }
-      }
+      if (consider(arrayItems[key], key, key)) break
     }
   } else {
     let order = 0
     for (const entry of collectionEntries(items)) {
-      const choice = choices.read(entry.item)
-      if (choice === null) continue
-      const score = prepared(choice, cutoff)
-      if (passesThreshold(compilation.direction, score, activeThreshold)) {
-        if (limit === null) {
-          results.push({ item: entry.item, key: entry.key, score, order })
-        } else if (results.length < limit) {
-          pushHeap(results, { item: entry.item, key: entry.key, score, order }, heapWorse)
-          if (results.length === limit) {
-            cutoff = results[0].score
-            if (optimal !== null && cutoff === optimal) break
-          }
-        } else if (better(compilation.direction, score, results[0].score)) {
-          replaceHeapRoot(
-            results,
-            { item: entry.item, key: entry.key, score, order },
-            heapWorse,
-          )
-          cutoff = results[0].score
-          if (optimal !== null && cutoff === optimal) break
-        }
-      }
+      if (consider(entry.item, entry.key, order)) break
       order++
     }
   }
