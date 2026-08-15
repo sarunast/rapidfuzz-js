@@ -29,9 +29,6 @@ export function prepareTokenSort(): PreparationFactory {
     }
     const score: PreparedKernel = (rawChoice, rawCutoff) => {
       const choice = preparedTokenChoice(rawChoice)
-      // `patternOf`, not `patternOf()`: the callee refuses an impossible cutoff
-      // before it sorts anything, and an argument would have built the query's
-      // masks on the way in regardless.
       return tokenSortRatioConverted(
         queryChoice.sequence,
         choice.sequence,

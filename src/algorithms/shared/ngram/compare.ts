@@ -9,22 +9,6 @@ import {
   type PackedGrams,
 } from './profile.js'
 
-/**
- * `Σ min(a_g, b_g)` for one comparison, without building a profile of either
- * side, or `null` where the pair cannot be packed and the profiles have to
- * answer instead.
- *
- * A prepared profile sorts its grams so that later queries can merge against
- * it. A direct comparison has no later query, so it is paying `O(n log n)` to
- * order something it reads once: this tallies the smaller side into a `Map` and
- * spends the larger against those counts, which is `O(n + m)`. Decrementing as
- * it goes is what makes one map enough — a gram runs out exactly when the
- * smaller side's count of it does, so the walk never needs the larger side's
- * own frequencies. Cosine gets no such shortcut, because `Σ b_g²` needs them.
- *
- * Answers any depth with a canonical radix, and is worth calling on far fewer:
- * Dice's direct path owns that policy and states what was measured.
- */
 export function directSharedFrequency(
   a: ArrayLike<unknown>,
   b: ArrayLike<unknown>,
@@ -36,14 +20,8 @@ export function directSharedFrequency(
   const gramsB = gramsIn(b, gramSize)
   if (gramsA === 0 || gramsB === 0) return null
   const domain = domainOf(a)
-  // Two first elements in different domains cannot share one packed key space,
-  // where `'b'` and `98` would become the same key. They may still share later
-  // grams — `['x', 1, 2]` and `[9, 1, 2]` both hold `[1, 2]` — so this defers to
-  // the profile path, which answers such a pair exactly. Never `0`.
   if (domainOf(b) !== domain) return null
 
-  // The smaller side is the one tallied, so the `Map` stays as small as the
-  // pair allows and the larger side's walk is lookups rather than insertions.
   const aFirst = gramsA <= gramsB
   const smallCount = aFirst ? gramsA : gramsB
   const largeCount = aFirst ? gramsB : gramsA
@@ -63,13 +41,6 @@ export function directSharedFrequency(
     const remaining = counts.get(key)
     if (remaining === undefined || remaining === 0) continue
     counts.set(key, remaining - 1)
-    // Every gram *occurrence* the smaller side had has now been consumed, and
-    // `Σ min` cannot exceed that count, so nothing left on the larger side can
-    // change the answer. Exact, not a cutoff — the same number the full walk
-    // returns. Both key arrays were built, and so validated, before this loop,
-    // so stopping early cannot answer for a pair that should have declined.
-    // Worth 2.3-3.7x on public Dice where it fires and nothing where it does
-    // not, which `bench/ngram.bench.ts` holds at 0.99-1.05x.
     if (++shared === smallCount) return shared
   }
   return shared
@@ -95,18 +66,6 @@ function dotCounts(a: GramNode, b: GramNode): number {
   return product
 }
 
-/**
- * A packed side against a trie one: every packed gram decoded back to its
- * elements and looked up.
- *
- * One function for both operations, and one orientation for both operand
- * orders, because `Σ min` and `Σ a·b` are each symmetric. The trie walks below
- * are literal per depth on a recorded measurement; this path is the rare one and
- * gets no such licence. It needs a sequence packing refused, which narrows with
- * depth as the canonical radix does: an astral code point at trigram depth, or
- * anything outside Latin-1 at depths 4 to 6, where the widest feasible rung is
- * `0x100`.
- */
 function packedAgainstTrie(
   packed: PackedGrams,
   root: GramNode,
@@ -141,30 +100,8 @@ function packedAgainstTrie(
   return total
 }
 
-/**
- * How much longer the other side has to be before searching into it beats
- * walking it. Swept over query lengths 5 to 50 against length ratios 1 to 64,
- * both walks over the same arrays: a probe is 0.13-0.44x of a merge from this
- * ratio upward and inside noise of it below, while the ratios it declines — 1
- * to 4 — are where a merge is up to 1.15x ahead. The corner it exists for is a
- * short query against long choices, where a merge measured 3.0x *slower* than
- * the trie kernel it replaces on 5 grams into 500.
- *
- * Swept unbounded, and that is the case that decides it: under a threshold's
- * minimum the bound cuts so early that every shape from 5x5 to 50x1600 costs
- * 0.0055-0.0084 ms whichever arm runs. The arm matters only where the bound
- * does not bite.
- */
 const PROBE_LENGTH_RATIO = 8
 
-/**
- * Two packed sides of the same domain and depth.
- *
- * `remaining` is the driving side's suffix totals and turns the walk bounded,
- * which pins that side down; unbounded, both operations are symmetric and the
- * shorter side drives. Either way the driver ascends, so a probe can start each
- * search where the last one landed.
- */
 export function packedIntersect(
   query: PackedGrams,
   choice: PackedGrams,
@@ -187,12 +124,6 @@ export function packedIntersect(
       let high = otherKeys.length - 1
       let found = -1
       while (low <= high) {
-        // The span is shifted rather than the sum: a sequence may hold up to
-        // `0xffff_ffff` elements, so `low + high` can pass 2^32 and wrap to a
-        // midpoint outside the window, while `high - low` is bounded by the
-        // length and `>>>` is exact over it. Shifting matters — the arithmetic
-        // is the loop, and `Math.floor((high - low) / 2)` measured 4.3x slower
-        // over 5 x 500 keys.
         const middle = low + ((high - low) >>> 1)
         const candidate = otherKeys[middle]
         if (candidate === key) {
@@ -230,23 +161,7 @@ export function packedIntersect(
   return total
 }
 
-/**
- * Whichever pair of representations turned up, reduced to the four cases that
- * exist. Orientation is normalized here rather than written twice: both
- * operations are symmetric, so a trie-first mixed pair is the packed-first one
- * with its operands swapped.
- *
- * A domain mismatch is `0` without a walk — `'a'` and `97` are different
- * elements at this layer, so two profiles that packed different domains share
- * no gram by definition.
- */
 function combine(a: NGramProfile, b: NGramProfile, multiply: boolean): number {
-  // Two depths share no gram, and packing is where that stops being structural:
-  // a trie of depth 1 could never line up with one of depth 2, while the
-  // unigram `[97]` and the bigram `[0, 97]` both key to 97. A scorer compares
-  // profiles it prepared itself and cannot reach this, which is why
-  // `sharedFrequencyKernel` and `dotProductKernel` do not repeat the test per
-  // candidate.
   if (a.gramSize !== b.gramSize) return 0
   const storageA = a.storage
   const storageB = b.storage
@@ -266,28 +181,14 @@ function combine(a: NGramProfile, b: NGramProfile, multiply: boolean): number {
     : sharedFrequencyTries(storageA.root, storageB.root, a.gramSize)
 }
 
-/** `Σ min(a_g, b_g)` over the grams the two profiles share. */
 export function sharedFrequency(a: NGramProfile, b: NGramProfile): number {
   return combine(a, b, false)
 }
 
-/** `Σ a_g · b_g` over the grams the two profiles share. */
 export function dotProduct(a: NGramProfile, b: NGramProfile): number {
   return combine(a, b, true)
 }
 
-/**
- * Depths 1-3 get literal loops; any deeper `gramSize` — the option accepts every
- * safe integer from 1 up — takes the generic walk. The generic walk
- * allocates three stack arrays per comparison, which measured 1.6x the
- * specialized bigram loop over 100 queries against 1000 prepared choices — and
- * over prebuilt trigram profiles, at four lengths from 12 to 512 characters,
- * 1.2-1.7x the literal trigram loop below.
- *
- * Deeper than that it is iterative over an explicit stack, not recursive:
- * `gramSize` is caller-supplied and equals the trie depth, so recursion would
- * put a stack overflow inside the range of valid inputs.
- */
 export function sharedFrequencyTries(
   rootA: GramNode,
   rootB: GramNode,
@@ -346,11 +247,6 @@ export function sharedFrequencyTries(
   return shared
 }
 
-/**
- * A second literal traversal rather than {@link sharedFrequencyTries} taking a
- * combiner: the innermost frame of a walk is the last place to put a callback
- * every n-gram metric would make megamorphic.
- */
 export function dotProductTries(
   rootA: GramNode,
   rootB: GramNode,

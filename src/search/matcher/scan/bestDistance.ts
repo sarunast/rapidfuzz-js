@@ -7,13 +7,6 @@ export function bestDistance(
   threshold: number | null,
   optimal: number | null,
 ): ScoredId | undefined {
-  // The winner is carried as an id, so a run of improvements allocates one
-  // result rather than one per improvement.
-  //
-  // What makes the first candidate a winner is `bestId`, not the sentinel: a
-  // custom metric may return the sentinel as a real score, and a bare
-  // `value < bestScore` would then select nothing. The sentinel is only here
-  // to mirror `bestSimilarity`.
   let bestId = -1
   let bestScore = Number.POSITIVE_INFINITY
   let cutoff = threshold

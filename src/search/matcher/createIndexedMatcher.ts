@@ -98,8 +98,6 @@ export function createIndexedMatcher<TItem, TBrand>(
   options: IndexedMatcherOptions<TItem, TBrand>,
 ): Matcher<TItem, unknown, 'similarity', TBrand> {
   assertOptionKeys(options, INDEXED_MATCHER_OPTION_KEYS, 'createIndexedMatcher')
-  // Read exactly once each, as `createMatcher` does: a getter could otherwise
-  // answer one thing to the reader and another to a second look.
   const scorer = options.scorer
   const normalize = options.normalize
   const getText = options.getText
@@ -107,27 +105,13 @@ export function createIndexedMatcher<TItem, TBrand>(
   assertCollection(items)
   const compilation = scorerCompilation(scorer)
   const indexChoices = compilation.indexChoices
-  // Runtime rather than static, because a custom scorer built from a plain
-  // function can never be enumerated in a type, and naming the two built-in
-  // metrics in a type would put algorithm identity inside `search/`.
   if (indexChoices === undefined) {
     throw new TypeError(
       'createIndexedMatcher: this scorer has no indexed representation. ' +
         'Indexed search is available for dice.similarity and cosine.similarity.',
     )
   }
-  // Nothing reads the direction: only a similarity metric declares the
-  // capability, so a distance scorer is already refused above, and the shared
-  // threshold helpers take the compilation rather than a direction and bounds.
   const read = sequenceReader({ getText, normalize, missingItems }, false)
-  // The same table `createMatcher` builds, filling an index where that one
-  // fills a prepared array.
-  //
-  // `add` inside the walk, not over a collected array afterwards: the reader
-  // borrows its sequence rather than snapshotting it, so an accessor handing
-  // back one reused buffer would leave every choice indexed as the last. It
-  // also keeps an unindexable choice from being discovered only after the whole
-  // collection has been read.
   const builder = indexChoices()
   const table = buildChoiceTable(items, (item) => {
     const sequence = read(item)
@@ -187,9 +171,6 @@ export function createIndexedMatcher<TItem, TBrand>(
     query: MaybeSequence,
     call?: BestOptions,
   ): IterableIterator<Match<TItem, unknown>> => {
-    // The threshold is read where the call is made and the query normalized
-    // where iteration starts, both matching `createMatcher` — a caller who
-    // mutates either between the two sees what they would see there.
     if (call !== undefined) assertOptionKeys(call, CALL_BEST_KEYS, 'matcher.searchIter')
     const threshold = optionalThreshold(call?.threshold)
     function* iterate(): Generator<Match<TItem, unknown>> {
@@ -200,16 +181,6 @@ export function createIndexedMatcher<TItem, TBrand>(
         return
       }
       if (impossibleThreshold(compilation, threshold)) return
-      // The ids and scores are copied before the first yield, never streamed
-      // from the index: the arrays a scan hands back are the index's own
-      // scratch, so a `search` run between two `next()` calls would otherwise
-      // rewrite what a live iterator is still walking.
-      //
-      // Two number arrays rather than the finished `Match` objects, which is
-      // the same protection for less: a caller who stops after one result of
-      // 100,000 measured 0.06x, and even a full drain 0.54x, against
-      // materializing them all up front. Below ~100 results it costs 0.2µs
-      // against a query that costs tens.
       const found = index.scan(normalized, kernelThreshold(compilation, threshold))
       const ids = found.ids.slice(0, found.length)
       const scores = found.scores.slice(0, found.length)

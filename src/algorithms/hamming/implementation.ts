@@ -53,16 +53,6 @@ export interface HammingOptions extends ScorerOptions {
   pad?: boolean | undefined
 }
 
-/**
- * Count the differing positions, abandoning the scan once `cutoff` is passed.
- *
- * Hamming has no structure to exploit — every position has to be looked at —
- * so a cutoff is the only thing that can make it sublinear. Under
- * best-match search, where the running best tightens the bound after every
- * candidate, most comparisons are decided within the first few positions
- * instead of after a full pass. The bail-out value is only required to exceed
- * `cutoff`; each caller maps it onto the rejection its convention reports.
- */
 function distance_(
   s1: ArrayLike<unknown>,
   s2: ArrayLike<unknown>,
@@ -79,27 +69,13 @@ function distance_(
   const limit = Math.min(len1, len2)
   const surplus = Math.max(len1, len2) - limit
 
-  // The length difference alone is already a lower bound on the distance, so
-  // badly mismatched candidates never reach a loop at all.
   if (surplus > cutoff) return cutoff + 1
 
-  // Two loops rather than one with the bound folded in. Testing the running
-  // distance after every mismatch measured ~7% on an unbounded `scoreMatrix`, where
-  // the test can never fire and `cutoff` is an infinity that drags the integer
-  // comparison into floating point. Most calls have no cutoff, so they get a
-  // loop that does not ask.
   return cutoff === Number.POSITIVE_INFINITY
     ? exactMismatches(s1, s2, limit, surplus)
     : boundedMismatches(s1, s2, limit, surplus, cutoff)
 }
 
-/**
- * Indexing a string yields a fresh one-character string per position, and
- * comparing two of those is a string comparison. Reading the code units instead
- * compares two integers. Both inputs share a representation by the time they
- * arrive here — `convPair` on the direct path, `alignRepresentation` on the
- * prepared one — so this only has to ask the question once.
- */
 function exactMismatches(
   s1: ArrayLike<unknown>,
   s2: ArrayLike<unknown>,
@@ -122,7 +98,6 @@ function exactMismatches(
   return dist
 }
 
-/** {@link exactMismatches}, abandoned as soon as the count passes `cutoff`. */
 function boundedMismatches(
   s1: ArrayLike<unknown>,
   s2: ArrayLike<unknown>,
@@ -150,14 +125,6 @@ function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
   return Math.max(s1.length, s2.length)
 }
 
-/**
- * Hamming distance: the number of positions at which the inputs differ, plus
- * the length difference when `pad` is enabled.
- *
- * If the distance is greater than `scoreCutoff`, `scoreCutoff + 1` is returned.
- *
- * @throws if `pad` is `false` and the inputs have different lengths.
- */
 function hammingDistance_impl(
   s1: MaybeSequence,
   s2: MaybeSequence,
@@ -195,11 +162,6 @@ function hammingNormalizedDistance_impl(
   return normDistCutoff(norm, options.scoreCutoff)
 }
 
-/**
- * Hamming similarity normalised into `[0, 1]`, where `1` means identical.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
 function hammingNormalizedSimilarity_impl(
   s1: MaybeSequence,
   s2: MaybeSequence,
@@ -260,14 +222,6 @@ export function hammingOpcodes(
   return hammingEditops(s1, s2, options).toOpcodes()
 }
 
-/**
- * Settle `pad` once, when a scorer is compiled.
- *
- * The direct paths read it as `options.pad ?? true` and the prepared one as
- * `Boolean(pad)`, so anything but a boolean is two spellings of a default
- * rather than one meaning. Compilation is the last point at which the caller's
- * value is still visible, so it is where the disagreement is worth ending.
- */
 const hammingConfigurationCanonicalizer: ConfigurationCanonicalizer = (options) => {
   const pad = Reflect.get(options, 'pad')
   if (pad == null || typeof pad === 'boolean') return options

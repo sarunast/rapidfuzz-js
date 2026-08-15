@@ -25,9 +25,6 @@ export function topDistance(
     return found === undefined ? [] : [found]
   }
 
-  // A tie is broken by the id, which is the source position: nothing is skipped
-  // before scoring, so the loop counter is the order a separate field used to
-  // carry.
   if (limit !== null) {
     const heap: ScoredId[] = []
     let cutoff = threshold
@@ -42,8 +39,6 @@ export function topDistance(
         }
         continue
       }
-      // A tie loses on id, and every later candidate has a later id, so the
-      // numeric test alone decides admission — no comparator call.
       if (value >= heap[0].score) continue
       replaceHeapRoot(heap, { id, score: value }, worse)
       cutoff = heap[0].score

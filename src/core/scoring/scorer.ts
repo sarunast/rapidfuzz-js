@@ -170,17 +170,11 @@ function customCompilation<TDirection extends Direction, TBrand>(
     bounds,
     symmetric,
     trusted: false,
-    // Passed rather than wrapped: a two-parameter function satisfies the
-    // three-parameter shape, and a custom metric has no cutoff to take.
     score,
     rawScore,
     prepareQuery: (query) => (choice) => rawScore(query, validatePreparedChoice(choice)),
     prepareChoice: (choice) => choice,
-    // A custom metric is handed the sequence itself, so a handle that outlives
-    // the call needs a copy of its own.
     prepareOwnedChoice: (choice) => snapshotSequence(choice),
-    // Fresh per call: a custom metric is whatever the caller passed, so two
-    // scorers built from one function still prepare choices for themselves.
     preparedChoiceKey: Object.freeze({}),
   }
 }
@@ -205,11 +199,6 @@ function createScoreMethod<TDirection extends Direction>(
   ): number | undefined {
     if (options === undefined) return compilation.score(a, b, null)
     const threshold = validateThreshold(options.threshold)
-    // Nothing can clear it, but a bad operand is still a `TypeError` rather
-    // than an `undefined`: the answer is skipped, never the validation. The
-    // `trusted` test is what makes `validate` visible — only a trusted
-    // compilation has a validation step separable from scoring, which is the
-    // same reason it is the only kind whose kernel may be skipped.
     if (compilation.trusted && impossibleThreshold(compilation, threshold)) {
       compilation.validate(a, b)
       return undefined
@@ -228,12 +217,7 @@ function fromCompilation<TDirection extends Direction, TBrand>(
     bounds: Object.freeze([compilation.bounds[0], compilation.bounds[1]]),
     symmetric: compilation.symmetric,
     score: createScoreMethod(compilation),
-    // Owned, not borrowed: a handle outlives this call, so mutating the
-    // sequence afterwards must not reach through it. `createMatcher` snapshots
-    // for the same reason, and the two have to agree.
     prepareChoice: (choice, options) => {
-      // Guarded rather than checked unconditionally: this runs once per choice,
-      // and the call that names no options has no keys to walk.
       if (options !== undefined) {
         assertOptionKeys(options, PREPARE_CHOICE_OPTION_KEYS, 'prepareChoice')
       }
@@ -296,16 +280,10 @@ export function createScorer<
   metric: Metric<TDirection, TConfig, TBrand>,
   configuration: TConfig,
 ): Scorer<TDirection, TBrand>
-// Without a configuration there is nothing to infer `Config` from, and trying
-// to is what refused a union of metrics whose configurations have no key in
-// common — `levenshtein.distance` beside `jaroWinkler.distance`, as a loop over
-// an array of metrics produces.
 export function createScorer<TDirection extends Direction, TBrand>(
   metric: Metric<TDirection, never, TBrand>,
   configuration?: undefined,
 ): Scorer<TDirection, TBrand>
-// A metric whose brand cannot be pinned still compiles a scorer; what it gives
-// up is the compile-time half of the prepared-choice check.
 export function createScorer<TDirection extends Direction>(
   metric: Metric<TDirection, never, AnyBrand>,
   configuration?: undefined,
@@ -330,24 +308,15 @@ export function createScorer<TDirection extends Direction>(
   metric: (a: MaybeSequence, b: MaybeSequence) => number,
   configuration: CustomScorerConfiguration<TDirection>,
 ): Scorer<TDirection>
-// `Metric<TDirection, never>` is "whatever its configuration", not "it takes none": the
-// compile hook is contravariant, so `object` would demand a hook accepting any
-// object and no built-in would be assignable. The overloads keep the real
-// `Config`; this line only has to admit them all.
 export function createScorer<TDirection extends Direction, TBrand>(
   metric:
     | Metric<TDirection, never, TBrand>
     | ((a: MaybeSequence, b: MaybeSequence) => number),
   configuration?: object,
 ): Scorer<TDirection, TBrand> {
-  // The direction is named rather than inferred: the guard reads `unknown`, so
-  // there is no argument left to infer `D` from, and a bare call would widen the
-  // result to `Scorer<Direction>`.
   if (isBuiltInMetric<TDirection, object, TBrand>(metric)) {
     return fromCompilation(metric[COMPILE](configuration))
   }
-  // The guard above answers `false` for a non-callable rather than throwing, so
-  // refuse it here — otherwise the scorer builds and fails at first use.
   if (typeof metric !== 'function') {
     throw new TypeError('metric must be a function')
   }
@@ -358,8 +327,6 @@ export function createScorer<TDirection extends Direction, TBrand>(
   }
   validateCustomConfigurationKeys(configuration, configuration.direction)
   validateBounds(configuration.bounds)
-  // Only similarity has a policy to choose: `validatePair` throws for a missing
-  // side of a distance pair whatever it is told.
   const missing: MissingPolicy =
     configuration.direction === 'similarity'
       ? (configuration.missing ?? 'compatible')
@@ -395,8 +362,6 @@ function validateCustomConfigurationKeys(
   direction: Direction,
 ): void {
   for (const key of Object.keys(configuration)) {
-    // `missing` is similarity-only, as it is for a built-in metric — see
-    // `configurationRecord` in `algorithms/shared/metricAdapter`.
     const known =
       key === 'direction' ||
       key === 'bounds' ||
@@ -408,8 +373,6 @@ function validateCustomConfigurationKeys(
   }
 }
 
-// Reads `unknown` because a JavaScript caller's `null` or `123` gets here, and
-// `Reflect.get` on a non-object throws an error about our internals.
 function isCustomConfiguration<TDirection extends Direction>(
   value: unknown,
 ): value is CustomScorerConfiguration<TDirection> {
@@ -462,8 +425,6 @@ export function withPublicScoreObserver(
       observer()
       return scorer.score
     },
-    // Copied plainly: the observer reports public `score` calls, and preparing
-    // a choice is not one.
     prepareChoice: (choice, options) => scorer.prepareChoice(choice, options),
   }
   compilations.set(observed, compilation)

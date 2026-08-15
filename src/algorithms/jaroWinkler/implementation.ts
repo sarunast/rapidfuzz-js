@@ -23,15 +23,9 @@ import {
 } from '../shared/scorerSupport.js'
 
 export interface JaroWinklerOptions extends ScorerOptions {
-  /** Weight of the common prefix bonus. Must be in `[0, 1]`. Defaults to `0.1`. */
   prefixWeight?: number | undefined
 }
 
-/**
- * Jaro similarity plus a bonus for a common prefix of up to four elements.
- *
- * The bonus only applies above a Jaro similarity of 0.7, matching RapidFuzz.
- */
 function similarity_(
   s1: ArrayLike<unknown>,
   s2: ArrayLike<unknown>,
@@ -39,9 +33,6 @@ function similarity_(
   scoreCutoff: number,
   prepared: PatternMask,
 ): number {
-  // No range test on `prefixWeight`: `prepareJaroWinkler` parses and checks it
-  // once per scorer, before it builds the pattern this takes. `directSimilarity`
-  // carries the test for the unprepared path, which has no such factory.
   const prefix = Math.min(commonPrefix(s1, s2), 4)
   let jaroCutoff = scoreCutoff
   if (jaroCutoff > 0.7) {
@@ -84,17 +75,6 @@ function directSimilarity(
   return sim >= scoreCutoff ? sim : 0
 }
 
-/**
- * Jaro-Winkler similarity in `[0, 1]`, where `1` means identical.
- *
- * If the similarity is smaller than `scoreCutoff`, `0` is returned.
- *
- * The score is already normalised, so `scoreCutoff` is read as a `double` in
- * `[0, 1]` rather than as a raw, element-counting cutoff — see
- * {@link jaroSimilarity}, which upstream treats the same way.
- *
- * @throws if `prefixWeight` is outside `[0, 1]`.
- */
 function jaroWinklerSimilarity_impl(
   s1: MaybeSequence,
   s2: MaybeSequence,
@@ -108,7 +88,6 @@ function jaroWinklerSimilarity_impl(
   )
 }
 
-/** Jaro-Winkler distance in `[0, 1]`, i.e. `1 - similarity`. */
 function jaroWinklerDistance_impl(
   s1: MaybeSequence,
   s2: MaybeSequence,
@@ -130,11 +109,6 @@ function jaroWinklerDistance_impl(
 
 type PreparedJaroWinklerKind = 'distance' | 'similarity'
 
-/**
- * One parse for the prepared factory and the canonicalizer, so they cannot
- * disagree. Testing for the range rather than against it rejects `NaN` with
- * the same comparison.
- */
 function parsePrefixWeight(options: Readonly<Record<string, unknown>>): number {
   const prefixWeight = Reflect.get(options, 'prefixWeight')
   if (prefixWeight == null) return 0.1
@@ -149,7 +123,6 @@ function parsePrefixWeight(options: Readonly<Record<string, unknown>>): number {
 
 function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparationFactory {
   return (options) => {
-    // Once per scorer, so a matcher preparing many queries never reparses it.
     const prefixWeight = parsePrefixWeight(options)
 
     const prepareQuery = (query: Sequence): PreparedKernel => {
@@ -158,9 +131,6 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparationFactory {
 
       return (rawChoice, rawCutoff) => {
         const b = preparedChoiceSequence(rawChoice)
-        // The common-prefix bonus and Jaro's transposition pass both compare the
-        // two sequences elementwise, so they have to agree on how a character is
-        // spelled.
         const similarityCutoff =
           kind === 'distance'
             ? rawCutoff === null
@@ -184,14 +154,6 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparationFactory {
   }
 }
 
-/**
- * Settle `prefixWeight` once, when a scorer is compiled.
- *
- * Every later path reads the weight from the record this returns, so a
- * non-number that {@link directSimilarity}'s numeric comparisons would quietly
- * coerce — or a `NaN` that would poison every score — is rejected here, before
- * either the direct or the prepared path can see it.
- */
 const jaroWinklerConfigurationCanonicalizer: ConfigurationCanonicalizer = (options) => {
   parsePrefixWeight(options)
   return options

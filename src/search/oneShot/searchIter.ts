@@ -16,12 +16,6 @@ import type { ChoiceReader } from '../shared/readers.js'
 import type { BestOptions, ItemIterable, Items, AnyMatcherOptions } from '../types.js'
 import { arrayItemsOf, presentEntries, stableOptionsOf } from './shared.js'
 
-// Array `searchIter` callers often stop after only a handful of matches.
-// Preparing a query before the first candidate made that case slower than
-// direct pair scoring; after eight scored choices the held representation
-// amortizes. Only the array branch adapts: a generic iterable prepares once
-// up front, because counting a first-N window over a source that may not
-// finish is a different question than this one.
 const STREAM_PREPARE_AFTER = 8
 
 /**
@@ -88,16 +82,8 @@ export function searchIter<TItem, TDirection extends Direction, TBrand>(
   items: Items<TItem>,
   options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
 ): IterableIterator<Match<TItem, unknown>> {
-  // Call options and collection shape are read and checked here, so a caller
-  // who mutates their options object before iterating cannot change a search
-  // already asked for, and a wrong threshold, scorer, collection or
-  // `missingItems` is refused at the call rather than on the first `next()`.
-  // The query is processed lazily with the scoring — that is what the
-  // iterator is for, so an invalid query still throws from `next()`.
   assertOptionKeys(options, BEST_OPTION_KEYS, 'searchIter')
   const threshold = optionalThreshold(options.threshold)
-  // Read before the generator exists, each exactly once: what the iterator
-  // scores with is settled at the call, not at the first `next()`.
   const scorer = options.scorer
   const normalize = options.normalize
   assertCollection(items)
@@ -140,9 +126,6 @@ function* iterateMatches<TItem>(
   if (impossibleThreshold(compilation, threshold)) return
   const activeThreshold = kernelThreshold(compilation, threshold)
   const sequences = choices.sequences
-  // The raw-score window scores sequences directly, so it belongs to text mode
-  // alone: a prepared choice is not one, and prepared mode has a held
-  // representation to amortize from the first candidate anyway.
   if (arrayItems !== null && sequences !== null) {
     let key = 0
     let scored = 0
@@ -171,9 +154,6 @@ function* iterateMatches<TItem>(
   }
 
   const prepared: PreparedKernel = compilation.prepareQuery(normalized)
-  // Only prepared mode reaches this array loop — text mode took the window
-  // above — and a prepared choice is never skipped: a missing or foreign one
-  // throws where it is read.
   if (arrayItems !== null) {
     for (let key = 0; key < arrayItems.length; key++) {
       const item = arrayItems[key]

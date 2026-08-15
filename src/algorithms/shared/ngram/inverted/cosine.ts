@@ -19,19 +19,6 @@ import {
   zeroesQualify,
 } from './query.js'
 
-/**
- * Cosine's dot product is `Σ qᵢ·cᵢ`, which is bounded by
- * `gramCount(query) · gramCount(choice)` — so while that product is a safe
- * integer, every term and every partial sum is exact whatever order they are
- * added in, and the index matches the exhaustive scorer to the bit.
- *
- * Above it they can disagree, because a dense list decomposes a repeated gram's
- * contribution as `q·(c-1) + q` where a sparse one computes `q·c`: at
- * `q = 116,982,125` and `c = 105,643,526` those are 12358404163972748 and
- * 12358404163972750. Checked rather than assumed, for the reason the Dice bound
- * in `assertDiceAccumulatorExact` is: the failure mode is a wrong score rather than a
- * thrown error. It takes ~100-million-gram sequences on both sides to reach.
- */
 export function assertCosineExact(queryGrams: number, maxChoiceGrams: number): void {
   if (queryGrams * maxChoiceGrams > Number.MAX_SAFE_INTEGER) {
     throw new RangeError(
@@ -40,24 +27,6 @@ export function assertCosineExact(queryGrams: number, maxChoiceGrams: number): v
   }
 }
 
-/**
- * The other half of Cosine's denominator, and a second boundary since prepared
- * profiles began packing their grams: `Σ count²` is summed here as `2c + 1` per
- * occurrence, and by a packed profile as `c²` per distinct gram, because
- * counting a run of sorted keys is where its counts come from. Both are exact
- * while every squared norm is a safe integer, so both sides answer alike.
- *
- * Above it neither is exact and they need not agree — one gram repeated
- * 268,435,459 times puts them 16 apart, one ulp at that magnitude — while a
- * merely large norm usually survives: the same pair agrees at 200,000,001.
- * Agreement up there is luck rather than a property, so the bound is the one
- * that can be proved.
- *
- * A norm rather than a length, deliberately. `Σ count² ≤ gramCount²` would make
- * `gramCount ≤ 94,906,265` a sufficient test, and it would refuse a
- * 100-million-gram query of distinct grams whose norm is nowhere near the
- * boundary. What decides this is repetition, so repetition is what it reads.
- */
 export function assertCosineNormsExact(
   querySquaredNorm: number,
   maxSquaredNorm: number,
@@ -72,30 +41,10 @@ export function assertCosineNormsExact(
   }
 }
 
-/**
- * One square root of the product and then a clamp, which is the arithmetic the
- * exhaustive kernel uses and for its reason: `Math.sqrt(3) * Math.sqrt(3)` is
- * `3.0000000000000004`, which would leave a profile scored against itself just
- * short of `1`.
- */
 function clamp(similarity: number): number {
   return similarity < 1 ? similarity : 1
 }
 
-/**
- * A Cosine index: `Σ a·b / √(‖a‖² ‖b‖²)`, clamped.
- *
- * Its accumulator stays `Float64Array`. The dot product is bounded by
- * `queryGrams × choiceGrams` rather than by the query alone, so a long query
- * against a long choice can carry it past what an `Int32Array` holds, and the
- * failure mode would be a wrong score rather than a thrown error.
- *
- * Two exactness conditions rather than one, and the denominator owns the
- * second: a packed profile sums the same squared norm in a different order, so
- * a query checks `assertCosineExact` for the numerator before extraction and
- * `assertCosineNormsExact` for the norms after it, once the query's own is
- * known.
- */
 class CosineIndex implements ChoiceIndex {
   private readonly state = new QueryState()
   private readonly accumulator: Float64Array
@@ -104,11 +53,6 @@ class CosineIndex implements ChoiceIndex {
     this.accumulator = new Float64Array(sealed.choiceCount)
   }
 
-  /**
-   * `Σ qᵢ·cᵢ ≤ gramCount(query) · gramCount(choice)`, and the longest choice in
-   * the index is the one that can carry it past a double's exact integers —
-   * where a dense list and a sparse one stop agreeing to the bit.
-   */
   private begin(query: Sequence): ArrayLike<unknown> {
     const elements = convSequence(query)
     assertCosineExact(
@@ -123,8 +67,6 @@ class CosineIndex implements ChoiceIndex {
     threshold: number | null,
     limit: number | null,
   ): SelectedChoices {
-    // Collect and sort rather than insert into place: with no limit there is no
-    // room bound to make the insertion walk in `top` cheap.
     if (limit === null) return rankSelected(this.collect(query, threshold, false))
     const sealed = this.sealed
     const state = this.state
@@ -160,11 +102,6 @@ class CosineIndex implements ChoiceIndex {
     return this.collect(query, threshold, true)
   }
 
-  /**
-   * Every qualifying choice, in the cheapest order the caller can use: `scan`
-   * needs ascending ids and pays for them, while a ranked call sorts by score
-   * afterwards and would throw that order away.
-   */
   private collect(
     query: Sequence,
     threshold: number | null,
@@ -236,9 +173,6 @@ class CosineIndex implements ChoiceIndex {
       const from = offsets[ordinal]
       const upto = offsets[ordinal + 1]
       if (dense !== null && dense[ordinal] === 1) {
-        // The dot product's default term is `queryCount × 1`, and an exception
-        // replaces it: an absent choice gives back the whole term, a repeated
-        // gram adds the extra `count − 1` copies.
         state.base += queryCount
         if (postingCounts === null) {
           for (let at = from; at < upto; at++) accumulator[ids[at]] -= queryCount
@@ -276,8 +210,6 @@ class CosineIndex implements ChoiceIndex {
   }
 
   private top(querySquaredNorm: number, threshold: number | null, room: number): number {
-    // A caller may ask for nothing, and then there is no result array to insert
-    // into: `room - 1` would read off the front of one.
     if (room === 0) return 0
     const sealed = this.sealed
     const state = this.state
@@ -293,11 +225,6 @@ class CosineIndex implements ChoiceIndex {
     for (let index = 0; index < total; index++) {
       const id = everyChoice ? index : touched[index]
       const choiceSquaredNorm = squaredNorm[id]
-      // Scored rather than skipped: a dense list puts every choice into this
-      // walk, gramless ones included. The zero-norm guard is load-bearing — the
-      // dense `base` applies to them too, so without it a gramless choice would
-      // divide a positive numerator by zero and the clamp would turn the
-      // infinity into a perfect score, which is what it used to get.
       const score =
         choiceSquaredNorm === 0
           ? 0
@@ -336,7 +263,6 @@ class CosineIndex implements ChoiceIndex {
   }
 }
 
-/** A builder for a Cosine index over grams of `gramSize` elements. */
 export function createCosineIndexBuilder(gramSize: number): ChoiceIndexBuilder {
   return new NGramIndexBuilder(
     gramSize,

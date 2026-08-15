@@ -1,10 +1,5 @@
-/**
- * Where the fixed Latin-1 mask region ends. `blockMasks.ts` is the canonical
- * home of the partition invariant; this value must agree with it.
- */
 export const DIRECT_LOOKUP_LIMIT = 256
 
-/** Whether a symbol directly indexes the fixed Latin-1 mask region. */
 export function isDirectSymbol(symbol: unknown): symbol is number {
   return (
     typeof symbol === 'number' &&
@@ -14,7 +9,6 @@ export function isDirectSymbol(symbol: unknown): symbol is number {
   )
 }
 
-/** Whether a symbol is an integer eligible for a prepared high-symbol window. */
 export function isHighSymbol(symbol: unknown): symbol is number {
   return (
     typeof symbol === 'number' && symbol >= DIRECT_LOOKUP_LIMIT && (symbol | 0) === symbol

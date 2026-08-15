@@ -13,18 +13,11 @@ export function assertCollection(value: unknown): void {
     throw new TypeError('items must be an array, iterable, map, or plain object')
   }
   if (isMapLike(value) || isIterable(value)) return
-  // An object that is neither is read as a record of keys to items, and only a
-  // plain one carries items that way. A `Date` or a `Promise` keeps its state
-  // somewhere Object.keys cannot see, so accepting it would answer a wrong
-  // argument with an empty collection instead of an error.
   if (!isPlainRecord(value)) {
     throw new TypeError('items must be an array, iterable, map, or plain object')
   }
 }
 
-// A plain object's prototype is `Object.prototype`, whose own prototype is
-// null; comparing the depth rather than the identity accepts one built in
-// another realm, where `Object.prototype` is a different object.
 function isPlainRecord(value: object): boolean {
   const prototype = Object.getPrototypeOf(value)
   return prototype === null || Object.getPrototypeOf(prototype) === null
@@ -56,7 +49,5 @@ export function* collectionEntries<TItem>(
     for (const item of items) yield { item, key: key++ }
     return
   }
-  // Object.keys over Object.entries: the same walk without a two-element
-  // array allocated for every property.
   for (const key of Object.keys(items)) yield { item: items[key], key }
 }

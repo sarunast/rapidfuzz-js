@@ -75,9 +75,6 @@ export const similarity: BuiltInMetric<
   DiceDistanceConfiguration
 > = /* @__PURE__ */ diceMetric(diceSimilarity, 'similarity')
 
-// Dice is normalized by construction, so these are the same metrics under the
-// names the other algorithms use. `typeof` carries the identity across instead
-// of restating it, which is what keeps their prepared choices interchangeable.
 /** Dice is already `0..1`, so this is {@link distance} itself. */
 export const normalizedDistance: typeof distance = distance
 /** Dice is already `0..1`, so this is {@link similarity} itself. */

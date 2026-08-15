@@ -76,8 +76,6 @@ export function bestMatch<TItem, TDirection extends Direction, TBrand>(
   options: AnyMatcherOptions<TItem, TDirection, TBrand> & BestOptions,
 ): Match<TItem, unknown> | undefined {
   assertOptionKeys(options, BEST_OPTION_KEYS, 'bestMatch')
-  // Argument shape is checked before any semantic exit: an impossible
-  // threshold must not turn an invalid collection into an empty result.
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
   return bestOfCollection(query, items, options, threshold)
@@ -101,8 +99,6 @@ export function bestOfCollection<TItem, TDirection extends Direction, TBrand>(
   const compilation = scorerCompilation(scorer)
   const normalize = options.normalize
   const stableOptions = stableOptionsOf(options, normalize)
-  // Before the query is normalized, so `search` at any limit refuses a wrong
-  // option in the same order — `limit: 1` delegates here.
   const choices = choiceReader(
     stableOptions,
     compilation.prepareChoice,

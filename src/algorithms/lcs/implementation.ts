@@ -75,12 +75,6 @@ function preparedLengthWorthwhile(
   return queryLength <= choiceLength && words <= activeWords * 2
 }
 
-/**
- * Number of elements that are not part of the longest common subsequence,
- * i.e. `max(|s1|, |s2|) - lcsSeqSimilarity(s1, s2)`.
- *
- * If the distance is greater than `scoreCutoff`, `scoreCutoff + 1` is returned.
- */
 function lcsSeqDistance_impl(
   s1: Sequence,
   s2: Sequence,
@@ -92,7 +86,6 @@ function lcsSeqDistance_impl(
   return distCutoff(max - boundedLength(a, b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
 }
 
-/** Length of the longest common subsequence of `s1` and `s2`. */
 function lcsSeqSimilarity_impl(
   s1: Sequence,
   s2: Sequence,
@@ -104,7 +97,6 @@ function lcsSeqSimilarity_impl(
   return simCutoff(boundedLength(a, b, misses), cutoff)
 }
 
-/** LCS distance normalised into `[0, 1]`, where `0` means identical. */
 function lcsSeqNormalizedDistance_impl(
   s1: Sequence,
   s2: Sequence,
@@ -120,11 +112,6 @@ function lcsSeqNormalizedDistance_impl(
   )
 }
 
-/**
- * LCS similarity normalised into `[0, 1]`, where `1` means identical.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
 function lcsSeqNormalizedSimilarity_impl(
   s1: Sequence,
   s2: Sequence,
@@ -153,9 +140,6 @@ export function lcsSeqEditops(s1: Sequence, s2: Sequence): Editops {
   const [full1, full2] = convPair(s1, s2)
   const { prefixLen, suffixLen } = commonAffix(full1, full2)
 
-  // The trimmed middle is addressed through `prefixLen` rather than copied out
-  // of each input: recovery only ever reads it, and the copies were two arrays
-  // the size of the inputs per call.
   const aLength = full1.length - suffixLen - prefixLen
   const bLength = full2.length - suffixLen - prefixLen
   const { sim, rows, words } = lcsSeqMatrix(
@@ -233,16 +217,9 @@ function prepareLcs(kind: PreparedLcsKind): PreparationFactory {
     let pattern: import('../shared/bitmask/pattern.js').PatternMask | null = null
     const length = (b: ArrayLike<unknown>, cutoff: number): number => {
       if (!preparedLengthWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
-        // The unprepared kernel trims a common affix, which compares the two
-        // sequences elementwise, so they have to agree on how a character is
-        // spelled. The held pattern below reads either representation.
         return boundedLength(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)
       }
       pattern ??= preparePattern(a, 0, a.length)
-      // A lower integer bound is deliberately conservative. Rounding a
-      // normalized threshold back into edit units can land one ULP above an
-      // integer; rounding upward there would reject a score exactly at the
-      // caller's threshold. Being one match looser only costs pruning.
       const required = Math.max(0, Math.floor(maximum(a, b) - cutoff))
       return required > 0
         ? lcsLengthPreparedBounded(pattern, b, 0, b.length, required)

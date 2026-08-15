@@ -65,10 +65,6 @@ export function scorePairs<TDirection extends Direction>(
   if (queries.length !== choices.length) {
     throw new RangeError('queries and choices must have the same length')
   }
-  // Configuration first, allocation second, data third. Every check below is a
-  // few comparisons, and reaching them after the allocation meant a bad
-  // threshold or an unusable multiplier was reported only once a typed array
-  // the length of the input had been handed out.
   const kind = options.into ?? 'f64'
   const compilation = scorerCompilation(options.scorer)
   const { threshold, multiplier } = resolveBatchOptions(
@@ -78,17 +74,10 @@ export function scorePairs<TDirection extends Direction>(
   const scores = allocateScores(kind, queries.length, 'scorePairs')
   const integral = kind !== 'f64' && kind !== 'f32'
   const rejected = rejectedScore(compilation, threshold, multiplier, integral)
-  // See `scoreStoreRange`: proven-storable scorers pay nothing, and everything
-  // else is tested against three locals the closure closes over.
   const limit = scoreStoreRange(kind, compilation.bounds, multiplier)
   const bounded = limit !== null
   const lowest = limit === null ? 0 : limit[0]
   const highest = limit === null ? 0 : limit[1]
-  // One closure, with the invariant tests inside it. Choosing between two
-  // closures — one that qualifies and one that cannot — measured 1.02-1.18x
-  // *slower* over six pair workloads, worst on the custom-scorer case it was
-  // meant to help: two shapes reaching one call site is what stops the call
-  // being inlined, and that costs more than the branches it removes.
   const store = (score: number): number => {
     const thresholded =
       rejected === null ||
@@ -98,7 +87,6 @@ export function scorePairs<TDirection extends Direction>(
         : rejected
     const scaled = thresholded * multiplier
     const stored = integral ? roundHalfAwayFromZero(scaled) : scaled
-    // Negated, so a `NaN` could not pass the way it passes a comparison.
     if (bounded && !(stored >= lowest && stored <= highest)) {
       unstorableScore(stored, kind, 'scorePairs')
     }

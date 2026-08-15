@@ -17,12 +17,6 @@ import type { ItemIterable, Items, AnyMatcherOptions, SearchOptions } from '../t
 import { bestOfCollection } from './bestMatch.js'
 import { arrayItemsOf, better, presentEntries, stableOptionsOf } from './shared.js'
 
-/**
- * A scored candidate with the source position that breaks its ties.
- *
- * Carried here rather than as a choice id: a one-shot search skips over gaps as
- * it reads, so the position a result reports is not the count of what it kept.
- */
 interface ScoredEntry<TItem, TKey> extends Match<TItem, TKey> {
   readonly order: number
 }
@@ -101,8 +95,6 @@ export function search<TItem, TDirection extends Direction, TBrand>(
   options: AnyMatcherOptions<TItem, TDirection, TBrand> & SearchOptions,
 ): readonly Match<TItem, unknown>[] {
   assertOptionKeys(options, SEARCH_OPTION_KEYS, 'search')
-  // Argument shape is checked before any semantic exit: `limit: 0` must not
-  // excuse an invalid collection or a non-finite threshold.
   const limit = resultLimit(options.limit)
   const threshold = optionalThreshold(options.threshold)
   assertCollection(items)
@@ -120,9 +112,6 @@ export function search<TItem, TDirection extends Direction, TBrand>(
     compilation.preparedChoiceKey,
     false,
   )
-  // Every option is read before the exit, so `limit: 0` refuses a foreign
-  // scorer and an unknown `missingItems` the way every other limit does. What
-  // it still skips is the work: no query normalization, no traversal.
   if (limit === 0) return []
   const normalized = normalizeQuery(query, normalize)
   const arrayItems = arrayItemsOf(items)
@@ -147,15 +136,10 @@ export function search<TItem, TDirection extends Direction, TBrand>(
     left: ScoredEntry<TItem, unknown>,
     right: ScoredEntry<TItem, unknown>,
   ) => worse(compilation.direction, left, right)
-  // Once a full heap holds nothing but optimal scores, later candidates can
-  // only tie, and a tie loses on order — so the scan is finished. The Matcher
-  // drivers stop on the same condition.
   const optimal = knownOptimum(compilation)
   let cutoff = activeThreshold
 
   if (arrayItems !== null) {
-    // An array index is already the source order the heap breaks ties on, so
-    // the counter the generic branch keeps is one the array branch can read.
     for (let key = 0; key < arrayItems.length; key++) {
       const item = arrayItems[key]
       const choice = choices.read(item)

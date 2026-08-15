@@ -21,8 +21,6 @@ function toCodePoints(value: string): Uint32Array {
   return size === length ? output : output.subarray(0, size)
 }
 
-// This regexp is load-bearing: on Latin-1 strings V8 can reject it without a
-// character-by-character JS scan, and it measured ~22x faster than that loop.
 const SURROGATE_PAIR = /[\uD800-\uDBFF][\uDC00-\uDFFF]/
 
 export function hasSurrogatePair(value: string): boolean {
@@ -81,11 +79,6 @@ export function isMissing(value: unknown): value is null | undefined {
   return value == null
 }
 
-/**
- * Element-wise `===` over two converted sequences, which is the equality every
- * metric here compares by — so `NaN` matches nothing, including itself, and
- * `-0` matches `0`.
- */
 export function elementsEqual(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
   if (a.length !== b.length) return false
   for (let index = 0; index < a.length; index++) {

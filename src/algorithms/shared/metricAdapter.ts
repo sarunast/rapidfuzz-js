@@ -51,11 +51,6 @@ interface BuiltInMetricOptions<TDirection extends Direction> {
   readonly configurationKeys?: readonly string[] | undefined
 }
 
-// Reads `unknown` because `createScorer(levenshtein.distance, null)` reaches
-// here from JavaScript, where the hook's `Config | undefined` proves nothing.
-// `Object.keys` answers `[]` for a number and a boolean alike, so a primitive
-// would otherwise pass for "no configuration" — and a string reached
-// `Reflect.get` and failed with an error about our own internals.
 function configurationObject(given: unknown): object {
   if (given === undefined) return {}
   if (typeof given !== 'object' || given === null) {
@@ -98,12 +93,7 @@ export function builtInMetric<
   TConfig extends object,
   TBrand,
 >(options: BuiltInMetricOptions<TDirection>): Metric<TDirection, TConfig, TBrand> {
-  // One per metric, shared by every scorer it compiles with default
-  // configuration, so choices prepared by one such scorer are accepted by
-  // another. A configured scorer gets its own below.
   const defaultPreparedChoiceKey = Object.freeze({})
-  // Keep this as a normal direct call: `Reflect.apply` measured 5-7% slower
-  // over short-string comparisons.
   const implementation = options.implementation
   const direct =
     options.directImplementation ??
@@ -112,9 +102,6 @@ export function builtInMetric<
         if (options.direction === 'similarity') return 0
         throw new TypeError('missing sequences are not supported by this scorer')
       }
-      // Keep the direct Metric path allocation-free. `validatePair` returns a
-      // tuple for generic callers; constructing that tuple for every short-string
-      // comparison was more expensive than the validation itself.
       if (typeof a !== 'string') validateSequence(a)
       if (typeof b !== 'string') validateSequence(b)
       return implementation(a, b)
@@ -131,9 +118,6 @@ export function builtInMetric<
     const symmetry = configurationSymmetryOf(options.implementation)
     const symmetric = symmetry?.(record) ?? true
     const preparation = options.implementation[PREPARE_SCORER](record)
-    // Batch and driver loops call rawScore thousands of times with one fixed
-    // threshold; a one-entry cache keeps the cutoff-bearing options from being
-    // rebuilt per pair. The threshold changes between loops, not inside them.
     let cutoffOptions: (Readonly<Record<string, unknown>> & ScorerOptions) | null = null
     let cutoffThreshold = 0
     const rawScore = (a: Sequence, b: Sequence, threshold: number | null): number => {
@@ -168,9 +152,6 @@ export function builtInMetric<
       prepareChoice: preparation.prepareChoice,
       indexChoices: preparation.indexChoices,
       proveOptimum: preparation.proveOptimum,
-      // `convSequence` copies a string and a plain array-like on its way to a
-      // prepared representation, and keeps a typed array by reference. Only
-      // that one has to be copied for a handle the caller keeps.
       prepareOwnedChoice: (choice) =>
         preparation.prepareChoice(
           ArrayBuffer.isView(choice) ? snapshotSequence(choice) : choice,

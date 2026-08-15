@@ -25,34 +25,10 @@ const INT_ROW_SENTINEL = 0x4000_0000
 
 export const UNIFORM: LevenshteinWeights = [1, 1, 1]
 
-/**
- * Reads the `weights` option, rejecting what no cost can mean.
- *
- * Upstream types these as unsigned integers and its own binding raises on a
- * negative one; this API takes `number`, so a fraction is deliberate but a
- * negative cost, a `NaN` or an infinity is not. None of them has an answer to
- * give: a negative cost makes the cheapest alignment unbounded, and either of
- * the others makes every comparison against them `NaN`. Both were reachable —
- * `NaN` came back as a distance rather than as an error.
- *
- * Every scorer goes through here. The prepared path always did, so a shape the
- * two paths disagreed on used to score as `NaN` directly and throw through
- * `process`.
- */
-/** Whether a value carries the three costs by name rather than by position. */
 function isLevenshteinCosts(value: object): boolean {
   return 'insertion' in value && 'deletion' in value && 'substitution' in value
 }
 
-/**
- * The one reader of the `weights` option, in either spelling.
- *
- * Positional rather than named because this is the scoring path — every
- * weighted comparison runs it, and the kernels destructure three numbers. The
- * named form is one object further out, in {@link levenshteinCosts}, so it is
- * paid for only where it is used: at scorer compilation and in the test harness.
- * Both spellings meet here, so there is one place for them to agree.
- */
 export function parseWeights(value: unknown): LevenshteinWeights {
   if (value == null) return UNIFORM
 
@@ -94,26 +70,18 @@ export function integralWeights(weights: LevenshteinWeights): boolean {
   return weights.every(Number.isInteger)
 }
 
-/** Preserve fractional cutoffs only for the fractional-weight JS extension. */
 export function levenshteinRawCutoff(
   cutoff: number | null | undefined,
   integral: boolean,
 ): number | null {
   if (integral) return canonicalRawCutoff(cutoff)
   if (cutoff == null) return null
-  // The same range `canonicalRawCutoff` enforces, minus its truncation: a
-  // fractional weighting has fractional distances, so the fraction is the part
-  // worth keeping.
   if (!Number.isFinite(cutoff) || cutoff < 0) {
     throw new RangeError('scoreCutoff has to be a finite count of at least 0')
   }
   return cutoff
 }
 
-/**
- * {@link levenshteinRawCutoff} for the similarity direction, where a count
- * clears a fractional cutoff only by reaching the next whole one.
- */
 export function levenshteinSimilarityCutoff(
   cutoff: number | null | undefined,
   integral: boolean,
@@ -126,17 +94,6 @@ export function rawBound(bound: number, integral: boolean): number {
   return Math.max(0, integral ? Math.floor(bound) : bound)
 }
 
-/**
- * {@link parseWeights} with the costs named.
- *
- * Exported because two callers outside scoring need the same answer and must
- * not re-derive it: the flags resolver that tells `process` whether a weighting
- * is symmetric, and the test harness that computes the maximum a normalized
- * score divides by. Always a fresh object, so a caller cannot mutate a shared
- * default and change what a later call reads.
- *
- * Not re-exported from the package barrel — this is shared internals, not API.
- */
 export function levenshteinCosts(value: unknown): LevenshteinCosts {
   const [insertion, deletion, substitution] = parseWeights(value)
   return { insertion, deletion, substitution }
@@ -161,13 +118,11 @@ export function distance_(
   if (insert === delete_ && insert > 0) {
     const scaledCutoff = Math.floor(scoreCutoff / insert)
 
-    // Factoring equal weights exposes the much faster uniform kernel.
     if (insert === replace) {
       const scaledHint = Math.ceil(scoreHint / insert)
       return levenshteinUniform(s1, s2, scaledCutoff, scaledHint) * insert
     }
 
-    // Substitution can never win when it costs at least delete + insert.
     if (replace >= insert + delete_) {
       const lcs = lcsLengthRange(s1, 0, len1, s2, 0, len2, scaledCutoff)
       return (len1 + len2 - 2 * lcs) * insert
@@ -208,22 +163,6 @@ export function distance_(
   const bounded = Number.isFinite(scoreCutoff) && scoreCutoff < Number.MAX_SAFE_INTEGER
   const step = sourceDelete + textInsert
 
-  // How far off the corridor between the two ends the budget can pay to go.
-  //
-  // Every alignment deletes at least `difference` elements of the longer side,
-  // which is `minimum` above and is already known to fit the budget. Beyond
-  // that, each insertion has to be matched by another deletion — the two
-  // lengths are fixed — so a step off the corridor and back costs
-  // `sourceDelete + textInsert`, and the budget buys `excursion` of them.
-  //
-  // The corridor itself runs from `sourceIndex - difference` to `sourceIndex`,
-  // so the reachable columns are that widened by the excursion at both ends.
-  // Nothing the row loop touches feeds back into it, so both spans are
-  // constants for the whole matrix rather than per-row quantities.
-  //
-  // The `+ 1` is the same slack the old symmetric radius carried: it costs one
-  // diagonal either side and keeps a fractional weighting whose quotient lands
-  // a hair below a whole number from banding one diagonal too tight.
   const difference = sourceLength - textLength
   const excursion =
     bounded && step > 0
@@ -258,14 +197,6 @@ export function distance_(
       )
 }
 
-/**
- * Whether the integer kernel can run without any value leaving `Int32Array`.
- *
- * The all-indel alignment bounds every real cell, and the largest quantity the
- * loop forms is the out-of-band sentinel plus one weight. Requiring both below
- * {@link INT_ROW_SENTINEL} — itself well under `2**31 - 1` — leaves the
- * arithmetic exact and the sentinel unreachable by any genuine cost.
- */
 function integerRowFits(
   sourceLength: number,
   textLength: number,
@@ -289,15 +220,6 @@ function integerRowFits(
   return largestCost + largestWeight < INT_ROW_SENTINEL
 }
 
-/**
- * The generic weighted DP over `Int32Array`.
- *
- * A near-duplicate of {@link weightedFloatDp}, and deliberately so: a single
- * body parameterised by row type is called with two different typed arrays, and
- * the polymorphic element access that produces measured *slower* than the
- * float-only version. Kept apart, each kernel stays monomorphic and the integer
- * one runs about 1.5x the float one. Any change here belongs in both.
- */
 function weightedIntegerDp(
   source: ArrayLike<unknown>,
   text: ArrayLike<unknown>,
@@ -316,10 +238,6 @@ function weightedIntegerDp(
   for (let i = 1; i <= sourceLength; i++) {
     const low = Math.max(1, i - belowSpan)
     const high = Math.min(textLength, i + aboveSpan)
-    // The diagonal predecessor of the row's first cell, read before column zero
-    // is overwritten. Once the band has left column one that is the previous
-    // row's own first cell, which the band's one-column-a-row drift leaves
-    // exactly here; the two coincide only while `low` is one.
     let prevDiag = row[low - 1]
     row[0] = i * sourceDelete
     const a = source[prefix + i - 1]
@@ -342,7 +260,6 @@ function weightedIntegerDp(
   return row[textLength]
 }
 
-/** The generic weighted DP over `Float64Array`. See {@link weightedIntegerDp}. */
 function weightedFloatDp(
   source: ArrayLike<unknown>,
   text: ArrayLike<unknown>,
@@ -361,7 +278,6 @@ function weightedFloatDp(
   for (let i = 1; i <= sourceLength; i++) {
     const low = Math.max(1, i - belowSpan)
     const high = Math.min(textLength, i + aboveSpan)
-    // See {@link weightedIntegerDp} for why the diagonal is read from `low - 1`.
     let prevDiag = row[low - 1]
     row[0] = i * sourceDelete
     const a = source[prefix + i - 1]
@@ -400,33 +316,11 @@ export function maximum(
     : Math.min(indel, len1 * replace + (len2 - len1) * insert)
 }
 
-/**
- * Weighted Levenshtein distance.
- *
- * If the distance is greater than `scoreCutoff`, `scoreCutoff + 1` is returned.
- */
 export function levenshteinDistanceImpl(
   s1: Sequence,
   s2: Sequence,
   options?: LevenshteinOptions,
 ): number {
-  // `levenshteinDistance(a, b)` on two BMP strings is the call shape almost
-  // every caller writes, and the generic path below spends more on describing
-  // it than the kernel spends scoring an eight-character pair: an options
-  // object to allocate and read four properties off, a weights triple to
-  // validate, `convPair`'s two-element tuple to allocate and destructure, and a
-  // cutoff to convert on the way in and collapse on the way out — none of which
-  // this shape can affect.
-  //
-  // What survives is the surrogate test, which is what decides the pair can be
-  // scored as strings at all; it is the same test and in the same order as
-  // `convPair`, so a pair takes the same representation either way.
-  //
-  // Uniform weights and no cutoff reduce `distance_` to exactly this call: the
-  // empty-input returns are `levenshteinUniform`'s own, the zero-cost and
-  // Indel-equivalent branches cannot be reached at `[1, 1, 1]`, the minimum-
-  // distance rejection cannot fire without a cutoff, and the `* insert` scaling
-  // is a multiplication by one. With no cutoff the final clamp returns its input.
   if (
     options === undefined &&
     typeof s1 === 'string' &&
@@ -447,7 +341,6 @@ export function levenshteinDistanceImpl(
   return cutoff === null || distance <= cutoff ? distance : cutoff + 1
 }
 
-/** Maximum possible weighted distance minus the actual distance. */
 export function levenshteinSimilarityImpl(
   s1: Sequence,
   s2: Sequence,
@@ -465,7 +358,6 @@ export function levenshteinSimilarityImpl(
   return simCutoff(max - distance_(a, b, weights, bound, hint), cutoff)
 }
 
-/** Weighted Levenshtein distance normalised into `[0, 1]`. */
 export function levenshteinNormalizedDistanceImpl(
   s1: Sequence,
   s2: Sequence,
@@ -487,11 +379,6 @@ export function levenshteinNormalizedDistanceImpl(
   )
 }
 
-/**
- * Levenshtein similarity normalised into `[0, 1]`, where `1` means identical.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
 export function levenshteinNormalizedSimilarityImpl(
   s1: Sequence,
   s2: Sequence,

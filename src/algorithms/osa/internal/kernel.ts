@@ -1,13 +1,3 @@
-/**
- * Shared Optimal String Alignment: Myers' recurrence plus the `TR` term that admits a
- * transposition of two adjacent elements.
- *
- * Separate from `levenshtein.ts` because `TR` reaches back into the previous
- * column, which needs a second carry chain the LCS and Levenshtein kernels do
- * not have. That extra chain is also why this module owns {@link osaScratch}
- * outright rather than sharing the row vectors in `shared.ts`.
- */
-
 import {
   directSlots,
   directStamps,
@@ -17,21 +7,10 @@ import {
 } from '../../shared/bitmask/blockMasks.js'
 import type { PatternMask } from '../../shared/bitmask/pattern.js'
 
-// Declared here rather than imported — see the note in `shared.ts`, which holds
-// the canonical definitions. Read once per element, where a cross-module
-// binding does not fold the way a module-local `const` does.
 const WORD_BITS = 32
 const WORD_MASK = 31
 const DIRECT_LOOKUP_LIMIT = 256
 
-/**
- * Optimal String Alignment over one word — port of `_osa_distance_hyrroe2003`.
- *
- * Myers' recurrence plus the `TR` term, which is what admits a transposition of
- * two adjacent elements. `TR` reaches back into the previous column, so
- * carrying it across words needs a second chain the LCS and Levenshtein kernels
- * do not have — {@link osaPrepared} keeps it, for patterns past one word.
- */
 export function osaOneWord(
   pattern: ArrayLike<unknown>,
   text: ArrayLike<unknown>,
@@ -39,7 +18,6 @@ export function osaOneWord(
   return osaOneWordRange(pattern, 0, pattern.length, text, 0, text.length)
 }
 
-/** Single-word OSA over caller-validated ranges. */
 export function osaOneWordRange(
   pattern: ArrayLike<unknown>,
   patternStart: number,
@@ -49,8 +27,6 @@ export function osaOneWordRange(
   textLength: number,
 ): number {
   if (patternLength === 0) return textLength
-  // Every shift below is taken modulo 32, so a longer pattern would not fail —
-  // it would quietly wrap and return a number that means nothing.
   if (patternLength > WORD_BITS) {
     throw new RangeError(`osaOneWord supports at most ${WORD_BITS} elements`)
   }
@@ -95,8 +71,6 @@ export function osaOneWordRange(
       matches = 0
     }
 
-    // A transposition is available exactly where this column matches and the
-    // previous one matched the other way round.
     const transposed = ((~d0 & matches) << 1) & previousMatches
     d0 = (((matches & vp) + vp) ^ vp) | matches | vn | transposed | 0
 
@@ -116,7 +90,6 @@ export function osaOneWordRange(
   return distance
 }
 
-/** Single-word OSA against immutable query masks. */
 export function osaOneWordPrepared(
   prepared: PatternMask,
   text: ArrayLike<unknown>,
@@ -125,7 +98,6 @@ export function osaOneWordPrepared(
 ): number {
   const patternLength = prepared.length
   if (patternLength === 0) return textLength
-  // As in `osaOneWordRange`: past one word the shifts wrap instead of failing.
   if (patternLength > WORD_BITS) {
     throw new RangeError(`osaOneWordPrepared supports at most ${WORD_BITS} elements`)
   }
@@ -145,10 +117,6 @@ export function osaOneWordPrepared(
 
   for (let i = 0; i < textLength; i++) {
     const symbol = stringText ? text.charCodeAt(textStart + i) : text[textStart + i]
-    // Written out rather than called, and that is load bearing — see the note
-    // on `patternBase`, whose body this is. A single shared copy sees numbers
-    // from string inputs and strings and objects from array inputs, goes
-    // megamorphic, and measured 2.43x slower once other kernels had used it.
     let base = -1
     if (
       typeof symbol === 'number' &&
@@ -184,24 +152,8 @@ export function osaOneWordPrepared(
   return distance
 }
 
-/** OSA against immutable query masks for repeated process scoring. */
 let osaScratch = new Int32Array(0)
 
-/**
- * The eight rolling vectors, as views onto {@link osaScratch}.
- *
- * Eight `subarray` calls is eight object allocations per scored pair, and a
- * `process` row scores one pair per choice — so they are cached across calls.
- *
- * The cache key is `stride`, not whether the backing array had to grow. Those
- * are different questions: the scratch is grown to a power of two and never
- * shrinks, so a later query with a *shorter* pattern leaves it untouched while
- * moving all eight boundaries. Keying on the allocation would hand that query
- * the previous query's windows, which overlap each other and silently corrupt
- * the recurrence. `osaViewStride` starts at a width no `stride` can take —
- * `stride` is `words + 1`, and `words === 0` returns before this point — so the
- * first call builds them.
- */
 let osaViewStride = 0
 let osaViewVp = new Int32Array(0)
 let osaViewVn = new Int32Array(0)
@@ -227,7 +179,6 @@ export function osaPrepared(
     let size = Math.max(64, osaScratch.length)
     while (size < needed) size *= 2
     osaScratch = new Int32Array(size)
-    // The views point into the array that was just replaced.
     osaViewStride = 0
   }
   if (osaViewStride !== stride) {
@@ -274,10 +225,6 @@ export function osaPrepared(
     let hpCarry = 1
     let hnCarry = 0
     const symbol = stringText ? text.charCodeAt(textStart + row) : text[textStart + row]
-    // Written out rather than called, and that is load bearing — see the note
-    // on `patternBase`, whose body this is. A single shared copy sees numbers
-    // from string inputs and strings and objects from array inputs, goes
-    // megamorphic, and measured 2.43x slower once other kernels had used it.
     let base = -1
     if (
       typeof symbol === 'number' &&
@@ -347,11 +294,7 @@ export function osaPrepared(
   return distance
 }
 
-/** Benchmark/test seam that returns retained scratch to a deterministic baseline. */
 export function resetOsaScratch(): void {
-  // The eight views have to be dropped with it: a `subarray` keeps the whole
-  // backing buffer alive, so replacing `osaScratch` alone frees nothing until
-  // the next call rebuilds them.
   const empty = new Int32Array(0)
   osaScratch = empty
   osaViewStride = 0
@@ -365,7 +308,6 @@ export function resetOsaScratch(): void {
   osaViewPm2 = empty
 }
 
-/** Test seam: the largest buffer any binding in this module still holds. */
 export function osaRetainedBytes(): number {
   return Math.max(
     osaScratch.buffer.byteLength,

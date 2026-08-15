@@ -1,31 +1,3 @@
-/**
- * Shared bit-parallel alignment matrices (Hyyrö 2004), used to recover edit
- * operations. Ports of the `_matrix` helpers in `LCSseq_py.py` and
- * `Levenshtein_py.py`.
- *
- * The vectors are as wide as `s1`, so they are held across machine words with
- * the carries chained by hand. Upstream leans on Python's arbitrary-precision
- * integers here, and `BigInt` would transfer that line for line — but a word
- * matrix recovers the same alignment between 1.5x and 3.3x faster, so the
- * arithmetic is spelled out instead.
- *
- * Each metric then has two kernels rather than one. A pattern of at most 32
- * elements — which, after affix trimming, is most of what fuzzy matching
- * compares — holds its whole vector in a number, so the one-word kernels carry
- * nothing between words, store a row by assignment, and never allocate the
- * per-word machinery the general case needs.
- *
- * @internal Inputs must already be normalized by `convPair` / `convSequence`.
- * In particular, raw strings would otherwise be indexed as UTF-16 code units.
- */
-
-/**
- * Words a range of `length` positions occupies.
- *
- * The subtraction precedes the shift because a bitwise operator converts to
- * `uint32` first: `length + 31` wraps to zero over the last 31 lengths a
- * sequence may have, and `MAX_SEQUENCE_LENGTH` admits every one of them.
- */
 function wordCount(length: number): number {
   return length === 0 ? 0 : ((length - 1) >>> 5) + 1
 }
@@ -36,35 +8,10 @@ function popcount32(word: number): number {
   return (((bits + (bits >>> 4)) & 0x0f0f_0f0f) * 0x0101_0101) >>> 24
 }
 
-/**
- * How much wider than the pattern itself a direct table may be.
- *
- * The table has an entry per element value between the pattern's least and its
- * greatest, so text drawn from one alphabet fills most of it and text drawn
- * from two distant ones — Latin plus CJK — would leave almost all of it empty.
- * Past this the pattern takes the `Map`, which costs a lookup per row but not a
- * table far larger than the pattern that has to be zeroed to build it.
- *
- * The slack keeps short patterns of ordinary text on the table: two characters
- * of Latin-1 span at most 256 entries however far apart in it they sit. Text
- * that spans most of Latin-1 is the case this bound decides, and it decides it
- * in the table's favour on measurement — eight such characters pay about 5% for
- * a table they barely fill, and thirty-two of them gain 1.5x.
- */
 const SPAN_SLACK = 256
 
-/** Stands in for a table a pattern with no table-able element never fills. */
 const NO_MASKS = new Int32Array(0)
 
-/**
- * Range of elements a direct table would have to cover to index a range of
- * `s1` by the element itself.
- *
- * `minSymbol` above `maxSymbol` says there is no such table: nothing satisfies
- * `symbol >= 1 && symbol <= 0`, so every element takes the `Map`. That is the
- * answer for a range holding no indexable element and for one whose elements
- * are too far apart to sit in a table together.
- */
 interface SymbolSpan {
   readonly minSymbol: number
   readonly maxSymbol: number
@@ -84,21 +31,11 @@ function symbolSpan(
   const stringPattern = typeof s1 === 'string'
   let minSymbol = 1
   let maxSymbol = 0
-  // Whether the span accounts for every element, which is what lets its width
-  // bound the table. One element on the `Map` and the range's own length is all
-  // that bounds it again.
   let spans = true
 
   for (let i = 0; i < length; i++) {
     const index = start + i
     const symbol = stringPattern ? s1.charCodeAt(index) : s1[index]
-    // The integer test is load bearing: a typed array has no element at a
-    // fractional index, so `1.5` would be written nowhere and read back as
-    // `undefined` rather than as itself. It also excludes NaN and the
-    // infinities, none of which is a position in a table.
-    //
-    // Negative elements need no test of their own — the table is indexed from
-    // `minSymbol`, so a sequence of them indexes from its own least element.
     if (typeof symbol !== 'number' || (symbol | 0) !== symbol) {
       spans = false
       continue
@@ -116,11 +53,6 @@ function symbolSpan(
     : { minSymbol, maxSymbol, spans }
 }
 
-/**
- * Blocks {@link wordPositionMasks} can allocate. A span that accounts for every
- * element bounds the table by its own width; otherwise the range's length is
- * the only bound either table has.
- */
 function maskBlockBound(span: SymbolCoverage, length: number): number {
   const { minSymbol, maxSymbol, spans } = span
   return spans && minSymbol <= maxSymbol
@@ -128,21 +60,6 @@ function maskBlockBound(span: SymbolCoverage, length: number): number {
     : length + 1
 }
 
-/**
- * Match masks for a range that fits one machine word, indexed by the element
- * itself rather than hashed.
- *
- * A pattern of at most 32 elements has at most 32 distinct ones, so the table
- * covers only `[minSymbol, maxSymbol]` — 26 entries for lowercase text —
- * instead of the whole of Latin-1 as the algorithm-owned kernels do. Those
- * hold one table for the process and stamp its entries; this one is built and
- * dropped per matrix, where a kilobyte to zero costs more than the lookups it
- * would save.
- *
- * An element outside the span matches nothing, which is the right answer for
- * every element the pattern does not contain — so `wide` stays unbuilt unless
- * the pattern itself holds something the table cannot index.
- */
 interface OneWordMasks extends SymbolSpan {
   readonly direct: Int32Array
   readonly wide: ReadonlyMap<unknown, number> | null
@@ -164,9 +81,6 @@ function oneWordMasks(
     const symbol = stringPattern ? s1.charCodeAt(index) : s1[index]
     const bit = 1 << i
 
-    // The same four-part test the row loops apply, and it has to stay the same:
-    // an element filed in one table and looked up in the other reads as absent
-    // from a pattern that contains it.
     if (
       typeof symbol === 'number' &&
       symbol >= minSymbol &&
@@ -177,8 +91,6 @@ function oneWordMasks(
       continue
     }
 
-    // `Map` matches keys by SameValueZero, under which NaN equals itself;
-    // sequence equality everywhere else is `===`, under which it does not.
     if (symbol !== symbol) continue
     if (wide === null) wide = new Map<unknown, number>()
     wide.set(symbol, (wide.get(symbol) ?? 0) | bit)
@@ -187,66 +99,16 @@ function oneWordMasks(
   return { direct, minSymbol, maxSymbol, wide }
 }
 
-/**
- * The same masks for a range wider than one machine word: each distinct element
- * owns `words` consecutive words of `masks`, and both tables map an element to
- * where its own start rather than to the masks themselves.
- *
- * Block `0` is reserved and stays zeroed, so a base of `0` says the range holds
- * no such element and reads back as matching nothing. That is what lets a table
- * start at zero rather than at `-1`, and what lets the Levenshtein row loop
- * read a word rather than branch on whether there is one.
- */
 interface WordMasks extends SymbolSpan {
   readonly masks: Int32Array
-  /** Where each element of the span starts in `masks`, or `0` for absent. */
   readonly bases: Int32Array
   readonly wide: ReadonlyMap<unknown, number> | null
 }
 
-/**
- * Blocks a mask table starts with when nothing bounds it but the range length.
- *
- * The number of distinct elements is only known once the range has been walked,
- * so either the walk happens twice or the table grows. Growing copies at most
- * twice what it ends up holding, and a copy of machine words is far cheaper
- * than a second pass that has to re-decide which table each element belongs to.
- *
- * A range with no span holds nothing a table can index, so its length is all
- * there is to go on and a long one makes that far too loose a bound to allocate
- * against. The table starts here and doubles.
- */
 const INITIAL_BLOCKS = 64
 
-/**
- * Widest span a table is sized against outright, rather than grown into.
- *
- * A span is close to what the range holds only while it is narrow. Once it is
- * wide the two come apart — an element every `n` positions spans as widely as
- * one at every position and fills a table `n` times smaller, and nothing known
- * before the walk tells them apart. So a span reaching past this starts at
- * `INITIAL_BLOCKS` instead; and since the span is exact once reached, a table
- * that outgrows the start goes straight there rather than doubling toward it.
- * A range that does fill a wide span pays one copy of the start for that; one
- * that does not — an array of a few values a thousand apart — never allocates
- * the thousand blocks between them.
- *
- * `SPAN_SLACK` is the same number for the same reason: a table this wide is one
- * ordinary text builds and fills, and past it the range is drawing from
- * somewhere its elements do not densely cover.
- */
 const MAX_SPAN_BLOCKS = 256
 
-/**
- * The table grown past `blocks`, which is either exactly `spanSize` or twice
- * over until it fits, capped at `limit`.
- *
- * `spanSize` is where a span puts the last block it can account for, so growth
- * that lands there needs no headroom and takes no second copy. Past it — a range
- * whose elements are not all the span's, so `wide` draws blocks from the same
- * table — and with no span at all, only `limit` bounds the table, and it bounds
- * it by however much the range repeats itself. Doubling is what there is.
- */
 function grownMasks(
   masks: Int32Array,
   blocks: number,
@@ -273,10 +135,6 @@ function wordPositionMasks(
     minSymbol > maxSymbol ? NO_MASKS : new Int32Array(maxSymbol - minSymbol + 1)
   const stringPattern = typeof s1 === 'string'
   let wide: Map<unknown, number> | null = null
-  // A range holds at most as many distinct elements as it is long, and this is
-  // the only bound that holds for both tables at once — the span bounds what the
-  // span table takes, and an element it rejects is filed in `wide`, which draws
-  // its blocks from the same table.
   const limit = (length + 1) * words
   const spanSize =
     minSymbol > maxSymbol ? 0 : (Math.min(maxSymbol - minSymbol + 1, length) + 1) * words
@@ -292,9 +150,6 @@ function wordPositionMasks(
     const symbol = stringPattern ? s1.charCodeAt(index) : s1[index]
     let base: number
 
-    // The same four-part test the row loops apply, and it has to stay the same:
-    // an element filed in one table and looked up in the other reads as absent
-    // from a range that contains it.
     if (
       typeof symbol === 'number' &&
       symbol >= minSymbol &&
@@ -310,8 +165,6 @@ function wordPositionMasks(
         bases[entry] = base
       }
     } else {
-      // `Map` matches keys by SameValueZero, under which NaN equals itself;
-      // sequence equality everywhere else is `===`, under which it does not.
       if (symbol !== symbol) continue
       if (wide === null) wide = new Map<unknown, number>()
       const held = wide.get(symbol)
@@ -331,13 +184,6 @@ function wordPositionMasks(
   return { masks, bases, minSymbol, maxSymbol, wide }
 }
 
-/**
- * The bits of a word that are positions of a range `length` elements long.
- *
- * `~(-1 << bits)` rather than `(1 << bits) - 1`, which at 31 bits is
- * `-2147483649` — the mask its callers want only once a bitwise operator has
- * coerced it back into a word.
- */
 function validBits(length: number): number {
   const bits = length & 31
   return bits === 0 ? -1 : ~(-1 << bits)
@@ -345,21 +191,10 @@ function validBits(length: number): number {
 
 export interface LcsSeqMatrix {
   readonly sim: number
-  /** `s2Length` rows of `words` machine words, row-major. */
   readonly rows: Int32Array
   readonly words: number
 }
 
-/**
- * Port of `LCSseq_py._matrix`. Returns the LCS length and the row vectors.
- *
- * Both inputs are given as a range rather than a whole sequence. Recovery
- * always works on an affix-trimmed middle, and materialising that middle cost
- * two arrays and a copy of every element per call — on a divide-and-conquer
- * recovery, per leaf. Reading through an offset costs nothing.
- *
- * @internal Inputs must already be normalized by `convPair` / `convSequence`.
- */
 export function lcsSeqMatrix(
   s1: ArrayLike<unknown>,
   s1Start: number,
@@ -368,9 +203,6 @@ export function lcsSeqMatrix(
   s2Start: number,
   s2Length: number,
 ): LcsSeqMatrix {
-  // An empty side has no common subsequence with anything, and recovery reads
-  // no row of a matrix with no rows — so neither the masks nor the vector are
-  // worth building. `words` is `0` because `rows` holds nothing to index.
   if (s1Length === 0 || s2Length === 0) {
     return { sim: 0, rows: new Int32Array(0), words: 0 }
   }
@@ -387,10 +219,6 @@ export function lcsSeqMatrix(
     words,
   )
   const stringText = typeof s2 === 'string'
-  // Once a state row no longer fits comfortably in the fast caches, keeping a
-  // small scratch vector hot and copying it out beats reading the preceding
-  // matrix row back in. The crossover was measured at 1024 pattern elements:
-  // in-place rows win through 32 words, while an 8192-element matrix regresses.
   if (words > 32) {
     const rows = new Int32Array(s2Length * words)
     const state = new Int32Array(words).fill(-1)
@@ -431,11 +259,6 @@ export function lcsSeqMatrix(
     return { sim, rows, words }
   }
 
-  // Keep the initial all-ones vector directly before the returned rows. Each
-  // row can then read its predecessor and write its final position in one pass,
-  // instead of writing a scratch vector and copying that vector afterwards.
-  // The allocation is the same size as the former rows + scratch allocation;
-  // the returned view simply hides the initial vector from recovery.
   const storage = new Int32Array((s2Length + 1) * words)
   storage.fill(-1, 0, words)
   const rows = storage.subarray(words)
@@ -460,8 +283,6 @@ export function lcsSeqMatrix(
       for (let w = 0; w < words; w++) {
         const s = storage[previousBase + w]
         const u = s & masks[base + w]
-        // `S + u` modulo the word width, with the carry out recovered from the
-        // operands: `S - u` is `S & ~u` here, since `u` is a subset of `S`.
         const sum = (s + u + carry) | 0
         carry = ((s & u) | ((s | u) & ~sum)) >>> 31
         storage[rowBase + w] = sum | (s & ~u)
@@ -471,8 +292,6 @@ export function lcsSeqMatrix(
     }
   }
 
-  // Only the bits below `s1Length` are positions; the rest of the top word was
-  // never a cell and must not be counted.
   let sim = 0
   for (let w = 0; w < words; w++) {
     const valid = w === words - 1 ? validBits(s1Length) : -1
@@ -482,10 +301,6 @@ export function lcsSeqMatrix(
   return { sim, rows, words }
 }
 
-/**
- * `lcsSeqMatrix` for a pattern of at most 32 elements: the vector is a number,
- * so the row loop carries nothing between words and stores a row by assignment.
- */
 function oneWordLcsSeqMatrix(
   s1: ArrayLike<unknown>,
   s1Start: number,
@@ -523,44 +338,18 @@ function oneWordLcsSeqMatrix(
   return { sim: popcount32(~state & validBits(s1Length)), rows, words: 1 }
 }
 
-/**
- * Port of `Levenshtein_py._matrix`. Returns the distance and the row vectors.
- *
- * @internal Inputs must already be normalized by `convPair` / `convSequence`.
- */
 export interface LevenshteinMatrix {
   readonly dist: number
-  /** `s2Length` rows of `stride` words, row-major. */
   readonly vp: Int32Array
   readonly vn: Int32Array
   readonly stride: number
-  /**
-   * Bit position that word `0` of each row starts at, or `null` when every row
-   * holds the whole vector. Always a multiple of the word width.
-   */
   readonly offsets: Int32Array | null
 }
 
-/**
- * Whether a matrix over these lengths stores a band rather than whole rows.
- *
- * A band has to be narrower than the vector to be worth storing, and a vector
- * of one word has no band to narrow — the one-word kernel below ignores the
- * caller's distance for exactly that reason.
- */
 function bandedRows(s1Length: number, maximumDistance: number): boolean {
   return s1Length > 32 && maximumDistance >= 0 && 2 * maximumDistance + 1 < s1Length
 }
 
-/**
- * Words each stored row takes.
- *
- * A band is `2 * maximumDistance + 1` positions wide and is stored from the
- * word boundary at or below its first one, so at worst it starts 31 bits into
- * the first stored word: `ceil((width + 31) / 32)` words hold any placement.
- * Ordinary division rather than a shift, for the reason {@link wordCount} gives
- * and because this is setup rather than a row loop.
- */
 function rowStride(s1Length: number, maximumDistance: number): number {
   const words = wordCount(s1Length)
   return bandedRows(s1Length, maximumDistance)
@@ -568,17 +357,6 @@ function rowStride(s1Length: number, maximumDistance: number): number {
     : words
 }
 
-/**
- * Bytes {@link levenshteinMatrix} will allocate for its rows.
- *
- * Exported so a caller deciding whether it can afford one asks the code that
- * does the allocating. The estimate it replaced was written for row objects
- * holding a payload each, and outlived them: it charged 24 bytes of overhead
- * per row plus the band's bits, where the rows are now two flat `Int32Array`s
- * and an offset. On a narrow band it read two to three times high, which sent
- * alignments to the divide-and-conquer path — and a different, though equally
- * short, edit script — over matrices that would have fitted comfortably.
- */
 export function levenshteinRowBytes(
   s1Length: number,
   s2Length: number,
@@ -588,15 +366,6 @@ export function levenshteinRowBytes(
   return s2Length * (2 * rowStride(s1Length, maximumDistance) * 4 + (banded ? 4 : 0))
 }
 
-/**
- * Bytes {@link levenshteinMatrix} holds at once, rows and pattern tables both.
- *
- * The rows are the whole cost only while the pattern draws on a small alphabet.
- * A range of distinct elements gives each one its own block of `words`, which
- * on a narrow band measured (2026-08-11) 54x the rows it was budgeted against —
- * so a caller with a memory limit has to count the tables or accept a matrix
- * hundreds of times over it. Ordinary text lands within 1% either way.
- */
 export function levenshteinMatrixBytes(
   s1: ArrayLike<unknown>,
   s1Start: number,
@@ -606,21 +375,14 @@ export function levenshteinMatrixBytes(
 ): number {
   const rows = levenshteinRowBytes(s1Length, s2Length, maximumDistance)
   const words = wordCount(s1Length)
-  // An empty text builds no tables, and a one-word pattern tables its span
-  // alone — at most `SPAN_SLACK` entries past the 32 elements themselves.
   if (s2Length === 0 || words < 2) return rows
 
   const span = symbolSpan(s1, s1Start, s1Length)
   const { minSymbol, maxSymbol } = span
   const bases = minSymbol > maxSymbol ? 0 : maxSymbol - minSymbol + 1
-  // `vpState` and `vnState` are a word apiece beside the tables.
   return rows + (maskBlockBound(span, s1Length) * words + bases + 2 * words) * 4
 }
 
-/**
- * Levenshtein matrix, optionally keeping only the caller-proven edit band of
- * each row. The recurrence is exact either way; a band narrows what is stored.
- */
 export function levenshteinMatrix(
   s1: ArrayLike<unknown>,
   s1Start: number,
@@ -630,8 +392,6 @@ export function levenshteinMatrix(
   s2Length: number,
   maximumDistance = -1,
 ): LevenshteinMatrix {
-  // With one side empty every element of the other is an edit, and recovery
-  // reads no row of a matrix with no rows.
   if (s1Length === 0 || s2Length === 0) {
     return {
       dist: s1Length + s2Length,
@@ -643,8 +403,6 @@ export function levenshteinMatrix(
   }
 
   const words = wordCount(s1Length)
-  // A band cannot narrow a row that is already one word wide, so the one-word
-  // kernel ignores `maximumDistance` and stores every row whole.
   if (words === 1) {
     return oneWordLevenshteinMatrix(s1, s1Start, s1Length, s2, s2Start, s2Length)
   }
@@ -688,8 +446,6 @@ export function levenshteinMatrix(
     for (let w = 0; w < words; w++) {
       const vpWord = vpState[w]
       const vnWord = vnState[w]
-      // A `matchBase` of `0` is the reserved zero block, so an element `s1` does
-      // not hold reads its masks like any other rather than testing for them.
       const x = masks[matchBase + w]
 
       const addend = x & vpWord
@@ -721,8 +477,6 @@ export function levenshteinMatrix(
       continue
     }
 
-    // The band of row `j + 1` starts here; storing from the word boundary at or
-    // below it keeps the recovery's index arithmetic to a shift.
     const from = Math.min(words - stride, Math.max(0, j + 1 - maximumDistance - 1) >>> 5)
     offsets[j] = from << 5
     for (let w = 0; w < stride; w++) {
@@ -734,10 +488,6 @@ export function levenshteinMatrix(
   return { dist: currDist, vp, vn, stride, offsets }
 }
 
-/**
- * `levenshteinMatrix` for a pattern of at most 32 elements: both vectors are
- * numbers, so a row is one Myers step with the carries folded into constants.
- */
 function oneWordLevenshteinMatrix(
   s1: ArrayLike<unknown>,
   s1Start: number,
@@ -791,7 +541,6 @@ function oneWordLevenshteinMatrix(
   return { dist: currDist, vp, vn, stride: 1, offsets: null }
 }
 
-/** @internal True when position `pos` of row `row` of a word matrix is set. */
 export function rowBitSet(
   rows: Int32Array,
   words: number,
@@ -801,7 +550,6 @@ export function rowBitSet(
   return (rows[row * words + (pos >>> 5)] & (1 << (pos & 31))) !== 0
 }
 
-/** @internal Test a whole-vector position in a row stored from `offset`. */
 export function shiftedRowBitSet(
   rows: Int32Array,
   stride: number,

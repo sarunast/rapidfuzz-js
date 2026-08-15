@@ -97,8 +97,6 @@ export function withPreparedFlags<TImplementation extends ErasedMetricImplementa
   prepare: PreparationFactory,
   registration: ScorerRegistration = {},
 ): TImplementation & Flagged & PreparedCapability {
-  // Decorates the implementation instead of wrapping it, so scoring pays no
-  // extra call. Registering unconditionally replaces any earlier registration.
   const scorer = Object.assign(implementation, {
     rfScorerFlags: Object.freeze({ ...flags }),
     [PREPARE_SCORER]: prepare,

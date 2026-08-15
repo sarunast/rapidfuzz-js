@@ -3,17 +3,6 @@ import type { Sequence } from './types.js'
 
 const NON_ALNUM = /[^\p{L}\p{N}]/gu
 
-/**
- * JavaScript lowercases with Unicode's full mapping, RapidFuzz with a simple
- * per-code-point table. `İ` gives `i` + `U+0307` where upstream gives `i`, and
- * a word-final `Σ` gives `ς` where upstream always gives `σ`.
- *
- * Replaced before lowercasing, never repaired after: a dot or a final sigma the
- * caller wrote is upstream's own answer, and by then the two are the same
- * character. Verified against rapidfuzz 3.14.5 and Node 26.5.1 on 2026-08-11 —
- * these two, and no others, over every code point. A finding about two
- * versions; re-run the sweep rather than trusting the class.
- */
 const FULL_CASE_DIVERGENT = /[İΣ]/
 const DOTTED_CAPITAL_I = 'İ'
 const CAPITAL_SIGMA = 'Σ'
@@ -47,12 +36,8 @@ export function normalizeText<TSequence extends ArrayLike<unknown>>(
   value: TSequence,
 ): TSequence
 export function normalizeText(value: Sequence): Sequence {
-  // Returned through the guard rather than directly: this is a public entry
-  // point, and what it hands back has to be a sequence whether or not it had
-  // text to normalize. `validateSequence` answers the value it was given.
   if (typeof value !== 'string') return validateSequence(value)
   const separated = value.replace(NON_ALNUM, ' ').trim()
-  // One scan, so ordinary input pays no replacement pass at all.
   if (!FULL_CASE_DIVERGENT.test(separated)) return separated.toLowerCase()
   return separated
     .replaceAll(DOTTED_CAPITAL_I, 'i')

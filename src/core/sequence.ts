@@ -6,17 +6,8 @@ import type {
   Sequence,
 } from './types.js'
 
-/**
- * The longest array JavaScript can hold. Without it `{ length: 2 ** 53 - 1 }`
- * passes here and fails in {@link snapshotSequence} instead, as a `RangeError`
- * about our own array. A representability bound, not a resource one.
- */
 const MAX_SEQUENCE_LENGTH = 0xffff_ffff
 
-/**
- * A callable is not a sequence, though every function has a `length`: accepting
- * one would score a misplaced argument instead of reporting it.
- */
 export function isSequence(value: unknown): value is Sequence {
   if (typeof value === 'string') return true
   if (typeof value !== 'object' || value === null || !('length' in value)) return false
@@ -36,13 +27,6 @@ export function validateSequence(value: unknown): Sequence {
   return value
 }
 
-/**
- * What a normalizer is allowed to return: a sequence, and not nothing.
- *
- * Takes an already-valid sequence and a normalizer that is known to be there,
- * so the caller keeps the decision it has to make anyway — whether a
- * normalizer exists at all — outside its loops.
- */
 export function normalizeSequence(value: Sequence, normalize: Normalizer): Sequence {
   const normalized = normalize(value)
   if (normalized == null) throw new TypeError('normalize returned a missing value')

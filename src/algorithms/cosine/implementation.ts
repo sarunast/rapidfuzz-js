@@ -30,11 +30,6 @@ export interface CosineOptions extends ScorerOptions {
   readonly gramSize?: number | undefined
 }
 
-/**
- * Unlike Dice, this branch is needed on both sides. With `‖A‖ = 0` and
- * `‖B‖ > 0` the quotient is `0 / 0`, which is `NaN` rather than `0`; a sequence
- * shorter than `gramSize` has no grams and no norm at all.
- */
 function profileSimilarity(
   a: NGramProfile,
   dot: FrequencyKernel,
@@ -45,23 +40,10 @@ function profileSimilarity(
     const similarity = zeroGramSimilarity(a, b)
     return similarity >= scoreCutoff ? similarity : 0
   }
-  // One square root of the product rather than two of the factors:
-  // `Math.sqrt(3) * Math.sqrt(3)` is 3.0000000000000004, which would leave a
-  // profile scored against itself just short of 1. The clamp covers the same
-  // rounding in the other direction.
   const similarity = Math.min(dot(b) / Math.sqrt(a.squaredNorm * b.squaredNorm), 1)
   return similarity >= scoreCutoff ? similarity : 0
 }
 
-/**
- * Cosine similarity over n-gram frequency vectors, in `[0, 1]`.
- *
- * The dot product of the two frequency vectors over the product of their
- * lengths — not the intersection-count formula some libraries ship under this
- * name. No padding is added at the ends.
- *
- * If the similarity is smaller than `scoreCutoff`, `0` is returned.
- */
 function cosineSimilarity_impl(
   s1: MaybeSequence,
   s2: MaybeSequence,
@@ -70,13 +52,8 @@ function cosineSimilarity_impl(
   if (s1 == null || s2 == null) return 0
   const gramSize = validGramSize(options.gramSize)
   const scoreCutoff = options.scoreCutoff
-  // `convPair`, not `convSequence` per side — see the Dice implementation: two
-  // BMP strings stay strings, and the pair form is what keeps both profiles
-  // keyed in one element domain.
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
   const query = profileOfElements(a, gramSize)
-  // One comparison, so no kernel to amortize: the generic walk is what a direct
-  // call wants.
   return normSimCutoff(
     profileSimilarity(
       query,
@@ -88,7 +65,6 @@ function cosineSimilarity_impl(
   )
 }
 
-/** Cosine distance in `[0, 1]`, i.e. `1 - similarity`. */
 function cosineDistance_impl(
   s1: MaybeSequence,
   s2: MaybeSequence,
@@ -114,7 +90,6 @@ type PreparedCosineKind = 'distance' | 'similarity'
 
 function prepareCosine(kind: PreparedCosineKind): PreparationFactory {
   return (options) => {
-    // Once per scorer, so a matcher preparing many queries never reparses it.
     const gramSize = parseGramSize(options)
 
     const prepareChoice = (choice: Sequence): NGramProfile =>
@@ -122,8 +97,6 @@ function prepareCosine(kind: PreparedCosineKind): PreparationFactory {
 
     const prepareQuery = (query: Sequence): PreparedKernel => {
       const a = buildProfile(query, gramSize)
-      // The query's trie is walked once, here, and never again while the search
-      // runs — see `dotProductKernel`.
       const dot = dotProductKernel(a)
 
       return (rawChoice, rawCutoff) => {
@@ -141,8 +114,6 @@ function prepareCosine(kind: PreparedCosineKind): PreparationFactory {
       }
     }
 
-    // Similarity only, for the reason Dice's is: an inverted index accumulates
-    // a dot product and a top-k over a distance is a different driver.
     const indexChoices =
       kind === 'similarity' ? () => createCosineIndexBuilder(gramSize) : undefined
 
@@ -150,12 +121,6 @@ function prepareCosine(kind: PreparedCosineKind): PreparationFactory {
   }
 }
 
-/**
- * Settle `gramSize` once, when a scorer is compiled, and drop it when it is the
- * default — see the Dice canonicalizer, which does the same for the same
- * reason: it is what lets `{ gramSize: 2 }` and no configuration at all share
- * one prepared-choice key.
- */
 const cosineConfigurationCanonicalizer: ConfigurationCanonicalizer = (options) =>
   parseGramSize(options) === 2 ? {} : options
 

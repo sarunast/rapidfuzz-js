@@ -42,21 +42,10 @@ export type AnyBrand = any
  * without importing anything of ours.
  */
 export class PreparedChoice<TBrand = AnyBrand> {
-  // Phantom, never assigned, never read. `(value: Brand) => Brand` keeps Brand
-  // invariant: PreparedChoice<Brand> must not widen to a union of two brands.
-  //
-  // Protected rather than private because declaration emit erases the type of
-  // a private member — `private brand;` — which would leave `Brand` unused in
-  // the packed `.d.ts` and every consumer unprotected. The private constructor
-  // refuses `extends` through the TypeScript API rather than at runtime, which
-  // is enough here: the class is exported as a type, never as a value.
   declare protected readonly brand: (value: TBrand) => TBrand
 
   readonly #owner: object
   readonly #value: unknown
-  // The normalizer the choice went through, so a search can refuse a handle
-  // whose text was made differently to the query it is about to be scored
-  // against. Nothing else can see it: the value is already normalized.
   readonly #normalize: Normalizer | undefined
 
   private constructor(owner: object, value: unknown, normalize: Normalizer | undefined) {
@@ -72,17 +61,12 @@ export class PreparedChoice<TBrand = AnyBrand> {
       normalize: Normalizer | undefined,
     ) => new PreparedChoice<TBrand>(owner, value, normalize)
     resolvePreparedChoice = (owner, handle, normalize) => {
-      // `#owner in handle` refuses anything the private constructor did not
-      // build, including `Object.create(PreparedChoice.prototype)` forgeries
-      // and spread clones.
       if (typeof handle !== 'object' || handle === null || !(#owner in handle)) {
         throw new TypeError('getPrepared returned an invalid prepared choice')
       }
       if (handle.#owner !== owner) {
         throw new TypeError('prepared choice is incompatible with this scorer')
       }
-      // By identity, not by equivalence: two normalizers cannot be compared any
-      // other way, and the alternative is scoring two sides made differently.
       if (handle.#normalize !== normalize) {
         throw new TypeError(normalizerMismatch(handle.#normalize, normalize))
       }

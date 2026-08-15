@@ -26,12 +26,6 @@ function preparedPrefixDistance(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>):
   return maximum(s1, s2) - commonPrefix(s1, s2)
 }
 
-/**
- * Elements outside the common prefix: `max(|s1|, |s2|)` minus the length of the
- * longest common prefix.
- *
- * If the distance is greater than `scoreCutoff`, `scoreCutoff + 1` is returned.
- */
 function prefixDistance_impl(
   s1: MaybeSequence,
   s2: MaybeSequence,
@@ -64,11 +58,6 @@ function prefixNormalizedDistance_impl(
   )
 }
 
-/**
- * Prefix similarity normalised into `[0, 1]`, where `1` means identical.
- *
- * If the normalised similarity is smaller than `scoreCutoff`, `0` is returned.
- */
 function prefixNormalizedSimilarity_impl(
   s1: MaybeSequence,
   s2: MaybeSequence,

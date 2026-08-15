@@ -20,14 +20,7 @@ export type ChoicePreparer = (choice: Sequence) => unknown
 export interface MetricPreparation {
   readonly prepareQuery: (query: Sequence) => PreparedKernel
   readonly prepareChoice: ChoicePreparer
-  // Declared where the configuration has already been parsed, so an index is
-  // built at the same gram size the kernels compare at. Only the metrics that
-  // have a corpus-wide representation define it; the adapter copies it onto the
-  // compilation either way.
   readonly indexChoices?: (() => ChoiceIndexBuilder) | undefined
-  // Declared beside `indexChoices` and copied across the same way. A metric
-  // defines it only where its perfect matches have a structural description —
-  // token-set containment is the one that does.
   readonly proveOptimum?: ((prepared: readonly unknown[]) => OptimumProof) | undefined
 }
 
@@ -66,15 +59,10 @@ export function prepareMetric(
   parseOptions: (options: Readonly<Record<string, unknown>>) => unknown = () => null,
 ): PreparationFactory {
   return (options) => {
-    // Once per scorer: configuration belongs to the scorer lifetime, so a
-    // matcher preparing many queries never reparses it.
     const parsedOptions = parseOptions(options)
     return {
       prepareQuery: (query) => {
         const preparedQuery = scorerSequence(query)
-        // A string query scored against array choices would otherwise be
-        // converted to code points once per candidate; the converted form
-        // never changes.
         let convertedQuery: ArrayLike<unknown> | null = null
         return (rawChoice, rawCutoff) => {
           const choice = preparedChoiceSequence(rawChoice)

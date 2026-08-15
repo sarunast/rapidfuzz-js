@@ -4,16 +4,6 @@ import type { SourceEntry } from '../shared/collection.js'
 import type { ChoiceReader, ReaderOptions } from '../shared/readers.js'
 import type { AnyMatcherOptions, Items } from '../types.js'
 
-/**
- * Every option a reader consumes, read exactly once, as `createMatcher` does
- * it.
- *
- * The reader and the query have to be handed the same normalizer: an accessor
- * that answers one function to each passes the prepared-choice check and then
- * scores against a query normalized some other way, which is the silent
- * mismatch that check exists to refuse. That is why `normalize` arrives as an
- * argument, already read, rather than being taken from `options` here.
- */
 export function stableOptionsOf<TItem, TDirection extends Direction, TBrand>(
   options: AnyMatcherOptions<TItem, TDirection, TBrand>,
   normalize: Normalizer | undefined,
@@ -34,13 +24,6 @@ export function arrayItemsOf<TItem>(items: Items<TItem>): readonly TItem[] | nul
   return Array.isArray(items) ? items : null
 }
 
-/**
- * Every choice that has text to score, in collection order.
- *
- * The walk a query with no text of its own takes: nothing is scored, so what a
- * result needs is only whether the choice was there. Cold by construction —
- * every caller of this has already settled that the query is empty.
- */
 export function* presentEntries<TItem>(
   items: Items<TItem>,
   choices: ChoiceReader<TItem>,

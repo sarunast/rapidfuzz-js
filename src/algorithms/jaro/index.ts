@@ -33,9 +33,6 @@ export const similarity: BuiltInMetric<'jaro.similarity', 'similarity'> =
     bounds: [0, 1],
   })
 
-// Jaro is normalized by construction, so these are the same metrics under the
-// names the other algorithms use. `typeof` carries the identity across instead
-// of restating it, which is what keeps their prepared choices interchangeable.
 /** Jaro is already `0..1`, so this is {@link distance} itself. */
 export const normalizedDistance: typeof distance = distance
 /** Jaro is already `0..1`, so this is {@link similarity} itself. */

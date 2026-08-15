@@ -44,11 +44,6 @@ export type ScoreArrayKind = keyof ScoreArrayOf
 /** Any of the arrays {@link ScoreArrayOf} names. */
 export type ScoreArray = ScoreArrayOf[ScoreArrayKind]
 
-/**
- * Function properties rather than methods, so `TArray` is checked contravariantly
- * under `strictFunctionTypes` — a method declaration is bivariant, which would
- * let a `Float64Array` factory sit in the `u8` slot of the table below.
- */
 interface ScoreArrayFactory<TArray extends ScoreArray> {
   /** Whether the store holds integers, so a score has to be rounded before it. */
   readonly integral: boolean
@@ -68,28 +63,8 @@ interface ScoreArrayFactory<TArray extends ScoreArray> {
   readonly view: (data: TArray, start: number, end: number) => TArray
 }
 
-/**
- * The largest finite `Float32Array` element, which the language does not name.
- *
- * Anything above it stores as `Infinity` rather than as a rounded neighbour,
- * so it is a bound on what `f32` holds in the same sense `255` bounds `u8`.
- * Precision below it is not: `f32` is chosen to lose digits.
- */
 const FLOAT32_MAX = 3.4028234663852886e38
 
-/**
- * One concrete factory per kind.
- *
- * Written out rather than derived from a constructor the caller passes, because
- * `new into(n)` for a generic `into` resolves its construct signature from the
- * *constraint* and comes back as the whole union — recovering `Uint8Array` from
- * it needs an assertion, which this project does not allow. Indexing a mapped
- * type by the generic key propagates the instantiation instead, and each entry
- * here is concrete so `subarray` has a single unambiguous signature.
- *
- * A static table over the built-in typed arrays: nothing registers a kind at
- * runtime, and no constructor has to be abstracted over.
- */
 const SCORE_ARRAYS: {
   readonly [TKind in ScoreArrayKind]: ScoreArrayFactory<ScoreArrayOf[TKind]>
 } = {
@@ -160,14 +135,6 @@ export function scoreArrayFactory<TKind extends ScoreArrayKind>(
   return factory
 }
 
-/**
- * The largest score count this library will try to allocate.
- *
- * Not a limit the language states: a typed array's length is bounded by what
- * the engine will hand out for the buffer behind it, which is smaller than this
- * on most machines and not written down anywhere. This is a portable ceiling
- * that turns an ask no engine will meet into one error rather than nine.
- */
 const MAX_LENGTH = 2 ** 32 - 1
 
 /**

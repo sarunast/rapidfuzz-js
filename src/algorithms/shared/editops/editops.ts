@@ -20,15 +20,6 @@ import type { Editop, MatchingBlock, Opcode, OpcodeTag } from './types.js'
 
 export type { Editop, EditopTag, MatchingBlock, Opcode, OpcodeTag } from './types.js'
 
-/**
- * What a tag and a position have to be before the checks below mean anything.
- *
- * Every bound is written as a comparison, and a comparison against `NaN` or
- * `undefined` is false — so an unchecked position passed each of them and
- * reached code that assumes it is a whole number. A tag outside its union is
- * worse than useless: several branches test for one tag and treat everything
- * else as its opposite, so an unknown one is silently read as a deletion.
- */
 function checkEditopTag(tag: unknown): void {
   if (tag !== 'replace' && tag !== 'delete' && tag !== 'insert') {
     throw new TypeError(`invalid edit operation tag ${String(tag)}`)
@@ -41,37 +32,23 @@ function checkOpcodeTag(tag: unknown): void {
   }
 }
 
-// Safe rather than merely whole: past 2^53 adjacent integers collide, so a
-// position up there is no longer an exact coordinate, and the per-element
-// loops in `opcodesToEditops` would be asked to run for years.
 function checkPosition(position: unknown): void {
   if (typeof position !== 'number' || !Number.isSafeInteger(position) || position < 0) {
     throw new TypeError('edit operation positions must be whole and at least zero')
   }
 }
 
-/**
- * The types below are a promise to a type checker, and the checks here are for
- * everything that reaches this from JavaScript, or through an `any`, having
- * made no such promise. Reading `.tag` off `null` would otherwise report a
- * list of operations as a missing property.
- */
 function checkOperation(op: unknown): void {
   if (typeof op !== 'object' || op === null) {
     throw new TypeError('an edit operation must be an object')
   }
 }
 
-/** The declared lengths a list of operations is validated against. */
 function checkLengths(srcLen: number, destLen: number): void {
   checkPosition(srcLen)
   checkPosition(destLen)
 }
 
-/**
- * Copied as they are checked, so that what is stored is this library's, not a
- * record the caller still holds a reference to and can write through.
- */
 function checkedEditop(op: Editop): Editop {
   checkOperation(op)
   checkEditopTag(op.tag)
@@ -81,7 +58,6 @@ function checkedEditop(op: Editop): Editop {
   return { tag: op.tag, srcPos: op.srcPos, destPos: op.destPos }
 }
 
-/** Mutable while being built: {@link listToOpcodes} merges adjacent blocks. */
 interface DraftOpcode {
   tag: OpcodeTag
   srcStart: number
@@ -107,7 +83,6 @@ function checkedOpcode(op: Opcode): DraftOpcode {
   }
 }
 
-/** Port of `_list_to_editops`. */
 function listToEditops(
   ops: readonly Editop[],
   srcLen: number,
@@ -116,11 +91,6 @@ function listToEditops(
   checkLengths(srcLen, destLen)
 
   const blocks: Editop[] = []
-  // Ordering is checked against the operation before it as the list is built,
-  // rather than in a second walk over the finished array: every operation is
-  // in hand once already. It does mean a list that breaks two rules now
-  // reports whichever comes first in reading order, where the second walk
-  // always reported every bound before any ordering. Both are refusals.
   let previous: Editop | undefined
 
   for (const raw of ops) {
@@ -151,7 +121,6 @@ function listToEditops(
   return blocks
 }
 
-/** Port of `_list_to_opcodes`. */
 function listToOpcodes(
   ops: readonly Opcode[],
   srcLen: number,
@@ -159,9 +128,6 @@ function listToOpcodes(
 ): Opcode[] {
   checkLengths(srcLen, destLen)
 
-  // No operations still describes both strings in full, as the single `equal`
-  // block that covers them — which is what upstream answers here too, by way
-  // of converting an empty editop list.
   if (ops.length === 0) return editopsToOpcodes([], srcLen, destLen)
 
   const blocks: DraftOpcode[] = []
@@ -197,7 +163,6 @@ function listToOpcodes(
     const last = blocks[blocks.length - 1]
 
     if (last !== undefined) {
-      // Merge adjacent blocks with the same tag.
       if (
         last.tag === op.tag &&
         last.srcEnd === op.srcStart &&
@@ -208,9 +173,6 @@ function listToOpcodes(
         continue
       }
 
-      // Continuity, against the block this one follows — the same comparison
-      // the second walk over the finished array used to make, minus the walk.
-      // A merged block cannot fail it: merging is that comparison, plus a tag.
       if (last.srcEnd !== op.srcStart || last.destEnd !== op.destStart) {
         throw new Error('List of edit operations is not continuous')
       }
@@ -232,10 +194,6 @@ function listToOpcodes(
   return blocks
 }
 
-/**
- * The two conversions, as plain functions over plain arrays, so that the
- * factories below can reach them without building an instance to discard.
- */
 function editopsToOpcodes(
   ops: readonly Editop[],
   srcLen: number,
@@ -327,29 +285,10 @@ function opcodesToEditops(blocks: readonly Opcode[]): Editop[] {
   return ops
 }
 
-/**
- * A view of `s` that can be indexed by code point.
- *
- * Every position in an edit script counts code points, so astral text has to be
- * split apart before it can be indexed at all. BMP text does not: UTF-16
- * indices and code point indices agree there, and the string can then be sliced
- * natively rather than rebuilt one character at a time. That is the rule
- * `convPair` applies to scorer inputs, asked here of each string separately —
- * `apply` reads its source and its destination independently, so one astral
- * argument need not slow the other down.
- */
 function codePointView(s: string): string | string[] {
   return hasSurrogatePair(s) ? Array.from(s) : s
 }
 
-/**
- * What both `apply` methods demand of their strings, in code points.
- *
- * Upstream checks neither length: its Python `Editops.apply` raises IndexError
- * where its `Opcodes.apply` silently clamps, and both pass extra source text
- * through — three behaviours for one mistake, and the JavaScript spellings of
- * two of them would splice `"undefined"` into the answer. One refusal instead.
- */
 function checkApplyLengths(
   srcLength: number,
   destLength: number,
@@ -363,15 +302,6 @@ function checkApplyLengths(
   }
 }
 
-/**
- * A run of unchanged text, as a string.
- *
- * The array branch is what {@link Opcodes.apply} has always done. Copying an
- * array run character by character instead measured 1.4-2.7x faster on short
- * runs and 1.6x slower on 64k-character ones, so it is not the clear win it
- * looks like; the win worth taking is the string branch, which allocates no
- * array at all.
- */
 function textSlice(view: string | string[], start: number, end: number): string {
   return typeof view === 'string'
     ? view.slice(start, end)
@@ -421,9 +351,6 @@ export class Editops {
   readonly destLen: number
 
   private constructor(operations: readonly Editop[], srcLen: number, destLen: number) {
-    // One call, whatever the length: what it buys is that `operations.push(…)`
-    // cannot leave `srcLen` describing a different alignment from the one
-    // stored. See the class comment for what it deliberately does not buy.
     this.operations = Object.freeze(operations)
     this.srcLen = srcLen
     this.destLen = destLen
@@ -620,9 +547,6 @@ export class Editops {
     if (this.srcLen !== other.srcLen || this.destLen !== other.destLen) return false
     if (this.operations.length !== other.operations.length) return false
 
-    // Indexed rather than `every`, which pays for a call per operation: 3.4x
-    // over a thousand of them, and level with it once the two arrays are large
-    // enough that fetching them is the cost.
     for (let i = 0; i < this.operations.length; i++) {
       const a = this.operations[i]
       const b = other.operations[i]
