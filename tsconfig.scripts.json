@@ -5,8 +5,9 @@
 // They are `.mjs` because each is a shell-invoked entry point, and the ones
 // under `scripts/` run against a checkout that may not have built anything.
 // The benchmark tooling used to be here for the same reason and no longer is:
-// Node executes `bench/tooling/*.ts` directly by stripping the types, so those
-// files are checked as TypeScript by `tsconfig.dev.json`.
+// Node executes `bench/harness/*.ts` and `bench/regression/*.ts` directly by
+// stripping the types, so those files are checked as TypeScript by
+// `tsconfig.dev.json`.
 //
 // Like the rest of the development tooling, these scripts do not emit public
 // declarations.

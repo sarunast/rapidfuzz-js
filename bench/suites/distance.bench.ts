@@ -1,33 +1,33 @@
-import { damerauLevenshteinDistance } from '../src/algorithms/damerauLevenshtein/implementation.js'
+import { damerauLevenshteinDistance } from '../../src/algorithms/damerauLevenshtein/implementation.js'
 import {
   hammingDistance,
   hammingNormalizedSimilarity,
-} from '../src/algorithms/hamming/implementation.js'
+} from '../../src/algorithms/hamming/implementation.js'
 import {
   indelDistance,
   indelNormalizedSimilarity,
-} from '../src/algorithms/indel/implementation.js'
-import { jaroSimilarity } from '../src/algorithms/jaro/implementation.js'
-import { jaroWinklerSimilarity } from '../src/algorithms/jaroWinkler/implementation.js'
+} from '../../src/algorithms/indel/implementation.js'
+import { jaroSimilarity } from '../../src/algorithms/jaro/implementation.js'
+import { jaroWinklerSimilarity } from '../../src/algorithms/jaroWinkler/implementation.js'
 import {
   lcsSeqEditops,
   lcsSeqNormalizedSimilarity,
-} from '../src/algorithms/lcs/implementation.js'
-import { levenshteinEditops } from '../src/algorithms/levenshtein/editops.js'
+} from '../../src/algorithms/lcs/implementation.js'
+import { levenshteinEditops } from '../../src/algorithms/levenshtein/editops.js'
 import {
   levenshteinDistance,
   levenshteinNormalizedSimilarity,
   levenshteinSimilarity,
-} from '../src/algorithms/levenshtein/metric.js'
-import { osaDistance } from '../src/algorithms/osa/implementation.js'
+} from '../../src/algorithms/levenshtein/metric.js'
+import { osaDistance } from '../../src/algorithms/osa/implementation.js'
 import {
   postfixNormalizedSimilarity,
   postfixSimilarity,
-} from '../src/algorithms/postfix/implementation.js'
+} from '../../src/algorithms/postfix/implementation.js'
 import {
   prefixNormalizedSimilarity,
   prefixSimilarity,
-} from '../src/algorithms/prefix/implementation.js'
+} from '../../src/algorithms/prefix/implementation.js'
 import {
   editedPairs,
   LATIN1,
@@ -35,8 +35,8 @@ import {
   similarPairs,
   words,
   WORD_BOUNDARY_LENGTHS,
-} from './tooling/corpus.js'
-import { describe, measure } from './tooling/harness.js'
+} from '../harness/corpus.js'
+import { describe, measure } from '../harness/harness.js'
 
 // Three length classes, because the algorithms have different crossover
 // points: short strings are dominated by setup cost, long ones by the inner
@@ -70,7 +70,7 @@ const weightedDissimilar = pairs(words(8, 512, 0x2718_2818))
 // Prefixes of the corpora above, for the scorers that cost enough per pair to
 // push a whole-corpus sample past a millisecond or two. Past that a sample is
 // long enough to contain a garbage collection every time, and the median stops
-// being able to reject the disturbed ones — see `tooling/harness.ts`. These are the
+// being able to reject the disturbed ones — see `harness/harness.ts`. These are the
 // same pairs in the same order, so the inputs stay reproducible.
 const veryLongFew = veryLong.slice(0, 8)
 const veryLongOne = veryLong.slice(0, 1)

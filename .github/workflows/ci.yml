@@ -76,7 +76,7 @@ jobs:
         run: pnpm typecheck:tooling
 
       # Everything below needs dist/, which is why type checking is split rather
-      # than run as one `pnpm typecheck` up front: `bench/tooling` imports the
+      # than run as one `pnpm typecheck` up front: `bench/memory` imports the
       # built package.
       #
       # The token is for tsdown's Codecov plugin, which measures the bundle.

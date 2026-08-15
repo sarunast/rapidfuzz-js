@@ -6,7 +6,14 @@
     "types": ["node"],
     "resolveJsonModule": true,
     "declaration": false,
-    "isolatedDeclarations": false
+    "isolatedDeclarations": false,
+    // `bench/regression/` is executed by node directly, which strips types
+    // rather than resolving them: a `./baseline.js` specifier there looks for a
+    // `.js` file that was never built and fails at load. The bench *suites* are
+    // bundled by esbuild first, which does rewrite the extension, so they keep
+    // the `.js` spelling the rest of the repo uses. Nothing is emitted from
+    // this project, which is the condition this option carries.
+    "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.test.ts", "testing", "tests", "bench/**/*.ts", "*.config.ts"],
   // `exclude` is inherited through `extends`, and the library config excludes

@@ -1,11 +1,11 @@
-import { fuzzPartialRatio } from '../src/fuzz/partialRatio.js'
-import { fuzzRatio } from '../src/fuzz/ratio.js'
-import { fuzzPartialTokenSetRatio } from '../src/fuzz/token/partialTokenSetRatio.js'
-import { fuzzTokenSetRatio } from '../src/fuzz/token/tokenSetRatio.js'
-import { fuzzTokenSortRatio } from '../src/fuzz/token/tokenSortRatio.js'
-import { fuzzWeightedRatio } from '../src/fuzz/weightedRatio.js'
-import { pairs, sentences, similarPairs } from './tooling/corpus.js'
-import { describe, measure } from './tooling/harness.js'
+import { fuzzPartialRatio } from '../../src/fuzz/partialRatio.js'
+import { fuzzRatio } from '../../src/fuzz/ratio.js'
+import { fuzzPartialTokenSetRatio } from '../../src/fuzz/token/partialTokenSetRatio.js'
+import { fuzzTokenSetRatio } from '../../src/fuzz/token/tokenSetRatio.js'
+import { fuzzTokenSortRatio } from '../../src/fuzz/token/tokenSortRatio.js'
+import { fuzzWeightedRatio } from '../../src/fuzz/weightedRatio.js'
+import { pairs, sentences, similarPairs } from '../harness/corpus.js'
+import { describe, measure } from '../harness/harness.js'
 
 const shortPairs = similarPairs(200, 8)
 const mediumPairs = similarPairs(200, 32)
@@ -37,7 +37,7 @@ const partialNeedle = 'abcdefghijklmnopqrstuvwxyz'.repeat(5).slice(0, 128)
 const partialHaystacks = sentences(50, 80, 0x71a1_5eed)
 
 // `partialRatio` scans O(n) windows per call, so a handful of these haystacks
-// is already a millisecond. See `tooling/harness.ts` for why a sample is kept there.
+// is already a millisecond. See `harness/harness.ts` for why a sample is kept there.
 const partialHaystacksFew = partialHaystacks.slice(0, 8)
 const partialHaystacksSome = partialHaystacks.slice(0, 16)
 
@@ -48,7 +48,7 @@ const partialHaystacksSome = partialHaystacks.slice(0, 16)
 // scan is *cheapest* on, and the opposite of what `extract` sees — there the
 // haystack holds a near-match, the running best keeps improving, and every
 // improvement is an endpoint the search has to do something about. Composed
-// here rather than in `tooling/corpus.ts`, which is hashed into all 155 baseline
+// here rather than in `harness/corpus.ts`, which is hashed into all 155 baseline
 // entries; this file is hashed into its own.
 const plantedHaystacks = partialHaystacksFew.map((haystack) => {
   const at = Math.floor(haystack.length / 3)
@@ -156,7 +156,7 @@ describe('partialRatio window scan', () => {
   // reads a handful of windows, so a long haystack whose first window is a
   // perfect match is where that gap is widest — the scan stops immediately and
   // everything else it prepared was waste. Composed here from `partialNeedle`
-  // rather than added to `tooling/corpus.ts`, which is hashed into all 155 baseline
+  // rather than added to `harness/corpus.ts`, which is hashed into all 155 baseline
   // entries where this file is hashed only into its own.
   const plantedAtStart = needle + 'z'.repeat(8_000)
 

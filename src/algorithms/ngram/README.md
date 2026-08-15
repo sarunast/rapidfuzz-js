@@ -392,7 +392,7 @@ would put a stack overflow inside the range of valid inputs.
   `testing/invertedIndex.ts`. The oracle is deliberately the slowest correct
   thing, so a differential failure names the implementation rather than a second
   clever version of it.
-- **Benchmarks**: `bench/ngram.bench.ts` and `bench/ngramIndex.bench.ts`. Read
+- **Benchmarks**: `bench/suites/ngram.bench.ts` and `bench/suites/ngramIndex.bench.ts`. Read
   the `benchmarks` skill before running either.
 - **Architecture rules**: `tests/architecture/imports.test.ts`.
 

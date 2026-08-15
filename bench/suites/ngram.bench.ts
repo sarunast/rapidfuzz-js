@@ -1,13 +1,13 @@
 import {
   cosineDistance,
   cosineSimilarity,
-} from '../src/algorithms/cosine/implementation.js'
-import { similarity as cosineMetric } from '../src/algorithms/cosine/index.js'
-import { diceDistance, diceSimilarity } from '../src/algorithms/dice/implementation.js'
-import { similarity as diceMetric } from '../src/algorithms/dice/index.js'
-import { bestMatch, createMatcher, createScorer, search } from '../src/index.js'
-import { editedPairs, pairs, similarPairs, words } from './tooling/corpus.js'
-import { describe, measure } from './tooling/harness.js'
+} from '../../src/algorithms/cosine/implementation.js'
+import { similarity as cosineMetric } from '../../src/algorithms/cosine/index.js'
+import { diceDistance, diceSimilarity } from '../../src/algorithms/dice/implementation.js'
+import { similarity as diceMetric } from '../../src/algorithms/dice/index.js'
+import { bestMatch, createMatcher, createScorer, search } from '../../src/index.js'
+import { editedPairs, pairs, similarPairs, words } from '../harness/corpus.js'
+import { describe, measure } from '../harness/harness.js'
 
 // Three length classes, as elsewhere in the suite: a profile's cost is one trie
 // insertion per element, so short inputs are dominated by conversion and

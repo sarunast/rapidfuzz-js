@@ -16,16 +16,16 @@
  * of both sizes, so this file is where that costs something if it ever does.
  */
 
-import { similarity as cosineMetric } from '../src/algorithms/cosine/index.js'
-import { similarity as diceMetric } from '../src/algorithms/dice/index.js'
+import { similarity as cosineMetric } from '../../src/algorithms/cosine/index.js'
+import { similarity as diceMetric } from '../../src/algorithms/dice/index.js'
 import {
   createIndexedMatcher,
   createMatcher,
   createScorer,
   search,
-} from '../src/index.js'
-import { sentences, words } from './tooling/corpus.js'
-import { describe, measure } from './tooling/harness.js'
+} from '../../src/index.js'
+import { sentences, words } from '../harness/corpus.js'
+import { describe, measure } from '../harness/harness.js'
 
 const GRAM_SIZE = 3
 
@@ -42,7 +42,7 @@ const phrases = sentences(10_000, 4)
 
 // Every choice sharing most of its grams with every other, which is the shape
 // the index is worst at and the docs lead with. Built here rather than in
-// `tooling/corpus.ts` because that file is hashed into every baseline entry in
+// `harness/corpus.ts` because that file is hashed into every baseline entry in
 // the suite, and this corpus is one file's business.
 // Three tail lengths, not one: against a corpus of a single length a short
 // query is refused by Dice's length bound alone, and the exhaustive arm would

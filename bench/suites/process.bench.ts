@@ -1,22 +1,22 @@
 import {
   distance as damerauDistance,
   normalizedSimilarity as damerauNormalizedSimilarity,
-} from '../src/algorithms/damerauLevenshtein/index.js'
-import { normalizedSimilarity as indelNormalizedSimilarity } from '../src/algorithms/indel/index.js'
-import { normalizedSimilarity as lcsNormalizedSimilarity } from '../src/algorithms/lcs/index.js'
+} from '../../src/algorithms/damerauLevenshtein/index.js'
+import { normalizedSimilarity as indelNormalizedSimilarity } from '../../src/algorithms/indel/index.js'
+import { normalizedSimilarity as lcsNormalizedSimilarity } from '../../src/algorithms/lcs/index.js'
 import {
   distance as levenshteinDistance,
   normalizedDistance as levenshteinNormalizedDistance,
   normalizedSimilarity as levenshteinNormalizedSimilarity,
   similarity as levenshteinSimilarity,
-} from '../src/algorithms/levenshtein/index.js'
-import { normalizedSimilarity as osaNormalizedSimilarity } from '../src/algorithms/osa/index.js'
+} from '../../src/algorithms/levenshtein/index.js'
+import { normalizedSimilarity as osaNormalizedSimilarity } from '../../src/algorithms/osa/index.js'
 import {
   weightedRatio,
   ratio as fuzzRatio,
   tokenSetRatio,
   tokenSortRatio,
-} from '../src/fuzz/index.js'
+} from '../../src/fuzz/index.js'
 import {
   bestMatch,
   createMatcher,
@@ -26,9 +26,9 @@ import {
   scorePairs,
   search,
   searchIter,
-} from '../src/index.js'
-import { sentences, similarPairs, words } from './tooling/corpus.js'
-import { describe, measure } from './tooling/harness.js'
+} from '../../src/index.js'
+import { sentences, similarPairs, words } from '../harness/corpus.js'
+import { describe, measure } from '../harness/harness.js'
 
 const choices = words(2_000, 12)
 const symmetricChoices = choices.slice(0, 200)

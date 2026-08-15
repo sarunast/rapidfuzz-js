@@ -15,10 +15,10 @@
  * Usage mirrors the old vitest spellings so the surrounding scripts kept
  * theirs:
  *
- *     node bench/tooling/runner.ts                   # whole suite, full windows
- *     node bench/tooling/runner.ts --quick fuzz      # quick windows, one file
- *     node bench/tooling/runner.ts -t 'partialRatio' # name filter, any file
- *     node bench/tooling/runner.ts --outputJson=out.json  # compare.ts's interface
+ *     node bench/harness/runner.ts                   # whole suite, full windows
+ *     node bench/harness/runner.ts --quick fuzz      # quick windows, one file
+ *     node bench/harness/runner.ts -t 'partialRatio' # name filter, any file
+ *     node bench/harness/runner.ts --outputJson=out.json  # compare.ts's interface
  *
  * A file may be named by any substring of its path, as everywhere else in the
  * bench tooling. `--testNamePattern=<re>` is accepted as the long spelling of
@@ -46,15 +46,16 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-const TOOLING_DIR = dirname(fileURLToPath(import.meta.url))
-const BENCH_DIR = dirname(TOOLING_DIR)
+const HARNESS_DIR = dirname(fileURLToPath(import.meta.url))
+const BENCH_DIR = dirname(HARNESS_DIR)
+const SUITES_DIR = join(BENCH_DIR, 'suites')
 const PROJECT_DIR = dirname(BENCH_DIR)
 
 /** Every bench file, project-relative with forward slashes. */
 function allBenchFiles(): string[] {
-  return readdirSync(BENCH_DIR)
+  return readdirSync(SUITES_DIR)
     .filter((name) => name.endsWith('.bench.ts'))
-    .map((name) => `bench/${name}`)
+    .map((name) => `bench/suites/${name}`)
     .sort()
 }
 
@@ -89,7 +90,7 @@ function chooseFiles(filters: readonly string[]): string[] {
  */
 function entryStub(file: string): string {
   return [
-    `import { setCurrentFile, runRegisteredBenchmarks } from './bench/tooling/harness.js'`,
+    `import { setCurrentFile, runRegisteredBenchmarks } from './bench/harness/harness.js'`,
     `setCurrentFile(${JSON.stringify(file)})`,
     `await import(${JSON.stringify(`./${file}`)})`,
     'runRegisteredBenchmarks()',
@@ -160,7 +161,7 @@ async function bundle(bundleDir: string, file: string, reuse: boolean): Promise<
 
 function usage(): void {
   process.stdout.write(`
-  node bench/tooling/runner.ts [options] [file …]
+  node bench/harness/runner.ts [options] [file …]
 
   Bundle the bench suite with esbuild and measure it in bare node.
 

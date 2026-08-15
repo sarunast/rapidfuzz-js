@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * Run the benchmark suite several times and compare the result against
- * `bench/tooling/baseline.json`.
+ * `bench/regression/baseline.json`.
  *
  * ## What a baseline stores
  *
  * Not a bare time. Every repeat brackets the suite with
- * `bench/control.bench.ts` — four workloads this library cannot change — and
+ * `bench/suites/control.bench.ts` — four workloads this library cannot change — and
  * stores what each of them measured, by name. That vector is the session's
  * yardstick, and a case's stored number is its median divided by how fast the
  * machine was while it ran: *this case, in units of that machine*.
@@ -63,11 +63,10 @@
  *
  * ## Usage
  *
- * See {@link USAGE}, or `node bench/tooling/compare.ts --help`.
+ * See {@link USAGE}, or `node bench/regression/compare.ts --help`.
  */
 
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import {
   existsSync,
   mkdtempSync,
@@ -81,13 +80,17 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-const TOOLING_DIR = dirname(fileURLToPath(import.meta.url))
-const BENCH_DIR = dirname(TOOLING_DIR)
+import type { Baseline, CaseRecord, Environment } from './baseline.ts'
+import { fileOf, fingerprint } from './baseline.ts'
+
+const REGRESSION_DIR = dirname(fileURLToPath(import.meta.url))
+const BENCH_DIR = dirname(REGRESSION_DIR)
+const SUITES_DIR = join(BENCH_DIR, 'suites')
 const PROJECT_DIR = dirname(BENCH_DIR)
-const DEFAULT_BASELINE = join(TOOLING_DIR, 'baseline.json')
+const DEFAULT_BASELINE = join(REGRESSION_DIR, 'baseline.json')
 
 /** The measurement child: bundles with esbuild, measures in bare node. */
-const RUNNER = join(TOOLING_DIR, 'runner.ts')
+const RUNNER = join(BENCH_DIR, 'harness', 'runner.ts')
 
 interface Options {
   /** Write the baseline instead of comparing. */
@@ -125,47 +128,6 @@ interface Timing {
   stoppedStable: boolean
   /** The block spread it ended at. */
   stability: number | null
-}
-
-/** Everything outside the code under test that changes what a number means. */
-interface Environment {
-  node: string
-  esbuild: string
-  platform: string
-  cpu: string
-  nodeOptions: string
-  /** {@link MEASUREMENT_VERSION} */
-  measurement: number
-}
-
-/**
- * One entry in `baseline.json`, which is a file on disk that outlives any one
- * run — this interface is the only description of what is in it, and a field
- * quietly added or dropped here is a baseline a later version reads
- * differently.
- *
- * `normalised` is the case's median in milliseconds, corrected to its
- * session's average machine speed. `machine` is that session's yardstick: the
- * per-control median, in milliseconds, keyed by control name.
- */
-interface CaseRecord extends Environment {
-  normalised: number
-  noise: number
-  median: number
-  machine: Record<string, number>
-  min: number
-  samples: number
-  batch: number
-  /** The shortest timed sample any repeat took, in milliseconds. */
-  sample: number
-  repeats: number
-  source: string
-  controls: string
-  recordedAt: string
-}
-
-interface Baseline {
-  cases: Record<string, CaseRecord>
 }
 
 /** The runner's `--outputJson` leaf. */
@@ -218,11 +180,11 @@ interface RunOptions {
 }
 
 const USAGE = `
-  node bench/tooling/compare.ts [options] [file …]
+  node bench/regression/compare.ts [options] [file …]
 
-  Compare the benchmark suite against bench/tooling/baseline.json. A file may
+  Compare the benchmark suite against bench/regression/baseline.json. A file may
   be named by any substring of its path. With no file, the whole suite runs;
-  bench/control.bench.ts is the anchor and always runs either way, whatever is
+  bench/suites/control.bench.ts is the anchor and always runs either way, whatever is
   filtered.
 
     --record                     (re)write the baseline instead of comparing
@@ -239,16 +201,16 @@ const USAGE = `
 
   Examples
 
-    node bench/tooling/compare.ts fuzz                 one file, by substring
-    node bench/tooling/compare.ts -t 'partialRatio'    one group, any file
-    node bench/tooling/compare.ts --quick -t '128 chars'  the fast look
-    node bench/tooling/compare.ts --record bench/fuzz.bench.ts
+    node bench/regression/compare.ts fuzz                 one file, by substring
+    node bench/regression/compare.ts -t 'partialRatio'    one group, any file
+    node bench/regression/compare.ts --quick -t '128 chars'  the fast look
+    node bench/regression/compare.ts --record bench/suites/fuzz.bench.ts
 
   For the edit loop, \`pnpm bench:quick\` skips the comparison entirely.
 `
 
 /** The file whose cases anchor every other case. See its header. */
-const CONTROL_FILE = 'bench/control.bench.ts'
+const CONTROL_FILE = 'bench/suites/control.bench.ts'
 
 /**
  * Smallest move worth reporting when the measured noise is smaller than this.
@@ -365,32 +327,18 @@ const SAMPLE_TOO_SHORT = 0.02
 const SAMPLE_TOO_LONG = 5
 
 /**
- * Everything a case's timing depends on besides `src` and its own bench file.
- *
- * `bench/tooling/runner.ts` is in here because the bundling options are decided
- * there, and changing any of them changes what a stored number means
- * without touching a benchmark. {@link MEASUREMENT_VERSION} covers a deliberate
- * change of method; this covers forgetting to bump it.
- */
-const SHARED_SOURCES = [
-  'bench/tooling/corpus.ts',
-  'bench/tooling/harness.ts',
-  'bench/tooling/runner.ts',
-]
-
-/**
  * A path argument in the one spelling everything downstream compares against.
  *
- * Stored case names begin with the path the runner reports — `bench/fuzz.bench.ts`,
+ * Stored case names begin with the path the runner reports — `bench/suites/fuzz.bench.ts`,
  * project-relative and slash-separated — and that string is the identity behind
  * three separate things: which baseline entries a partial `--record` replaces,
  * which ones `candidates` considers, and which file gets fingerprinted. Left
- * raw, `./bench/fuzz.bench.ts` and an absolute path each name the same file and
+ * raw, `./bench/suites/fuzz.bench.ts` and an absolute path each name the same file and
  * match none of them, so a re-record would quietly keep the stale entries it
  * was run to remove. Normalising here means there is only ever one namespace.
  */
 function canonicalFile(arg: string): string {
-  // Resolved against the project, not the process's cwd: `bench/fuzz.bench.ts`
+  // Resolved against the project, not the process's cwd: `bench/suites/fuzz.bench.ts`
   // has to name the same file whichever directory the command was typed in,
   // and the runner canonicalises its own arguments the same way.
   return relative(PROJECT_DIR, resolve(PROJECT_DIR, arg)).split(sep).join('/')
@@ -437,7 +385,7 @@ function parseArgs(argv: readonly string[]): Options {
     else if (arg === '-t') {
       const pattern = argv[++i]
       if (pattern === undefined) throw new Error('-t needs a pattern after it')
-      // The one hazard of a two-token option: `-t bench/fuzz.bench.ts` is a
+      // The one hazard of a two-token option: `-t bench/suites/fuzz.bench.ts` is a
       // plausible typo, and it would eat the file as a pattern and then
       // silently measure every file instead of the one asked for. A pattern
       // that names a bench file is never what was meant.
@@ -562,38 +510,6 @@ function relativeSpread(values: readonly number[], centre: number): number {
 }
 
 /**
- * Identify the definition a case was measured under.
- *
- * A case is named, not numbered, which survives reordering — but a name says
- * nothing about the fixture behind it. Widening `128 chars` to 256 without
- * renaming it would otherwise report as a 2x regression. The fingerprint covers
- * the bench file and everything it shares, so any such edit is visible as an
- * edit rather than as a result.
- */
-const fingerprints = new Map<string, string>()
-function fingerprint(benchFile: string): string {
-  const cached = fingerprints.get(benchFile)
-  if (cached !== undefined) return cached
-
-  const hash = createHash('sha256')
-  for (const name of [benchFile, ...SHARED_SOURCES]) {
-    const path = join(PROJECT_DIR, name)
-    // Treating a missing file as empty content would fingerprint every case
-    // by the shared helpers alone, and then editing a fixture would no longer
-    // invalidate anything. If the path a case's name implies is not there,
-    // the assumption behind these names has broken and the fingerprint is
-    // worth nothing.
-    if (!existsSync(path)) {
-      throw new Error(`cannot fingerprint benchmark source: ${path}`)
-    }
-    hash.update(readFileSync(path))
-  }
-  const digest = hash.digest('hex').slice(0, 12)
-  fingerprints.set(benchFile, digest)
-  return digest
-}
-
-/**
  * The version actually installed, not the range asked for.
  *
  * A declaration can say `^0.28.0` while two checkouts run 0.28.1 and 0.28.4,
@@ -650,9 +566,9 @@ const describeEnvironment = (record: Partial<Environment>): string =>
  * controls.
  *
  * Resolved to real paths, rather than passed through. A positional argument is
- * a *substring* to the runner, so `compare.ts fuzz` runs `bench/fuzz.bench.ts`
+ * a *substring* to the runner, so `compare.ts fuzz` runs `bench/suites/fuzz.bench.ts`
  * perfectly well — and then every later use of that argument is comparing the
- * string "fuzz" against a stored case named `bench/fuzz.bench.ts > …`, which
+ * string "fuzz" against a stored case named `bench/suites/fuzz.bench.ts > …`, which
  * matches nothing. Recording is where that bites: the entries the re-record
  * exists to replace would be kept, because they did not look like they
  * belonged to the file being recorded. Matching the filter against the
@@ -663,16 +579,16 @@ const describeEnvironment = (record: Partial<Environment>): string =>
  * inside it, so they are never in this list.
  */
 function suiteFiles(filters: readonly string[]): string[] {
-  const all = readdirSync(BENCH_DIR)
+  const all = readdirSync(SUITES_DIR)
     .filter((entry) => entry.endsWith('.bench.ts'))
     // Interpolated, not `join`ed. What is being built here is an identity — the
     // same string the runner puts in a case's name and `baseline.json` stores — and
     // identities do not have a platform. `join` would spell it
-    // `bench\fuzz.bench.ts` on Windows, where it would match neither
+    // `bench\suites\fuzz.bench.ts` on Windows, where it would match neither
     // {@link CONTROL_FILE} on the next line, so the anchor would be measured as
     // a subject, nor anything {@link canonicalFile} produced, so a filter naming
     // a real file would be rejected as matching none.
-    .map((entry) => `bench/${entry}`)
+    .map((entry) => `bench/suites/${entry}`)
     .filter((file) => file !== CONTROL_FILE)
 
   if (all.length === 0) {
@@ -875,7 +791,7 @@ function runPass(
 /**
  * Flatten a runner report to `name -> timing`.
  *
- * `group.fullName` already reads `bench/distance.bench.ts > indelDistance`, so
+ * `group.fullName` already reads `bench/suites/distance.bench.ts > indelDistance`, so
  * it carries the file without the absolute path the report's `filepath` has.
  */
 function collect(report: RunnerReport): Map<string, Timing> {
@@ -1160,18 +1076,13 @@ function candidates(
  * The string the `-t` filter matches against.
  *
  * Not the name this script stores. The filter sees a case's group path and its
- * name with single spaces and never sees the file, so `bench/fuzz.bench.ts >
+ * name with single spaces and never sees the file, so `bench/suites/fuzz.bench.ts >
  * ratio > 8 chars` is `ratio 8 chars` to a pattern. Predicting the filter with
  * the stored name instead would quietly disagree with the run — `-t '^ratio'`
  * matches every case here and none there.
  */
 function taskName(name: string): string {
   return name.slice(name.indexOf(' > ') + 3).replaceAll(' > ', ' ')
-}
-
-/** The bench file a stored case came from — the first segment of its name. */
-function fileOf(name: string): string {
-  return name.slice(0, name.indexOf(' > '))
 }
 
 /**

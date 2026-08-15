@@ -13,7 +13,7 @@
  * a `charCodeAt` scan, which is how every scorer here reads its input.
  */
 
-import { describe, measure } from './tooling/harness.js'
+import { describe, measure } from '../harness/harness.js'
 
 /**
  * Somewhere for a result to go that the optimiser cannot prove is dead. Without

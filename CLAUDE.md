@@ -307,7 +307,7 @@ exports, so a new inference surface gets an unannotated `export const` there in
 the same change.
 
 Prepared search must not add a per-candidate cost to the text search path.
-`bench/process.bench.ts` is where that is noticed.
+`bench/suites/process.bench.ts` is where that is noticed.
 
 Shared infrastructure owns policy and metadata; an algorithm module declares
 algorithm facts and nothing else. A metric names itself once, as
@@ -356,8 +356,8 @@ layout exists to prevent.
 ## Benchmarks
 
 Read the `benchmarks` skill before running any `pnpm bench*` script, before
-editing a bench file or anything under `bench/tooling/`, and before quoting a
+editing a bench file or anything under `bench/harness/`, and before quoting a
 number. Two rules bite before it loads: a bench file is hashed into its own
 cases, so run `pnpm bench:compare` on it _before_ editing it, and the same holds
-for `bench/tooling/harness.ts`, `corpus.ts` and `runner.ts`, where any edit
+for `bench/harness/harness.ts`, `corpus.ts` and `runner.ts`, where any edit
 invalidates the entire baseline.

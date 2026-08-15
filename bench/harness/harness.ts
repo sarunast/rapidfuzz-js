@@ -8,7 +8,7 @@
  * transform sat between the measured code and V8: every ESM import rewritten
  * into namespace property access, constant folding defeated, and roughly 2.5x
  * added to every case body — asymmetrically, so an A/B across module layouts
- * lied. `bench/tooling/runner.ts` now bundles a run once with esbuild and executes it
+ * lied. `bench/harness/runner.ts` now bundles a run once with esbuild and executes it
  * in bare `node`: plain statically compiled JS with no runtime transform.
  * (Not the shipped `dist/` shape — tsdown emits that unbundled — but a stable
  * artifact free of the distortion, which is what regression numbers need.)

@@ -5,7 +5,7 @@ calculated, and how to reproduce them.
 
 Every number below comes from a single recorded pass of
 [`bench/comparison/run.mjs`](bench/comparison/run.mjs), plus one pass of the
-internal `bench/process.bench.ts` for the `Matcher` table. Rerunning replaces
+internal `bench/suites/process.bench.ts` for the `Matcher` table. Rerunning replaces
 all of them together; do not update one table from a later run.
 
 Two sections are exceptions, and both are marked as such:
@@ -262,7 +262,7 @@ normalization. The token-sort case gains most because tokenizing and sorting
 the `Matcher`. Plain `ratio` gains least because its reusable setup is a
 smaller share of the total work.
 
-See [`bench/process.bench.ts`](bench/process.bench.ts) for the paired cases and
+See [`bench/suites/process.bench.ts`](bench/suites/process.bench.ts) for the paired cases and
 the [README](README.md#one-query-or-many) for usage. The suite does not yet
 carry a one-shot partner for the normalized-edit `Matcher` case, so that family
 has no paired figure here.
@@ -782,12 +782,12 @@ this library faster or slower than its stored baseline. It covers distance
 metrics, edit operations, fuzzy scorers, one-shot search, `Matcher`
 construction and reuse, matrices, paired scoring, cutoffs, and Unicode cases.
 
-`bench/tooling/compare.ts` normalizes every result against control workloads
+`bench/regression/compare.ts` normalizes every result against control workloads
 measured before and after the suite. This reduces distortion from CPU
 frequency, background load, and thermal changes.
 
 Important fields in
-[`bench/tooling/baseline.json`](bench/tooling/baseline.json):
+[`bench/regression/baseline.json`](bench/regression/baseline.json):
 
 | Field                | Meaning                                                   |
 | -------------------- | --------------------------------------------------------- |
@@ -816,7 +816,7 @@ pnpm install
 
 ```sh
 pnpm bench:quick
-pnpm bench:quick bench/fuzz.bench.ts
+pnpm bench:quick bench/suites/fuzz.bench.ts
 pnpm bench:quick -t 'partialRatio'
 ```
 
