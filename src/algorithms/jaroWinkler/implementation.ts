@@ -22,8 +22,23 @@ import {
   withPreparedFlags,
 } from '../shared/scorerSupport.js'
 
-export interface JaroWinklerOptions extends ScorerOptions {
+interface JaroWinklerOptions extends ScorerOptions {
   prefixWeight?: number | undefined
+}
+
+function jaroCutoffFor(prefixSimilarity: number, scoreCutoff: number): number {
+  if (scoreCutoff <= 0.7) return scoreCutoff
+  if (prefixSimilarity >= 1) return 0.7
+  return Math.max(0.7, (prefixSimilarity - scoreCutoff) / (prefixSimilarity - 1))
+}
+
+function winklerBonus(
+  jaro: number,
+  prefixSimilarity: number,
+  scoreCutoff: number,
+): number {
+  const sim = jaro > 0.7 ? Math.min(jaro + prefixSimilarity * (1 - jaro), 1) : jaro
+  return sim >= scoreCutoff ? sim : 0
 }
 
 function similarity_(
@@ -33,23 +48,10 @@ function similarity_(
   scoreCutoff: number,
   prepared: PatternMask,
 ): number {
-  const prefix = Math.min(commonPrefix(s1, s2), 4)
-  let jaroCutoff = scoreCutoff
-  if (jaroCutoff > 0.7) {
-    const prefixSimilarity = prefix * prefixWeight
-    jaroCutoff =
-      prefixSimilarity >= 1
-        ? 0.7
-        : Math.max(0.7, (prefixSimilarity - jaroCutoff) / (prefixSimilarity - 1))
-  }
-  let sim = jaroSimilarityPrepared_(s1, prepared, s2, jaroCutoff)
-
-  if (sim > 0.7) {
-    sim += prefix * prefixWeight * (1 - sim)
-    sim = Math.min(sim, 1)
-  }
-
-  return sim >= scoreCutoff ? sim : 0
+  const prefixSimilarity = Math.min(commonPrefix(s1, s2), 4) * prefixWeight
+  const jaroCutoff = jaroCutoffFor(prefixSimilarity, scoreCutoff)
+  const jaro = jaroSimilarityPrepared_(s1, prepared, s2, jaroCutoff)
+  return winklerBonus(jaro, prefixSimilarity, scoreCutoff)
 }
 
 function directSimilarity(
@@ -61,18 +63,9 @@ function directSimilarity(
   if (prefixWeight > 1 || prefixWeight < 0) {
     throw new RangeError('prefix_weight has to be in the range 0.0 - 1.0')
   }
-  const prefix = Math.min(commonPrefix(s1, s2), 4)
-  let jaroCutoff = scoreCutoff
-  if (jaroCutoff > 0.7) {
-    const prefixSimilarity = prefix * prefixWeight
-    jaroCutoff =
-      prefixSimilarity >= 1
-        ? 0.7
-        : Math.max(0.7, (prefixSimilarity - jaroCutoff) / (prefixSimilarity - 1))
-  }
-  let sim = jaroSimilarity_(s1, s2, jaroCutoff)
-  if (sim > 0.7) sim = Math.min(sim + prefix * prefixWeight * (1 - sim), 1)
-  return sim >= scoreCutoff ? sim : 0
+  const prefixSimilarity = Math.min(commonPrefix(s1, s2), 4) * prefixWeight
+  const jaroCutoff = jaroCutoffFor(prefixSimilarity, scoreCutoff)
+  return winklerBonus(jaroSimilarity_(s1, s2, jaroCutoff), prefixSimilarity, scoreCutoff)
 }
 
 function jaroWinklerSimilarity_impl(
