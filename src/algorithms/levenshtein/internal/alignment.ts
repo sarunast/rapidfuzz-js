@@ -1,4 +1,4 @@
-import { preparePattern } from '../../shared/bitmask/pattern.js'
+import { preparePattern } from '../../bitmask/pattern.js'
 import {
   levenshteinMatrix,
   levenshteinMatrixBytes,

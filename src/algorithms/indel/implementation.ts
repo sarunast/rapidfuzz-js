@@ -1,5 +1,8 @@
 import { directMetric } from '../../core/scoring/builtIn/directMetric.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import { sharesAffix } from '../affix.js'
+import { wordCount } from '../bitmask/blockMasks.js'
+import type { PatternMask } from '../bitmask/pattern.js'
 import {
   lcsSeqEditops,
   lcsSeqLengthPrepared,
@@ -8,8 +11,6 @@ import {
   prepareLcsPattern,
   UNBOUNDED_MISSES,
 } from '../lcs/implementation.js'
-import { sharesAffix } from '../shared/affix.js'
-import { wordCount } from '../shared/bitmask/blockMasks.js'
 import type { Editops, Opcodes } from '../shared/editops/index.js'
 import {
   alignRepresentation,
@@ -64,7 +65,7 @@ function preparedDistanceWorthwhile(
 
 function distanceFromPrepared(
   query: ArrayLike<unknown>,
-  pattern: import('../shared/bitmask/pattern.js').PatternMask,
+  pattern: PatternMask,
   choice: ArrayLike<unknown>,
   scoreCutoff: number,
 ): number {
@@ -107,7 +108,7 @@ export function indelOpcodes(s1: Sequence, s2: Sequence): Opcodes {
 function prepareIndel(kind: MetricScoreKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
-    let pattern: import('../shared/bitmask/pattern.js').PatternMask | null = null
+    let pattern: PatternMask | null = null
     const preparedDistance = (b: ArrayLike<unknown>, cutoff: number): number => {
       if (!preparedDistanceWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
         return distance_(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)

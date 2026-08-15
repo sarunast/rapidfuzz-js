@@ -1,4 +1,4 @@
-import { commonSuffix } from '../shared/affix.js'
+import { commonSuffix } from '../affix.js'
 import {
   validateSequence,
   convPair,

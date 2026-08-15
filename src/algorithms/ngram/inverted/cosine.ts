@@ -2,9 +2,9 @@ import type {
   ChoiceIndex,
   ChoiceIndexBuilder,
   SelectedChoices,
-} from '../../../../core/scoring/choiceIndex.js'
-import { convSequence } from '../../../../core/sequence.js'
-import type { Sequence } from '../../../../core/types.js'
+} from '../../../core/scoring/choiceIndex.js'
+import { convSequence } from '../../../core/sequence.js'
+import type { Sequence } from '../../../core/types.js'
 import { NGramIndexBuilder, type SealedIndex } from './builder.js'
 import { extractGrams } from './keys.js'
 import {
@@ -19,23 +19,46 @@ import {
   zeroesQualify,
 } from './query.js'
 
-export function assertDiceAccumulatorExact(gramCount: number): void {
-  if (gramCount > 0x7fff_ffff) {
-    throw new RangeError('a query of more than 2147483647 grams cannot be indexed')
+export function assertCosineExact(queryGrams: number, maxChoiceGrams: number): void {
+  if (queryGrams * maxChoiceGrams > Number.MAX_SAFE_INTEGER) {
+    throw new RangeError(
+      'a cosine query of this many grams cannot be scored exactly against a choice this long',
+    )
   }
 }
 
-class DiceIndex implements ChoiceIndex {
-  private readonly state = new QueryState()
-  private readonly accumulator: Int32Array
+export function assertCosineNormsExact(
+  querySquaredNorm: number,
+  maxSquaredNorm: number,
+): void {
+  if (
+    querySquaredNorm > Number.MAX_SAFE_INTEGER ||
+    maxSquaredNorm > Number.MAX_SAFE_INTEGER
+  ) {
+    throw new RangeError(
+      'a cosine query with grams repeated this often cannot be scored exactly against this corpus',
+    )
+  }
+}
 
-  constructor(private readonly sealed: SealedIndex<null>) {
-    this.accumulator = new Int32Array(sealed.choiceCount)
+function clamp(similarity: number): number {
+  return similarity < 1 ? similarity : 1
+}
+
+class CosineIndex implements ChoiceIndex {
+  private readonly state = new QueryState()
+  private readonly accumulator: Float64Array
+
+  constructor(private readonly sealed: SealedIndex<Float64Array>) {
+    this.accumulator = new Float64Array(sealed.choiceCount)
   }
 
   private begin(query: Sequence): ArrayLike<unknown> {
     const elements = convSequence(query)
-    assertDiceAccumulatorExact(elements.length - this.sealed.gramSize + 1)
+    assertCosineExact(
+      elements.length - this.sealed.gramSize + 1,
+      this.sealed.maxGramCount,
+    )
     return elements
   }
 
@@ -51,8 +74,15 @@ class DiceIndex implements ChoiceIndex {
     if (elements.length < sealed.gramSize) {
       return gramlessResult(sealed, state, elements, threshold, limit, false)
     }
-    const queryGrams = elements.length - sealed.gramSize + 1
-    extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
+    const querySquaredNorm = extractGrams(
+      elements,
+      sealed.gramSize,
+      sealed.radix,
+      false,
+      state.keys,
+      state.counts,
+    )
+    assertCosineNormsExact(querySquaredNorm, sealed.maxSquaredNorm)
     this.accumulate()
     const room = roomFor(limit, sealed.choiceCount)
     state.reserve(room)
@@ -60,7 +90,7 @@ class DiceIndex implements ChoiceIndex {
       sealed,
       state,
       this.accumulator,
-      this.top(queryGrams, threshold, room),
+      this.top(querySquaredNorm, threshold, room),
       threshold,
       room,
     )
@@ -83,8 +113,15 @@ class DiceIndex implements ChoiceIndex {
     if (elements.length < sealed.gramSize) {
       return gramlessResult(sealed, state, elements, threshold, null, ascending)
     }
-    const queryGrams = elements.length - sealed.gramSize + 1
-    extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
+    const querySquaredNorm = extractGrams(
+      elements,
+      sealed.gramSize,
+      sealed.radix,
+      false,
+      state.keys,
+      state.counts,
+    )
+    assertCosineNormsExact(querySquaredNorm, sealed.maxSquaredNorm)
     this.accumulate()
     const everyChoice = state.scannedAll || zeroesQualify(threshold)
     const source = everyChoice ? null : ascending ? sortTouched(state) : state.touched
@@ -93,16 +130,18 @@ class DiceIndex implements ChoiceIndex {
     const ids = state.ids
     const scores = state.scores
     const accumulator = this.accumulator
-    const choiceGramCounts = sealed.gramCount
+    const squaredNorm = sealed.squaredNorm
     const base = state.base
     let length = 0
     for (let index = 0; index < total; index++) {
       const id = source === null ? index : source[index]
-      const choiceGrams = choiceGramCounts[id]
+      const choiceSquaredNorm = squaredNorm[id]
       const score =
-        choiceGrams === 0
+        choiceSquaredNorm === 0
           ? 0
-          : (2 * (base + accumulator[id])) / (queryGrams + choiceGrams)
+          : clamp(
+              (base + accumulator[id]) / Math.sqrt(querySquaredNorm * choiceSquaredNorm),
+            )
       if (threshold !== null && score < threshold) continue
       ids[length] = id
       scores[length] = score
@@ -134,25 +173,23 @@ class DiceIndex implements ChoiceIndex {
       const from = offsets[ordinal]
       const upto = offsets[ordinal + 1]
       if (dense !== null && dense[ordinal] === 1) {
-        state.base += 1
+        state.base += queryCount
         if (postingCounts === null) {
-          for (let at = from; at < upto; at++) accumulator[ids[at]] -= 1
+          for (let at = from; at < upto; at++) accumulator[ids[at]] -= queryCount
           continue
         }
         for (let at = from; at < upto; at++) {
-          const count = postingCounts[at]
-          accumulator[ids[at]] += (queryCount < count ? queryCount : count) - 1
+          accumulator[ids[at]] += queryCount * (postingCounts[at] - 1)
         }
         continue
       }
       if (!tracking) {
         if (postingCounts === null) {
-          for (let at = from; at < upto; at++) accumulator[ids[at]] += 1
+          for (let at = from; at < upto; at++) accumulator[ids[at]] += queryCount
           continue
         }
         for (let at = from; at < upto; at++) {
-          const count = postingCounts[at]
-          accumulator[ids[at]] += queryCount < count ? queryCount : count
+          accumulator[ids[at]] += queryCount * postingCounts[at]
         }
         continue
       }
@@ -160,26 +197,25 @@ class DiceIndex implements ChoiceIndex {
         for (let at = from; at < upto; at++) {
           const id = ids[at]
           if (accumulator[id] === 0) touched.push(id)
-          accumulator[id] += 1
+          accumulator[id] += queryCount
         }
         continue
       }
       for (let at = from; at < upto; at++) {
         const id = ids[at]
         if (accumulator[id] === 0) touched.push(id)
-        const count = postingCounts[at]
-        accumulator[id] += queryCount < count ? queryCount : count
+        accumulator[id] += queryCount * postingCounts[at]
       }
     }
   }
 
-  private top(queryGrams: number, threshold: number | null, room: number): number {
+  private top(querySquaredNorm: number, threshold: number | null, room: number): number {
     if (room === 0) return 0
     const sealed = this.sealed
     const state = this.state
     const touched = state.touched
     const accumulator = this.accumulator
-    const choiceGramCounts = sealed.gramCount
+    const squaredNorm = sealed.squaredNorm
     const base = state.base
     const everyChoice = state.scannedAll
     const total = everyChoice ? sealed.choiceCount : touched.length
@@ -188,11 +224,13 @@ class DiceIndex implements ChoiceIndex {
     let length = 0
     for (let index = 0; index < total; index++) {
       const id = everyChoice ? index : touched[index]
-      const choiceGrams = choiceGramCounts[id]
+      const choiceSquaredNorm = squaredNorm[id]
       const score =
-        choiceGrams === 0
+        choiceSquaredNorm === 0
           ? 0
-          : (2 * (base + accumulator[id])) / (queryGrams + choiceGrams)
+          : clamp(
+              (base + accumulator[id]) / Math.sqrt(querySquaredNorm * choiceSquaredNorm),
+            )
       if (threshold !== null && score < threshold) continue
       let at = length
       if (at === room) {
@@ -225,10 +263,10 @@ class DiceIndex implements ChoiceIndex {
   }
 }
 
-export function createDiceIndexBuilder(gramSize: number): ChoiceIndexBuilder {
+export function createCosineIndexBuilder(gramSize: number): ChoiceIndexBuilder {
   return new NGramIndexBuilder(
     gramSize,
-    () => null,
-    (sealed) => new DiceIndex(sealed),
+    (values) => Float64Array.from(values),
+    (sealed) => new CosineIndex(sealed),
   )
 }

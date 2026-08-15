@@ -13,8 +13,8 @@ import {
   prepareChoiceSequence,
 } from '../../core/scoring/builtIn/preparation.js'
 import { convSequence } from '../../core/sequence.js'
+import { sharesAffix } from '../affix.js'
 import { prefixDistance } from '../prefix/implementation.js'
-import { sharesAffix } from './affix.js'
 
 it('treats mixed string and array representations as worth aligning', () => {
   const text = 'a'.repeat(64)

@@ -8,7 +8,7 @@ import {
   METRICS,
   pairs,
   THRESHOLDS,
-} from '../../../../../testing/invertedIndex.js'
+} from '../../../../testing/invertedIndex.js'
 
 describe('choices and queries with no grams', () => {
   it('scores an equal gramless pair 1 and everything else 0', () => {

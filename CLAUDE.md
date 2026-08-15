@@ -229,17 +229,18 @@ Source ownership follows dependency direction, guarded in `tests/architecture/`:
   ```
 
 - Each algorithm directory owns its public metric, compilation, preparation and
-  hot kernels. Shared algorithm code is limited to proven low-level data
-  structures under `algorithms/shared/`. Where one grows past a single file it
-  becomes a directory of peer modules with no barrel, imported file by file —
-  `shared/bitmask/`, and `shared/ngram/`, whose layers run
-  `key -> packing -> profile -> compare -> kernel` with the optional inverted
-  index in `ngram/inverted/` built on top and never reached back into.
-  `tests/architecture/imports.test.ts` pins both directory listings and that
-  direction. `shared/editops/` is the one directory there with a barrel, and
-  deliberately: it is a representation facade — `Editops`, `Opcodes`, their
-  types and the constructor helper are one thing to import — where `ngram/`'s
-  file-by-file import _is_ its dependency architecture.
+  hot kernels. Below them sit the **algorithm foundations** — `affix.ts`,
+  `bitmask/`, `ngram/` — proven low-level data structures that a public
+  algorithm may depend on and that must never depend back. They have no
+  `index.ts` and therefore no published subpath, which is what tells
+  `imports.test.ts` they are foundations rather than a thirteenth algorithm; a
+  separate rule fails an edge from one of them into any published directory.
+  Where a foundation grows past a single file it becomes a directory of peer
+  modules with no barrel, imported file by file — `bitmask/`, and `ngram/`,
+  whose layers run `key -> packing -> profile -> compare -> kernel` with the
+  optional inverted index in `ngram/inverted/` built on top and never reached
+  back into. `tests/architecture/imports.test.ts` pins both directory listings
+  and that direction.
 - **The algorithms are not all peers.** Three are defined on another, so three
   cross-algorithm edges exist and are allowed by name: `indel -> lcs`
   (Indel distance is `|a| + |b| - 2·LCS`), `jaroWinkler -> jaro` (Jaro plus a

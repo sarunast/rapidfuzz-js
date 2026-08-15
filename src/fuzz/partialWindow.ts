@@ -1,11 +1,11 @@
+import { checkedStartGeneration } from '../algorithms/bitmask/blockMasks.js'
+import type { PatternMask } from '../algorithms/bitmask/pattern.js'
 import {
   lcsSeqLengthPrepared,
   lcsSeqLengthPreparedBounded,
   lcsSeqLengthRange,
   prepareLcsPattern,
 } from '../algorithms/lcs/implementation.js'
-import { checkedStartGeneration } from '../algorithms/shared/bitmask/blockMasks.js'
-import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
 import {
   validateSequence,
   convPair,

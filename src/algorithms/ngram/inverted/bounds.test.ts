@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { indexOf, pairs } from '../../../../../testing/invertedIndex.js'
-import { createScorer } from '../../../../core/scoring/scorer.js'
-import { similarity as diceSimilarity } from '../../../dice/index.js'
+import { indexOf, pairs } from '../../../../testing/invertedIndex.js'
+import { createScorer } from '../../../core/scoring/scorer.js'
+import { similarity as diceSimilarity } from '../../dice/index.js'
 import { assertAddressable } from './builder.js'
 import { assertCosineExact, assertCosineNormsExact } from './cosine.js'
 import { assertDiceAccumulatorExact, createDiceIndexBuilder } from './dice.js'

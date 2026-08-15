@@ -1,7 +1,7 @@
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import { commonPrefix } from '../affix.js'
+import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
 import { jaroSimilarity_, jaroSimilarityPrepared_ } from '../jaro/implementation.js'
-import { commonPrefix } from '../shared/affix.js'
-import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
   validateSequence,

@@ -14,7 +14,7 @@ import {
   pairs,
   QUERIES,
   THRESHOLDS,
-} from '../../../../../testing/invertedIndex.js'
+} from '../../../../testing/invertedIndex.js'
 
 describe('an indexed search answers what the exhaustive one does', () => {
   it('matches key, score and order across the whole matrix', () => {

@@ -1,8 +1,8 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
-import { referenceDot, referenceShared } from '../../../../testing/reference/ngram.js'
-import { Dice } from '../../../../testing/scorers.js'
+import { referenceDot, referenceShared } from '../../../testing/reference/ngram.js'
+import { Dice } from '../../../testing/scorers.js'
 import { directSharedFrequency, dotProduct, sharedFrequency } from './compare.js'
 import { buildProfile, profileOfElements } from './profile.js'
 

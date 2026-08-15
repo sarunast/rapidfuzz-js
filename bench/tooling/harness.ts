@@ -35,11 +35,11 @@
 import { writeFileSync } from 'node:fs'
 import process from 'node:process'
 
+import { resetBitVectorScratch } from '../../src/algorithms/bitmask/blockMasks.js'
 import { resetDamerauScratch } from '../../src/algorithms/damerauLevenshtein/implementation.js'
 import { resetJaroScratch } from '../../src/algorithms/jaro/implementation.js'
 import { resetWeightedScratch } from '../../src/algorithms/levenshtein/internal/scratch.js'
 import { resetOsaScratch } from '../../src/algorithms/osa/internal/kernel.js'
-import { resetBitVectorScratch } from '../../src/algorithms/shared/bitmask/blockMasks.js'
 
 /** The subset of measurement options a case may override. */
 export interface MeasureOptions {

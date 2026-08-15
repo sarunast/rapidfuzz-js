@@ -2,9 +2,9 @@ import type {
   ChoiceIndex,
   ChoiceIndexBuilder,
   SelectedChoices,
-} from '../../../../core/scoring/choiceIndex.js'
-import { convSequence } from '../../../../core/sequence.js'
-import type { Sequence } from '../../../../core/types.js'
+} from '../../../core/scoring/choiceIndex.js'
+import { convSequence } from '../../../core/sequence.js'
+import type { Sequence } from '../../../core/types.js'
 import { NGramIndexBuilder, type SealedIndex } from './builder.js'
 import { extractGrams } from './keys.js'
 import {
@@ -19,46 +19,23 @@ import {
   zeroesQualify,
 } from './query.js'
 
-export function assertCosineExact(queryGrams: number, maxChoiceGrams: number): void {
-  if (queryGrams * maxChoiceGrams > Number.MAX_SAFE_INTEGER) {
-    throw new RangeError(
-      'a cosine query of this many grams cannot be scored exactly against a choice this long',
-    )
+export function assertDiceAccumulatorExact(gramCount: number): void {
+  if (gramCount > 0x7fff_ffff) {
+    throw new RangeError('a query of more than 2147483647 grams cannot be indexed')
   }
 }
 
-export function assertCosineNormsExact(
-  querySquaredNorm: number,
-  maxSquaredNorm: number,
-): void {
-  if (
-    querySquaredNorm > Number.MAX_SAFE_INTEGER ||
-    maxSquaredNorm > Number.MAX_SAFE_INTEGER
-  ) {
-    throw new RangeError(
-      'a cosine query with grams repeated this often cannot be scored exactly against this corpus',
-    )
-  }
-}
-
-function clamp(similarity: number): number {
-  return similarity < 1 ? similarity : 1
-}
-
-class CosineIndex implements ChoiceIndex {
+class DiceIndex implements ChoiceIndex {
   private readonly state = new QueryState()
-  private readonly accumulator: Float64Array
+  private readonly accumulator: Int32Array
 
-  constructor(private readonly sealed: SealedIndex<Float64Array>) {
-    this.accumulator = new Float64Array(sealed.choiceCount)
+  constructor(private readonly sealed: SealedIndex<null>) {
+    this.accumulator = new Int32Array(sealed.choiceCount)
   }
 
   private begin(query: Sequence): ArrayLike<unknown> {
     const elements = convSequence(query)
-    assertCosineExact(
-      elements.length - this.sealed.gramSize + 1,
-      this.sealed.maxGramCount,
-    )
+    assertDiceAccumulatorExact(elements.length - this.sealed.gramSize + 1)
     return elements
   }
 
@@ -74,15 +51,8 @@ class CosineIndex implements ChoiceIndex {
     if (elements.length < sealed.gramSize) {
       return gramlessResult(sealed, state, elements, threshold, limit, false)
     }
-    const querySquaredNorm = extractGrams(
-      elements,
-      sealed.gramSize,
-      sealed.radix,
-      false,
-      state.keys,
-      state.counts,
-    )
-    assertCosineNormsExact(querySquaredNorm, sealed.maxSquaredNorm)
+    const queryGrams = elements.length - sealed.gramSize + 1
+    extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
     this.accumulate()
     const room = roomFor(limit, sealed.choiceCount)
     state.reserve(room)
@@ -90,7 +60,7 @@ class CosineIndex implements ChoiceIndex {
       sealed,
       state,
       this.accumulator,
-      this.top(querySquaredNorm, threshold, room),
+      this.top(queryGrams, threshold, room),
       threshold,
       room,
     )
@@ -113,15 +83,8 @@ class CosineIndex implements ChoiceIndex {
     if (elements.length < sealed.gramSize) {
       return gramlessResult(sealed, state, elements, threshold, null, ascending)
     }
-    const querySquaredNorm = extractGrams(
-      elements,
-      sealed.gramSize,
-      sealed.radix,
-      false,
-      state.keys,
-      state.counts,
-    )
-    assertCosineNormsExact(querySquaredNorm, sealed.maxSquaredNorm)
+    const queryGrams = elements.length - sealed.gramSize + 1
+    extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
     this.accumulate()
     const everyChoice = state.scannedAll || zeroesQualify(threshold)
     const source = everyChoice ? null : ascending ? sortTouched(state) : state.touched
@@ -130,18 +93,16 @@ class CosineIndex implements ChoiceIndex {
     const ids = state.ids
     const scores = state.scores
     const accumulator = this.accumulator
-    const squaredNorm = sealed.squaredNorm
+    const choiceGramCounts = sealed.gramCount
     const base = state.base
     let length = 0
     for (let index = 0; index < total; index++) {
       const id = source === null ? index : source[index]
-      const choiceSquaredNorm = squaredNorm[id]
+      const choiceGrams = choiceGramCounts[id]
       const score =
-        choiceSquaredNorm === 0
+        choiceGrams === 0
           ? 0
-          : clamp(
-              (base + accumulator[id]) / Math.sqrt(querySquaredNorm * choiceSquaredNorm),
-            )
+          : (2 * (base + accumulator[id])) / (queryGrams + choiceGrams)
       if (threshold !== null && score < threshold) continue
       ids[length] = id
       scores[length] = score
@@ -173,23 +134,25 @@ class CosineIndex implements ChoiceIndex {
       const from = offsets[ordinal]
       const upto = offsets[ordinal + 1]
       if (dense !== null && dense[ordinal] === 1) {
-        state.base += queryCount
+        state.base += 1
         if (postingCounts === null) {
-          for (let at = from; at < upto; at++) accumulator[ids[at]] -= queryCount
+          for (let at = from; at < upto; at++) accumulator[ids[at]] -= 1
           continue
         }
         for (let at = from; at < upto; at++) {
-          accumulator[ids[at]] += queryCount * (postingCounts[at] - 1)
+          const count = postingCounts[at]
+          accumulator[ids[at]] += (queryCount < count ? queryCount : count) - 1
         }
         continue
       }
       if (!tracking) {
         if (postingCounts === null) {
-          for (let at = from; at < upto; at++) accumulator[ids[at]] += queryCount
+          for (let at = from; at < upto; at++) accumulator[ids[at]] += 1
           continue
         }
         for (let at = from; at < upto; at++) {
-          accumulator[ids[at]] += queryCount * postingCounts[at]
+          const count = postingCounts[at]
+          accumulator[ids[at]] += queryCount < count ? queryCount : count
         }
         continue
       }
@@ -197,25 +160,26 @@ class CosineIndex implements ChoiceIndex {
         for (let at = from; at < upto; at++) {
           const id = ids[at]
           if (accumulator[id] === 0) touched.push(id)
-          accumulator[id] += queryCount
+          accumulator[id] += 1
         }
         continue
       }
       for (let at = from; at < upto; at++) {
         const id = ids[at]
         if (accumulator[id] === 0) touched.push(id)
-        accumulator[id] += queryCount * postingCounts[at]
+        const count = postingCounts[at]
+        accumulator[id] += queryCount < count ? queryCount : count
       }
     }
   }
 
-  private top(querySquaredNorm: number, threshold: number | null, room: number): number {
+  private top(queryGrams: number, threshold: number | null, room: number): number {
     if (room === 0) return 0
     const sealed = this.sealed
     const state = this.state
     const touched = state.touched
     const accumulator = this.accumulator
-    const squaredNorm = sealed.squaredNorm
+    const choiceGramCounts = sealed.gramCount
     const base = state.base
     const everyChoice = state.scannedAll
     const total = everyChoice ? sealed.choiceCount : touched.length
@@ -224,13 +188,11 @@ class CosineIndex implements ChoiceIndex {
     let length = 0
     for (let index = 0; index < total; index++) {
       const id = everyChoice ? index : touched[index]
-      const choiceSquaredNorm = squaredNorm[id]
+      const choiceGrams = choiceGramCounts[id]
       const score =
-        choiceSquaredNorm === 0
+        choiceGrams === 0
           ? 0
-          : clamp(
-              (base + accumulator[id]) / Math.sqrt(querySquaredNorm * choiceSquaredNorm),
-            )
+          : (2 * (base + accumulator[id])) / (queryGrams + choiceGrams)
       if (threshold !== null && score < threshold) continue
       let at = length
       if (at === room) {
@@ -263,10 +225,10 @@ class CosineIndex implements ChoiceIndex {
   }
 }
 
-export function createCosineIndexBuilder(gramSize: number): ChoiceIndexBuilder {
+export function createDiceIndexBuilder(gramSize: number): ChoiceIndexBuilder {
   return new NGramIndexBuilder(
     gramSize,
-    (values) => Float64Array.from(values),
-    (sealed) => new CosineIndex(sealed),
+    () => null,
+    (sealed) => new DiceIndex(sealed),
   )
 }

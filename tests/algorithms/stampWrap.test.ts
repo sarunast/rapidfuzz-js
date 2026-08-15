@@ -14,6 +14,7 @@
 // effect checked.
 import { describe, expect, it } from 'vitest'
 
+import { resetBitVectorScratch } from '../../src/algorithms/bitmask/blockMasks.js'
 import {
   damerauLevenshteinDistance,
   resetDamerauScratch,
@@ -21,7 +22,6 @@ import {
 import { indelDistance } from '../../src/algorithms/indel/implementation.js'
 import { lcsSeqNormalizedSimilarity } from '../../src/algorithms/lcs/implementation.js'
 import { levenshteinDistance } from '../../src/algorithms/levenshtein/metric.js'
-import { resetBitVectorScratch } from '../../src/algorithms/shared/bitmask/blockMasks.js'
 import { fuzzPartialRatio } from '../../src/fuzz/partialRatio.js'
 import {
   partialRatioAlignment_impl,

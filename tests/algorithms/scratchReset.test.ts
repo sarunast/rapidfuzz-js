@@ -20,6 +20,10 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  maskPoolOf,
+  resetBitVectorScratch,
+} from '../../src/algorithms/bitmask/blockMasks.js'
+import {
   damerauLevenshteinDistance,
   resetDamerauScratch,
 } from '../../src/algorithms/damerauLevenshtein/implementation.js'
@@ -40,10 +44,6 @@ import {
   osaRetainedBytes,
   resetOsaScratch,
 } from '../../src/algorithms/osa/internal/kernel.js'
-import {
-  maskPoolOf,
-  resetBitVectorScratch,
-} from '../../src/algorithms/shared/bitmask/blockMasks.js'
 import { matrixScores } from '../../testing/scoreMatrix.js'
 
 function resetAll(): void {

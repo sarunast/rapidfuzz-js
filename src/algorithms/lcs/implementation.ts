@@ -1,7 +1,7 @@
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import { commonAffix, sharesAffix } from '../shared/affix.js'
-import { UNBOUNDED_MISSES, wordCount } from '../shared/bitmask/blockMasks.js'
-import { preparePattern } from '../shared/bitmask/pattern.js'
+import { commonAffix, sharesAffix } from '../affix.js'
+import { UNBOUNDED_MISSES, wordCount } from '../bitmask/blockMasks.js'
+import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
 import { lcsSeqMatrix, rowBitSet } from '../shared/bitParallel.js'
 import {
   editopsFromValidated,
@@ -209,7 +209,7 @@ export function lcsSeqOpcodes(s1: Sequence, s2: Sequence): Opcodes {
 function prepareLcs(kind: MetricScoreKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
-    let pattern: import('../shared/bitmask/pattern.js').PatternMask | null = null
+    let pattern: PatternMask | null = null
     const length = (b: ArrayLike<unknown>, cutoff: number): number => {
       if (!preparedLengthWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
         return boundedLength(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)

@@ -59,6 +59,26 @@ function sourceImports(path: string): string[] {
   return imports
 }
 
+// The public subpaths, and the one list two rules read: reachability walks
+// from them, and `algorithmDirectory` derives from them what counts as a
+// public algorithm directory.
+const ENTRYPOINTS: readonly string[] = [
+  'index.ts',
+  'fuzz/index.ts',
+  'algorithms/cosine/index.ts',
+  'algorithms/damerauLevenshtein/index.ts',
+  'algorithms/dice/index.ts',
+  'algorithms/hamming/index.ts',
+  'algorithms/indel/index.ts',
+  'algorithms/jaro/index.ts',
+  'algorithms/jaroWinkler/index.ts',
+  'algorithms/lcs/index.ts',
+  'algorithms/levenshtein/index.ts',
+  'algorithms/osa/index.ts',
+  'algorithms/postfix/index.ts',
+  'algorithms/prefix/index.ts',
+]
+
 describe('dependency direction', () => {
   // Everything below reads specifiers off disk without resolving them, so a
   // typo silently drops an edge instead of failing: the cycle walk sees one
@@ -198,22 +218,7 @@ describe('dependency direction', () => {
   })
 
   it('keeps every source module reachable from a public entrypoint', () => {
-    const entries = [
-      'index.ts',
-      'fuzz/index.ts',
-      'algorithms/cosine/index.ts',
-      'algorithms/damerauLevenshtein/index.ts',
-      'algorithms/dice/index.ts',
-      'algorithms/hamming/index.ts',
-      'algorithms/indel/index.ts',
-      'algorithms/jaro/index.ts',
-      'algorithms/jaroWinkler/index.ts',
-      'algorithms/lcs/index.ts',
-      'algorithms/levenshtein/index.ts',
-      'algorithms/osa/index.ts',
-      'algorithms/postfix/index.ts',
-      'algorithms/prefix/index.ts',
-    ].map((path) => join(source, path))
+    const entries = ENTRYPOINTS.map((path) => join(source, path))
     const reachable = new Set<string>()
     const visit = (path: string): void => {
       if (reachable.has(path)) return
@@ -237,11 +242,22 @@ describe('dependency direction', () => {
     'levenshtein -> lcs',
   ]
 
+  // A public algorithm directory is one with a published subpath, derived from
+  // the entrypoint list rather than named again here. The foundations —
+  // `affix.ts`, `bitmask/`, `ngram/` — have no `index.ts` and are therefore not
+  // algorithms for the purposes of the cross-algorithm rule below; the rule
+  // after it is what governs them instead.
+  const ALGORITHM_DIRECTORIES: readonly string[] = ENTRYPOINTS.filter((path) =>
+    path.startsWith('algorithms/'),
+  ).map((path) => path.split('/')[1] ?? '')
+
+  const ALGORITHM_FOUNDATIONS: readonly string[] = ['affix.ts', 'bitmask', 'ngram']
+
   function algorithmDirectory(path: string): string | null {
     const within = relative(join(source, 'algorithms'), path)
     if (within.startsWith('..') || !within.includes(sep)) return null
-    const top = within.split(sep)[0]
-    return top === 'shared' ? null : (top ?? null)
+    const top = within.split(sep)[0] ?? ''
+    return ALGORITHM_DIRECTORIES.includes(top) ? top : null
   }
 
   it('lets an algorithm depend only on the foundations it is defined on', () => {
@@ -262,6 +278,30 @@ describe('dependency direction', () => {
     }
     expect(crossings).toEqual([])
     expect([...seen].sort()).toEqual([...FOUNDATION_EDGES].sort())
+  })
+
+  // The other half of the rule above, and what keeps its silence about the
+  // foundations from being three unstated exemptions. `affix.ts`, `bitmask/`
+  // and `ngram/` are below the algorithms built on them: an edge back up would
+  // be caught by nothing otherwise, because `algorithmDirectory` answers null
+  // for their own files.
+  it('keeps the algorithm foundations below the algorithms built on them', () => {
+    const roots = ALGORITHM_FOUNDATIONS.map((name) => join(source, 'algorithms', name))
+    const inFoundation = (path: string): boolean =>
+      roots.some((root) => path === root || path.startsWith(`${root}${sep}`))
+
+    expect(
+      typeScriptFiles(join(source, 'algorithms'))
+        .filter(inFoundation)
+        .flatMap((path) =>
+          sourceImports(path)
+            .filter((dependency) => algorithmDirectory(dependency) !== null)
+            .map(
+              (dependency) =>
+                `${relative(source, path)} -> ${relative(source, dependency)}`,
+            ),
+        ),
+    ).toEqual([])
   })
 
   it('keeps Levenshtein internals below its public orchestration modules', () => {
@@ -292,7 +332,7 @@ describe('dependency direction', () => {
   })
 
   it('keeps shared bitmask code representation-only', () => {
-    const directory = join(source, 'algorithms/shared/bitmask')
+    const directory = join(source, 'algorithms/bitmask')
     expect(shippedEntries(directory)).toEqual([
       'blockMasks.ts',
       'lookup.ts',
@@ -301,7 +341,7 @@ describe('dependency direction', () => {
   })
 
   it('keeps the n-gram subsystem laid out as its layers', () => {
-    const ngram = join(source, 'algorithms/shared/ngram')
+    const ngram = join(source, 'algorithms/ngram')
     expect(shippedEntries(ngram)).toEqual([
       'README.md',
       'compare.ts',
@@ -325,7 +365,7 @@ describe('dependency direction', () => {
     // The inverted index is an optional acceleration strategy over n-gram
     // semantics, never the foundation: a profile, a comparison or a prepared
     // kernel that reached into `inverted/` would invert that.
-    const ngram = join(source, 'algorithms/shared/ngram')
+    const ngram = join(source, 'algorithms/ngram')
     const inverted = join(ngram, 'inverted')
     const semantics = typeScriptFiles(ngram).filter(
       (path) => !path.startsWith(`${inverted}${sep}`),
@@ -346,7 +386,7 @@ describe('dependency direction', () => {
     // The other direction of the rule above, and the stronger half: the index
     // reaches back into `ngram/` for the key arithmetic and nothing else, so it
     // shares an encoding with the profiles without sharing a representation.
-    const ngram = join(source, 'algorithms/shared/ngram')
+    const ngram = join(source, 'algorithms/ngram')
     const inverted = join(ngram, 'inverted')
     const permitted = join(ngram, 'key.ts')
     expect(
@@ -370,7 +410,7 @@ describe('dependency direction', () => {
     // Both are leaves by construction — one is integer arithmetic over a radix
     // ladder, the other reads a single option — and an edge out of either is
     // the first sign that policy has leaked into them.
-    const ngram = join(source, 'algorithms/shared/ngram')
+    const ngram = join(source, 'algorithms/ngram')
     expect(sourceImports(join(ngram, 'key.ts'))).toEqual([])
     expect(sourceImports(join(ngram, 'gramSize.ts'))).toEqual([])
   })

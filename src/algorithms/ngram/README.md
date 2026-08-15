@@ -1,9 +1,12 @@
-# `shared/ngram/`
+# `algorithms/ngram/`
 
-Infrastructure shared by the Dice and Cosine metrics. **Not a metric itself** —
-nothing here is exported from a public entry point, and `algorithms/dice/` and
-`algorithms/cosine/` are the only consumers. It lives under `shared/` for the
-same reason `shared/bitmask/` does: two algorithms need it and neither owns it.
+An **algorithm foundation**, not a metric family. Nothing here is exported from
+a public entry point; `algorithms/dice/` and `algorithms/cosine/` are the only
+consumers, and it depends on nothing under `algorithms/` itself. That is what
+its position states — it sits beside the public algorithms because it is below
+them, in the same layer as `algorithms/bitmask/` and `algorithms/affix.ts`, and
+`tests/architecture/imports.test.ts` fails an edge from here into any of the
+twelve published directories.
 
 Both metrics reduce to one question — _how many grams do these two sequences
 share?_ — differing only in how a shared gram is scored:
@@ -17,7 +20,7 @@ Everything here exists to answer that numerator quickly, at three different
 lifetimes, over element types ranging from Latin-1 characters to arbitrary
 objects.
 
-There is no barrel. Import the file you need, as every `shared/bitmask/`
+There is no barrel. Import the file you need, as every `algorithms/bitmask/`
 consumer already does.
 
 ---
@@ -61,11 +64,10 @@ inverted/dice      → inverted/keys, inverted/builder, inverted/query
 inverted/cosine    → inverted/keys, inverted/builder, inverted/query
 ```
 
-Outward, the subsystem reaches only `shared/sequence` (for `convSequence` and
-`elementsEqual`) and `core/` — `core/types` for `Sequence`, and
-`core/scoring/choiceIndex` for the `ChoiceIndex`/`ChoiceIndexBuilder` protocol
-the index implements. It imports no
-algorithm, and nothing imports it except `algorithms/dice/` and
+Outward, the subsystem reaches only `core/` — `core/sequence` for `convSequence`
+and `elementsEqual`, `core/types` for `Sequence`, and `core/scoring/choiceIndex`
+for the `ChoiceIndex`/`ChoiceIndexBuilder` protocol the index implements. It
+imports no algorithm, and nothing imports it except `algorithms/dice/` and
 `algorithms/cosine/`.
 
 Three rules, all enforced by `tests/architecture/imports.test.ts`:
@@ -385,10 +387,11 @@ would put a stack overflow inside the range of valid inputs.
 
 ## Where the rest lives
 
-- **Tests**: `tests/algorithms/ngram/`, mirroring this layout, with the shared
-  oracle in `reference.ts` and index fixtures in `inverted/support.ts`. The
-  oracle is deliberately the slowest correct thing, so a differential failure
-  names the implementation rather than a second clever version of it.
+- **Tests**: colocated, `<module>.test.ts` beside what it covers, with the
+  shared oracle in `testing/reference/ngram.ts` and index fixtures in
+  `testing/invertedIndex.ts`. The oracle is deliberately the slowest correct
+  thing, so a differential failure names the implementation rather than a second
+  clever version of it.
 - **Benchmarks**: `bench/ngram.bench.ts` and `bench/ngramIndex.bench.ts`. Read
   the `benchmarks` skill before running either.
 - **Architecture rules**: `tests/architecture/imports.test.ts`.

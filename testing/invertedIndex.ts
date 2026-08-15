@@ -5,8 +5,8 @@
 
 import { similarity as cosineSimilarity } from '../src/algorithms/cosine/index.js'
 import { similarity as diceSimilarity } from '../src/algorithms/dice/index.js'
-import { createCosineIndexBuilder } from '../src/algorithms/shared/ngram/inverted/cosine.js'
-import { createDiceIndexBuilder } from '../src/algorithms/shared/ngram/inverted/dice.js'
+import { createCosineIndexBuilder } from '../src/algorithms/ngram/inverted/cosine.js'
+import { createDiceIndexBuilder } from '../src/algorithms/ngram/inverted/dice.js'
 import type { ChoiceIndex } from '../src/core/scoring/choiceIndex.js'
 import { createScorer } from '../src/core/scoring/scorer.js'
 import { createMatcher } from '../src/index.js'

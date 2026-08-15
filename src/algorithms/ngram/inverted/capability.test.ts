@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { exhaustive, METRICS, pairs } from '../../../../../testing/invertedIndex.js'
-import { createScorer, scorerCompilation } from '../../../../core/scoring/scorer.js'
+import { exhaustive, METRICS, pairs } from '../../../../testing/invertedIndex.js'
+import { createScorer, scorerCompilation } from '../../../core/scoring/scorer.js'
 import {
   distance as cosineDistance,
   similarity as cosineSimilarity,
-} from '../../../cosine/index.js'
+} from '../../cosine/index.js'
 import {
   distance as diceDistance,
   similarity as diceSimilarity,
-} from '../../../dice/index.js'
+} from '../../dice/index.js'
 
 describe('the capability a metric declares', () => {
   it('is offered by both similarity metrics and answers like the Matcher', () => {

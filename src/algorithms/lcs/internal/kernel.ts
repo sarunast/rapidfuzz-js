@@ -13,8 +13,8 @@ import {
   rowVector,
   wideSlots,
   wordCount,
-} from '../../shared/bitmask/blockMasks.js'
-import type { PatternMask } from '../../shared/bitmask/pattern.js'
+} from '../../bitmask/blockMasks.js'
+import type { PatternMask } from '../../bitmask/pattern.js'
 
 const WORD_BITS = 32
 const WORD_SHIFT = 5

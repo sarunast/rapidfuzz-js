@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { preparePattern } from '../algorithms/shared/bitmask/pattern.js'
+import { preparePattern } from '../algorithms/bitmask/pattern.js'
 import {
   indelNormSimHeld,
   partialRatioAlignment_impl,

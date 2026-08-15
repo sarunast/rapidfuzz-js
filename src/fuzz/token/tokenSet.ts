@@ -1,5 +1,5 @@
+import type { PatternMask } from '../../algorithms/bitmask/pattern.js'
 import { lcsSeqLengthRange } from '../../algorithms/lcs/implementation.js'
-import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
 import { validateSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import {
   type CharSet,

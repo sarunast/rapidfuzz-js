@@ -1,4 +1,4 @@
-import { commonPrefix } from '../shared/affix.js'
+import { commonPrefix } from '../affix.js'
 import {
   convPair,
   validateSequence,

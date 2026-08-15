@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  exhaustive,
-  indexOf,
-  METRICS,
-  pairs,
-} from '../../../../../testing/invertedIndex.js'
+import { exhaustive, indexOf, METRICS, pairs } from '../../../../testing/invertedIndex.js'
 import { feasibleRadices } from '../key.js'
 import { createDiceIndexBuilder } from './dice.js'
 import { repackKey } from './keys.js'

@@ -1,7 +1,7 @@
 // Not ported from RapidFuzz — this guards an optimisation of ours, not a
 // behaviour of upstream's.
 //
-// The scorers run on bit-parallel kernels (`algorithms/shared/bitmask/`) rather
+// The scorers run on bit-parallel kernels (`algorithms/bitmask/`) rather
 // than the dynamic programs they replaced. The DP was obviously correct; the
 // kernels are not, so they are checked against it directly here.
 //
@@ -18,6 +18,8 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
+import { commonAffix } from '../../src/algorithms/affix.js'
+import { preparePattern } from '../../src/algorithms/bitmask/pattern.js'
 import { damerauLevenshteinDistance } from '../../src/algorithms/damerauLevenshtein/implementation.js'
 import { jaroSimilarity } from '../../src/algorithms/jaro/implementation.js'
 import {
@@ -46,8 +48,6 @@ import {
   osaOneWordRange,
   osaPrepared,
 } from '../../src/algorithms/osa/internal/kernel.js'
-import { commonAffix } from '../../src/algorithms/shared/affix.js'
-import { preparePattern } from '../../src/algorithms/shared/bitmask/pattern.js'
 import {
   lcsSeqMatrix,
   levenshteinMatrix,

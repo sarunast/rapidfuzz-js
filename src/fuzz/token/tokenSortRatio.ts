@@ -1,5 +1,5 @@
+import type { PatternMask } from '../../algorithms/bitmask/pattern.js'
 import { prepareLcsPattern } from '../../algorithms/lcs/implementation.js'
-import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
 import {
   type PreparationFactory,
   FUZZ_FLAGS,

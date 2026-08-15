@@ -1,8 +1,8 @@
 import { directMetric } from '../../core/scoring/builtIn/directMetric.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import { commonAffix } from '../shared/affix.js'
-import { WORD_LIMIT } from '../shared/bitmask/blockMasks.js'
-import { preparePattern } from '../shared/bitmask/pattern.js'
+import { commonAffix } from '../affix.js'
+import { WORD_LIMIT } from '../bitmask/blockMasks.js'
+import { preparePattern } from '../bitmask/pattern.js'
 import {
   alignRepresentation,
   distanceCutoffFor,

@@ -7,7 +7,7 @@ import {
   METRICS,
   pairs,
   THRESHOLDS,
-} from '../../../../../testing/invertedIndex.js'
+} from '../../../../testing/invertedIndex.js'
 import { createDiceIndexBuilder } from './dice.js'
 
 describe('the posting representation', () => {
