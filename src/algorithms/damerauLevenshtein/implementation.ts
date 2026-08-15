@@ -1,6 +1,6 @@
+import { directMetric } from '../../core/scoring/builtIn/directMetric.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import { checkedStartGeneration } from '../shared/bitmask/blockMasks.js'
-import { directMetric } from '../shared/directMetric.js'
 import {
   alignRepresentation,
   distanceCutoffFor,

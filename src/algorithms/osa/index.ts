@@ -1,4 +1,4 @@
-import { builtInMetric, type BuiltInMetric } from '../shared/metricAdapter.js'
+import { builtInMetric, type BuiltInMetric } from '../../core/scoring/builtIn/metric.js'
 import {
   osaDistance,
   osaNormalizedDistance,

@@ -1,5 +1,5 @@
 import type { SelectedChoices } from '../../../../core/scoring/choiceIndex.js'
-import { elementsEqual } from '../../sequence.js'
+import { elementsEqual } from '../../../../core/sequence.js'
 import type { Postings, SealedIndex } from './builder.js'
 
 export function outranks(

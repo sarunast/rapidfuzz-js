@@ -1,3 +1,4 @@
+import { directMetric } from '../../core/scoring/builtIn/directMetric.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import {
   lcsSeqEditops,
@@ -9,7 +10,6 @@ import {
 } from '../lcs/implementation.js'
 import { sharesAffix } from '../shared/affix.js'
 import { wordCount } from '../shared/bitmask/blockMasks.js'
-import { directMetric } from '../shared/directMetric.js'
 import type { Editops, Opcodes } from '../shared/editops/index.js'
 import {
   alignRepresentation,

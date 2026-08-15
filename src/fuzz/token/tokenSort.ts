@@ -1,5 +1,5 @@
 import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
-import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
+import { validateSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import { indelNormSimHeld, ratioConverted } from '../partialWindow.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
 import {
@@ -57,7 +57,7 @@ export function tokenSortRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(validateSequence(s1), validateSequence(s2))
 
   return tokenSortRatioConverted(a, b, options.scoreCutoff ?? 0)
 }

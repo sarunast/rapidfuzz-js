@@ -3,8 +3,8 @@ import type {
   ChoiceIndexBuilder,
   SelectedChoices,
 } from '../../../../core/scoring/choiceIndex.js'
+import { convSequence } from '../../../../core/sequence.js'
 import type { Sequence } from '../../../../core/types.js'
-import { convSequence } from '../../sequence.js'
 import { NGramIndexBuilder, type SealedIndex } from './builder.js'
 import { extractGrams } from './keys.js'
 import {

@@ -11,7 +11,7 @@ import {
   type NGramProfile,
 } from '../shared/ngram/profile.js'
 import {
-  asSequence,
+  validateSequence,
   convPair,
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
@@ -52,7 +52,7 @@ function cosineSimilarity_impl(
   if (s1 == null || s2 == null) return 0
   const gramSize = validGramSize(options.gramSize)
   const scoreCutoff = options.scoreCutoff
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const query = profileOfElements(a, gramSize)
   return normSimCutoff(
     profileSimilarity(
@@ -72,7 +72,7 @@ function cosineDistance_impl(
 ): number {
   const gramSize = validGramSize(options.gramSize)
   const cutoff = options.scoreCutoff
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const query = profileOfElements(a, gramSize)
   return normDistCutoff(
     1 -

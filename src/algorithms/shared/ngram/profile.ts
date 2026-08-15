@@ -1,5 +1,5 @@
+import { convSequence, elementsEqual } from '../../../core/sequence.js'
 import type { Sequence } from '../../../core/types.js'
-import { convSequence, elementsEqual } from '../sequence.js'
 import { canonicalRadix } from './key.js'
 import { domainOf, packedKeys, type ElementDomain } from './packing.js'
 

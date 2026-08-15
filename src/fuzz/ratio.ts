@@ -1,5 +1,4 @@
 import { prepareLcsPattern } from '../algorithms/lcs/implementation.js'
-import type { BuiltInMetric } from '../algorithms/shared/metricAdapter.js'
 import {
   prepareChoiceSequence,
   preparedChoiceSequence,
@@ -9,6 +8,7 @@ import {
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
+import type { BuiltInMetric } from '../core/scoring/builtIn/metric.js'
 import type { PreparedKernel } from '../core/scoring/compilation.js'
 import type { Sequence } from '../core/types.js'
 import { fuzzMetric } from './metric.js'

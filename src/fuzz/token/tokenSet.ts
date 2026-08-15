@@ -1,6 +1,6 @@
 import { lcsSeqLengthRange } from '../../algorithms/lcs/implementation.js'
 import type { PatternMask } from '../../algorithms/shared/bitmask/pattern.js'
-import { asSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
+import { validateSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
 import {
   type CharSet,
   partialAlignmentConverted,
@@ -39,7 +39,7 @@ export function tokenSetRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(validateSequence(s1), validateSequence(s2))
 
   return tokenSetRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -178,7 +178,7 @@ export function tokenRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(validateSequence(s1), validateSequence(s2))
 
   return tokenRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -190,7 +190,7 @@ export function partialTokenSortRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(validateSequence(s1), validateSequence(s2))
 
   const scoreCutoff = options.scoreCutoff ?? 0
   if (scoreCutoff > 100) return 0
@@ -209,7 +209,7 @@ export function partialTokenSetRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(validateSequence(s1), validateSequence(s2))
 
   return partialTokenSetRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -244,7 +244,7 @@ export function partialTokenRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = tokenPair(asSequence(s1), asSequence(s2))
+  const [a, b] = tokenPair(validateSequence(s1), validateSequence(s2))
 
   return partialTokenRatioConverted(a, b, options.scoreCutoff ?? 0)
 }

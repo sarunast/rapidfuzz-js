@@ -1,7 +1,7 @@
 import { commonPrefix } from '../shared/affix.js'
 import {
   convPair,
-  asSequence,
+  validateSequence,
   distCutoff,
   normalizeDistance,
   normDistCutoff,
@@ -28,7 +28,7 @@ function prefixDistance_impl(
   s2: MaybeSequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return distCutoff(maxSequenceLength(a, b) - commonPrefix(a, b), options.scoreCutoff)
 }
 
@@ -38,7 +38,7 @@ function prefixSimilarity_impl(
   options: ScorerOptions = {},
 ): number {
   if (s1 == null || s2 == null) return 0
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return simCutoff(commonPrefix(a, b), options.scoreCutoff)
 }
 
@@ -47,7 +47,7 @@ function prefixNormalizedDistance_impl(
   s2: MaybeSequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const max = maxSequenceLength(a, b)
   return normDistCutoff(
     normalizeDistance(max - commonPrefix(a, b), max),
@@ -61,7 +61,7 @@ function prefixNormalizedSimilarity_impl(
   options: ScorerOptions = {},
 ): number {
   if (s1 == null || s2 == null) return 0
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const max = maxSequenceLength(a, b)
   return normSimCutoff(
     1 - normalizeDistance(max - commonPrefix(a, b), max),

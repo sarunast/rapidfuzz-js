@@ -1,4 +1,3 @@
-import type { BuiltInMetric } from '../algorithms/shared/metricAdapter.js'
 /**
  * `weightedRatio` picks a strategy rather than defining a new comparison algorithm.
  *
@@ -14,7 +13,7 @@ import type { BuiltInMetric } from '../algorithms/shared/metricAdapter.js'
  * two copies have to be kept in step by hand.
  */
 import {
-  asSequence,
+  validateSequence,
   convSequence,
   hasSurrogatePair,
   isMissing,
@@ -22,6 +21,7 @@ import {
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
 } from '../algorithms/shared/scorerSupport.js'
+import type { BuiltInMetric } from '../core/scoring/builtIn/metric.js'
 import { fuzzMetric } from './metric.js'
 import { partialRatioConverted, ratioConverted } from './partialWindow.js'
 import { prepareFuzz } from './preparation.js'
@@ -47,8 +47,8 @@ export function weightedRatio_impl(
 
   const UNBASE_SCALE = 0.95
 
-  const p1 = asSequence(s1)
-  const p2 = asSequence(s2)
+  const p1 = validateSequence(s1)
+  const p2 = validateSequence(s2)
 
   if (p1.length === 0 || p2.length === 0) return 0
 

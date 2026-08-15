@@ -1,6 +1,6 @@
-import type { MaybeSequence, Sequence } from '../../core/types.js'
+import type { MaybeSequence, Sequence } from '../../types.js'
+import type { ScorerOptions } from './options.js'
 import { PREPARE_SCORER, type PreparationFactory } from './preparation.js'
-import type { ScorerOptions } from './types.js'
 
 interface ScorerFlags {
   readonly worstScore: number

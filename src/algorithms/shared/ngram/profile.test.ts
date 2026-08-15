@@ -3,9 +3,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { Cosine, Dice } from '../../../../testing/scorers.js'
+import { elementsEqual } from '../../../core/sequence.js'
 import { cosineSimilarity } from '../../cosine/implementation.js'
 import { diceSimilarity } from '../../dice/implementation.js'
-import { elementsEqual } from '../sequence.js'
 import { dotProduct, sharedFrequency } from './compare.js'
 import { buildProfile } from './profile.js'
 

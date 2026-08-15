@@ -1,5 +1,16 @@
-export * from './cutoff.js'
-export * from './preparation.js'
-export * from './scorerMetadata.js'
-export * from './sequence.js'
-export * from './types.js'
+export * from '../../core/scoring/builtIn/cutoff.js'
+export * from '../../core/scoring/builtIn/preparation.js'
+export * from '../../core/scoring/builtIn/implementation.js'
+export * from '../../core/scoring/builtIn/options.js'
+export {
+  alignRepresentation,
+  convPair,
+  convSequence,
+  elementsEqual,
+  hasSurrogatePair,
+  isMissing,
+  isSequence,
+  maxSequenceLength,
+  scorerSequence,
+  validateSequence,
+} from '../../core/sequence.js'

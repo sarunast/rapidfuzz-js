@@ -5,7 +5,7 @@ import {
   type Opcodes,
 } from '../shared/editops/index.js'
 import {
-  asSequence,
+  validateSequence,
   convPair,
   distanceCutoffFor,
   distCutoff,
@@ -127,7 +127,7 @@ function hammingDistance_impl(
   s2: MaybeSequence,
   options: HammingOptions = {},
 ): number {
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const cutoff = distanceCutoffFor(
     'distance',
     options.scoreCutoff,
@@ -142,7 +142,7 @@ function hammingSimilarity_impl(
   options: HammingOptions = {},
 ): number {
   if (s1 == null || s2 == null) return 0
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const max = maxSequenceLength(a, b)
   const cutoff = distanceCutoffFor('similarity', options.scoreCutoff, max)
   return simCutoff(
@@ -156,7 +156,7 @@ function hammingNormalizedDistance_impl(
   s2: MaybeSequence,
   options: HammingOptions = {},
 ): number {
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const max = maxSequenceLength(a, b)
   const cutoff = distanceCutoffFor('normalizedDistance', options.scoreCutoff, max)
   const norm = normalizeDistance(distance_(a, b, options.pad ?? true, cutoff), max)
@@ -169,7 +169,7 @@ function hammingNormalizedSimilarity_impl(
   options: HammingOptions = {},
 ): number {
   if (s1 == null || s2 == null) return 0
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const max = maxSequenceLength(a, b)
   const cutoff = distanceCutoffFor('normalizedSimilarity', options.scoreCutoff, max)
   const norm = normalizeDistance(distance_(a, b, options.pad ?? true, cutoff), max)

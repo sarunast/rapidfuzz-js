@@ -4,7 +4,7 @@ import { commonPrefix } from '../shared/affix.js'
 import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
-  asSequence,
+  validateSequence,
   convPair,
   type ConfigurationCanonicalizer,
   normDistCutoff,
@@ -74,7 +74,7 @@ function jaroWinklerSimilarity_impl(
   options: JaroWinklerOptions = {},
 ): number {
   if (s1 == null || s2 == null) return 0
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return normSimCutoff(
     directSimilarity(a, b, options.prefixWeight ?? 0.1, options.scoreCutoff ?? 0),
     options.scoreCutoff,
@@ -86,7 +86,7 @@ function jaroWinklerDistance_impl(
   s2: MaybeSequence,
   options: JaroWinklerOptions = {},
 ): number {
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const cutoff = options.scoreCutoff
   return normDistCutoff(
     1 -

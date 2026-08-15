@@ -1,7 +1,7 @@
-import type { Sequence } from '../../core/types.js'
+import { convPair } from '../../sequence.js'
+import type { Sequence } from '../../types.js'
 import { distanceCutoffFor, scoreFromDistance, type MetricScoreKind } from './cutoff.js'
-import { convPair } from './sequence.js'
-import type { ScorerOptions } from './types.js'
+import type { ScorerOptions } from './options.js'
 
 type BoundedDistance = (
   s1: ArrayLike<unknown>,

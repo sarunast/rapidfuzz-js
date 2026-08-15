@@ -3,7 +3,7 @@ import { wordCount } from '../shared/bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../shared/bitmask/pattern.js'
 import {
   alignRepresentation,
-  asSequence,
+  validateSequence,
   convPair,
   normDistCutoff,
   normSimCutoff,
@@ -438,7 +438,7 @@ function jaroSimilarity_impl(
   options: ScorerOptions = {},
 ): number {
   if (s1 == null || s2 == null) return 0
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return normSimCutoff(
     jaroSimilarity_(a, b, options.scoreCutoff ?? 0),
     options.scoreCutoff,
@@ -450,7 +450,7 @@ function jaroDistance_impl(
   s2: MaybeSequence,
   options: ScorerOptions = {},
 ): number {
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const cutoff = options.scoreCutoff
   return normDistCutoff(
     1 - jaroSimilarity_(a, b, cutoff == null ? 0 : 1 - cutoff),

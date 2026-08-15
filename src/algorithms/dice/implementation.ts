@@ -14,7 +14,7 @@ import {
   type NGramProfile,
 } from '../shared/ngram/profile.js'
 import {
-  asSequence,
+  validateSequence,
   convPair,
   elementsEqual,
   NORMALIZED_DISTANCE_FLAGS,
@@ -96,7 +96,7 @@ function diceSimilarity_impl(
   if (s1 == null || s2 == null) return 0
   const gramSize = validGramSize(options.gramSize)
   const scoreCutoff = options.scoreCutoff
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return normSimCutoff(directSimilarity(a, b, gramSize, scoreCutoff ?? 0), scoreCutoff)
 }
 
@@ -107,7 +107,7 @@ function diceDistance_impl(
 ): number {
   const gramSize = validGramSize(options.gramSize)
   const cutoff = options.scoreCutoff
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return normDistCutoff(
     1 - directSimilarity(a, b, gramSize, cutoff == null ? 0 : 1 - cutoff),
     cutoff,

@@ -1,9 +1,9 @@
-import type { ChoiceIndexBuilder } from '../../core/scoring/choiceIndex.js'
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import type { OptimumProof } from '../../core/scoring/optimumProof.js'
-import type { Sequence } from '../../core/types.js'
+import { alignRepresentation, convSequence, scorerSequence } from '../../sequence.js'
+import type { Sequence } from '../../types.js'
+import type { ChoiceIndexBuilder } from '../choiceIndex.js'
+import type { PreparedKernel } from '../compilation.js'
+import type { OptimumProof } from '../optimumProof.js'
 import { distanceCutoffFor, scoreFromDistance, type MetricScoreKind } from './cutoff.js'
-import { alignRepresentation, convSequence, scorerSequence } from './sequence.js'
 
 export const PREPARE_SCORER: unique symbol = Symbol('rapidfuzz.prepareScorer')
 

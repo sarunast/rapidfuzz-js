@@ -1,21 +1,21 @@
-import { COMPILE, type MetricCompilation } from '../../core/scoring/compilation.js'
-import type { Metric, NoConfiguration } from '../../core/scoring/metric.js'
-import { snapshotSequence, validatePair, validateSequence } from '../../core/sequence.js'
+import { snapshotSequence, validatePair, validateSequence } from '../../sequence.js'
 import type {
   Direction,
   MaybeSequence,
   MissingPolicy,
   Sequence,
   SimilarityConfiguration,
-} from '../../core/types.js'
+} from '../../types.js'
+import { COMPILE, type MetricCompilation } from '../compilation.js'
+import type { Metric, NoConfiguration } from '../metric.js'
 import {
-  configurationSymmetryOf,
   configurationCanonicalizerOf,
-  PREPARE_SCORER,
+  configurationSymmetryOf,
   type ErasedMetricImplementation,
   type PreparedCapability,
-  type ScorerOptions,
-} from './scorerSupport.js'
+} from './implementation.js'
+import type { ScorerOptions } from './options.js'
+import { PREPARE_SCORER } from './preparation.js'
 
 /**
  * The type of a metric this package built, named by `TId`.

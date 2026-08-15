@@ -2,8 +2,8 @@ import type {
   ChoiceIndex,
   ChoiceIndexBuilder,
 } from '../../../../core/scoring/choiceIndex.js'
+import { convSequence } from '../../../../core/sequence.js'
 import type { Sequence } from '../../../../core/types.js'
-import { convSequence } from '../../sequence.js'
 import { feasibleRadices } from '../key.js'
 import { extractGrams, OutOfRadix, radixFor, repackKey } from './keys.js'
 

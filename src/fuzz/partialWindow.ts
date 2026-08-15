@@ -6,7 +6,11 @@ import {
 } from '../algorithms/lcs/implementation.js'
 import { checkedStartGeneration } from '../algorithms/shared/bitmask/blockMasks.js'
 import type { PatternMask } from '../algorithms/shared/bitmask/pattern.js'
-import { asSequence, convPair, isMissing } from '../algorithms/shared/scorerSupport.js'
+import {
+  validateSequence,
+  convPair,
+  isMissing,
+} from '../algorithms/shared/scorerSupport.js'
 import type { FuzzInput, FuzzOptions, ScoreAlignment } from './types.js'
 
 function indelNormSim(
@@ -108,7 +112,7 @@ export function ratio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return ratioConverted(a, b, options.scoreCutoff ?? 0)
 }
 
@@ -439,7 +443,7 @@ export function partialRatioAlignment_impl(
 ): ScoreAlignment | null {
   if (isMissing(s1) || isMissing(s2)) return null
 
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
 
   return partialAlignmentConverted(a, b, options.scoreCutoff ?? 0)
 }
@@ -506,6 +510,6 @@ export function partialRatio_impl(
 ): number {
   if (isMissing(s1) || isMissing(s2)) return 0
 
-  const [a, b] = convPair(asSequence(s1), asSequence(s2))
+  const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return partialAlignmentConverted(a, b, options.scoreCutoff ?? 0, true)?.score ?? 0
 }

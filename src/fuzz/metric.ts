@@ -1,5 +1,5 @@
-import { builtInMetric } from '../algorithms/shared/metricAdapter.js'
 import type { MaybeSequenceMetricImplementation } from '../algorithms/shared/scorerSupport.js'
+import { builtInMetric } from '../core/scoring/builtIn/metric.js'
 import type { Metric } from '../core/scoring/metric.js'
 import type { FuzzOptions } from './types.js'
 

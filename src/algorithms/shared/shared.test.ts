@@ -1,20 +1,20 @@
 import { expect, it } from 'vitest'
 
-import { prefixDistance } from '../prefix/implementation.js'
-import { sharesAffix } from './affix.js'
-import {
-  PREPARE_SCORER,
-  prepareMetric,
-  preparedChoiceSequence,
-  prepareChoiceSequence,
-} from './preparation.js'
 import {
   configurationCanonicalizerOf,
   configurationSymmetryOf,
   DISTANCE_FLAGS,
   withPreparedFlags,
-} from './scorerMetadata.js'
-import { convSequence } from './sequence.js'
+} from '../../core/scoring/builtIn/implementation.js'
+import {
+  PREPARE_SCORER,
+  prepareMetric,
+  preparedChoiceSequence,
+  prepareChoiceSequence,
+} from '../../core/scoring/builtIn/preparation.js'
+import { convSequence } from '../../core/sequence.js'
+import { prefixDistance } from '../prefix/implementation.js'
+import { sharesAffix } from './affix.js'
 
 it('treats mixed string and array representations as worth aligning', () => {
   const text = 'a'.repeat(64)
