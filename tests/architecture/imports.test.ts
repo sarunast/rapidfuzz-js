@@ -339,7 +339,7 @@ describe('dependency direction', () => {
     ).toEqual([])
   })
 
-  it('keeps shared bitmask code representation-only', () => {
+  it('keeps the bitmask foundation representation-only', () => {
     const directory = join(source, 'algorithms/bitmask')
     expect(shippedEntries(directory)).toEqual([
       'blockMasks.ts',

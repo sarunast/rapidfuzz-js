@@ -2,9 +2,9 @@
 
 An **algorithm foundation**, not a metric family. Nothing here is exported from
 a public entry point; `algorithms/dice/` and `algorithms/cosine/` are the only
-consumers, and it depends on nothing under `algorithms/` itself. That is what
-its position states — it sits beside the public algorithms because it is below
-them, in the same layer as `algorithms/bitmask/` and `algorithms/affix.ts`, and
+consumers, and it depends on no public algorithm. That is what its position
+states — it sits beside the public algorithms because it is below them, in the
+same layer as `algorithms/bitmask/` and `algorithms/affix.ts`, and
 `tests/architecture/imports.test.ts` fails an edge from here into any of the
 twelve published directories.
 
