@@ -48,8 +48,8 @@ const partialHaystacksSome = partialHaystacks.slice(0, 16)
 // scan is *cheapest* on, and the opposite of what `extract` sees — there the
 // haystack holds a near-match, the running best keeps improving, and every
 // improvement is an endpoint the search has to do something about. Composed
-// here rather than in `harness/corpus.ts`, which is hashed into all 155 baseline
-// entries; this file is hashed into its own.
+// here rather than in `harness/corpus.ts`, which is hashed into every baseline
+// entry in the suite; this file is hashed into its own.
 const plantedHaystacks = partialHaystacksFew.map((haystack) => {
   const at = Math.floor(haystack.length / 3)
   return haystack.slice(0, at) + partialNeedle + haystack.slice(at + partialNeedle.length)
@@ -156,8 +156,8 @@ describe('partialRatio window scan', () => {
   // reads a handful of windows, so a long haystack whose first window is a
   // perfect match is where that gap is widest — the scan stops immediately and
   // everything else it prepared was waste. Composed here from `partialNeedle`
-  // rather than added to `harness/corpus.ts`, which is hashed into all 155 baseline
-  // entries where this file is hashed only into its own.
+  // rather than added to `harness/corpus.ts`, which is hashed into every
+  // baseline entry in the suite where this file is hashed only into its own.
   const plantedAtStart = needle + 'z'.repeat(8_000)
 
   measure('perfect first window in an 8k haystack', () => {
