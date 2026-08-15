@@ -116,4 +116,9 @@ describe('the sequence boundary', () => {
   test('converts single-character elements without changing longer strings', () => {
     expect(convSequence(['a', '😀', 'ab'])).toEqual([97, 0x1f600, 'ab'])
   })
+
+  test('uses narrow string storage until a code point needs promotion', () => {
+    expect(convSequence('abc')).toBeInstanceOf(Uint16Array)
+    expect(convSequence('a😀')).toBeInstanceOf(Uint32Array)
+  })
 })

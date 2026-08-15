@@ -54,15 +54,20 @@ export function snapshotSequence(value: Sequence): Sequence {
   return owned
 }
 
-function toCodePoints(value: string): Uint32Array {
+function toCodePoints(value: string): Uint16Array | Uint32Array {
   const length = value.length
-  const output = new Uint32Array(length)
+  let output: Uint16Array | Uint32Array = new Uint16Array(length)
   let size = 0
   for (let index = 0; index < length; index++) {
     const high = value.charCodeAt(index)
     if (high >= 0xd800 && high <= 0xdbff && index + 1 < length) {
       const low = value.charCodeAt(index + 1)
       if (low >= 0xdc00 && low <= 0xdfff) {
+        if (output instanceof Uint16Array) {
+          const promoted = new Uint32Array(length)
+          promoted.set(output.subarray(0, size))
+          output = promoted
+        }
         output[size++] = (high - 0xd800) * 0x400 + (low - 0xdc00) + 0x10000
         index++
         continue
