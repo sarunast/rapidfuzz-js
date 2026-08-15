@@ -1,4 +1,4 @@
-export type HigherPriority<TItem> = (left: TItem, right: TItem) => boolean
+type HigherPriority<TItem> = (left: TItem, right: TItem) => boolean
 
 export function pushHeap<TItem>(
   heap: TItem[],

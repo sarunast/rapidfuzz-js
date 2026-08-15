@@ -20,7 +20,7 @@ interface PostingBuilder {
   readonly counts: number[]
 }
 
-export interface GramlessChoice {
+interface GramlessChoice {
   readonly id: number
   readonly elements: readonly unknown[]
 }

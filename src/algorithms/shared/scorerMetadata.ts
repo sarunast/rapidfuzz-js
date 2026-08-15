@@ -2,13 +2,13 @@ import type { MaybeSequence, Sequence } from '../../core/types.js'
 import { PREPARE_SCORER, type PreparationFactory } from './preparation.js'
 import type { ScorerOptions } from './types.js'
 
-export interface ScorerFlags {
+interface ScorerFlags {
   readonly worstScore: number
   readonly optimalScore: number
   readonly symmetric: boolean
 }
 
-export interface Flagged {
+interface Flagged {
   readonly rfScorerFlags: ScorerFlags
 }
 
@@ -36,7 +36,7 @@ export type ConfigurationCanonicalizer = (
   options: Readonly<Record<string, unknown>>,
 ) => Readonly<Record<string, unknown>>
 
-export interface ScorerRegistration {
+interface ScorerRegistration {
   readonly configurationSymmetry?: ConfigurationSymmetryResolver | undefined
   readonly configurationCanonicalizer?: ConfigurationCanonicalizer | undefined
 }

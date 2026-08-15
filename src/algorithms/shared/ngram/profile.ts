@@ -16,12 +16,12 @@ export interface PackedGrams {
   readonly counts: Uint32Array
 }
 
-export interface GramTrie {
+interface GramTrie {
   readonly kind: 'trie'
   readonly root: GramNode
 }
 
-export type ProfileStorage = PackedGrams | GramTrie
+type ProfileStorage = PackedGrams | GramTrie
 
 export class NGramProfile {
   constructor(

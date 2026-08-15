@@ -189,7 +189,7 @@ function validBits(length: number): number {
   return bits === 0 ? -1 : ~(-1 << bits)
 }
 
-export interface LcsSeqMatrix {
+interface LcsSeqMatrix {
   readonly sim: number
   readonly rows: Int32Array
   readonly words: number
@@ -338,7 +338,7 @@ function oneWordLcsSeqMatrix(
   return { sim: popcount32(~state & validBits(s1Length)), rows, words: 1 }
 }
 
-export interface LevenshteinMatrix {
+interface LevenshteinMatrix {
   readonly dist: number
   readonly vp: Int32Array
   readonly vn: Int32Array

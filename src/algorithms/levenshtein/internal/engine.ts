@@ -23,7 +23,7 @@ export { resetWeightedScratch } from './scratch.js'
 
 const INT_ROW_SENTINEL = 0x4000_0000
 
-export const UNIFORM: LevenshteinWeights = [1, 1, 1]
+const UNIFORM: LevenshteinWeights = [1, 1, 1]
 
 function isLevenshteinCosts(value: object): boolean {
   return 'insertion' in value && 'deletion' in value && 'substitution' in value

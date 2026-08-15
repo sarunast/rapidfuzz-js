@@ -407,7 +407,7 @@ function jaroOneWord(
 
 type PreparedJaroKind = 'distance' | 'similarity'
 
-export function prepareJaro(kind: PreparedJaroKind): PreparationFactory {
+function prepareJaro(kind: PreparedJaroKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
     const pattern = preparePattern(a, 0, a.length)

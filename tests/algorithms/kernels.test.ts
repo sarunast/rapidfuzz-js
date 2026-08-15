@@ -42,7 +42,6 @@ import {
 } from '../../src/algorithms/levenshtein/metric.js'
 import { osaDistance } from '../../src/algorithms/osa/implementation.js'
 import {
-  osaOneWord,
   osaOneWordPrepared,
   osaOneWordRange,
   osaPrepared,
@@ -802,8 +801,8 @@ describe('word boundaries', () => {
 
 describe('the OSA kernel agrees with its dynamic program', () => {
   it('handles an empty pattern in the exported one-word kernel', () => {
-    expect(osaOneWord([], [1, 2])).toBe(2)
-    expect(osaOneWord([], [])).toBe(0)
+    expect(osaOneWordRange([], 0, 0, [1, 2], 0, 2)).toBe(2)
+    expect(osaOneWordRange([], 0, 0, [], 0, 0)).toBe(0)
   })
 
   it('on small alphabets, where transpositions actually occur', () => {
@@ -1832,7 +1831,9 @@ describe('the exported OSA kernels answer for their own bounds', () => {
 
   it('agrees with the one-word kernel where both apply', () => {
     const text = [4, 3, 2, 1, 4]
-    expect(osaManyWords(pattern, text)).toBe(osaOneWord(pattern, text))
+    expect(osaManyWords(pattern, text)).toBe(
+      osaOneWordRange(pattern, 0, pattern.length, text, 0, text.length),
+    )
     expect(osaManyWords(pattern, text)).toBe(osaDistance(pattern, text))
   })
 })

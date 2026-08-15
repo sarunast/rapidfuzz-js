@@ -310,7 +310,7 @@ export class UniqueTokenSet {
   }
 }
 
-export function uniqueTokens(tokens: readonly unknown[][]): UniqueTokenSet {
+function uniqueTokens(tokens: readonly unknown[][]): UniqueTokenSet {
   const out = new UniqueTokenSet()
 
   for (let i = 0; i < tokens.length; i++) {

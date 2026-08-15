@@ -11,13 +11,6 @@ const WORD_BITS = 32
 const WORD_MASK = 31
 const DIRECT_LOOKUP_LIMIT = 256
 
-export function osaOneWord(
-  pattern: ArrayLike<unknown>,
-  text: ArrayLike<unknown>,
-): number {
-  return osaOneWordRange(pattern, 0, pattern.length, text, 0, text.length)
-}
-
 export function osaOneWordRange(
   pattern: ArrayLike<unknown>,
   patternStart: number,

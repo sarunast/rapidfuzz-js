@@ -2,13 +2,13 @@ export const WORD_BITS = 32
 export const WORD_SHIFT = 5
 export const WORD_MASK = 31
 
+const DIRECT_LOOKUP_LIMIT = 256
+
 export function wordCount(length: number): number {
   return length === 0 ? 0 : ((length - 1) >>> WORD_SHIFT) + 1
 }
 
-export const DIRECT_LOOKUP_LIMIT = 256
-
-export const DIRECT_LOOKUP_MAX = 0x1_0000
+const DIRECT_LOOKUP_MAX = 0x1_0000
 
 let maskPool: Int32Array | null = null
 let vectorP: Int32Array | null = null
@@ -182,7 +182,7 @@ export function buildWordMasks(
   return stamp
 }
 
-export function buildBlockMasks(
+function buildBlockMasks(
   pattern: ArrayLike<unknown>,
   start: number,
   length: number,

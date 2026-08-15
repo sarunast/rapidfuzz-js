@@ -8,7 +8,7 @@ import {
 import type { MaybeSequence, Normalizer, Sequence } from '../../core/types.js'
 import type { MissingItemsPolicy } from '../types.js'
 
-export type SequenceReader<TItem> = (item: TItem) => Sequence | null
+type SequenceReader<TItem> = (item: TItem) => Sequence | null
 
 export interface ReaderOptions<TItem, TBrand = AnyBrand> {
   readonly getText?: ((item: TItem) => MaybeSequence) | undefined
