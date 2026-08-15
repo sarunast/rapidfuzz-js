@@ -16,14 +16,11 @@ import {
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
   type MaybeSequenceMetricImplementation,
+  maxSequenceLength,
 } from '../shared/scorerSupport.js'
 
-function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
-  return Math.max(s1.length, s2.length)
-}
-
 function preparedPrefixDistance(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
-  return maximum(s1, s2) - commonPrefix(s1, s2)
+  return maxSequenceLength(s1, s2) - commonPrefix(s1, s2)
 }
 
 function prefixDistance_impl(
@@ -32,7 +29,7 @@ function prefixDistance_impl(
   options: ScorerOptions = {},
 ): number {
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
-  return distCutoff(maximum(a, b) - commonPrefix(a, b), options.scoreCutoff)
+  return distCutoff(maxSequenceLength(a, b) - commonPrefix(a, b), options.scoreCutoff)
 }
 
 function prefixSimilarity_impl(
@@ -51,7 +48,7 @@ function prefixNormalizedDistance_impl(
   options: ScorerOptions = {},
 ): number {
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
-  const max = maximum(a, b)
+  const max = maxSequenceLength(a, b)
   return normDistCutoff(
     normalizeDistance(max - commonPrefix(a, b), max),
     options.scoreCutoff,
@@ -65,7 +62,7 @@ function prefixNormalizedSimilarity_impl(
 ): number {
   if (s1 == null || s2 == null) return 0
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
-  const max = maximum(a, b)
+  const max = maxSequenceLength(a, b)
   return normSimCutoff(
     1 - normalizeDistance(max - commonPrefix(a, b), max),
     options.scoreCutoff,
@@ -76,23 +73,23 @@ export const prefixDistance: MaybeSequenceMetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     prefixDistance_impl,
     DISTANCE_FLAGS,
-    prepareMetric('distance', preparedPrefixDistance, maximum),
+    prepareMetric('distance', preparedPrefixDistance, maxSequenceLength),
   )
 export const prefixSimilarity: MaybeSequenceMetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     prefixSimilarity_impl,
     SIMILARITY_FLAGS,
-    prepareMetric('similarity', preparedPrefixDistance, maximum),
+    prepareMetric('similarity', preparedPrefixDistance, maxSequenceLength),
   )
 export const prefixNormalizedDistance: MaybeSequenceMetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     prefixNormalizedDistance_impl,
     NORMALIZED_DISTANCE_FLAGS,
-    prepareMetric('normalizedDistance', preparedPrefixDistance, maximum),
+    prepareMetric('normalizedDistance', preparedPrefixDistance, maxSequenceLength),
   )
 export const prefixNormalizedSimilarity: MaybeSequenceMetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
     prefixNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,
-    prepareMetric('normalizedSimilarity', preparedPrefixDistance, maximum),
+    prepareMetric('normalizedSimilarity', preparedPrefixDistance, maxSequenceLength),
   )

@@ -22,8 +22,9 @@ export function distanceCutoffFor(
   kind: MetricScoreKind,
   rawCutoff: number | null | undefined,
   maximum: number,
+  unbounded: number = Number.POSITIVE_INFINITY,
 ): number {
-  if (rawCutoff == null) return Number.POSITIVE_INFINITY
+  if (rawCutoff == null) return unbounded
   switch (kind) {
     case 'distance':
       return rawDistanceBound(rawCutoff)
@@ -33,6 +34,24 @@ export function distanceCutoffFor(
       return rawCutoff * maximum
     case 'normalizedSimilarity':
       return (1 - rawCutoff) * maximum
+  }
+}
+
+export function scoreFromDistance(
+  kind: MetricScoreKind,
+  distance: number,
+  maximum: number,
+  rawCutoff: number | null | undefined,
+): number {
+  switch (kind) {
+    case 'distance':
+      return distCutoff(distance, rawCutoff)
+    case 'similarity':
+      return simCutoff(maximum - distance, rawCutoff)
+    case 'normalizedDistance':
+      return normDistCutoff(normalizeDistance(distance, maximum), rawCutoff)
+    case 'normalizedSimilarity':
+      return normSimCutoff(1 - normalizeDistance(distance, maximum), rawCutoff)
   }
 }
 

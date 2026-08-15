@@ -9,18 +9,13 @@ import {
 } from '../lcs/implementation.js'
 import { sharesAffix } from '../shared/affix.js'
 import { wordCount } from '../shared/bitmask/blockMasks.js'
+import { directMetric } from '../shared/directMetric.js'
 import type { Editops, Opcodes } from '../shared/editops/index.js'
 import {
   alignRepresentation,
-  canonicalRawCutoff,
-  canonicalSimilarityCutoff,
-  convPair,
-  distCutoff,
-  normalizeDistance,
-  normDistCutoff,
-  normSimCutoff,
-  simCutoff,
-  type ScorerOptions,
+  distanceCutoffFor,
+  scoreFromDistance,
+  type MetricScoreKind,
   type Sequence,
   DISTANCE_FLAGS,
   NORMALIZED_DISTANCE_FLAGS,
@@ -34,7 +29,7 @@ import {
   type MetricImplementation,
 } from '../shared/scorerSupport.js'
 
-function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
+function combinedLength(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
   return s1.length + s2.length
 }
 
@@ -85,56 +80,8 @@ function distanceFromPrepared(
   return query.length + choice.length - 2 * lcs
 }
 
-function indelDistance_impl(
-  s1: Sequence,
-  s2: Sequence,
-  options: ScorerOptions = {},
-): number {
-  const [a, b] = convPair(s1, s2)
-  const cutoff = canonicalRawCutoff(options.scoreCutoff)
-  return distCutoff(distance_(a, b, cutoff ?? UNBOUNDED_MISSES), cutoff)
-}
-
-function indelSimilarity_impl(
-  s1: Sequence,
-  s2: Sequence,
-  options: ScorerOptions = {},
-): number {
-  const [a, b] = convPair(s1, s2)
-  const max = maximum(a, b)
-  const cutoff = canonicalSimilarityCutoff(options.scoreCutoff)
-  const misses = cutoff == null ? UNBOUNDED_MISSES : max - cutoff
-  return simCutoff(max - distance_(a, b, misses), cutoff)
-}
-
-function indelNormalizedDistance_impl(
-  s1: Sequence,
-  s2: Sequence,
-  options: ScorerOptions = {},
-): number {
-  const [a, b] = convPair(s1, s2)
-  const max = maximum(a, b)
-  const cutoff =
-    options.scoreCutoff == null ? UNBOUNDED_MISSES : options.scoreCutoff * max
-  return normDistCutoff(
-    normalizeDistance(distance_(a, b, cutoff), max),
-    options.scoreCutoff,
-  )
-}
-
-function indelNormalizedSimilarity_impl(
-  s1: Sequence,
-  s2: Sequence,
-  options: ScorerOptions = {},
-): number {
-  const [a, b] = convPair(s1, s2)
-  const max = maximum(a, b)
-  const cutoff =
-    options.scoreCutoff == null ? UNBOUNDED_MISSES : (1 - options.scoreCutoff) * max
-  return normSimCutoff(
-    1 - normalizeDistance(distance_(a, b, cutoff), max),
-    options.scoreCutoff,
-  )
+function indelMetric(kind: MetricScoreKind) {
+  return directMetric(kind, distance_, combinedLength, UNBOUNDED_MISSES)
 }
 
 /**
@@ -157,13 +104,7 @@ export function indelOpcodes(s1: Sequence, s2: Sequence): Opcodes {
   return lcsSeqEditops(s1, s2).toOpcodes()
 }
 
-type PreparedIndelKind =
-  | 'distance'
-  | 'similarity'
-  | 'normalizedDistance'
-  | 'normalizedSimilarity'
-
-function prepareIndel(kind: PreparedIndelKind): PreparationFactory {
+function prepareIndel(kind: MetricScoreKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
     let pattern: import('../shared/bitmask/pattern.js').PatternMask | null = null
@@ -177,32 +118,9 @@ function prepareIndel(kind: PreparedIndelKind): PreparationFactory {
 
     const score: PreparedKernel = (rawChoice, rawCutoff) => {
       const b = preparedChoiceSequence(rawChoice)
-      const max = maximum(a, b)
-      switch (kind) {
-        case 'distance': {
-          const cutoff = canonicalRawCutoff(rawCutoff)
-          return distCutoff(preparedDistance(b, cutoff ?? UNBOUNDED_MISSES), cutoff)
-        }
-        case 'similarity': {
-          const cutoff = canonicalSimilarityCutoff(rawCutoff)
-          const misses = cutoff === null ? UNBOUNDED_MISSES : max - cutoff
-          return simCutoff(max - preparedDistance(b, misses), cutoff)
-        }
-        case 'normalizedDistance': {
-          const cutoff = rawCutoff === null ? UNBOUNDED_MISSES : rawCutoff * max
-          return normDistCutoff(
-            normalizeDistance(preparedDistance(b, cutoff), max),
-            rawCutoff,
-          )
-        }
-        case 'normalizedSimilarity': {
-          const cutoff = rawCutoff === null ? UNBOUNDED_MISSES : (1 - rawCutoff) * max
-          return normSimCutoff(
-            1 - normalizeDistance(preparedDistance(b, cutoff), max),
-            rawCutoff,
-          )
-        }
-      }
+      const max = combinedLength(a, b)
+      const budget = distanceCutoffFor(kind, rawCutoff, max, UNBOUNDED_MISSES)
+      return scoreFromDistance(kind, preparedDistance(b, budget), max, rawCutoff)
     }
     return score
   }
@@ -210,24 +128,24 @@ function prepareIndel(kind: PreparedIndelKind): PreparationFactory {
 }
 
 export const indelDistance: MetricImplementation = /* @__PURE__ */ withPreparedFlags(
-  indelDistance_impl,
+  indelMetric('distance'),
   DISTANCE_FLAGS,
   prepareIndel('distance'),
 )
 export const indelSimilarity: MetricImplementation = /* @__PURE__ */ withPreparedFlags(
-  indelSimilarity_impl,
+  indelMetric('similarity'),
   SIMILARITY_FLAGS,
   prepareIndel('similarity'),
 )
 export const indelNormalizedDistance: MetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
-    indelNormalizedDistance_impl,
+    indelMetric('normalizedDistance'),
     NORMALIZED_DISTANCE_FLAGS,
     prepareIndel('normalizedDistance'),
   )
 export const indelNormalizedSimilarity: MetricImplementation =
   /* @__PURE__ */ withPreparedFlags(
-    indelNormalizedSimilarity_impl,
+    indelMetric('normalizedSimilarity'),
     NORMALIZED_SIMILARITY_FLAGS,
     prepareIndel('normalizedSimilarity'),
   )

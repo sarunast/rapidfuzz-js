@@ -13,6 +13,9 @@ import {
   alignRepresentation,
   canonicalRawCutoff,
   canonicalSimilarityCutoff,
+  distanceCutoffFor,
+  scoreFromDistance,
+  type MetricScoreKind,
   convPair,
   distCutoff,
   normalizeDistance,
@@ -31,6 +34,7 @@ import {
   type PreparationFactory,
   withPreparedFlags,
   type MetricImplementation,
+  maxSequenceLength,
 } from '../shared/scorerSupport.js'
 import {
   lcsLengthPrepared,
@@ -44,10 +48,6 @@ export {
   lcsLengthRange as lcsSeqLengthRange,
   preparePattern as prepareLcsPattern,
   UNBOUNDED_MISSES,
-}
-
-function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
-  return Math.max(s1.length, s2.length)
 }
 
 function boundedLength(
@@ -81,7 +81,7 @@ function lcsSeqDistance_impl(
   options: ScorerOptions = {},
 ): number {
   const [a, b] = convPair(s1, s2)
-  const max = maximum(a, b)
+  const max = maxSequenceLength(a, b)
   const cutoff = canonicalRawCutoff(options.scoreCutoff)
   return distCutoff(max - boundedLength(a, b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
 }
@@ -93,7 +93,8 @@ function lcsSeqSimilarity_impl(
 ): number {
   const [a, b] = convPair(s1, s2)
   const cutoff = canonicalSimilarityCutoff(options.scoreCutoff)
-  const misses = cutoff === null ? Number.MAX_SAFE_INTEGER : maximum(a, b) - cutoff
+  const misses =
+    cutoff === null ? Number.MAX_SAFE_INTEGER : maxSequenceLength(a, b) - cutoff
   return simCutoff(boundedLength(a, b, misses), cutoff)
 }
 
@@ -103,7 +104,7 @@ function lcsSeqNormalizedDistance_impl(
   options: ScorerOptions = {},
 ): number {
   const [a, b] = convPair(s1, s2)
-  const max = maximum(a, b)
+  const max = maxSequenceLength(a, b)
   const cutoff =
     options.scoreCutoff == null ? Number.MAX_SAFE_INTEGER : options.scoreCutoff * max
   return normDistCutoff(
@@ -118,7 +119,7 @@ function lcsSeqNormalizedSimilarity_impl(
   options: ScorerOptions = {},
 ): number {
   const [a, b] = convPair(s1, s2)
-  const max = maximum(a, b)
+  const max = maxSequenceLength(a, b)
   const cutoff =
     options.scoreCutoff == null
       ? Number.MAX_SAFE_INTEGER
@@ -205,13 +206,7 @@ export function lcsSeqOpcodes(s1: Sequence, s2: Sequence): Opcodes {
   return lcsSeqEditops(s1, s2).toOpcodes()
 }
 
-type PreparedLcsKind =
-  | 'distance'
-  | 'similarity'
-  | 'normalizedDistance'
-  | 'normalizedSimilarity'
-
-function prepareLcs(kind: PreparedLcsKind): PreparationFactory {
+function prepareLcs(kind: MetricScoreKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
     let pattern: import('../shared/bitmask/pattern.js').PatternMask | null = null
@@ -220,7 +215,7 @@ function prepareLcs(kind: PreparedLcsKind): PreparationFactory {
         return boundedLength(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)
       }
       pattern ??= preparePattern(a, 0, a.length)
-      const required = Math.max(0, Math.floor(maximum(a, b) - cutoff))
+      const required = Math.max(0, Math.floor(maxSequenceLength(a, b) - cutoff))
       return required > 0
         ? lcsLengthPreparedBounded(pattern, b, 0, b.length, required)
         : lcsLengthPrepared(pattern, b, 0, b.length)
@@ -228,33 +223,9 @@ function prepareLcs(kind: PreparedLcsKind): PreparationFactory {
 
     const score: PreparedKernel = (rawChoice, rawCutoff) => {
       const b = preparedChoiceSequence(rawChoice)
-      const max = maximum(a, b)
-      switch (kind) {
-        case 'distance': {
-          const cutoff = canonicalRawCutoff(rawCutoff)
-          return distCutoff(max - length(b, cutoff ?? Number.MAX_SAFE_INTEGER), cutoff)
-        }
-        case 'similarity': {
-          const cutoff = canonicalSimilarityCutoff(rawCutoff)
-          const misses = cutoff === null ? Number.MAX_SAFE_INTEGER : max - cutoff
-          return simCutoff(length(b, misses), cutoff)
-        }
-        case 'normalizedDistance': {
-          const cutoff = rawCutoff === null ? Number.MAX_SAFE_INTEGER : rawCutoff * max
-          return normDistCutoff(
-            normalizeDistance(max - length(b, cutoff), max),
-            rawCutoff,
-          )
-        }
-        case 'normalizedSimilarity': {
-          const cutoff =
-            rawCutoff === null ? Number.MAX_SAFE_INTEGER : (1 - rawCutoff) * max
-          return normSimCutoff(
-            1 - normalizeDistance(max - length(b, cutoff), max),
-            rawCutoff,
-          )
-        }
-      }
+      const max = maxSequenceLength(a, b)
+      const budget = distanceCutoffFor(kind, rawCutoff, max, Number.MAX_SAFE_INTEGER)
+      return scoreFromDistance(kind, max - length(b, budget), max, rawCutoff)
     }
     return score
   }

@@ -24,6 +24,7 @@ import {
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
+  maxSequenceLength,
 } from '../shared/scorerSupport.js'
 
 export interface HammingEditopsOptions {
@@ -121,17 +122,17 @@ function boundedMismatches(
   return dist
 }
 
-function maximum(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
-  return Math.max(s1.length, s2.length)
-}
-
 function hammingDistance_impl(
   s1: MaybeSequence,
   s2: MaybeSequence,
   options: HammingOptions = {},
 ): number {
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
-  const cutoff = distanceCutoffFor('distance', options.scoreCutoff, maximum(a, b))
+  const cutoff = distanceCutoffFor(
+    'distance',
+    options.scoreCutoff,
+    maxSequenceLength(a, b),
+  )
   return distCutoff(distance_(a, b, options.pad ?? true, cutoff), options.scoreCutoff)
 }
 
@@ -142,7 +143,7 @@ function hammingSimilarity_impl(
 ): number {
   if (s1 == null || s2 == null) return 0
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
-  const max = maximum(a, b)
+  const max = maxSequenceLength(a, b)
   const cutoff = distanceCutoffFor('similarity', options.scoreCutoff, max)
   return simCutoff(
     max - distance_(a, b, options.pad ?? true, cutoff),
@@ -156,7 +157,7 @@ function hammingNormalizedDistance_impl(
   options: HammingOptions = {},
 ): number {
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
-  const max = maximum(a, b)
+  const max = maxSequenceLength(a, b)
   const cutoff = distanceCutoffFor('normalizedDistance', options.scoreCutoff, max)
   const norm = normalizeDistance(distance_(a, b, options.pad ?? true, cutoff), max)
   return normDistCutoff(norm, options.scoreCutoff)
@@ -169,7 +170,7 @@ function hammingNormalizedSimilarity_impl(
 ): number {
   if (s1 == null || s2 == null) return 0
   const [a, b] = convPair(asSequence(s1), asSequence(s2))
-  const max = maximum(a, b)
+  const max = maxSequenceLength(a, b)
   const cutoff = distanceCutoffFor('normalizedSimilarity', options.scoreCutoff, max)
   const norm = normalizeDistance(distance_(a, b, options.pad ?? true, cutoff), max)
   return normSimCutoff(1 - norm, options.scoreCutoff)
@@ -232,27 +233,37 @@ export const hammingDistance: MaybeSequenceMetricImplementation<HammingOptions> 
   /* @__PURE__ */ withPreparedFlags(
     hammingDistance_impl,
     DISTANCE_FLAGS,
-    prepareMetric('distance', preparedHammingDistance, maximum, parsedPad),
+    prepareMetric('distance', preparedHammingDistance, maxSequenceLength, parsedPad),
     { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )
 export const hammingSimilarity: MaybeSequenceMetricImplementation<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingSimilarity_impl,
     SIMILARITY_FLAGS,
-    prepareMetric('similarity', preparedHammingDistance, maximum, parsedPad),
+    prepareMetric('similarity', preparedHammingDistance, maxSequenceLength, parsedPad),
     { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )
 export const hammingNormalizedDistance: MaybeSequenceMetricImplementation<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingNormalizedDistance_impl,
     NORMALIZED_DISTANCE_FLAGS,
-    prepareMetric('normalizedDistance', preparedHammingDistance, maximum, parsedPad),
+    prepareMetric(
+      'normalizedDistance',
+      preparedHammingDistance,
+      maxSequenceLength,
+      parsedPad,
+    ),
     { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )
 export const hammingNormalizedSimilarity: MaybeSequenceMetricImplementation<HammingOptions> =
   /* @__PURE__ */ withPreparedFlags(
     hammingNormalizedSimilarity_impl,
     NORMALIZED_SIMILARITY_FLAGS,
-    prepareMetric('normalizedSimilarity', preparedHammingDistance, maximum, parsedPad),
+    prepareMetric(
+      'normalizedSimilarity',
+      preparedHammingDistance,
+      maxSequenceLength,
+      parsedPad,
+    ),
     { configurationCanonicalizer: hammingConfigurationCanonicalizer },
   )

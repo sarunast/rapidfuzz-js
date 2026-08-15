@@ -86,3 +86,7 @@ export function elementsEqual(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boo
   }
   return true
 }
+
+export function maxSequenceLength(a: ArrayLike<unknown>, b: ArrayLike<unknown>): number {
+  return Math.max(a.length, b.length)
+}

@@ -2,22 +2,14 @@ import type { ChoiceIndexBuilder } from '../../core/scoring/choiceIndex.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import type { OptimumProof } from '../../core/scoring/optimumProof.js'
 import type { Sequence } from '../../core/types.js'
-import {
-  distanceCutoffFor,
-  distCutoff,
-  normalizeDistance,
-  normDistCutoff,
-  normSimCutoff,
-  simCutoff,
-  type MetricScoreKind,
-} from './cutoff.js'
+import { distanceCutoffFor, scoreFromDistance, type MetricScoreKind } from './cutoff.js'
 import { alignRepresentation, convSequence, scorerSequence } from './sequence.js'
 
 export const PREPARE_SCORER: unique symbol = Symbol('rapidfuzz.prepareScorer')
 
 export type ChoicePreparer = (choice: Sequence) => unknown
 
-export interface MetricPreparation {
+interface MetricPreparation {
   readonly prepareQuery: (query: Sequence) => PreparedKernel
   readonly prepareChoice: ChoicePreparer
   readonly indexChoices?: (() => ChoiceIndexBuilder) | undefined
@@ -78,16 +70,7 @@ export function prepareMetric(
             parsedOptions,
             distanceCutoffFor(kind, rawCutoff, max),
           )
-          switch (kind) {
-            case 'distance':
-              return distCutoff(score, rawCutoff)
-            case 'similarity':
-              return simCutoff(max - score, rawCutoff)
-            case 'normalizedDistance':
-              return normDistCutoff(normalizeDistance(score, max), rawCutoff)
-            case 'normalizedSimilarity':
-              return normSimCutoff(1 - normalizeDistance(score, max), rawCutoff)
-          }
+          return scoreFromDistance(kind, score, max, rawCutoff)
         }
       },
       prepareChoice: prepareChoiceSequence,
