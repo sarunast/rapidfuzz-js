@@ -1,11 +1,7 @@
 import type { Editop } from '../../../core/editops/index.js'
 import { preparePattern } from '../../bitmask/pattern.js'
-import {
-  levenshteinMatrix,
-  levenshteinMatrixBytes,
-  rowBitSet,
-  shiftedRowBitSet,
-} from '../../shared/bitParallel.js'
+import { rowBitSet, shiftedRowBitSet } from '../../bitmask/rowBits.js'
+import { levenshteinMatrix, levenshteinMatrixBytes } from './matrix.js'
 import {
   ALIGNMENT_MATRIX_LIMIT,
   growHirschbergRows,

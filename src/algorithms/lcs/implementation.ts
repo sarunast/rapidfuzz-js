@@ -41,12 +41,13 @@ import type { Sequence } from '../../core/types.js'
 import { commonAffix, sharesAffix } from '../affix.js'
 import { UNBOUNDED_MISSES, wordCount } from '../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
-import { lcsSeqMatrix, rowBitSet } from '../shared/bitParallel.js'
+import { rowBitSet } from '../bitmask/rowBits.js'
 import {
   lcsLengthPrepared,
   lcsLengthPreparedBounded,
   lcsLengthRange,
 } from './internal/kernel.js'
+import { lcsSeqMatrix } from './internal/matrix.js'
 
 export {
   lcsLengthPrepared as lcsSeqLengthPrepared,

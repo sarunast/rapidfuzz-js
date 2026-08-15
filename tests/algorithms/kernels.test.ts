@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest'
 
 import { commonAffix } from '../../src/algorithms/affix.js'
 import { preparePattern } from '../../src/algorithms/bitmask/pattern.js'
+import { rowBitSet, shiftedRowBitSet } from '../../src/algorithms/bitmask/rowBits.js'
 import { damerauLevenshteinDistance } from '../../src/algorithms/damerauLevenshtein/implementation.js'
 import { jaroSimilarity } from '../../src/algorithms/jaro/implementation.js'
 import {
@@ -31,7 +32,13 @@ import {
   lcsLengthPreparedBounded,
   lcsLengthRange,
 } from '../../src/algorithms/lcs/internal/kernel.js'
+import { lcsSeqMatrix } from '../../src/algorithms/lcs/internal/matrix.js'
 import { levenshteinEditops } from '../../src/algorithms/levenshtein/editops.js'
+import {
+  levenshteinMatrix,
+  levenshteinMatrixBytes,
+  levenshteinRowBytes,
+} from '../../src/algorithms/levenshtein/internal/matrix.js'
 import {
   levenshteinPrepared,
   levenshteinSmallBand,
@@ -48,14 +55,6 @@ import {
   osaOneWordRange,
   osaPrepared,
 } from '../../src/algorithms/osa/internal/kernel.js'
-import {
-  lcsSeqMatrix,
-  levenshteinMatrix,
-  levenshteinMatrixBytes,
-  levenshteinRowBytes,
-  rowBitSet,
-  shiftedRowBitSet,
-} from '../../src/algorithms/shared/bitParallel.js'
 import { fuzzPartialRatio } from '../../src/fuzz/partialRatio.js'
 import { partialRatioAlignment_impl } from '../../src/fuzz/partialWindow.js'
 import { fuzzRatio } from '../../src/fuzz/ratio.js'

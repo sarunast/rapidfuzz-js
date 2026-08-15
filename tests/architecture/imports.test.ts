@@ -302,6 +302,14 @@ describe('dependency direction', () => {
             ),
         ),
     ).toEqual([])
+
+    // And that a fourth foundation cannot appear outside the rule: every entry
+    // directly under `algorithms/` is a public algorithm or a named foundation.
+    expect(
+      shippedEntries(join(source, 'algorithms')).filter(
+        (name) => !ALGORITHM_DIRECTORIES.includes(name),
+      ),
+    ).toEqual([...ALGORITHM_FOUNDATIONS])
   })
 
   it('keeps Levenshtein internals below its public orchestration modules', () => {
@@ -337,6 +345,8 @@ describe('dependency direction', () => {
       'blockMasks.ts',
       'lookup.ts',
       'pattern.ts',
+      'positionMasks.ts',
+      'rowBits.ts',
     ])
   })
 
@@ -472,6 +482,7 @@ describe('dependency direction', () => {
 describe('removed architecture', () => {
   it.each([
     '_common.ts',
+    'algorithms/shared',
     'configure.ts',
     'distance/index.ts',
     'internal',

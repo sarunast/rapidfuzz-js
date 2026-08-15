@@ -293,9 +293,9 @@ describe('levenshteinEditops', () => {
   )
 })
 
-// Alignment recovery runs on the matrix kernels in `_bitParallel.ts` rather
-// than the score-only ones. Keep its scaling visible independently from
-// similarity.
+// Alignment recovery runs on the matrix kernels in `lcs/internal/matrix.ts`
+// and `levenshtein/internal/matrix.ts` rather than the score-only ones. Keep
+// its scaling visible independently from similarity.
 describe('lcsSeqEditops', () => {
   measure('32 chars, similar', () => {
     for (const [a, b] of medium) lcsSeqEditops(a, b)
