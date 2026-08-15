@@ -236,7 +236,20 @@ Source ownership follows dependency direction, guarded in `tests/architecture/`:
   `key -> packing -> profile -> compare -> kernel` with the optional inverted
   index in `ngram/inverted/` built on top and never reached back into.
   `tests/architecture/imports.test.ts` pins both directory listings and that
-  direction.
+  direction. `shared/editops/` is the one directory there with a barrel, and
+  deliberately: it is a representation facade — `Editops`, `Opcodes`, their
+  types and the constructor helper are one thing to import — where `ngram/`'s
+  file-by-file import _is_ its dependency architecture.
+- **The algorithms are not all peers.** Three are defined on another, so three
+  cross-algorithm edges exist and are allowed by name: `indel -> lcs`
+  (Indel distance is `|a| + |b| - 2·LCS`), `jaroWinkler -> jaro` (Jaro plus a
+  prefix bonus), and `levenshtein -> lcs` (weighted Levenshtein degenerates to
+  scaled Indel when insertion and deletion cost the same positive amount and
+  substitution costs at least their sum). `lcs` is the foundation the Indel and
+  fuzz families are built on, not a sibling of them. `imports.test.ts` holds
+  that allow-list and fails both ways — a fourth edge, or an entry no longer
+  used. It scopes itself to `algorithms/`, so the `fuzz -> lcs` edges are a
+  different question and are not on this list.
 - `fuzz/` is split by scorer family; basic similarity must not import token or
   adaptive-fuzzy modules.
 - `search/` and `batch/` depend only on core protocols, never on named

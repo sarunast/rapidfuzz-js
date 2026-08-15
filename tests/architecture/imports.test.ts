@@ -231,6 +231,39 @@ describe('dependency direction', () => {
     ).toEqual([])
   })
 
+  const FOUNDATION_EDGES: readonly string[] = [
+    'indel -> lcs',
+    'jaroWinkler -> jaro',
+    'levenshtein -> lcs',
+  ]
+
+  function algorithmDirectory(path: string): string | null {
+    const within = relative(join(source, 'algorithms'), path)
+    if (within.startsWith('..') || !within.includes(sep)) return null
+    const top = within.split(sep)[0]
+    return top === 'shared' ? null : (top ?? null)
+  }
+
+  it('lets an algorithm depend only on the foundations it is defined on', () => {
+    const crossings: string[] = []
+    const seen = new Set<string>()
+    for (const path of typeScriptFiles(join(source, 'algorithms'))) {
+      const from = algorithmDirectory(path)
+      if (from === null) continue
+      for (const dependency of sourceImports(path)) {
+        const to = algorithmDirectory(dependency)
+        if (to === null || to === from) continue
+        const edge = `${from} -> ${to}`
+        seen.add(edge)
+        if (!FOUNDATION_EDGES.includes(edge)) {
+          crossings.push(`${relative(source, path)} -> ${relative(source, dependency)}`)
+        }
+      }
+    }
+    expect(crossings).toEqual([])
+    expect([...seen].sort()).toEqual([...FOUNDATION_EDGES].sort())
+  })
+
   it('keeps Levenshtein internals below its public orchestration modules', () => {
     const directory = join(source, 'algorithms/levenshtein')
     const forbidden = (names: readonly string[]): Set<string> =>
