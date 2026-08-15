@@ -1,12 +1,12 @@
 // @ts-check
 /**
  * What each held structure costs in memory, over the corpus
- * `ngram-index.mjs` times: an indexed `Matcher`, a prepared `Matcher`, the gram
+ * `throughput.mjs` times: an indexed `Matcher`, a prepared `Matcher`, the gram
  * arrays `dice-coefficient` is handed, and a Fuse index.
  *
  * ```sh
- * pnpm build && node bench/comparison/ngram-index-memory.mjs
- * node bench/comparison/ngram-index-memory.mjs --max=1000000
+ * pnpm build && node bench/comparison/indexedSearch/memory.mjs
+ * node bench/comparison/indexedSearch/memory.mjs --max=1000000
  * ```
  *
  * **One arm per process, and that is the whole design.** Measuring several
@@ -28,7 +28,7 @@ import { execFileSync } from 'node:child_process'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-import { buildCorpus } from './ladder-corpus.mjs'
+import { buildCorpus } from './corpus.mjs'
 
 const GRAM_SIZE = 2
 
@@ -65,9 +65,9 @@ function retainedBytes() {
  */
 async function measureOne(arm, count) {
   const { similarity: diceSimilarity } =
-    await import('../../dist/algorithms/dice/index.js')
+    await import('../../../dist/algorithms/dice/index.js')
   const { createIndexedMatcher, createMatcher, createScorer } =
-    await import('../../dist/index.js')
+    await import('../../../dist/index.js')
   const scorer = createScorer(diceSimilarity, { gramSize: GRAM_SIZE })
 
   // The corpus is built before the baseline reading, so it is charged to the

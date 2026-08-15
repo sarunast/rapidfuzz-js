@@ -1,7 +1,7 @@
 node_modules/
 dist/
 .venv/
-bench/comparison/last-run.json
+bench/comparison/libraries/last-run.json
 coverage/
 *.tgz
 .DS_Store

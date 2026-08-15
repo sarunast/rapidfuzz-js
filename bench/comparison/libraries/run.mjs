@@ -9,7 +9,7 @@
  * node bench/comparison/run.mjs --python=/path/to/venv/bin/python
  * ```
  *
- * Two things separate this from `bench/tooling/compare.ts`, and they are the reason it
+ * Two things separate this from `bench/regression/compare.ts`, and they are the reason it
  * is a second script rather than more cases in the first:
  *
  *   - **It measures `dist/`, not `src/`.** Every contender is installed from
@@ -35,38 +35,38 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { similarity as cosineSimilarity } from '../../dist/algorithms/cosine/index.js'
-import { distance as damerauLevenshteinDistance } from '../../dist/algorithms/damerauLevenshtein/index.js'
-import { similarity as diceSimilarity } from '../../dist/algorithms/dice/index.js'
-import { distance as hammingDistance } from '../../dist/algorithms/hamming/index.js'
-import { distance as indelDistance } from '../../dist/algorithms/indel/index.js'
-import { similarity as jaroSimilarity } from '../../dist/algorithms/jaro/index.js'
-import { similarity as jaroWinklerSimilarity } from '../../dist/algorithms/jaroWinkler/index.js'
+import { similarity as cosineSimilarity } from '../../../dist/algorithms/cosine/index.js'
+import { distance as damerauLevenshteinDistance } from '../../../dist/algorithms/damerauLevenshtein/index.js'
+import { similarity as diceSimilarity } from '../../../dist/algorithms/dice/index.js'
+import { distance as hammingDistance } from '../../../dist/algorithms/hamming/index.js'
+import { distance as indelDistance } from '../../../dist/algorithms/indel/index.js'
+import { similarity as jaroSimilarity } from '../../../dist/algorithms/jaro/index.js'
+import { similarity as jaroWinklerSimilarity } from '../../../dist/algorithms/jaroWinkler/index.js'
 import {
   editops as lcsEditops,
   similarity as lcsSimilarity,
-} from '../../dist/algorithms/lcs/index.js'
+} from '../../../dist/algorithms/lcs/index.js'
 import {
   distance as levenshteinDistance,
   editops as levenshteinEditops,
-} from '../../dist/algorithms/levenshtein/index.js'
-import { distance as osaDistance } from '../../dist/algorithms/osa/index.js'
-import { distance as postfixDistance } from '../../dist/algorithms/postfix/index.js'
-import { distance as prefixDistance } from '../../dist/algorithms/prefix/index.js'
+} from '../../../dist/algorithms/levenshtein/index.js'
+import { distance as osaDistance } from '../../../dist/algorithms/osa/index.js'
+import { distance as postfixDistance } from '../../../dist/algorithms/postfix/index.js'
+import { distance as prefixDistance } from '../../../dist/algorithms/prefix/index.js'
 import {
   weightedRatio,
   partialRatio,
   ratio as fuzzRatio,
   tokenSetRatio,
   tokenSortRatio,
-} from '../../dist/fuzz/index.js'
+} from '../../../dist/fuzz/index.js'
 import {
   bestMatch,
   createMatcher,
   createScorer,
   scoreMatrix,
   scorePairs,
-} from '../../dist/index.js'
+} from '../../../dist/index.js'
 
 // The contenders are dependencies of `bench/comparison/package.json`, not of
 // the library — nothing in `src/`, `tests/` or the baseline benchmarks needs
@@ -127,8 +127,8 @@ function winkCosine(gramSize) {
  * are handed the same strings.
  */
 const RAW = { full_process: false }
+import { speedup, time } from '../shared/timing.mjs'
 import { buildCorpus, PAIR_LENGTHS } from './corpus.mjs'
-import { speedup, time } from './timing.mjs'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 

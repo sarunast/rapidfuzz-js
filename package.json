@@ -119,7 +119,7 @@
     "bench:compare:quick": "node bench/regression/compare.ts --quick",
     "bench:confirm": "node bench/regression/compare.ts --confirm",
     "bench:baseline": "node bench/regression/compare.ts --record",
-    "bench:libraries": "node bench/comparison/run.mjs",
+    "bench:libraries": "node bench/comparison/libraries/run.mjs",
     "typecheck": "npm run typecheck:library && npm run typecheck:tooling && npm run typecheck:dev",
     "typecheck:library": "tsc --noEmit",
     "typecheck:tooling": "tsc -p tsconfig.scripts.json",

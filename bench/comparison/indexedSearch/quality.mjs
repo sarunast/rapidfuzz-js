@@ -4,10 +4,10 @@
  * cannot show.
  *
  * ```sh
- * pnpm build && node bench/comparison/search-quality.mjs
+ * pnpm build && node bench/comparison/indexedSearch/quality.mjs
  * ```
  *
- * `ngram-index.mjs` measures how fast each library narrows a list. Fast is only
+ * `throughput.mjs` measures how fast each library narrows a list. Fast is only
  * half an answer: a search that returns in a microsecond without the item the
  * user typed has not done the job. This script asks the other half. It takes
  * known entries out of the corpus, damages them the way a person does — a
@@ -30,9 +30,9 @@
 
 import process from 'node:process'
 
-import { similarity as diceSimilarity } from '../../dist/algorithms/dice/index.js'
-import { createIndexedMatcher, createMatcher, createScorer } from '../../dist/index.js'
-import { buildCorpus } from './ladder-corpus.mjs'
+import { similarity as diceSimilarity } from '../../../dist/algorithms/dice/index.js'
+import { createIndexedMatcher, createMatcher, createScorer } from '../../../dist/index.js'
+import { buildCorpus } from './corpus.mjs'
 
 let uFuzzy, Fuse, fuzzball, stringSimilarity, diceCoefficient, nGram
 try {
@@ -258,6 +258,6 @@ for (const [name, run] of ARMS) {
 console.log(
   `\n  Out of ${TARGETS} per cell. Times are one warm pass over every query, not a\n` +
     '  median — read them as an order of magnitude and take the real figures from\n' +
-    '  ngram-index.mjs. uFuzzy and Fuse appear twice because their defaults refuse\n' +
+    '  throughput.mjs. uFuzzy and Fuse appear twice because their defaults refuse\n' +
     '  intra-word errors and off-start matches respectively.\n',
 )

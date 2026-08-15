@@ -4,7 +4,7 @@ This document explains how `rapidfuzz-js` performs, how the measurements are
 calculated, and how to reproduce them.
 
 Every number below comes from a single recorded pass of
-[`bench/comparison/run.mjs`](bench/comparison/run.mjs), plus one pass of the
+[`bench/comparison/libraries/run.mjs`](bench/comparison/libraries/run.mjs), plus one pass of the
 internal `bench/suites/process.bench.ts` for the `Matcher` table. Rerunning replaces
 all of them together; do not update one table from a later run.
 
@@ -16,13 +16,13 @@ Two sections are exceptions, and both are marked as such:
   makes them comparable to the rest without being from the same pass — and they
   were reproduced across three runs.
 - **Searching a growing collection** is a separate script with its own corpus,
-  `bench/comparison/ngram-index.mjs`, because it varies the size of the
+  `bench/comparison/indexedSearch/throughput.mjs`, because it varies the size of the
   collection and the rest of the suite does not. Its times are absolute, every
   arm in it ran in one process, and a second run reproduced every figure over
   1 ms to within 4% and the sub-microsecond cells to within 10%. Its memory
-  table comes from `ngram-index-memory.mjs`, which measures every cell in a
+  table comes from `indexedSearch/memory.mjs`, which measures every cell in a
   child process of its own and reproduced identically across three runs, and
-  its hit-rate table from `search-quality.mjs`, which is deterministic — the
+  its hit-rate table from `indexedSearch/quality.mjs`, which is deterministic — the
   corpus, the damage and every library's configuration are fixed, so it returns
   the same counts every time.
 
@@ -365,7 +365,7 @@ separate: a `Matcher` scores every choice, and an indexed one scores only the
 choices that share an n-gram with the query.
 
 Recorded in its own pass of
-[`bench/comparison/ngram-index.mjs`](bench/comparison/ngram-index.mjs) and
+[`bench/comparison/indexedSearch/throughput.mjs`](bench/comparison/indexedSearch/throughput.mjs) and
 reproduced in a second run; see the note at the top of this document.
 
 ### The workload
@@ -759,20 +759,20 @@ from an exact catalog entry to a string sharing nothing with it.
 
 Source files:
 
-- [`bench/comparison/run.mjs`](bench/comparison/run.mjs) runs the comparisons.
-- [`bench/comparison/ngram-index.mjs`](bench/comparison/ngram-index.mjs) runs
+- [`bench/comparison/libraries/run.mjs`](bench/comparison/libraries/run.mjs) runs the comparisons.
+- [`bench/comparison/indexedSearch/throughput.mjs`](bench/comparison/indexedSearch/throughput.mjs) runs
   the size ladder with the same timing loop, and
-  [`ngram-index-memory.mjs`](bench/comparison/ngram-index-memory.mjs) measures
+  [`indexedSearch/memory.mjs`](bench/comparison/indexedSearch/memory.mjs) measures
   what each structure in it retains, one child process per cell.
-- [`bench/comparison/search-quality.mjs`](bench/comparison/search-quality.mjs)
+- [`bench/comparison/indexedSearch/quality.mjs`](bench/comparison/indexedSearch/quality.mjs)
   measures whether each library finds the entry a damaged query came from.
-- [`bench/comparison/ladder-corpus.mjs`](bench/comparison/ladder-corpus.mjs)
+- [`bench/comparison/indexedSearch/corpus.mjs`](bench/comparison/indexedSearch/corpus.mjs)
   builds the ladder's corpus, shared by all three so the space and hit-rate
   figures describe the strings the time figures used.
-- [`bench/comparison/corpus.mjs`](bench/comparison/corpus.mjs) builds the corpus.
-- [`bench/comparison/timing.mjs`](bench/comparison/timing.mjs) defines the
+- [`bench/comparison/libraries/corpus.mjs`](bench/comparison/libraries/corpus.mjs) builds the corpus.
+- [`bench/comparison/shared/timing.mjs`](bench/comparison/shared/timing.mjs) defines the
   JavaScript timing loop.
-- [`bench/comparison/rapidfuzz_bench.py`](bench/comparison/rapidfuzz_bench.py)
+- [`bench/comparison/libraries/rapidfuzz_bench.py`](bench/comparison/libraries/rapidfuzz_bench.py)
   mirrors that loop for Python.
 
 ## Internal performance metrics
@@ -847,7 +847,7 @@ pnpm install --dir bench/comparison
 pnpm bench:libraries
 ```
 
-The runner writes raw results to `bench/comparison/last-run.json`, which is
+The runner writes raw results to `bench/comparison/libraries/last-run.json`, which is
 ignored by Git.
 
 The size ladder behind
@@ -855,9 +855,9 @@ The size ladder behind
 script over its own corpus:
 
 ```sh
-node bench/comparison/ngram-index.mjs
-node bench/comparison/ngram-index.mjs --gram=3
-node bench/comparison/ngram-index.mjs --max=1000000
+node bench/comparison/indexedSearch/throughput.mjs
+node bench/comparison/indexedSearch/throughput.mjs --gram=3
+node bench/comparison/indexedSearch/throughput.mjs --max=1000000
 ```
 
 A full ladder including the 1,000,000-choice rung takes about three minutes.
@@ -869,8 +869,8 @@ What each structure retains is a second script, because every cell needs its own
 process:
 
 ```sh
-node bench/comparison/ngram-index-memory.mjs
-node bench/comparison/ngram-index-memory.mjs --max=1000000
+node bench/comparison/indexedSearch/memory.mjs
+node bench/comparison/indexedSearch/memory.mjs --max=1000000
 ```
 
 It spawns one child per structure and size, and takes about twelve seconds. The
@@ -880,7 +880,7 @@ children are given an 8 GB old space, which the largest arms need — a prepared
 Whether each library finds the entry the query came from is a third:
 
 ```sh
-node bench/comparison/search-quality.mjs
+node bench/comparison/indexedSearch/quality.mjs
 ```
 
 It is deterministic and takes about a minute. uFuzzy and Fuse each appear twice
@@ -892,7 +892,7 @@ To include Python RapidFuzz:
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install rapidfuzz numpy
-node bench/comparison/run.mjs --python=.venv/bin/python
+node bench/comparison/libraries/run.mjs --python=.venv/bin/python
 ```
 
 You can also set `RAPIDFUZZ_PYTHON` to the Python interpreter path.

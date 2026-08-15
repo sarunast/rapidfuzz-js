@@ -6,7 +6,7 @@ shape and the same statistic, and prints seconds-per-pass as JSON on stdout.
 Run through `run.mjs`, not directly:
 
     python3 -m venv .venv && .venv/bin/pip install rapidfuzz
-    node bench/comparison/run.mjs --python=.venv/bin/python
+    node bench/comparison/libraries/run.mjs --python=.venv/bin/python
 
 The timing here mirrors `timing.mjs` deliberately — three warm-up passes, a
 pass scaled to at least 50ms, nine timed ones, report the median. There is less

@@ -2,7 +2,7 @@
 /**
  * The corpus both legs of the comparison run against.
  *
- * Deliberately separate from `bench/_corpus.ts`, which is fingerprinted into
+ * Deliberately separate from `bench/harness/corpus.ts`, which is fingerprinted into
  * every baseline entry — editing that file costs a full re-record, and this one
  * has nothing to do with the baseline suite. It is also `.mjs` rather than
  * `.ts` because the Python leg reads the same data through a JSON file, and a
@@ -16,7 +16,7 @@
 const LOWERCASE = 'abcdefghijklmnopqrstuvwxyz'
 
 /**
- * xorshift32. The same generator `bench/_corpus.ts` uses, restated here rather
+ * xorshift32. The same generator `bench/harness/corpus.ts` uses, restated here rather
  * than imported, because that file is fingerprinted and this one must not
  * depend on it.
  *

@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * The corpus the size ladder searches, shared by the two scripts that measure
- * it — `ngram-index.mjs` for time and `ngram-index-memory.mjs` for space. One
+ * it — `throughput.mjs` for time and `memory.mjs` for space. One
  * definition, because a memory figure that describes different strings from the
  * timing figure beside it is worse than no figure.
  */

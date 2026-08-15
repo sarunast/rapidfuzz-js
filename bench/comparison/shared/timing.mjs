@@ -2,7 +2,7 @@
 /**
  * The timing loop both legs share, restated in Python in `rapidfuzz_bench.py`.
  *
- * Not `bench/_harness.ts`: that one is fingerprinted into every baseline entry
+ * Not `bench/harness/harness.ts`: that one is fingerprinted into every baseline entry
  * and answers a different question — how this library moves against its own
  * past. This one compares two implementations inside one process, where the
  * only defensible statistic is a median over repeats. A machine that spikes

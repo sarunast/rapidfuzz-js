@@ -5,7 +5,7 @@
 // and the shared bitmask builder additionally keeps a symbol table that widens
 // permanently, a one-entry mask memo and a generation counter. The benchmarks
 // clear all of that between cases so that a case's number does not depend on
-// which case ran before it — see `bench/_harness.ts`.
+// which case ran before it — see `bench/harness/harness.ts`.
 //
 // That makes the reset functions load-bearing for the benchmark methodology in
 // a way nothing else checks: a buffer they forget leaves the order dependence

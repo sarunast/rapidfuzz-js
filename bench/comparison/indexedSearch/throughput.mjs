@@ -4,9 +4,9 @@
  * two matchers against the JavaScript packages that do the same job.
  *
  * ```sh
- * pnpm build && node bench/comparison/ngram-index.mjs
- * node bench/comparison/ngram-index.mjs --gram=3
- * node bench/comparison/ngram-index.mjs --max=1000000
+ * pnpm build && node bench/comparison/indexedSearch/throughput.mjs
+ * node bench/comparison/indexedSearch/throughput.mjs --gram=3
+ * node bench/comparison/indexedSearch/throughput.mjs --max=1000000
  * ```
  *
  * Eight arms answer the same question — _which of these N strings best matches
@@ -43,15 +43,15 @@
 
 import process from 'node:process'
 
-import { similarity as diceSimilarity } from '../../dist/algorithms/dice/index.js'
+import { similarity as diceSimilarity } from '../../../dist/algorithms/dice/index.js'
 import {
   createIndexedMatcher,
   createMatcher,
   createScorer,
   search,
-} from '../../dist/index.js'
-import { buildCorpus } from './ladder-corpus.mjs'
-import { time } from './timing.mjs'
+} from '../../../dist/index.js'
+import { time } from '../shared/timing.mjs'
+import { buildCorpus } from './corpus.mjs'
 
 let uFuzzy, Fuse, fuzzball, stringSimilarity, diceCoefficient, nGram
 try {
