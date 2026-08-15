@@ -8,12 +8,7 @@
  * putting it here keeps those tables comparable to upstream's line for line,
  * and keeps the API from carrying a method that exists for the tests.
  */
-import type {
-  EditopTag,
-  Editops,
-  OpcodeTag,
-  Opcodes,
-} from '../src/algorithms/shared/editops/index.js'
+import type { EditopTag, Editops, OpcodeTag, Opcodes } from '../src/core/editops/index.js'
 
 /** Flatten an `Editops` record list into upstream's `(tag, srcPos, destPos)`. */
 export function editopTuples(ops: Editops): Array<[EditopTag, number, number]> {

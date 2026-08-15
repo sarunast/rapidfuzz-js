@@ -8,9 +8,12 @@
 // values are the same values.
 import { describe, expect, it } from 'vitest'
 
-import { callUntyped } from '../../../../testing/untyped.js'
-import * as indel from '../../indel/index.js'
-import { levenshteinEditops, levenshteinOpcodes } from '../../levenshtein/editops.js'
+import { callUntyped } from '../../../testing/untyped.js'
+import * as indel from '../../algorithms/indel/index.js'
+import {
+  levenshteinEditops,
+  levenshteinOpcodes,
+} from '../../algorithms/levenshtein/editops.js'
 import { Editops, Opcodes, type Editop, type EditopTag, type Opcode } from './index.js'
 
 it('exposes canonical edit-operation producers in both forms', () => {

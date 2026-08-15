@@ -228,6 +228,12 @@ Source ownership follows dependency direction, guarded in `tests/architecture/`:
      core primitives
   ```
 
+  `core/editops/` is a primitive and the one directory in `core/` with a
+  barrel, deliberately: it is a representation facade — `Editops`, `Opcodes`,
+  their types and the constructor helper are one thing to import. It is core's
+  rather than any algorithm's because Hamming, Indel, LCS and Levenshtein all
+  produce the same edit script, and none of them owns what it is.
+
 - Each algorithm directory owns its public metric, compilation, preparation and
   hot kernels. Below them sit the **algorithm foundations** — `affix.ts`,
   `bitmask/`, `ngram/` — proven low-level data structures that a public

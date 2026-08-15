@@ -15,7 +15,7 @@
  * still map. See README's "Differences from Python RapidFuzz" for the rest.
  */
 
-import { hasSurrogatePair } from '../../../core/sequence.js'
+import { hasSurrogatePair } from '../sequence.js'
 import type { Editop, MatchingBlock, Opcode, OpcodeTag } from './types.js'
 
 export type { Editop, EditopTag, MatchingBlock, Opcode, OpcodeTag } from './types.js'

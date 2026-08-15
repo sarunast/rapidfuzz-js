@@ -3,7 +3,7 @@ import {
   type Editop,
   type Editops,
   type Opcodes,
-} from '../shared/editops/index.js'
+} from '../../core/editops/index.js'
 import {
   validateSequence,
   convPair,

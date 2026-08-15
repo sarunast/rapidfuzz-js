@@ -1,3 +1,4 @@
+import type { Editops, Opcodes } from '../../core/editops/index.js'
 import { directMetric } from '../../core/scoring/builtIn/directMetric.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
 import { sharesAffix } from '../affix.js'
@@ -11,7 +12,6 @@ import {
   prepareLcsPattern,
   UNBOUNDED_MISSES,
 } from '../lcs/implementation.js'
-import type { Editops, Opcodes } from '../shared/editops/index.js'
 import {
   alignRepresentation,
   distanceCutoffFor,

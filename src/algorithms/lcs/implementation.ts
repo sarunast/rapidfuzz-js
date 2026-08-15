@@ -1,14 +1,14 @@
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import { commonAffix, sharesAffix } from '../affix.js'
-import { UNBOUNDED_MISSES, wordCount } from '../bitmask/blockMasks.js'
-import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
-import { lcsSeqMatrix, rowBitSet } from '../shared/bitParallel.js'
 import {
   editopsFromValidated,
   type Editop,
   type Editops,
   type Opcodes,
-} from '../shared/editops/index.js'
+} from '../../core/editops/index.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import { commonAffix, sharesAffix } from '../affix.js'
+import { UNBOUNDED_MISSES, wordCount } from '../bitmask/blockMasks.js'
+import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
+import { lcsSeqMatrix, rowBitSet } from '../shared/bitParallel.js'
 import {
   alignRepresentation,
   canonicalRawCutoff,
