@@ -128,14 +128,16 @@ Two habits follow from this:
 
 ## Code speaks for itself
 
-The default is no comment. A better name, a named intermediate, or an extracted
-function explains more reliably than prose beside the code does — a comment that
-restates the line is one more thing that can drift out of true, and it will.
+Write almost no internal comments. A better name, a named intermediate, or an
+extracted function explains more reliably than prose beside the code does — a
+comment that restates the line is one more thing that can drift out of true,
+and it will.
 
-Write one only where it adds what the code cannot: why a bound is that number,
-what a measurement found, what a non-obvious ordering protects, why the obvious
-simpler form is wrong. Two or three lines. Not the investigation that produced
-it — a date, a version and the conclusion carry that.
+The one exception is genuinely kernel-hard code: a bit-parallel recurrence, a
+carry chain, an aliasing or ordering constraint that is invisible in the
+expression. There, two or three lines saying what the reader cannot derive.
+Nowhere else, and never the investigation that produced the code — measurement
+narratives belong in the commit message, not beside the loop.
 
 This governs the **inside** of a module. The public surface is the exception,
 and it is a hard requirement — see below.
