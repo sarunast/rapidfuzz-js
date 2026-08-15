@@ -13,7 +13,7 @@
 // those scorers happen to use today.
 import { describe, expect, it } from 'vitest'
 
-import { convSequence } from '../../algorithms/shared/scorerSupport.js'
+import { convSequence } from '../../core/sequence.js'
 import { fuzzTokenRatio } from './tokenRatio.js'
 import {
   difference,

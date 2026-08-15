@@ -4,38 +4,44 @@ import {
   type Editops,
   type Opcodes,
 } from '../../core/editops/index.js'
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import { commonAffix, sharesAffix } from '../affix.js'
-import { UNBOUNDED_MISSES, wordCount } from '../bitmask/blockMasks.js'
-import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
-import { lcsSeqMatrix, rowBitSet } from '../shared/bitParallel.js'
 import {
-  alignRepresentation,
   canonicalRawCutoff,
   canonicalSimilarityCutoff,
   distanceCutoffFor,
   scoreFromDistance,
   type MetricScoreKind,
-  convPair,
   distCutoff,
   normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-  type ScorerOptions,
-  type Sequence,
+} from '../../core/scoring/builtIn/cutoff.js'
+import {
   DISTANCE_FLAGS,
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
-  prepareChoiceSequence,
-  preparedChoiceSequence,
-  scorerSequence,
-  type PreparationFactory,
   withPreparedFlags,
   type MetricImplementation,
+} from '../../core/scoring/builtIn/implementation.js'
+import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
+import {
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  type PreparationFactory,
+} from '../../core/scoring/builtIn/preparation.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import {
+  alignRepresentation,
+  convPair,
+  scorerSequence,
   maxSequenceLength,
-} from '../shared/scorerSupport.js'
+} from '../../core/sequence.js'
+import type { Sequence } from '../../core/types.js'
+import { commonAffix, sharesAffix } from '../affix.js'
+import { UNBOUNDED_MISSES, wordCount } from '../bitmask/blockMasks.js'
+import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
+import { lcsSeqMatrix, rowBitSet } from '../shared/bitParallel.js'
 import {
   lcsLengthPrepared,
   lcsLengthPreparedBounded,

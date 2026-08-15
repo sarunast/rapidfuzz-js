@@ -6,11 +6,7 @@ import {
   lcsSeqLengthRange,
   prepareLcsPattern,
 } from '../algorithms/lcs/implementation.js'
-import {
-  validateSequence,
-  convPair,
-  isMissing,
-} from '../algorithms/shared/scorerSupport.js'
+import { validateSequence, convPair, isMissing } from '../core/sequence.js'
 import type { FuzzInput, FuzzOptions, ScoreAlignment } from './types.js'
 
 function indelNormSim(

@@ -1,7 +1,5 @@
-import {
-  PREPARE_SCORER,
-  type PreparedCapability,
-} from '../src/algorithms/shared/scorerSupport.js'
+import type { PreparedCapability } from '../src/core/scoring/builtIn/implementation.js'
+import { PREPARE_SCORER } from '../src/core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '../src/core/scoring/compilation.js'
 import { validateSequence } from '../src/core/sequence.js'
 import type { Sequence } from '../src/core/types.js'

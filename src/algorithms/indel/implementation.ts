@@ -1,6 +1,26 @@
 import type { Editops, Opcodes } from '../../core/editops/index.js'
+import {
+  distanceCutoffFor,
+  scoreFromDistance,
+  type MetricScoreKind,
+} from '../../core/scoring/builtIn/cutoff.js'
 import { directMetric } from '../../core/scoring/builtIn/directMetric.js'
+import {
+  DISTANCE_FLAGS,
+  NORMALIZED_DISTANCE_FLAGS,
+  NORMALIZED_SIMILARITY_FLAGS,
+  SIMILARITY_FLAGS,
+  withPreparedFlags,
+  type MetricImplementation,
+} from '../../core/scoring/builtIn/implementation.js'
+import {
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  type PreparationFactory,
+} from '../../core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import { alignRepresentation, scorerSequence } from '../../core/sequence.js'
+import type { Sequence } from '../../core/types.js'
 import { sharesAffix } from '../affix.js'
 import { wordCount } from '../bitmask/blockMasks.js'
 import type { PatternMask } from '../bitmask/pattern.js'
@@ -12,23 +32,6 @@ import {
   prepareLcsPattern,
   UNBOUNDED_MISSES,
 } from '../lcs/implementation.js'
-import {
-  alignRepresentation,
-  distanceCutoffFor,
-  scoreFromDistance,
-  type MetricScoreKind,
-  type Sequence,
-  DISTANCE_FLAGS,
-  NORMALIZED_DISTANCE_FLAGS,
-  NORMALIZED_SIMILARITY_FLAGS,
-  SIMILARITY_FLAGS,
-  prepareChoiceSequence,
-  preparedChoiceSequence,
-  scorerSequence,
-  type PreparationFactory,
-  withPreparedFlags,
-  type MetricImplementation,
-} from '../shared/scorerSupport.js'
 
 function combinedLength(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
   return s1.length + s2.length

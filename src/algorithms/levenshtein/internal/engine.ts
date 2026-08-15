@@ -1,16 +1,14 @@
-import { lcsLengthRange } from '../../lcs/internal/kernel.js'
 import {
   canonicalRawCutoff,
   canonicalSimilarityCutoff,
-  convPair,
-  hasSurrogatePair,
-  isSequence,
   normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-  type Sequence,
-} from '../../shared/scorerSupport.js'
+} from '../../../core/scoring/builtIn/cutoff.js'
+import { convPair, hasSurrogatePair, isSequence } from '../../../core/sequence.js'
+import type { Sequence } from '../../../core/types.js'
+import { lcsLengthRange } from '../../lcs/internal/kernel.js'
 import type {
   LevenshteinCosts,
   LevenshteinOptions,

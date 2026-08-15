@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import {
+  convSequence,
   isSequence,
   normalizeSequence,
   snapshotSequence,
@@ -110,5 +111,9 @@ describe('the sequence boundary', () => {
     expect(() => Reflect.apply(normalizeSequence, undefined, ['abc', () => 42])).toThrow(
       'expected a string or an array-like sequence',
     )
+  })
+
+  test('converts single-character elements without changing longer strings', () => {
+    expect(convSequence(['a', '😀', 'ab'])).toEqual([97, 0x1f600, 'ab'])
   })
 })

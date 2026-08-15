@@ -4,7 +4,8 @@ import {
   type Editops,
   type Opcodes,
 } from '../../core/editops/index.js'
-import { convPair, type Sequence } from '../shared/scorerSupport.js'
+import { convPair } from '../../core/sequence.js'
+import type { Sequence } from '../../core/types.js'
 import { alignHirschberg } from './internal/alignment.js'
 
 /**

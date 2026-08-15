@@ -1,26 +1,28 @@
+import { normDistCutoff, normSimCutoff } from '../../core/scoring/builtIn/cutoff.js'
+import {
+  type ConfigurationCanonicalizer,
+  type MaybeSequenceMetricImplementation,
+  NORMALIZED_DISTANCE_FLAGS,
+  NORMALIZED_SIMILARITY_FLAGS,
+  withPreparedFlags,
+} from '../../core/scoring/builtIn/implementation.js'
+import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
+import {
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  type PreparationFactory,
+} from '../../core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import { commonPrefix } from '../affix.js'
-import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
-import { jaroSimilarity_, jaroSimilarityPrepared_ } from '../jaro/implementation.js'
 import {
   alignRepresentation,
   validateSequence,
   convPair,
-  type ConfigurationCanonicalizer,
-  normDistCutoff,
-  normSimCutoff,
-  type MaybeSequence,
-  type Sequence,
-  type MaybeSequenceMetricImplementation,
-  type ScorerOptions,
-  NORMALIZED_DISTANCE_FLAGS,
-  NORMALIZED_SIMILARITY_FLAGS,
-  prepareChoiceSequence,
-  preparedChoiceSequence,
   scorerSequence,
-  type PreparationFactory,
-  withPreparedFlags,
-} from '../shared/scorerSupport.js'
+} from '../../core/sequence.js'
+import type { MaybeSequence, Sequence } from '../../core/types.js'
+import { commonPrefix } from '../affix.js'
+import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
+import { jaroSimilarity_, jaroSimilarityPrepared_ } from '../jaro/implementation.js'
 
 interface JaroWinklerOptions extends ScorerOptions {
   prefixWeight?: number | undefined

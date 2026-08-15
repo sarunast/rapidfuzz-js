@@ -1,4 +1,16 @@
+import { normDistCutoff, normSimCutoff } from '../../core/scoring/builtIn/cutoff.js'
+import {
+  NORMALIZED_DISTANCE_FLAGS,
+  NORMALIZED_SIMILARITY_FLAGS,
+  withPreparedFlags,
+  type ConfigurationCanonicalizer,
+  type MaybeSequenceMetricImplementation,
+} from '../../core/scoring/builtIn/implementation.js'
+import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
+import type { PreparationFactory } from '../../core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import { validateSequence, convPair, elementsEqual } from '../../core/sequence.js'
+import type { MaybeSequence, Sequence } from '../../core/types.js'
 import { directSharedFrequency, sharedFrequency } from '../ngram/compare.js'
 import { parseGramSize, validGramSize } from '../ngram/gramSize.js'
 import { createDiceIndexBuilder } from '../ngram/inverted/dice.js'
@@ -10,22 +22,6 @@ import {
   zeroGramSimilarity,
   type NGramProfile,
 } from '../ngram/profile.js'
-import {
-  validateSequence,
-  convPair,
-  elementsEqual,
-  NORMALIZED_DISTANCE_FLAGS,
-  NORMALIZED_SIMILARITY_FLAGS,
-  normDistCutoff,
-  normSimCutoff,
-  withPreparedFlags,
-  type ConfigurationCanonicalizer,
-  type MaybeSequence,
-  type MaybeSequenceMetricImplementation,
-  type PreparationFactory,
-  type ScorerOptions,
-  type Sequence,
-} from '../shared/scorerSupport.js'
 
 export interface DiceOptions extends ScorerOptions {
   readonly gramSize?: number | undefined

@@ -1,4 +1,4 @@
-import type { ScorerOptions } from '../shared/scorerSupport.js'
+import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
 
 /** Cost of an insertion, a deletion, and a substitution, in that order. */
 export type LevenshteinWeights = readonly [

@@ -1,26 +1,32 @@
-import { directMetric } from '../../core/scoring/builtIn/directMetric.js'
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import { commonAffix } from '../affix.js'
-import { WORD_LIMIT } from '../bitmask/blockMasks.js'
-import { preparePattern } from '../bitmask/pattern.js'
 import {
-  alignRepresentation,
   distanceCutoffFor,
   scoreFromDistance,
   type MetricScoreKind,
-  type Sequence,
+} from '../../core/scoring/builtIn/cutoff.js'
+import { directMetric } from '../../core/scoring/builtIn/directMetric.js'
+import {
   DISTANCE_FLAGS,
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
-  prepareChoiceSequence,
-  preparedChoiceSequence,
-  scorerSequence,
-  type PreparationFactory,
   withPreparedFlags,
   type MetricImplementation,
+} from '../../core/scoring/builtIn/implementation.js'
+import {
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  type PreparationFactory,
+} from '../../core/scoring/builtIn/preparation.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import {
+  alignRepresentation,
+  scorerSequence,
   maxSequenceLength,
-} from '../shared/scorerSupport.js'
+} from '../../core/sequence.js'
+import type { Sequence } from '../../core/types.js'
+import { commonAffix } from '../affix.js'
+import { WORD_LIMIT } from '../bitmask/blockMasks.js'
+import { preparePattern } from '../bitmask/pattern.js'
 import { osaOneWordRange, osaOneWordPrepared, osaPrepared } from './internal/kernel.js'
 
 function distance_(

@@ -1,5 +1,5 @@
 import type { PatternMask } from '../../algorithms/bitmask/pattern.js'
-import { validateSequence, isMissing } from '../../algorithms/shared/scorerSupport.js'
+import { validateSequence, isMissing } from '../../core/sequence.js'
 import { indelNormSimHeld, ratioConverted } from '../partialWindow.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
 import {

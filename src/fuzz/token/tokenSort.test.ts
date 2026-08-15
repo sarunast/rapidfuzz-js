@@ -9,7 +9,7 @@
 // Every expected score below was taken from rapidfuzz 3.14.5 on 2026-08-13.
 import { describe, expect, it } from 'vitest'
 
-import { convSequence } from '../../algorithms/shared/scorerSupport.js'
+import { convSequence } from '../../core/sequence.js'
 import { tokenViewOf } from './tokens.js'
 import { tokenSortRatioConverted } from './tokenSort.js'
 import { fuzzTokenSortRatio } from './tokenSortRatio.js'

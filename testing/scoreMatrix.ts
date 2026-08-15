@@ -1,7 +1,5 @@
-import type {
-  ErasedMetricImplementation,
-  MaybeSequence,
-} from '../src/algorithms/shared/scorerSupport.js'
+import type { ErasedMetricImplementation } from '../src/core/scoring/builtIn/implementation.js'
+import type { MaybeSequence } from '../src/core/types.js'
 
 interface MatrixTestOptions {
   readonly scorer: ErasedMetricImplementation

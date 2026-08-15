@@ -1,23 +1,23 @@
-import { commonPrefix } from '../affix.js'
 import {
-  convPair,
-  validateSequence,
   distCutoff,
   normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
-  type ScorerOptions,
-  type MaybeSequence,
-  prepareMetric,
+} from '../../core/scoring/builtIn/cutoff.js'
+import {
   withPreparedFlags,
   DISTANCE_FLAGS,
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
   SIMILARITY_FLAGS,
   type MaybeSequenceMetricImplementation,
-  maxSequenceLength,
-} from '../shared/scorerSupport.js'
+} from '../../core/scoring/builtIn/implementation.js'
+import type { ScorerOptions } from '../../core/scoring/builtIn/options.js'
+import { prepareMetric } from '../../core/scoring/builtIn/preparation.js'
+import { convPair, validateSequence, maxSequenceLength } from '../../core/sequence.js'
+import type { MaybeSequence } from '../../core/types.js'
+import { commonPrefix } from '../affix.js'
 
 function preparedPrefixDistance(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
   return maxSequenceLength(s1, s2) - commonPrefix(s1, s2)

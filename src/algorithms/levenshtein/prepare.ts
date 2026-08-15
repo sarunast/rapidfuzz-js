@@ -1,19 +1,20 @@
-import type { PreparedKernel } from '../../core/scoring/compilation.js'
-import type { Sequence } from '../../core/types.js'
-import { sharesWideAffix } from '../affix.js'
-import { wordCount } from '../bitmask/blockMasks.js'
-import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
 import {
-  alignRepresentation,
   normalizeDistance,
   normDistCutoff,
   normSimCutoff,
   simCutoff,
+} from '../../core/scoring/builtIn/cutoff.js'
+import {
   prepareChoiceSequence,
   preparedChoiceSequence,
-  scorerSequence,
   type PreparationFactory,
-} from '../shared/scorerSupport.js'
+} from '../../core/scoring/builtIn/preparation.js'
+import type { PreparedKernel } from '../../core/scoring/compilation.js'
+import { alignRepresentation, scorerSequence } from '../../core/sequence.js'
+import type { Sequence } from '../../core/types.js'
+import { sharesWideAffix } from '../affix.js'
+import { wordCount } from '../bitmask/blockMasks.js'
+import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
 import {
   distance_,
   integralWeights,

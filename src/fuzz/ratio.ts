@@ -1,15 +1,17 @@
 import { prepareLcsPattern } from '../algorithms/lcs/implementation.js'
 import {
-  prepareChoiceSequence,
-  preparedChoiceSequence,
-  scorerSequence,
-  type PreparationFactory,
   FUZZ_FLAGS,
   type MaybeSequenceMetricImplementation,
   withPreparedFlags,
-} from '../algorithms/shared/scorerSupport.js'
+} from '../core/scoring/builtIn/implementation.js'
 import type { BuiltInMetric } from '../core/scoring/builtIn/metric.js'
+import {
+  prepareChoiceSequence,
+  preparedChoiceSequence,
+  type PreparationFactory,
+} from '../core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '../core/scoring/compilation.js'
+import { scorerSequence } from '../core/sequence.js'
 import type { Sequence } from '../core/types.js'
 import { fuzzMetric } from './metric.js'
 import { ratioHeld, ratio_impl } from './partialWindow.js'
