@@ -9,12 +9,13 @@ import type { Sequence } from '#core/types.js'
 import { NGramIndexBuilder, type SealedIndex } from './builder.js'
 import { extractGrams } from './keys.js'
 import {
+  accumulateSharedFrequency,
   fillZeroes,
   gramlessResult,
   outranks,
   QueryState,
   rankSelected,
-  reachesDenseList,
+  resetQuery,
   roomFor,
   sortTouched,
   zeroesQualify,
@@ -54,7 +55,7 @@ class DiceIndex implements ChoiceIndex {
     }
     const queryGrams = elements.length - sealed.gramSize + 1
     extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
-    this.accumulate()
+    accumulateSharedFrequency(sealed, state, this.accumulator)
     const room = roomFor(limit, sealed.choiceCount)
     state.reserve(room)
     const length = fillZeroes(
@@ -65,7 +66,7 @@ class DiceIndex implements ChoiceIndex {
       threshold,
       room,
     )
-    this.reset()
+    resetQuery(state, this.accumulator)
     return { ids: state.ids, scores: state.scores, length }
   }
 
@@ -86,7 +87,7 @@ class DiceIndex implements ChoiceIndex {
     }
     const queryGrams = elements.length - sealed.gramSize + 1
     extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
-    this.accumulate()
+    accumulateSharedFrequency(sealed, state, this.accumulator)
     const everyChoice = state.scannedAll || zeroesQualify(threshold)
     const source = everyChoice ? null : ascending ? sortTouched(state) : state.touched
     const total = source === null ? sealed.choiceCount : source.length
@@ -109,69 +110,8 @@ class DiceIndex implements ChoiceIndex {
       scores[length] = score
       length++
     }
-    this.reset()
+    resetQuery(state, this.accumulator)
     return { ids, scores, length }
-  }
-
-  private accumulate(): void {
-    const sealed = this.sealed
-    const state = this.state
-    const postings = sealed.postings
-    const accumulator = this.accumulator
-    const touched = state.touched
-    const keys = state.keys
-    const queryCounts = state.counts
-    const ids = postings.ids
-    const postingCounts = postings.counts
-    const offsets = postings.offsets
-    const dense = postings.dense
-    state.base = 0
-    if (dense !== null && reachesDenseList(postings, dense, keys)) state.scannedAll = true
-    const tracking = !state.scannedAll
-    for (let index = 0; index < keys.length; index++) {
-      const ordinal = postings.ordinals.get(keys[index])
-      if (ordinal === undefined) continue
-      const queryCount = queryCounts[index]
-      const from = offsets[ordinal]
-      const upto = offsets[ordinal + 1]
-      if (dense !== null && dense[ordinal] === 1) {
-        state.base += 1
-        if (postingCounts === null) {
-          for (let at = from; at < upto; at++) accumulator[ids[at]] -= 1
-          continue
-        }
-        for (let at = from; at < upto; at++) {
-          const count = postingCounts[at]
-          accumulator[ids[at]] += (queryCount < count ? queryCount : count) - 1
-        }
-        continue
-      }
-      if (!tracking) {
-        if (postingCounts === null) {
-          for (let at = from; at < upto; at++) accumulator[ids[at]] += 1
-          continue
-        }
-        for (let at = from; at < upto; at++) {
-          const count = postingCounts[at]
-          accumulator[ids[at]] += queryCount < count ? queryCount : count
-        }
-        continue
-      }
-      if (postingCounts === null) {
-        for (let at = from; at < upto; at++) {
-          const id = ids[at]
-          if (accumulator[id] === 0) touched.push(id)
-          accumulator[id] += 1
-        }
-        continue
-      }
-      for (let at = from; at < upto; at++) {
-        const id = ids[at]
-        if (accumulator[id] === 0) touched.push(id)
-        const count = postingCounts[at]
-        accumulator[id] += queryCount < count ? queryCount : count
-      }
-    }
   }
 
   private top(queryGrams: number, threshold: number | null, room: number): number {
@@ -211,20 +151,6 @@ class DiceIndex implements ChoiceIndex {
       scores[at] = score
     }
     return length
-  }
-
-  private reset(): void {
-    const state = this.state
-    const accumulator = this.accumulator
-    const touched = state.touched
-    if (state.scannedAll) accumulator.fill(0)
-    else
-      for (let index = 0; index < touched.length; index++) accumulator[touched[index]] = 0
-    touched.length = 0
-    state.keys.length = 0
-    state.counts.length = 0
-    state.scannedAll = false
-    state.base = 0
   }
 }
 

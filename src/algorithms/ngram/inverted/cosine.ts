@@ -15,6 +15,7 @@ import {
   QueryState,
   rankSelected,
   reachesDenseList,
+  resetQuery,
   roomFor,
   sortTouched,
   zeroesQualify,
@@ -95,7 +96,7 @@ class CosineIndex implements ChoiceIndex {
       threshold,
       room,
     )
-    this.reset()
+    resetQuery(state, this.accumulator)
     return { ids: state.ids, scores: state.scores, length }
   }
 
@@ -148,7 +149,7 @@ class CosineIndex implements ChoiceIndex {
       scores[length] = score
       length++
     }
-    this.reset()
+    resetQuery(state, this.accumulator)
     return { ids, scores, length }
   }
 
@@ -249,20 +250,6 @@ class CosineIndex implements ChoiceIndex {
       scores[at] = score
     }
     return length
-  }
-
-  private reset(): void {
-    const state = this.state
-    const accumulator = this.accumulator
-    const touched = state.touched
-    if (state.scannedAll) accumulator.fill(0)
-    else
-      for (let index = 0; index < touched.length; index++) accumulator[touched[index]] = 0
-    touched.length = 0
-    state.keys.length = 0
-    state.counts.length = 0
-    state.scannedAll = false
-    state.base = 0
   }
 }
 
