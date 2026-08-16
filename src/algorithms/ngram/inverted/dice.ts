@@ -7,12 +7,12 @@ import { convSequence } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
 import { NGramIndexBuilder, type SealedIndex } from './builder.js'
-import { extractGrams } from './keys.js'
 import { accumulateSharedFrequency, assertSharedAccumulatorExact } from './overlap.js'
 import {
   fillZeroes,
   gramlessResult,
   outranks,
+  prepareQueryGrams,
   QueryState,
   rankSelected,
   resetQuery,
@@ -48,7 +48,7 @@ class DiceIndex implements ChoiceIndex {
       return gramlessResult(sealed, state, elements, threshold, limit, false)
     }
     const queryGrams = elements.length - sealed.gramSize + 1
-    extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
+    prepareQueryGrams(sealed, elements, state)
     accumulateSharedFrequency(sealed, state, this.accumulator)
     const room = roomFor(limit, sealed.choiceCount)
     state.reserve(room)
@@ -80,7 +80,7 @@ class DiceIndex implements ChoiceIndex {
       return gramlessResult(sealed, state, elements, threshold, null, ascending)
     }
     const queryGrams = elements.length - sealed.gramSize + 1
-    extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
+    prepareQueryGrams(sealed, elements, state)
     accumulateSharedFrequency(sealed, state, this.accumulator)
     const everyChoice = state.scannedAll || zeroesQualify(threshold)
     const source = everyChoice ? null : ascending ? sortTouched(state) : state.touched

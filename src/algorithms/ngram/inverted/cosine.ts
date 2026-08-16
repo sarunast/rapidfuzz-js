@@ -7,11 +7,11 @@ import { convSequence } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
 import { NGramIndexBuilder, type SealedIndex } from './builder.js'
-import { extractGrams } from './keys.js'
 import {
   fillZeroes,
   gramlessResult,
   outranks,
+  prepareQueryGrams,
   QueryState,
   rankSelected,
   reachesDenseList,
@@ -76,14 +76,7 @@ class CosineIndex implements ChoiceIndex {
     if (elements.length < sealed.gramSize) {
       return gramlessResult(sealed, state, elements, threshold, limit, false)
     }
-    const querySquaredNorm = extractGrams(
-      elements,
-      sealed.gramSize,
-      sealed.radix,
-      false,
-      state.keys,
-      state.counts,
-    )
+    const querySquaredNorm = prepareQueryGrams(sealed, elements, state)
     assertCosineNormsExact(querySquaredNorm, sealed.maxSquaredNorm)
     this.accumulate()
     const room = roomFor(limit, sealed.choiceCount)
@@ -115,14 +108,7 @@ class CosineIndex implements ChoiceIndex {
     if (elements.length < sealed.gramSize) {
       return gramlessResult(sealed, state, elements, threshold, null, ascending)
     }
-    const querySquaredNorm = extractGrams(
-      elements,
-      sealed.gramSize,
-      sealed.radix,
-      false,
-      state.keys,
-      state.counts,
-    )
+    const querySquaredNorm = prepareQueryGrams(sealed, elements, state)
     assertCosineNormsExact(querySquaredNorm, sealed.maxSquaredNorm)
     this.accumulate()
     const everyChoice = state.scannedAll || zeroesQualify(threshold)

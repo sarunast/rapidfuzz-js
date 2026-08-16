@@ -2,6 +2,7 @@ import type { SelectedChoices } from '#core/scoring/choiceIndex.js'
 import { elementsEqual } from '#core/sequence.js'
 
 import type { Postings, SealedIndex } from './builder.js'
+import { extractGrams } from './keys.js'
 
 export function outranks(
   score: number,
@@ -139,6 +140,26 @@ export function reachesDenseList(
     if (ordinal !== undefined && dense[ordinal] === 1) return true
   }
   return false
+}
+
+/**
+ * Fills the query scratch with the keys and frequencies of one query's grams,
+ * spelled the way the sealed index keys its postings, and returns the query's
+ * squared norm. Cosine scores from that norm; Dice and Tversky discard it.
+ */
+export function prepareQueryGrams(
+  sealed: SealedIndex<Float64Array | null>,
+  elements: ArrayLike<unknown>,
+  state: QueryState,
+): number {
+  return extractGrams(
+    elements,
+    sealed.gramSize,
+    sealed.radix,
+    false,
+    state.keys,
+    state.counts,
+  )
 }
 
 /** Returns the per-query scratch to its untouched state after an answer. */
