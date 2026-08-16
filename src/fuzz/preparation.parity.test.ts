@@ -15,8 +15,12 @@ import { describe, expect, it } from 'vitest'
 import { fuzzPartialRatio } from './partialRatio.js'
 import { prepareFuzz } from './preparation.js'
 import { prepareRatio, fuzzRatio } from './ratio.js'
+import { fuzzPartialTokenRatio } from './token/partialTokenRatio.js'
+import { fuzzPartialTokenSetRatio } from './token/partialTokenSetRatio.js'
+import { fuzzPartialTokenSortRatio } from './token/partialTokenSortRatio.js'
 import { fuzzTokenRatio } from './token/tokenRatio.js'
 import { fuzzTokenSetRatio } from './token/tokenSetRatio.js'
+import { prepareTokenSort, fuzzTokenSortRatio } from './token/tokenSortRatio.js'
 import { fuzzWeightedRatio } from './weightedRatio.js'
 
 const preparedScore = (
@@ -80,6 +84,7 @@ describe('prepared scorers agree with raw ones', () => {
       ['a'.repeat(70), 'z'.repeat(70)],
       ['ab', 'z'.repeat(200)],
       ['foo foo bar', 'baz baz qux'],
+      ['alpha beta', '😀 😀 gamma'],
       ['a'.repeat(10), 'z'.repeat(10)],
       ['alpha beta', 'gamma delta epsilon'],
     ]
@@ -101,6 +106,62 @@ describe('prepared scorers agree with raw ones', () => {
     expect(preparedScore(factory, `q${'a'.repeat(70)}`, `c${'a'.repeat(70)}`, 70)).toBe(
       fuzzTokenSetRatio(`q${'a'.repeat(70)}`, `c${'a'.repeat(70)}`),
     )
+  })
+
+  // A retained choice changes representation as it is reused: its canonical
+  // joins build as code-point arrays on the first query, repack into BMP
+  // strings on the second, and stay packed from the third on. A Matcher holds
+  // its prepared choices for its lifetime, so this is the state machine every
+  // matcher corpus walks — and the per-pair helper above never leaves the
+  // first state, because it prepares a fresh choice for every assertion. Three
+  // passes over one handle pin all three states against the raw scorer, for
+  // every token scorer, including the shapes that refuse to pack (astral),
+  // deduplicate first (repeated tokens), or chunk the pack (a 1500-element
+  // token).
+  it('answers identically while a retained choice repacks across queries', () => {
+    const scorers = [
+      ['tokenSortRatio', fuzzTokenSortRatio, prepareTokenSort()],
+      ['tokenSetRatio', fuzzTokenSetRatio, prepareFuzz('tokenSetRatio')],
+      ['tokenRatio', fuzzTokenRatio, prepareFuzz('tokenRatio')],
+      [
+        'partialTokenSortRatio',
+        fuzzPartialTokenSortRatio,
+        prepareFuzz('partialTokenSortRatio'),
+      ],
+      [
+        'partialTokenSetRatio',
+        fuzzPartialTokenSetRatio,
+        prepareFuzz('partialTokenSetRatio'),
+      ],
+      ['partialTokenRatio', fuzzPartialTokenRatio, prepareFuzz('partialTokenRatio')],
+      ['weightedRatio', fuzzWeightedRatio, prepareFuzz('weightedRatio')],
+    ] as const
+    const choices = [
+      'grizzly bear roaming the tundra',
+      'beta beta alpha',
+      '😀😀 alpha beta',
+      `${'x'.repeat(1500)} alpha`,
+      'delta',
+    ]
+    const queries = ['bear roaming tundra', 'alpha beta', 'gamma delta epsilon']
+
+    for (const [name, raw, factory] of scorers) {
+      const preparation = factory({})
+      for (const choiceText of choices) {
+        const handle = preparation.prepareChoice(choiceText)
+        for (let pass = 1; pass <= 3; pass++) {
+          for (const query of queries) {
+            const kernel = preparation.prepareQuery(query)
+            for (const cutoff of [0, 60, 90]) {
+              expect(
+                kernel(handle, cutoff),
+                `${name}: ${query} / ${choiceText.slice(0, 24)} @ ${cutoff}, pass ${pass}`,
+              ).toBe(raw(query, choiceText, { scoreCutoff: cutoff }))
+            }
+          }
+        }
+      }
+    }
   })
 
   // The length ratios weightedRatio branches on — under 1.5, exactly 1.5, up to 8 and

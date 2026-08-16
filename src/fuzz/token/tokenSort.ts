@@ -1,5 +1,5 @@
 import type { PatternMask } from '#algorithms/bitmask/pattern.js'
-import { validateSequence, isMissing } from '#core/sequence.js'
+import { alignRepresentation, validateSequence, isMissing } from '#core/sequence.js'
 
 import { indelNormSimHeld, ratioConverted } from '../partialWindow.js'
 import type { FuzzInput, FuzzOptions } from '../types.js'
@@ -48,7 +48,11 @@ export function tokenSortRatioConverted(
     )
   }
 
-  return ratioConverted(sortedA, sortedB, scoreCutoff)
+  return ratioConverted(
+    alignRepresentation(sortedA, sortedB),
+    alignRepresentation(sortedB, sortedA),
+    scoreCutoff,
+  )
 }
 
 export function tokenSortRatio_impl(

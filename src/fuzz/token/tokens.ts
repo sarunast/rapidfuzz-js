@@ -361,8 +361,10 @@ function uniqueTokens(tokens: readonly unknown[][]): UniqueTokenSet {
 export class PreparedTokenChoice {
   split?: unknown[][]
   unique?: UniqueTokenSet
-  sorted?: unknown[]
-  uniqueJoined?: unknown[]
+  sorted?: unknown[] | string
+  sortedPackAttempted?: boolean
+  uniqueJoined?: unknown[] | string
+  uniqueJoinedPackAttempted?: boolean
   hasWhitespace?: boolean
   canonicalLength?: number
 
@@ -410,17 +412,66 @@ function canonicalLength(s: ArrayLike<unknown>): number {
   return tokens === 0 ? 0 : elements + tokens - 1
 }
 
-export function sortedOf(choice: PreparedTokenChoice): unknown[] {
-  return (choice.sorted ??= joinTokens(sortTokens(splitOf(choice))))
+function fromCharCodes(codes: readonly number[]): string {
+  if (codes.length <= 1024) return String.fromCharCode(...codes)
+
+  let out = ''
+  for (let i = 0; i < codes.length; i += 1024) {
+    out += String.fromCharCode(...codes.slice(i, i + 1024))
+  }
+  return out
 }
 
-export function uniqueJoinedOf(choice: PreparedTokenChoice): unknown[] {
-  if (choice.uniqueJoined !== undefined) return choice.uniqueJoined
+function isBmpCodes(joined: readonly unknown[]): joined is readonly number[] {
+  for (let i = 0; i < joined.length; i++) {
+    const x = joined[i]
+    if (typeof x !== 'number' || x < 0 || x > 0xffff || (x | 0) !== x) return false
+  }
+  return true
+}
+
+// A packed string and its code-point array are the same sequence only where
+// symbols are compared numerically: the mask kernels key strings by
+// charCodeAt, and CharSet stores codes. They are DIFFERENT sequences under raw
+// element equality — 'a' !== 97 — which lcsSeqLengthRange reaches through
+// measureAffix and lcsMbleven. Nothing enforces this boundary: every pair a
+// packed form can meet must either stay mask/charset-keyed or be aligned with
+// alignRepresentation first, the way tokenSortRatioConverted's ratioConverted
+// arm does. tokens.canonical.test.ts and the reuse parity suite pin the
+// transitions this cache goes through.
+function packedSequence(joined: readonly unknown[]): string | null {
+  return isBmpCodes(joined) ? fromCharCodes(joined) : null
+}
+
+// Deliberately non-idempotent in representation: the first access builds and
+// returns the joined array, and the second repacks it into a BMP string, so
+// the same logical value can come back with a different type. Only a retained
+// choice is ever read twice — a one-shot view keeps the array and never pays
+// for packing.
+export function sortedOf(choice: PreparedTokenChoice): unknown[] | string {
+  const sorted = choice.sorted
+  if (sorted === undefined) {
+    return (choice.sorted = joinTokens(sortTokens(splitOf(choice))))
+  }
+  if (typeof sorted === 'string' || choice.sortedPackAttempted) return sorted
+
+  choice.sortedPackAttempted = true
+  const packed = packedSequence(sorted)
+  return packed === null ? sorted : (choice.sorted = packed)
+}
+
+export function uniqueJoinedOf(choice: PreparedTokenChoice): unknown[] | string {
+  const memo = choice.uniqueJoined
+  if (memo !== undefined) {
+    if (typeof memo === 'string' || choice.uniqueJoinedPackAttempted) return memo
+
+    choice.uniqueJoinedPackAttempted = true
+    const packed = packedSequence(memo)
+    return packed === null ? memo : (choice.uniqueJoined = packed)
+  }
 
   const unique = uniqueOf(choice)
-  if (unique.size === splitOf(choice).length) {
-    return (choice.uniqueJoined = sortedOf(choice))
-  }
+  if (unique.size === splitOf(choice).length) return sortedOf(choice)
 
   return (choice.uniqueJoined = joinTokens(sortedUniqueOf(unique).tokens))
 }
