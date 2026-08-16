@@ -1,5 +1,9 @@
 import type { PatternMask } from '#algorithms/bitmask/pattern.js'
-import { lcsSeqLengthRange } from '#algorithms/lcs/implementation.js'
+import {
+  lcsSeqLengthPrepared,
+  lcsSeqLengthPreparedBounded,
+  lcsSeqLengthRange,
+} from '#algorithms/lcs/implementation.js'
 import { validateSequence, isMissing } from '#core/sequence.js'
 
 import {
@@ -13,12 +17,14 @@ import {
   intersects,
   joinTokens,
   sortedOf,
+  sortedUniqueOf,
   tokenPair,
-  sortTokens,
   splitOf,
   tokenViewOf,
+  uniqueJoinedOf,
   uniqueOf,
   type PreparedTokenChoice,
+  type UniqueTokenSet,
 } from './tokens.js'
 import { tokenSortRatioConverted } from './tokenSort.js'
 
@@ -45,12 +51,40 @@ export function tokenSetRatio_impl(
   return tokenSetRatioConverted(a, b, options.scoreCutoff ?? 0)
 }
 
+function disjointTokensRatio(
+  abLen: number,
+  patternA: () => PatternMask,
+  viewB: PreparedTokenChoice,
+  tokensB: UniqueTokenSet,
+  scoreCutoff: number,
+): number {
+  const baLen = tokensB.payload + tokensB.size - 1
+  const lensum = abLen + baLen
+  const cutoffDistance = Math.ceil(lensum * (1 - scoreCutoff / 100))
+  const lengthDiff = abLen > baLen ? abLen - baLen : baLen - abLen
+  if (lengthDiff > cutoffDistance) return 0
+
+  const joinedB = uniqueJoinedOf(viewB)
+  const required = Math.ceil((lensum - cutoffDistance) / 2)
+  const lcs =
+    required > 0 && scoreCutoff >= 70 && lensum >= 128
+      ? lcsSeqLengthPreparedBounded(patternA(), joinedB, 0, baLen, required)
+      : lcsSeqLengthPrepared(patternA(), joinedB, 0, baLen)
+  if (lcs < 0) return 0
+
+  const dist = lensum - 2 * lcs
+  if (dist > cutoffDistance) return 0
+
+  return normDistance(dist, lensum, scoreCutoff)
+}
+
 export function tokenSetRatioConverted(
   a: ArrayLike<unknown>,
   b: ArrayLike<unknown>,
   scoreCutoff: number,
   viewA?: PreparedTokenChoice,
   viewB?: PreparedTokenChoice,
+  uniquePatternA?: () => PatternMask,
 ): number {
   if (scoreCutoff > 100) return 0
 
@@ -66,8 +100,10 @@ export function tokenSetRatioConverted(
   const diffAb: unknown[][] = []
   const diffBa: unknown[][] = []
 
-  for (const [key, token] of tokensA.packed) {
-    if (tokensB.packed.has(key)) {
+  const entriesA = sortedUniqueOf(tokensA)
+  for (let i = 0; i < entriesA.keys.length; i++) {
+    const token = entriesA.tokens[i]
+    if (tokensB.has(entriesA.keys[i], token)) {
       sectCount++
       sectPayload += token.length
     } else {
@@ -75,32 +111,25 @@ export function tokenSetRatioConverted(
       diffAb.push(token)
     }
   }
-  for (const [key, bucket] of tokensA.mixed) {
-    for (const token of bucket) {
-      if (tokensB.has(key, token)) {
-        sectCount++
-        sectPayload += token.length
-      } else {
-        diffAbPayload += token.length
-        diffAb.push(token)
-      }
-    }
+
+  if (sectCount === 0 && uniquePatternA !== undefined && viewB !== undefined) {
+    return disjointTokensRatio(
+      diffAbPayload + diffAb.length - 1,
+      uniquePatternA,
+      viewB,
+      tokensB,
+      scoreCutoff,
+    )
   }
 
   if (sectCount !== 0 && diffAb.length === 0) return 100
 
-  for (const [key, token] of tokensB.packed) {
-    if (!tokensA.packed.has(key)) {
+  const entriesB = sortedUniqueOf(tokensB)
+  for (let i = 0; i < entriesB.keys.length; i++) {
+    const token = entriesB.tokens[i]
+    if (!tokensA.has(entriesB.keys[i], token)) {
       diffBaPayload += token.length
       diffBa.push(token)
-    }
-  }
-  for (const [key, bucket] of tokensB.mixed) {
-    for (const token of bucket) {
-      if (!tokensA.has(key, token)) {
-        diffBaPayload += token.length
-        diffBa.push(token)
-      }
     }
   }
 
@@ -128,8 +157,8 @@ export function tokenSetRatioConverted(
   const lengthDiff = abLen > baLen ? abLen - baLen : baLen - abLen
 
   if (lengthDiff <= cutoffDistance) {
-    const diffAbJoined = joinTokens(sortTokens(diffAb), abLen)
-    const diffBaJoined = joinTokens(sortTokens(diffBa), baLen)
+    const diffAbJoined = joinTokens(diffAb, abLen)
+    const diffBaJoined = joinTokens(diffBa, baLen)
     const dist = indelDist(diffAbJoined, diffBaJoined, cutoffDistance)
 
     if (dist <= cutoffDistance) {
@@ -149,13 +178,21 @@ export function tokenRatioConverted(
   viewA?: PreparedTokenChoice,
   viewB?: PreparedTokenChoice,
   preparedSortedPatternA?: () => PatternMask,
+  preparedUniquePatternA?: () => PatternMask,
 ): number {
   if (scoreCutoff > 100) return 0
 
   const tokensViewA = viewA ?? tokenViewOf(a)
   const tokensViewB = viewB ?? tokenViewOf(b)
 
-  const setScore = tokenSetRatioConverted(a, b, scoreCutoff, tokensViewA, tokensViewB)
+  const setScore = tokenSetRatioConverted(
+    a,
+    b,
+    scoreCutoff,
+    tokensViewA,
+    tokensViewB,
+    viewA === undefined ? undefined : preparedUniquePatternA,
+  )
 
   if (setScore === 100) return 100
 
@@ -232,8 +269,8 @@ export function partialTokenSetRatioConverted(
   if (intersects(tokensA, tokensB)) return 100
 
   return partialRatioConverted(
-    joinTokens(sortTokens(difference(tokensA, tokensB))),
-    joinTokens(sortTokens(difference(tokensB, tokensA))),
+    joinTokens(difference(tokensA, tokensB)),
+    joinTokens(difference(tokensB, tokensA)),
     scoreCutoff,
   )
 }
@@ -292,8 +329,8 @@ export function partialTokenRatioConverted(
   return Math.max(
     result,
     partialRatioConverted(
-      joinTokens(sortTokens(diffAb)),
-      joinTokens(sortTokens(diffBa)),
+      joinTokens(diffAb),
+      joinTokens(diffBa),
       Math.max(scoreCutoff, result),
     ),
   )

@@ -268,16 +268,24 @@ function isMixedTokenKey(key: string): boolean {
   return key.length > 0 && key.charCodeAt(0) > BMP_KEY_PREFIX_CODE
 }
 
+export interface SortedUniqueTokens {
+  readonly keys: readonly string[]
+  readonly tokens: readonly unknown[][]
+}
+
 export class UniqueTokenSet {
   readonly packed: Map<string, unknown[]> = new Map<string, unknown[]>()
   readonly mixed: Map<string, unknown[][]> = new Map<string, unknown[][]>()
+  sortedEntries: SortedUniqueTokens | null = null
   size: number = 0
+  payload: number = 0
 
   add(key: string, token: unknown[]): void {
     if (!isMixedTokenKey(key)) {
       if (!this.packed.has(key)) {
         this.packed.set(key, token)
         this.size++
+        this.payload += token.length
       }
       return
     }
@@ -286,6 +294,7 @@ export class UniqueTokenSet {
     if (bucket === undefined) {
       this.mixed.set(key, [token])
       this.size++
+      this.payload += token.length
       return
     }
 
@@ -294,6 +303,7 @@ export class UniqueTokenSet {
     }
     bucket.push(token)
     this.size++
+    this.payload += token.length
   }
 
   has(key: string, token: readonly unknown[]): boolean {
@@ -306,6 +316,35 @@ export class UniqueTokenSet {
     }
     return false
   }
+}
+
+export function sortedUniqueOf(set: UniqueTokenSet): SortedUniqueTokens {
+  if (set.sortedEntries !== null) return set.sortedEntries
+
+  const keys: string[] = []
+  const tokens: unknown[][] = []
+  for (const [key, token] of set.packed) {
+    keys.push(key)
+    tokens.push(token)
+  }
+  for (const [key, bucket] of set.mixed) {
+    for (const token of bucket) {
+      keys.push(key)
+      tokens.push(token)
+    }
+  }
+
+  const order = keys.map((_, index) => index)
+  order.sort((x, y) => compareTokens(tokens[x], tokens[y]))
+
+  const sortedKeys = new Array<string>(order.length)
+  const sortedTokens = new Array<unknown[]>(order.length)
+  for (let i = 0; i < order.length; i++) {
+    sortedKeys[i] = keys[order[i]]
+    sortedTokens[i] = tokens[order[i]]
+  }
+
+  return (set.sortedEntries = { keys: sortedKeys, tokens: sortedTokens })
 }
 
 function uniqueTokens(tokens: readonly unknown[][]): UniqueTokenSet {
@@ -323,6 +362,7 @@ export class PreparedTokenChoice {
   split?: unknown[][]
   unique?: UniqueTokenSet
   sorted?: unknown[]
+  uniqueJoined?: unknown[]
   hasWhitespace?: boolean
   canonicalLength?: number
 
@@ -374,6 +414,17 @@ export function sortedOf(choice: PreparedTokenChoice): unknown[] {
   return (choice.sorted ??= joinTokens(sortTokens(splitOf(choice))))
 }
 
+export function uniqueJoinedOf(choice: PreparedTokenChoice): unknown[] {
+  if (choice.uniqueJoined !== undefined) return choice.uniqueJoined
+
+  const unique = uniqueOf(choice)
+  if (unique.size === splitOf(choice).length) {
+    return (choice.uniqueJoined = sortedOf(choice))
+  }
+
+  return (choice.uniqueJoined = joinTokens(sortedUniqueOf(unique).tokens))
+}
+
 export function hasWhitespaceOf(choice: PreparedTokenChoice): boolean {
   return (choice.hasWhitespace ??= containsWhitespace(choice.sequence))
 }
@@ -398,11 +449,11 @@ export function preparedTokenChoice(value: unknown): PreparedTokenChoice {
 }
 
 export function difference(a: UniqueTokenSet, b: UniqueTokenSet): unknown[][] {
+  const { keys, tokens } = sortedUniqueOf(a)
   const out: unknown[][] = []
 
-  for (const [key, token] of a.packed) if (!b.packed.has(key)) out.push(token)
-  for (const [key, bucket] of a.mixed) {
-    for (const token of bucket) if (!b.has(key, token)) out.push(token)
+  for (let i = 0; i < keys.length; i++) {
+    if (!b.has(keys[i], tokens[i])) out.push(tokens[i])
   }
 
   return out

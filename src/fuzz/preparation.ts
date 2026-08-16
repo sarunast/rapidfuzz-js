@@ -30,6 +30,7 @@ import {
   sortedOf,
   tokenChoicePreparer,
   tokenViewOf,
+  uniqueJoinedOf,
 } from './token/tokens.js'
 import {
   partialTokenRatioConverted,
@@ -79,6 +80,14 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
       }
       return sortedPattern
     }
+    let uniquePattern: PatternMask | null = null
+    const uniquePatternOf = (): PatternMask => {
+      if (uniquePattern === null) {
+        const joined = uniqueJoinedOf(queryTokens)
+        uniquePattern = prepareLcsPattern(joined, 0, joined.length)
+      }
+      return uniquePattern
+    }
     let sortedCharSet: CharSet | null = null
     const sortedCharSetOf = (): CharSet =>
       (sortedCharSet ??= charSetOf(sortedOf(queryTokens)))
@@ -110,7 +119,14 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
         }
         case 'tokenSetRatio': {
           const choice = preparedTokenChoice(rawChoice)
-          return tokenSetRatioConverted(a, choice.sequence, cutoff, queryView, choice)
+          return tokenSetRatioConverted(
+            a,
+            choice.sequence,
+            cutoff,
+            queryView,
+            choice,
+            uniquePatternOf,
+          )
         }
         case 'tokenRatio': {
           const choice = preparedTokenChoice(rawChoice)
@@ -121,6 +137,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
             queryView,
             choice,
             sortedPatternOf,
+            uniquePatternOf,
           )
         }
         case 'partialTokenSortRatio': {
@@ -186,6 +203,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
                 queryView,
                 preparedTokens,
                 sortedPatternOf,
+                uniquePatternOf,
               ) * unbaseScale,
             )
           }

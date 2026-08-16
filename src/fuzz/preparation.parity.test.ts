@@ -66,6 +66,43 @@ describe('prepared scorers agree with raw ones', () => {
     }
   })
 
+  // Prepared token-set scoring takes a separate route when the two token sets
+  // share nothing: both sides collapse to their sorted unique joins and the
+  // query's bit-parallel pattern is reused across choices. These pairs walk
+  // that route's branches — the bounded kernel above 128 joined elements at a
+  // cutoff of 70, its unreachable-requirement exit, the length gate, the
+  // below-cutoff distance exit, and duplicate tokens on either side, which
+  // join through the deduplicated path rather than the sorted one.
+  it('matches the raw scorer when the token sets are disjoint', () => {
+    const factory = prepareFuzz('tokenSetRatio')
+    const pairs: readonly (readonly [string, string])[] = [
+      [`q${'a'.repeat(70)}`, `c${'a'.repeat(70)}`],
+      ['a'.repeat(70), 'z'.repeat(70)],
+      ['ab', 'z'.repeat(200)],
+      ['foo foo bar', 'baz baz qux'],
+      ['a'.repeat(10), 'z'.repeat(10)],
+      ['alpha beta', 'gamma delta epsilon'],
+    ]
+
+    for (const [a, b] of pairs) {
+      for (const cutoff of [0, 60, 70, 90, 98, 100]) {
+        const expected = fuzzTokenSetRatio(a, b, { scoreCutoff: cutoff })
+        expect(preparedScore(factory, a, b, cutoff), `${a} / ${b} @ ${cutoff}`).toBe(
+          expected,
+        )
+        expect(preparedScore(factory, b, a, cutoff), `${b} / ${a} @ ${cutoff}`).toBe(
+          fuzzTokenSetRatio(b, a, { scoreCutoff: cutoff }),
+        )
+      }
+    }
+
+    // The concrete shape the bounded kernel accepts: disjoint tokens whose
+    // characters still align, so the distance stays inside a 70 cutoff.
+    expect(preparedScore(factory, `q${'a'.repeat(70)}`, `c${'a'.repeat(70)}`, 70)).toBe(
+      fuzzTokenSetRatio(`q${'a'.repeat(70)}`, `c${'a'.repeat(70)}`),
+    )
+  })
+
   // The length ratios weightedRatio branches on — under 1.5, exactly 1.5, up to 8 and
   // past it — crossed with the cutoffs its scale factors turn into impossible
   // ones. A cutoff of 90 divided by the 0.9 partial scale is exactly 100, and
