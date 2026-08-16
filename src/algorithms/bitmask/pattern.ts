@@ -1,4 +1,27 @@
-import { DIRECT_LOOKUP_LIMIT, isDirectSymbol, isHighSymbol } from './lookup.js'
+// Private to preparation. `blockMasks.ts` partitions symbols differently and
+// keeps its own copy of the limit, which folds where a cross-module binding
+// does not — the two are not one rule with two call sites.
+const DIRECT_LOOKUP_LIMIT = 256
+
+function isDirectSymbol(symbol: unknown): symbol is number {
+  return (
+    typeof symbol === 'number' &&
+    symbol >= 0 &&
+    symbol < DIRECT_LOOKUP_LIMIT &&
+    (symbol | 0) === symbol
+  )
+}
+
+/**
+ * An integer at or above the direct table, which is the candidate set for the
+ * dense high window — not a guarantee of a place in it, since a symbol outside
+ * the chosen span ends up in `wideOffsets` instead.
+ */
+function isHighIntegerSymbol(symbol: unknown): symbol is number {
+  return (
+    typeof symbol === 'number' && symbol >= DIRECT_LOOKUP_LIMIT && (symbol | 0) === symbol
+  )
+}
 
 const WORD_SHIFT = 5
 const WORD_MASK = 31
@@ -56,7 +79,7 @@ export function preparePattern(
       continue
     }
     if (symbol !== symbol) continue
-    if (isHighSymbol(symbol)) {
+    if (isHighIntegerSymbol(symbol)) {
       highs ??= { at: [], of: [] }
       highs.at.push(i)
       highs.of.push(symbol)

@@ -358,7 +358,6 @@ describe('dependency direction', () => {
     const directory = join(source, 'algorithms/bitmask')
     expect(shippedEntries(directory)).toEqual([
       'blockMasks.ts',
-      'lookup.ts',
       'pattern.ts',
       'positionMasks.ts',
       'rowBits.ts',
