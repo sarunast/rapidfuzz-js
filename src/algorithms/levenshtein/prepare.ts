@@ -14,8 +14,8 @@ import { alignRepresentation, scorerSequence } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
 import { sharesWideAffix } from '../affix.js'
-import { wordCount } from '../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
+import { wordCount } from '../bitmask/words.js'
 import {
   distance_,
   integralWeights,

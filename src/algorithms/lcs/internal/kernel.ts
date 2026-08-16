@@ -10,10 +10,10 @@ import {
   directLimit,
   measureAffix,
   rowVector,
-  wordCount,
   type BuiltMasks,
 } from '../../bitmask/blockMasks.js'
 import type { PatternMask } from '../../bitmask/pattern.js'
+import { wordCount } from '../../bitmask/words.js'
 
 const WORD_BITS = 32
 const WORD_SHIFT = 5

@@ -18,8 +18,8 @@ import {
   buildWordMasks,
   maskPoolOf,
   resetBitVectorScratch,
-  wordCount,
 } from './blockMasks.js'
+import { wordCount } from './words.js'
 
 const RETAINED_MASK_WORDS = 1 << 19
 const MASK_PATTERN_LIMIT = 4096

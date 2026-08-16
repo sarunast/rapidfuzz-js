@@ -22,8 +22,8 @@ import { alignRepresentation, scorerSequence, maxSequenceLength } from '#core/se
 import type { Sequence } from '#core/types.js'
 
 import { commonAffix } from '../affix.js'
-import { WORD_LIMIT } from '../bitmask/blockMasks.js'
 import { preparePattern } from '../bitmask/pattern.js'
+import { WORD_BITS } from '../bitmask/words.js'
 import { osaOneWordRange, osaOneWordPrepared, osaPrepared } from './internal/kernel.js'
 
 function distance_(
@@ -58,7 +58,7 @@ function osaRange(
   textStart: number,
   textLength: number,
 ): number {
-  if (patternLength <= WORD_LIMIT) {
+  if (patternLength <= WORD_BITS) {
     return osaOneWordRange(
       pattern,
       patternStart,
@@ -98,7 +98,7 @@ function prepareOsa(kind: MetricScoreKind): PreparationFactory {
             // sequences elementwise, so they have to agree on how a character
             // is spelled. The held-pattern kernels read either representation.
             a.length <= b.length
-            ? a.length <= WORD_LIMIT
+            ? a.length <= WORD_BITS
               ? osaOneWordPrepared(pattern, b)
               : osaPrepared(pattern, b)
             : distance_(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)

@@ -23,8 +23,8 @@ import { alignRepresentation, scorerSequence } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
 import { sharesAffix } from '../affix.js'
-import { wordCount } from '../bitmask/blockMasks.js'
 import type { PatternMask } from '../bitmask/pattern.js'
+import { wordCount } from '../bitmask/words.js'
 import {
   lcsSeqEditops,
   lcsSeqLengthPrepared,

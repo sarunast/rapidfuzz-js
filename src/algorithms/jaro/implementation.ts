@@ -20,8 +20,8 @@ import {
 } from '#core/sequence.js'
 import type { MaybeSequence, Sequence } from '#core/types.js'
 
-import { wordCount } from '../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
+import { wordCount } from '../bitmask/words.js'
 
 let patternFlags: Uint32Array | null = null
 let textFlags: Uint32Array | null = null

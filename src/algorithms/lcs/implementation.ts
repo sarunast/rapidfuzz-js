@@ -40,9 +40,10 @@ import {
 import type { Sequence } from '#core/types.js'
 
 import { commonAffix, sharesAffix } from '../affix.js'
-import { UNBOUNDED_MISSES, wordCount } from '../bitmask/blockMasks.js'
+import { UNBOUNDED_MISSES } from '../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
 import { rowBitSet } from '../bitmask/rowBits.js'
+import { wordCount } from '../bitmask/words.js'
 import {
   lcsLengthPrepared,
   lcsLengthPreparedBounded,

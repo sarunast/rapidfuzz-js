@@ -1,10 +1,10 @@
-import { wordCount } from '../../bitmask/blockMasks.js'
 import {
   maskBlockBound,
   oneWordMasks,
   symbolSpan,
   wordPositionMasks,
 } from '../../bitmask/positionMasks.js'
+import { wordCount } from '../../bitmask/words.js'
 
 interface LevenshteinMatrix {
   readonly dist: number

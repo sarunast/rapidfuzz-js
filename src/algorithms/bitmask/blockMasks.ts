@@ -1,12 +1,6 @@
-export const WORD_BITS = 32
-export const WORD_SHIFT = 5
-export const WORD_MASK = 31
+import { WORD_MASK, WORD_SHIFT, wordCount } from './words.js'
 
 const DIRECT_LOOKUP_LIMIT = 256
-
-export function wordCount(length: number): number {
-  return length === 0 ? 0 : ((length - 1) >>> WORD_SHIFT) + 1
-}
 
 const DIRECT_LOOKUP_MAX = 0x1_0000
 
@@ -367,8 +361,6 @@ export function blockMasksFor(
 
   return { stamp: maskGeneration, pool: maskPoolOf(), wide: EMPTY_WIDE }
 }
-
-export const WORD_LIMIT: number = WORD_BITS
 
 export const UNBOUNDED_MISSES: number = Number.MAX_SAFE_INTEGER
 

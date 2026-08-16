@@ -361,6 +361,7 @@ describe('dependency direction', () => {
       'pattern.ts',
       'positionMasks.ts',
       'rowBits.ts',
+      'words.ts',
     ])
   })
 

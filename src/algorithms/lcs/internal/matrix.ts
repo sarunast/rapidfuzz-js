@@ -1,5 +1,5 @@
-import { wordCount } from '../../bitmask/blockMasks.js'
 import { oneWordMasks, wordPositionMasks } from '../../bitmask/positionMasks.js'
+import { wordCount } from '../../bitmask/words.js'
 import { popcount } from './kernel.js'
 
 interface LcsSeqMatrix {
@@ -9,9 +9,9 @@ interface LcsSeqMatrix {
 }
 
 /**
- * The bits of the last word a pattern of `length` actually occupies. The words
- * above it are all ones, so counting them unmasked would add the padding to the
- * similarity.
+ * The bits of the last word a pattern of `length` actually occupies. The
+ * padding bits above them stay ones in the row state, so counting them
+ * unmasked would add the padding to the similarity.
  */
 function validBits(length: number): number {
   const bits = length & 31

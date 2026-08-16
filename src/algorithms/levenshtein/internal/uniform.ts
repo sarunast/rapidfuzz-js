@@ -12,10 +12,10 @@ import {
   measureAffix,
   rowVector,
   rowVectorN,
-  wordCount,
   type BuiltMasks,
 } from '../../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../../bitmask/pattern.js'
+import { wordCount } from '../../bitmask/words.js'
 
 // Copies of the canonical definitions in `blockMasks.ts`; a module-local const
 // folds where a cross-module binding does not. Any copy that disagrees is a bug.
