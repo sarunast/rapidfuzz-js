@@ -8,8 +8,8 @@ import type { Sequence } from '#core/types.js'
 
 import { NGramIndexBuilder, type SealedIndex } from './builder.js'
 import { extractGrams } from './keys.js'
+import { accumulateSharedFrequency, assertSharedAccumulatorExact } from './overlap.js'
 import {
-  accumulateSharedFrequency,
   fillZeroes,
   gramlessResult,
   outranks,
@@ -20,12 +20,6 @@ import {
   sortTouched,
   zeroesQualify,
 } from './query.js'
-
-export function assertTverskyAccumulatorExact(gramCount: number): void {
-  if (gramCount > 0x7fff_ffff) {
-    throw new RangeError('a query of more than 2147483647 grams cannot be indexed')
-  }
-}
 
 class TverskyIndex implements ChoiceIndex {
   private readonly state = new QueryState()
@@ -47,7 +41,7 @@ class TverskyIndex implements ChoiceIndex {
 
   private begin(query: Sequence): ArrayLike<unknown> {
     const elements = convSequence(query)
-    assertTverskyAccumulatorExact(elements.length - this.sealed.gramSize + 1)
+    assertSharedAccumulatorExact(elements.length - this.sealed.gramSize + 1)
     return elements
   }
 

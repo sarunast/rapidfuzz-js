@@ -383,6 +383,7 @@ describe('dependency direction', () => {
       'cosine.ts',
       'dice.ts',
       'keys.ts',
+      'overlap.ts',
       'query.ts',
       'tversky.ts',
     ])

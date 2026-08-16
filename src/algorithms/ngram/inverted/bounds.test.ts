@@ -8,8 +8,8 @@ import { similarity as diceSimilarity } from '../../dice/index.js'
 import { similarity as tverskySimilarity } from '../../tversky/index.js'
 import { assertAddressable } from './builder.js'
 import { assertCosineExact, assertCosineNormsExact } from './cosine.js'
-import { assertDiceAccumulatorExact, createDiceIndexBuilder } from './dice.js'
-import { assertTverskyAccumulatorExact } from './tversky.js'
+import { createDiceIndexBuilder } from './dice.js'
+import { assertSharedAccumulatorExact } from './overlap.js'
 
 describe('what an index refuses', () => {
   it('refuses a choice whose elements are not integers', () => {
@@ -31,16 +31,10 @@ describe('what an index refuses', () => {
     expect(() => assertAddressable(0xffff_ffff, 0xffff_ffff, 0xffff_ffff)).not.toThrow()
   })
 
-  it('refuses a query too large for the narrow Dice accumulator', () => {
-    expect(() => assertDiceAccumulatorExact(0x8000_0000)).toThrow(RangeError)
-    expect(() => assertDiceAccumulatorExact(0x8000_0000)).toThrow(/2147483647 grams/)
-    expect(() => assertDiceAccumulatorExact(0x7fff_ffff)).not.toThrow()
-  })
-
-  it('refuses a query too large for the narrow Tversky accumulator', () => {
-    expect(() => assertTverskyAccumulatorExact(0x8000_0000)).toThrow(RangeError)
-    expect(() => assertTverskyAccumulatorExact(0x8000_0000)).toThrow(/2147483647 grams/)
-    expect(() => assertTverskyAccumulatorExact(0x7fff_ffff)).not.toThrow()
+  it('refuses a query too large for the narrow shared accumulator', () => {
+    expect(() => assertSharedAccumulatorExact(0x8000_0000)).toThrow(RangeError)
+    expect(() => assertSharedAccumulatorExact(0x8000_0000)).toThrow(/2147483647 grams/)
+    expect(() => assertSharedAccumulatorExact(0x7fff_ffff)).not.toThrow()
   })
 
   it('keeps huge finite Tversky weights finite in the index arithmetic', () => {

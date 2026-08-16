@@ -8,8 +8,8 @@ import type { Sequence } from '#core/types.js'
 
 import { NGramIndexBuilder, type SealedIndex } from './builder.js'
 import { extractGrams } from './keys.js'
+import { accumulateSharedFrequency, assertSharedAccumulatorExact } from './overlap.js'
 import {
-  accumulateSharedFrequency,
   fillZeroes,
   gramlessResult,
   outranks,
@@ -21,12 +21,6 @@ import {
   zeroesQualify,
 } from './query.js'
 
-export function assertDiceAccumulatorExact(gramCount: number): void {
-  if (gramCount > 0x7fff_ffff) {
-    throw new RangeError('a query of more than 2147483647 grams cannot be indexed')
-  }
-}
-
 class DiceIndex implements ChoiceIndex {
   private readonly state = new QueryState()
   private readonly accumulator: Int32Array
@@ -37,7 +31,7 @@ class DiceIndex implements ChoiceIndex {
 
   private begin(query: Sequence): ArrayLike<unknown> {
     const elements = convSequence(query)
-    assertDiceAccumulatorExact(elements.length - this.sealed.gramSize + 1)
+    assertSharedAccumulatorExact(elements.length - this.sealed.gramSize + 1)
     return elements
   }
 
