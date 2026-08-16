@@ -15,6 +15,8 @@ import type { MaybeSequence, Sequence } from '#core/types.js'
 
 import { directSharedFrequency, sharedFrequency } from '../ngram/compare.js'
 import { parseGramSize, validGramSize } from '../ngram/gramSize.js'
+import { createDiceIndexBuilder } from '../ngram/inverted/dice.js'
+import { createTverskyIndexBuilder } from '../ngram/inverted/tversky.js'
 import { sharedFrequencyKernel, type BoundedFrequencyKernel } from '../ngram/kernel.js'
 import {
   buildProfile,
@@ -130,6 +132,11 @@ function preparedSimilarity(
     return similarity >= scoreCutoff ? similarity : 0
   }
   if (similarityBound(gramsA, gramsB, alpha, beta) < scoreCutoff) return 0
+  // Deliberately unbounded: inverting the threshold into a minimum shared
+  // count is not float-safe here. Tiny weights round the score up to the
+  // brink of 1 while the real-number inversion still demands more shared
+  // grams than a qualifying candidate has, and the bounded walk would then
+  // under-count it into a false rejection.
   const similarity = tverskyScore(shared(b, 0), gramsA, gramsB, alpha, beta)
   return similarity >= scoreCutoff ? similarity : 0
 }
@@ -194,7 +201,17 @@ function prepareTversky(kind: PreparedTverskyKind): PreparationFactory {
       }
     }
 
-    return { prepareQuery, prepareChoice }
+    // Default weights are exactly Dice — the halved penalty sum is `(A+B)/2`
+    // and power-of-two scaling never changes IEEE rounding — so they share
+    // Dice's index, hot loop and arithmetic.
+    const indexChoices =
+      kind === 'similarity'
+        ? alpha === 0.5 && beta === 0.5
+          ? () => createDiceIndexBuilder(gramSize)
+          : () => createTverskyIndexBuilder(gramSize, alpha, beta)
+        : undefined
+
+    return { prepareQuery, prepareChoice, indexChoices }
   }
 }
 

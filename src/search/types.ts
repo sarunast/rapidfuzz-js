@@ -97,7 +97,7 @@ export type AnyMatcherOptions<
  * the per-choice representation an index replaces.
  */
 export interface IndexedMatcherOptions<TItem, TBrand = AnyBrand> {
-  /** A similarity scorer that offers an index — `dice` or `cosine` today. */
+  /** A similarity scorer that offers an index — `dice`, `cosine` or `tversky` today. */
   readonly scorer: Scorer<'similarity', TBrand>
   /**
    * Where the searchable text lives on an item. Required when items are not

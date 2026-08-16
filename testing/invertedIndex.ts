@@ -1,44 +1,73 @@
 // Fixtures and the exhaustive oracle every inverted-index test checks
 // against. Shared rather than copied: an index is only ever correct
-// relative to the exhaustive scorer it reproduces, so all four files
+// relative to the exhaustive scorer it reproduces, so all the files
 // have to be comparing against the same one.
+//
+// A spec carries metric configuration only; gram size is a representation
+// dimension the test loops own. Representation suites take one spec per
+// index implementation, weight semantics stay in the Tversky parity runs.
 
 import { similarity as cosineSimilarity } from '../src/algorithms/cosine/index.js'
 import { similarity as diceSimilarity } from '../src/algorithms/dice/index.js'
 import { createCosineIndexBuilder } from '../src/algorithms/ngram/inverted/cosine.js'
 import { createDiceIndexBuilder } from '../src/algorithms/ngram/inverted/dice.js'
+import { createTverskyIndexBuilder } from '../src/algorithms/ngram/inverted/tversky.js'
+import { similarity as tverskySimilarity } from '../src/algorithms/tversky/index.js'
 import type { ChoiceIndex } from '../src/core/scoring/choiceIndex.js'
 import { createScorer } from '../src/core/scoring/scorer.js'
 import { createMatcher } from '../src/index.js'
 
-export type Metric = 'dice' | 'cosine'
+export type MetricSpec =
+  | { readonly metric: 'dice' }
+  | { readonly metric: 'cosine' }
+  | { readonly metric: 'tversky'; readonly alpha: number; readonly beta: number }
+
+function matcherOf(spec: MetricSpec, gramSize: number, choices: readonly string[]) {
+  switch (spec.metric) {
+    case 'dice':
+      return createMatcher(choices, {
+        scorer: createScorer(diceSimilarity, { gramSize }),
+      })
+    case 'cosine':
+      return createMatcher(choices, {
+        scorer: createScorer(cosineSimilarity, { gramSize }),
+      })
+    case 'tversky':
+      return createMatcher(choices, {
+        scorer: createScorer(tverskySimilarity, {
+          gramSize,
+          alpha: spec.alpha,
+          beta: spec.beta,
+        }),
+      })
+  }
+}
 
 export function indexOf(
-  metric: Metric,
+  spec: MetricSpec,
   gramSize: number,
   choices: readonly string[],
 ): ChoiceIndex {
   const builder =
-    metric === 'dice'
+    spec.metric === 'dice'
       ? createDiceIndexBuilder(gramSize)
-      : createCosineIndexBuilder(gramSize)
+      : spec.metric === 'cosine'
+        ? createCosineIndexBuilder(gramSize)
+        : createTverskyIndexBuilder(gramSize, spec.alpha, spec.beta)
   for (const choice of choices) builder.add(choice)
   return builder.seal()
 }
 
 /** What the exhaustive Matcher answers, as `(id, score)` pairs. */
 export function exhaustive(
-  metric: Metric,
+  spec: MetricSpec,
   gramSize: number,
   choices: readonly string[],
   query: string,
   threshold: number | null,
   limit: number | null,
 ): { id: number; score: number }[] {
-  const scorer = createScorer(metric === 'dice' ? diceSimilarity : cosineSimilarity, {
-    gramSize,
-  })
-  const matcher = createMatcher(choices, { scorer })
+  const matcher = matcherOf(spec, gramSize, choices)
   const call = threshold === null ? { limit } : { limit, threshold }
   return matcher
     .search(query, call)
@@ -59,16 +88,13 @@ export function pairs(selected: {
 
 /** `searchIter`'s answer: every qualifying match, in collection order. */
 export function exhaustiveScan(
-  metric: Metric,
+  spec: MetricSpec,
   gramSize: number,
   choices: readonly string[],
   query: string,
   threshold: number | null,
 ): { id: number; score: number }[] {
-  const scorer = createScorer(metric === 'dice' ? diceSimilarity : cosineSimilarity, {
-    gramSize,
-  })
-  const matcher = createMatcher(choices, { scorer })
+  const matcher = matcherOf(spec, gramSize, choices)
   const call = threshold === null ? undefined : { threshold }
   return [...matcher.searchIter(query, call)].map((match) => ({
     id: Number(match.key),
@@ -76,8 +102,24 @@ export function exhaustiveScan(
   }))
 }
 
-export const METRICS: readonly Metric[] = ['dice', 'cosine']
-export const THRESHOLDS: readonly (number | null)[] = [null, 0, 0.5, 0.8, 1]
+/** One spec per index implementation, for representation-level suites. */
+export const REPRESENTATION_SPECS = [
+  { metric: 'dice' },
+  { metric: 'cosine' },
+  { metric: 'tversky', alpha: 1, beta: 0.1 },
+] as const satisfies readonly MetricSpec[]
+
+/** The weight shapes Tversky parity has to hold at. */
+export const TVERSKY_SPECS = [
+  { metric: 'tversky', alpha: 0.5, beta: 0.5 },
+  { metric: 'tversky', alpha: 1, beta: 1 },
+  { metric: 'tversky', alpha: 1, beta: 0 },
+  { metric: 'tversky', alpha: 1, beta: 0.1 },
+  { metric: 'tversky', alpha: 0.2, beta: 0.7 },
+  { metric: 'tversky', alpha: 2, beta: 10 },
+] as const satisfies readonly MetricSpec[]
+
+export const THRESHOLDS: readonly (number | null)[] = [null, 0, 0.1, 0.5, 0.8, 1]
 export const LIMITS: readonly (number | null)[] = [1, 3, null]
 
 export const CORPORA: readonly (readonly string[])[] = [

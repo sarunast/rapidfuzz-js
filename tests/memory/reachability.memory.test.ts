@@ -5,22 +5,28 @@ import { describe, expect, it } from 'vitest'
 import { similarity as cosineSimilarity } from '../../src/algorithms/cosine/index.js'
 import { similarity as diceSimilarity } from '../../src/algorithms/dice/index.js'
 import { QueryState } from '../../src/algorithms/ngram/inverted/query.js'
+import { similarity as tverskySimilarity } from '../../src/algorithms/tversky/index.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
 import { createIndexedMatcher } from '../../src/search/matcher/createIndexedMatcher.js'
 
 const choices = ['ab', 'bc', 'cd', 'de'] as const
 const dice = createScorer(diceSimilarity, { gramSize: 2 })
 const cosine = createScorer(cosineSimilarity, { gramSize: 2 })
+// Non-default weights, so this exercises the Tversky index rather than the
+// Dice index the default configuration routes to.
+const tversky = createScorer(tverskySimilarity, { gramSize: 2, alpha: 1, beta: 0.1 })
 
 function count(constructor: Function): number {
   return queryObjects(constructor, { format: 'count' })
 }
 
-function constructUseAndDrop(kind: 'dice' | 'cosine'): void {
+function constructUseAndDrop(kind: 'dice' | 'cosine' | 'tversky'): void {
   const matcher =
     kind === 'dice'
       ? createIndexedMatcher([...choices], { scorer: dice })
-      : createIndexedMatcher([...choices], { scorer: cosine })
+      : kind === 'cosine'
+        ? createIndexedMatcher([...choices], { scorer: cosine })
+        : createIndexedMatcher([...choices], { scorer: tversky })
   matcher.best('bc')
   matcher.search('cd', { limit: 2 })
 }
@@ -99,9 +105,9 @@ function submitLateInvalid(
 }
 
 describe.sequential('indexed matcher reachability', () => {
-  it('returns Dice and Cosine query states to baseline after destruction', () => {
+  it('returns Dice, Cosine and Tversky query states to baseline after destruction', () => {
     const baseline = count(QueryState)
-    for (const kind of ['dice', 'cosine'] as const) {
+    for (const kind of ['dice', 'cosine', 'tversky'] as const) {
       for (let repeat = 0; repeat < 5; repeat++) constructUseAndDrop(kind)
       expect(count(QueryState)).toBe(baseline)
     }

@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import { createScorer } from '#core/scoring/scorer.js'
+import { createIndexedMatcher, createMatcher } from '#search/index.js'
 
 import { indexOf, pairs } from '../../../../testing/invertedIndex.js'
 import { similarity as diceSimilarity } from '../../dice/index.js'
+import { similarity as tverskySimilarity } from '../../tversky/index.js'
 import { assertAddressable } from './builder.js'
 import { assertCosineExact, assertCosineNormsExact } from './cosine.js'
 import { assertDiceAccumulatorExact, createDiceIndexBuilder } from './dice.js'
+import { assertTverskyAccumulatorExact } from './tversky.js'
 
 describe('what an index refuses', () => {
   it('refuses a choice whose elements are not integers', () => {
@@ -16,7 +19,7 @@ describe('what an index refuses', () => {
   })
 
   it('refuses a query whose elements are not integers', () => {
-    const index = indexOf('dice', 2, ['abc'])
+    const index = indexOf({ metric: 'dice' }, 2, ['abc'])
     expect(() => index.select([{}, {}, {}], null, 1)).toThrow(TypeError)
   })
 
@@ -32,6 +35,37 @@ describe('what an index refuses', () => {
     expect(() => assertDiceAccumulatorExact(0x8000_0000)).toThrow(RangeError)
     expect(() => assertDiceAccumulatorExact(0x8000_0000)).toThrow(/2147483647 grams/)
     expect(() => assertDiceAccumulatorExact(0x7fff_ffff)).not.toThrow()
+  })
+
+  it('refuses a query too large for the narrow Tversky accumulator', () => {
+    expect(() => assertTverskyAccumulatorExact(0x8000_0000)).toThrow(RangeError)
+    expect(() => assertTverskyAccumulatorExact(0x8000_0000)).toThrow(/2147483647 grams/)
+    expect(() => assertTverskyAccumulatorExact(0x7fff_ffff)).not.toThrow()
+  })
+
+  it('keeps huge finite Tversky weights finite in the index arithmetic', () => {
+    const index = indexOf(
+      { metric: 'tversky', alpha: Number.MAX_VALUE, beta: Number.MAX_VALUE },
+      2,
+      ['abcdef', 'abcxyz'],
+    )
+    const found = pairs(index.select('abcdef', null, 2))
+    expect(found[0]).toEqual({ id: 0, score: 1 })
+    expect(found[1].score).toBeGreaterThan(0)
+    expect(Number.isFinite(found[1].score)).toBe(true)
+  })
+
+  it('keeps arbitrary string-token sequences out of the index', () => {
+    // The key extractor packs integer elements — characters only work because
+    // sequence conversion turns them into code points. The exhaustive matcher
+    // scores token arrays; the indexed one refuses them at construction.
+    const scorer = createScorer(tverskySimilarity, { gramSize: 1, alpha: 1, beta: 0 })
+    expect(
+      createMatcher([['google', 'ag']], { scorer }).best(['google', 'ag'])?.score,
+    ).toBe(1)
+    expect(() => createIndexedMatcher([['google', 'ag']], { scorer })).toThrow(
+      /integer elements only/,
+    )
   })
 
   it('refuses a Cosine pair whose dot product would leave the exact integers', () => {
@@ -107,9 +141,12 @@ describe('what an index refuses', () => {
   it('scores nothing when the threshold is past the scale', () => {
     // A gramless pair is the one shape that can reach 1, so a threshold above it
     // has to leave the result empty rather than admitting the equal choice.
-    const index = indexOf('dice', 3, ['ab', 'ab'])
+    const index = indexOf({ metric: 'dice' }, 3, ['ab', 'ab'])
     expect(pairs(index.select('ab', 1.5, 2))).toEqual([])
     expect(pairs(index.scan('ab', 1.5))).toEqual([])
+    const tversky = indexOf({ metric: 'tversky', alpha: 1, beta: 0.1 }, 3, ['ab', 'ab'])
+    expect(pairs(tversky.select('ab', 1.5, 2))).toEqual([])
+    expect(pairs(tversky.scan('ab', 1.5))).toEqual([])
   })
 
   it('is one-shot', () => {

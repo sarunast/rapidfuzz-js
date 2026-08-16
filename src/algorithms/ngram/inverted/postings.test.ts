@@ -4,7 +4,7 @@ import {
   exhaustive,
   exhaustiveScan,
   indexOf,
-  METRICS,
+  REPRESENTATION_SPECS,
   pairs,
   THRESHOLDS,
 } from '../../../../testing/invertedIndex.js'
@@ -12,12 +12,12 @@ import { createDiceIndexBuilder } from './dice.js'
 
 describe('the posting representation', () => {
   it('stores no counts when nothing repeats, and widens when it does', () => {
-    for (const metric of METRICS) {
+    for (const spec of REPRESENTATION_SPECS) {
       for (const repeats of [1, 2, 300, 70_000]) {
         const choices = ['ab', `${'a'.repeat(repeats + 1)}b`]
-        const index = indexOf(metric, 2, choices)
+        const index = indexOf(spec, 2, choices)
         expect(pairs(index.select('aa', null, 2))).toEqual(
-          exhaustive(metric, 2, choices, 'aa', null, 2),
+          exhaustive(spec, 2, choices, 'aa', null, 2),
         )
       }
     }
@@ -26,14 +26,14 @@ describe('the posting representation', () => {
   it('inverts a list that covers most of the corpus', () => {
     // `no` is in six of seven choices, past the two-thirds cutoff.
     const choices = ['node', 'nodes', 'noded', 'nodex', 'nodey', 'nodez', 'qq']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 2, choices)
+    for (const spec of REPRESENTATION_SPECS) {
+      const index = indexOf(spec, 2, choices)
       for (const threshold of THRESHOLDS) {
         expect(pairs(index.select('node', threshold, 3))).toEqual(
-          exhaustive(metric, 2, choices, 'node', threshold, 3),
+          exhaustive(spec, 2, choices, 'node', threshold, 3),
         )
         expect(pairs(index.scan('node', threshold))).toEqual(
-          exhaustiveScan(metric, 2, choices, 'node', threshold),
+          exhaustiveScan(spec, 2, choices, 'node', threshold),
         )
       }
     }
@@ -43,14 +43,14 @@ describe('the posting representation', () => {
     // Dense with `counts === null`: `ab` is in six of seven choices and no gram
     // repeats within any of them, so an exception can only be an absence.
     const choices = ['abc', 'abd', 'abe', 'abf', 'abg', 'abh', 'xyz']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 2, choices)
+    for (const spec of REPRESENTATION_SPECS) {
+      const index = indexOf(spec, 2, choices)
       for (const threshold of THRESHOLDS) {
         expect(pairs(index.select('abc', threshold, 3))).toEqual(
-          exhaustive(metric, 2, choices, 'abc', threshold, 3),
+          exhaustive(spec, 2, choices, 'abc', threshold, 3),
         )
         expect(pairs(index.scan('abc', threshold))).toEqual(
-          exhaustiveScan(metric, 2, choices, 'abc', threshold),
+          exhaustiveScan(spec, 2, choices, 'abc', threshold),
         )
       }
     }
@@ -60,10 +60,10 @@ describe('the posting representation', () => {
     // `ab` is dense and `zq` is not, so one query reaches both and the sparse
     // walk runs with the touched set already abandoned.
     const choices = ['abc', 'abd', 'abe', 'abf', 'abg', 'abzq', 'zq']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 2, choices)
+    for (const spec of REPRESENTATION_SPECS) {
+      const index = indexOf(spec, 2, choices)
       expect(pairs(index.select('abzq', null, null))).toEqual(
-        exhaustive(metric, 2, choices, 'abzq', null, null),
+        exhaustive(spec, 2, choices, 'abzq', null, null),
       )
     }
   })
@@ -71,13 +71,13 @@ describe('the posting representation', () => {
   it('walks a counted sparse list under a widened scan', () => {
     // The same, with a repeat somewhere so the whole index carries counts.
     const choices = ['abc', 'abd', 'abe', 'abf', 'abg', 'abzqzq', 'zq']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 2, choices)
+    for (const spec of REPRESENTATION_SPECS) {
+      const index = indexOf(spec, 2, choices)
       // Both sides of the shared minimum: the query holds `zq` twice in the
       // first and once in the second, against a choice that holds it twice.
       for (const query of ['abzqzq', 'abzq']) {
         expect(pairs(index.select(query, null, null))).toEqual(
-          exhaustive(metric, 2, choices, query, null, null),
+          exhaustive(spec, 2, choices, query, null, null),
         )
       }
     }
@@ -86,10 +86,10 @@ describe('the posting representation', () => {
   it('inverts a list whose members repeat the gram', () => {
     // Dense with a counts array: most choices hold `aa`, and some hold it twice.
     const choices = ['aab', 'aaab', 'aaac', 'aad', 'aae', 'aaf', 'zz']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 2, choices)
+    for (const spec of REPRESENTATION_SPECS) {
+      const index = indexOf(spec, 2, choices)
       expect(pairs(index.select('aab', null, null))).toEqual(
-        exhaustive(metric, 2, choices, 'aab', null, null),
+        exhaustive(spec, 2, choices, 'aab', null, null),
       )
     }
   })

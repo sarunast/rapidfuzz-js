@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { exhaustive, indexOf, METRICS, pairs } from '../../../../testing/invertedIndex.js'
+import {
+  exhaustive,
+  indexOf,
+  pairs,
+  REPRESENTATION_SPECS,
+} from '../../../../testing/invertedIndex.js'
 import { feasibleRadices } from '../key.js'
 import { createDiceIndexBuilder } from './dice.js'
 import { repackKey } from './keys.js'
@@ -20,11 +25,11 @@ describe('the key scheme', () => {
     // A byte-radix index, then a lone surrogate that needs BMP, then an astral
     // character that no trigram radix holds at all.
     const choices = ['abc', '\ud800bc', '😀bc']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 3, choices)
+    for (const spec of REPRESENTATION_SPECS) {
+      const index = indexOf(spec, 3, choices)
       for (const query of choices) {
         expect(pairs(index.select(query, 0.99, 1))).toEqual(
-          exhaustive(metric, 3, choices, query, 0.99, 1),
+          exhaustive(spec, 3, choices, query, 0.99, 1),
         )
       }
     }
@@ -33,11 +38,11 @@ describe('the key scheme', () => {
   it('keeps a joined-string index exact', () => {
     // Gram size 3 over astral text has no feasible packed radix at all.
     const choices = ['😀😁😂', '😀😁😃', '😀😁😂😄']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 3, choices)
+    for (const spec of REPRESENTATION_SPECS) {
+      const index = indexOf(spec, 3, choices)
       for (const query of [...choices, '😀😁']) {
         expect(pairs(index.select(query, null, null))).toEqual(
-          exhaustive(metric, 3, choices, query, null, null),
+          exhaustive(spec, 3, choices, query, null, null),
         )
       }
     }
@@ -68,7 +73,7 @@ describe('the key scheme', () => {
     for (const choice of ['abcdefgh', 'abcdefgi']) builder.add(choice)
     const index = builder.seal()
     expect(pairs(index.select('abcdefgh', 0.5, 2))).toEqual(
-      exhaustive('dice', 7, ['abcdefgh', 'abcdefgi'], 'abcdefgh', 0.5, 2),
+      exhaustive({ metric: 'dice' }, 7, ['abcdefgh', 'abcdefgi'], 'abcdefgh', 0.5, 2),
     )
   })
 
@@ -84,10 +89,10 @@ describe('the key scheme', () => {
     // The index is byte-keyed; the query's astral grams cannot appear in it, and
     // still have to count toward the query's own gram count and norm.
     const choices = ['abcd', 'abce']
-    for (const metric of METRICS) {
-      const index = indexOf(metric, 2, choices)
+    for (const spec of REPRESENTATION_SPECS) {
+      const index = indexOf(spec, 2, choices)
       expect(pairs(index.select('ab😀cd', null, null))).toEqual(
-        exhaustive(metric, 2, choices, 'ab😀cd', null, null),
+        exhaustive(spec, 2, choices, 'ab😀cd', null, null),
       )
     }
   })

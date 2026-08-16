@@ -384,6 +384,7 @@ describe('dependency direction', () => {
       'dice.ts',
       'keys.ts',
       'query.ts',
+      'tversky.ts',
     ])
   })
 

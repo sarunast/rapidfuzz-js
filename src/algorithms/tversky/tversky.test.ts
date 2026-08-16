@@ -16,6 +16,22 @@ import {
   similarity as tverskyMetric,
 } from './index.js'
 
+// Positive finite doubles order like their bit patterns, so stepping the
+// pattern is stepping one ulp.
+const ULP_VIEW = new DataView(new ArrayBuffer(8))
+
+function ulpAbove(value: number): number {
+  ULP_VIEW.setFloat64(0, value)
+  ULP_VIEW.setBigUint64(0, ULP_VIEW.getBigUint64(0) + 1n)
+  return ULP_VIEW.getFloat64(0)
+}
+
+function ulpBelow(value: number): number {
+  ULP_VIEW.setFloat64(0, value)
+  ULP_VIEW.setBigUint64(0, ULP_VIEW.getBigUint64(0) - 1n)
+  return ULP_VIEW.getFloat64(0)
+}
+
 describe('multiset n-gram similarity', () => {
   it('counts a repeated gram as often as both sides carry it', () => {
     // min(3, 2) + min(1, 2) = 3 shared against 1 first-only and 1 second-only
@@ -76,8 +92,8 @@ describe('the three equivalences', () => {
         expect(tversky.score(a, b)).toBe(exact)
         expect(tversky.score(a, b, { threshold: exact })).toBe(exact)
         // The prepared kernels differ inside — Dice hands its walk a minimum
-        // shared count, Tversky does not yet — so the equivalence has to hold
-        // through a matcher too, thresholded at the exact boundary included.
+        // shared count, Tversky deliberately does not — so the equivalence has
+        // to hold through a matcher too, thresholded at the boundary included.
         const viaTversky = createMatcher([b], { scorer: tversky })
         const viaDice = createMatcher([b], { scorer: dice })
         expect(viaTversky.best(a)?.score).toBe(viaDice.best(a)?.score)
@@ -378,6 +394,51 @@ describe('thresholds', () => {
     ).toBeUndefined()
   })
 
+  it('holds the boundary to within one ulp of the exact score', () => {
+    // The dangerous failure of any threshold shortcut is rejecting a
+    // candidate whose exact score qualifies. The exact score and its two ulp
+    // neighbours sit right on that edge.
+    for (const options of [
+      { gramSize: 2, alpha: 1, beta: 0.25 },
+      { gramSize: 1, alpha: 0.2, beta: 0.7 },
+      { gramSize: 3, alpha: 2, beta: 10 },
+    ]) {
+      const scorer = createScorer(tverskyMetric, options)
+      const query = 'the wonderful new york mets'
+      const choice = 'new york mets and the dogs'
+      const exact = scorer.score(query, choice)
+      expect(exact).toBeGreaterThan(0)
+      expect(exact).toBeLessThan(1)
+      const prepared = prepareScorerOf(tverskySimilarity)(query, options)
+      expect(prepared(choice, exact)).toBe(exact)
+      expect(prepared(choice, ulpBelow(exact))).toBe(exact)
+      expect(prepared(choice, ulpAbove(exact))).toBe(0)
+    }
+  })
+
+  it('never inverts a threshold into a minimum shared count', () => {
+    // The regression that keeps the prepared walk unbounded. At tiny weights
+    // the score rounds up to the brink of 1 while a real-number inversion of
+    // the threshold demands seven shared grams of a candidate that qualifies
+    // with six — and the keys are chosen so the packed walk meets every
+    // query-only gram first, which is where a bounded walk would give up and
+    // under-count the match into a false rejection.
+    const options = { gramSize: 1, alpha: 2 ** -54, beta: 2 ** -54 }
+    const scorer = createScorer(tverskyMetric, options)
+    const query = [0, 1, 2, 3, 1000, 1001, 1002, 1003, 1004, 1005]
+    const choice = [
+      1000, 1001, 1002, 1003, 1004, 1005, 2110, 2111, 2112, 2113, 2114, 2115, 2116, 2117,
+      2118, 2119, 2120, 2121, 2122, 2123, 2124, 2125, 2126,
+    ]
+    const exact = scorer.score(query, choice)
+    expect(exact).toBe(0.9999999999999999)
+    const prepared = prepareScorerOf(tverskySimilarity)(query, options)
+    expect(prepared(choice, exact)).toBe(exact)
+    expect(
+      createMatcher([choice], { scorer }).best(query, { threshold: exact })?.score,
+    ).toBe(exact)
+  })
+
   it('applies a threshold to sequences that have no grams', () => {
     const scorer = createScorer(tverskyMetric, { alpha: 1, beta: 0 })
     expect(scorer.score('a', 'b', { threshold: 0.5 })).toBeUndefined()
@@ -510,6 +571,35 @@ describe('properties', () => {
           createMatcher([b], { scorer }).best(a, { threshold: exact })?.score,
         ).toBeCloseTo(exact, 12)
       }),
+    )
+  })
+
+  it('answers a thresholded prepared score exactly as the direct one, at every weight magnitude', () => {
+    // Weights spanning the double range prove the scaled arithmetic never
+    // flips a verdict between the two paths.
+    const magnitudes = fc
+      .integer({ min: -160, max: 160 })
+      .map((exponent) => 2 ** exponent)
+    const anyWeight = fc.oneof(
+      magnitudes,
+      fc.constantFrom(0, 0.1, 0.5, 1, Number.MAX_VALUE),
+    )
+    const thresholds = fc.double({ min: 0, max: 1, noNaN: true })
+    fc.assert(
+      fc.property(
+        sequences,
+        sequences,
+        anyWeight,
+        anyWeight,
+        thresholds,
+        (a, b, alpha, beta, threshold) => {
+          fc.pre(alpha !== 0 || beta !== 0)
+          const options = { alpha, beta }
+          const direct = createScorer(tverskyMetric, options).score(a, b)
+          const prepared = prepareScorerOf(tverskySimilarity)(a, options)
+          expect(prepared(b, threshold)).toBe(direct >= threshold ? direct : 0)
+        },
+      ),
     )
   })
 })

@@ -286,7 +286,7 @@ describe('what it refuses', () => {
   it('names the metrics that do have one', () => {
     const scorer = createScorer(levenshteinSimilarity)
     expect(() => createIndexedMatcher(['a'], { scorer })).toThrow(
-      /dice\.similarity and cosine\.similarity/,
+      /dice\.similarity, cosine\.similarity and tversky\.similarity/,
     )
   })
 
