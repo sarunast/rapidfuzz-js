@@ -3,7 +3,6 @@ import {
   directStamps,
   buildWordMasks,
   directLimit,
-  wideSlots,
 } from '../../bitmask/blockMasks.js'
 import type { PatternMask } from '../../bitmask/pattern.js'
 
@@ -25,10 +24,11 @@ export function osaOneWordRange(
   }
   if (textLength === 0) return patternLength
 
-  const stamp = buildWordMasks(pattern, patternStart, patternLength)
+  const masks = buildWordMasks(pattern, patternStart, patternLength)
+  const stamp = masks.stamp
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   const top = 1 << (patternLength - 1)
 

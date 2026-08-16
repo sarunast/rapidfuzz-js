@@ -8,16 +8,24 @@
  * its own block of `words`, so the mask pool grows with `length * words` where
  * text grows with the alphabet.
  *
- * Two readings, because only the second is a leak: what the comparison holds
- * while it runs, which nothing can avoid, and what survives one unrelated
- * comparison afterwards.
+ * Both readings are taken after the call has returned and after three
+ * collections, so neither is the peak the comparison reached while it ran —
+ * nothing here measures that, and a reading that needs it has to come from an
+ * allocation hook rather than a heap delta. What they separate is when the
+ * scratch is let go: immediately, which is what the ownership split promises,
+ * or only once some later call happens to displace it.
  *
- * The second reading has a floor of tens of kilobytes either way — a heap
- * measured after three collections moves that much between two runs that did
- * nothing at all, and one control run came back at -877 kB. It is a scale
- * check, not a byte count: the buffers that legitimately survive come to about
- * 11 kB, against a peak of 67 MB. Read the median across rounds, and read a
- * regression as an order of magnitude rather than a number.
+ * Each round measures against a heap the round before it left, so the median
+ * across them is the growth a further comparison adds rather than the total: it
+ * reads near zero once the capped pool and the symbol table are there, and the
+ * first round is the one that pays for them. Growth is the reading that matters
+ * — a bound only holds if a thousand more comparisons do not move it.
+ *
+ * Both have a floor of tens of kilobytes either way — a heap measured after
+ * three collections moves that much between two runs that did nothing at all,
+ * and one control run came back at -877 kB. It is a scale check, not a byte
+ * count, against the 67 MB such a comparison allocates. Read a regression as an
+ * order of magnitude rather than a number.
  */
 import process from 'node:process'
 
@@ -50,7 +58,7 @@ function unique(tag: string): ReadonlyArray<unknown> {
 
 const ROUNDS = 5
 
-/** One round: the peak the comparison reaches, and what outlives it. */
+/** One round: what the comparison leaves behind, and what then outlives it. */
 function round(): { held: number; survived: number } {
   collect()
   const before = retainedBytes()
@@ -81,7 +89,7 @@ process.stdout.write(
     {
       elements: count,
       rounds: ROUNDS,
-      heldByTheComparison: median(held),
+      heldAfterTheCallReturned: median(held),
       heldAfterUnrelatedWork: median(survived),
       heldAfterUnrelatedWorkRange: [Math.min(...survived), Math.max(...survived)],
       heldPerElement: median(held) / count,

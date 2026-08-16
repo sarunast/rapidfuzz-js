@@ -9,12 +9,11 @@ import {
   buildWordMasks,
   clearRange,
   directLimit,
-  maskPoolOf,
   measureAffix,
   rowVector,
   rowVectorN,
-  wideSlots,
   wordCount,
+  type BuiltMasks,
 } from '../../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../../bitmask/pattern.js'
 
@@ -38,10 +37,11 @@ function levenshteinOneWord(
   textStart: number,
   textLength: number,
 ): number {
-  const stamp = buildWordMasks(pattern, patternStart, patternLength)
+  const masks = buildWordMasks(pattern, patternStart, patternLength)
+  const stamp = masks.stamp
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   const top = 1 << (patternLength - 1)
 
@@ -98,7 +98,7 @@ function patternOffset(
   stamp: number,
   slots: Int32Array,
   stamps: Int32Array,
-  wide: Map<unknown, number>,
+  wide: ReadonlyMap<unknown, number>,
   limit: number,
 ): number {
   if (
@@ -130,18 +130,18 @@ function levenshteinManyWords(
   textLength: number,
 ): number {
   const words = wordCount(patternLength)
-  const stamp = blockMasksFor(pattern, patternStart, patternLength, words)
+  const masks = blockMasksFor(pattern, patternStart, patternLength, words)
 
   if (words === 2) {
-    return levenshteinTwoWords(patternLength, text, textStart, textLength, stamp)
+    return levenshteinTwoWords(patternLength, text, textStart, textLength, masks)
   }
   if (words === 3) {
-    return levenshteinThreeWords(patternLength, text, textStart, textLength, stamp)
+    return levenshteinThreeWords(patternLength, text, textStart, textLength, masks)
   }
   if (words === 4) {
-    return levenshteinFourWords(patternLength, text, textStart, textLength, stamp)
+    return levenshteinFourWords(patternLength, text, textStart, textLength, masks)
   }
-  return levenshteinWideWords(patternLength, words, text, textStart, textLength, stamp)
+  return levenshteinWideWords(patternLength, words, text, textStart, textLength, masks)
 }
 
 function levenshteinTwoWords(
@@ -149,12 +149,13 @@ function levenshteinTwoWords(
   text: ArrayLike<unknown>,
   textStart: number,
   textLength: number,
-  stamp: number,
+  masks: BuiltMasks,
 ): number {
-  const pool = maskPoolOf()
+  const stamp = masks.stamp
+  const pool = masks.pool
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   let vp0 = -1
   let vp1 = -1
@@ -209,12 +210,13 @@ function levenshteinThreeWords(
   text: ArrayLike<unknown>,
   textStart: number,
   textLength: number,
-  stamp: number,
+  masks: BuiltMasks,
 ): number {
-  const pool = maskPoolOf()
+  const stamp = masks.stamp
+  const pool = masks.pool
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   let vp0 = -1
   let vp1 = -1
@@ -282,12 +284,13 @@ function levenshteinFourWords(
   text: ArrayLike<unknown>,
   textStart: number,
   textLength: number,
-  stamp: number,
+  masks: BuiltMasks,
 ): number {
-  const pool = maskPoolOf()
+  const stamp = masks.stamp
+  const pool = masks.pool
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   let vp0 = -1
   let vp1 = -1
@@ -372,17 +375,18 @@ function levenshteinWideWords(
   text: ArrayLike<unknown>,
   textStart: number,
   textLength: number,
-  stamp: number,
+  masks: BuiltMasks,
 ): number {
   const vp = rowVector(words)
   const vn = rowVectorN(words)
   clearRange(vp, -1, 0, words)
   clearRange(vn, 0, 0, words)
 
-  const pool = maskPoolOf()
+  const stamp = masks.stamp
+  const pool = masks.pool
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   const lastWord = words - 1
   const top = 1 << ((patternLength - 1) & WORD_MASK)
@@ -497,16 +501,17 @@ function levenshteinManyWordsBanded(
   budget: number,
 ): number {
   const words = wordCount(patternLength)
-  const stamp = blockMasksFor(pattern, patternStart, patternLength, words)
+  const masks = blockMasksFor(pattern, patternStart, patternLength, words)
 
   const vp = rowVector(words)
   const vn = rowVectorN(words)
   const scores = bandVector(words)
 
-  const pool = maskPoolOf()
+  const stamp = masks.stamp
+  const pool = masks.pool
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   const last = 1 << ((patternLength - 1) & WORD_MASK)
   const stringText = typeof text === 'string'

@@ -182,49 +182,62 @@ describe('the OSA scratch after a reset', () => {
 // a sequence that repeats nothing takes `length * words` — 48.8 MB for two
 // 20,000-element arrays of distinct objects, which the API accepts because an
 // element is whatever the caller's sequence holds. That much is unavoidable
-// during the comparison; keeping it afterwards is not.
+// during the comparison; keeping it afterwards is not, and the comparison is
+// the last thing a process runs often enough for "the next build clears it" to
+// be no answer at all.
+//
+// Which owner a build's masks go to is covered where the builders are, in
+// `src/algorithms/bitmask/blockMasks.test.ts`. What is only visible from here
+// is that a public call leaves nothing oversized behind.
 describe('the mask pool past its retention cap', () => {
-  const RETAINED_MASK_WORDS = 1 << 18
+  const RETAINED_MASK_WORDS = 1 << 19
 
   /** Distinct objects, so every element takes a block of its own. */
   function unique(count: number, tag: string): ReadonlyArray<unknown> {
     return Array.from({ length: count }, (_, index) => ({ tag, index }))
   }
 
-  const wideA = unique(3200, 'a')
-  const wideB = unique(3200, 'b')
+  // One element past the largest pattern the memo takes, which is the first
+  // size whose masks the module refuses to keep.
+  const wideA = unique(4097, 'a')
+  const wideB = unique(4097, 'b')
 
-  it('grows past the cap when the comparison needs it', () => {
+  it('is back within the cap once the comparison has returned', () => {
     resetAll()
 
-    expect(levenshteinDistance(wideA, wideB)).toBe(3200)
-    expect(maskPoolOf().length).toBeGreaterThan(RETAINED_MASK_WORDS)
+    expect(levenshteinDistance(wideA, wideB)).toBe(4097)
+    expect(maskPoolOf().length).toBeLessThanOrEqual(RETAINED_MASK_WORDS)
   })
 
-  it('holds it while the next build could fill it again', () => {
+  // Both sides of the handover. A build climbing past the cap leaves the module
+  // holding exactly the cap — the sizes on the way up are still worth keeping,
+  // and the one that cleared it is not — and the follow-up then reuses that
+  // buffer rather than growing one of its own.
+  it('stops at the cap, and leaves that much to reuse', () => {
     resetAll()
     levenshteinDistance(wideA, wideB)
-    const grown = maskPoolOf().length
+    expect(maskPoolOf().length).toBe(RETAINED_MASK_WORDS)
 
-    expect(levenshteinDistance(unique(3200, 'c'), unique(3200, 'd'))).toBe(3200)
-    expect(maskPoolOf().length).toBe(grown)
-  })
+    const held = maskPoolOf()
+    const repetitive = 'a'.repeat(3000)
+    expect(levenshteinDistance(repetitive, `b${repetitive.slice(1, -1)}c`)).toBe(2)
+    expect(maskPoolOf()).toBe(held)
 
-  it('drops it for a single-word build, which can never use it', () => {
-    resetAll()
-    levenshteinDistance(wideA, wideB)
-
+    // Nothing shrinks it back either: bounded scratch is the part that stays.
     expect(levenshteinDistance('kitten', 'sitting')).toBe(3)
-    expect(maskPoolOf().length).toBeLessThanOrEqual(64)
+    expect(maskPoolOf()).toBe(held)
   })
 
-  it('drops it for a multi-word build too small to want it', () => {
+  // `length * words` is the worst case, not the need: past 4096 elements a
+  // sequence clears the cap on that bound alone, so a follow-up of one repeated
+  // character — 157 words of masks — used to vote for keeping an 8 MB pool.
+  it('cannot be held open by a long low-cardinality follow-up', () => {
     resetAll()
     levenshteinDistance(wideA, wideB)
 
-    const text = 'abcdefghij'.repeat(100)
-    expect(levenshteinDistance(text, 'z'.repeat(1000))).toBe(1000)
-    expect(maskPoolOf().length).toBeLessThan(RETAINED_MASK_WORDS)
+    const repetitive = 'a'.repeat(5000)
+    expect(levenshteinDistance(repetitive, `b${repetitive.slice(1, -1)}c`)).toBe(2)
+    expect(maskPoolOf().length).toBeLessThanOrEqual(RETAINED_MASK_WORDS)
   })
 
   it('answers the same either side of the cap', () => {
@@ -233,6 +246,17 @@ describe('the mask pool past its retention cap', () => {
 
     levenshteinDistance('kitten', 'sitting')
     expect(levenshteinDistance(wideA, wideB)).toBe(cold)
+  })
+
+  it('answers the same for a string pattern either side of the cap', () => {
+    resetAll()
+    const long = Array.from({ length: 4096 }, (_, i) => String.fromCharCode(0x4e00 + i))
+    const pattern = long.join('')
+    const text = [...long].reverse().join('')
+
+    const cold = levenshteinDistance(pattern, text)
+    expect(levenshteinDistance(pattern, text)).toBe(cold)
+    expect(maskPoolOf().length).toBeLessThanOrEqual(RETAINED_MASK_WORDS)
   })
 })
 

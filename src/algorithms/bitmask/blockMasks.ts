@@ -15,7 +15,6 @@ let vectorP: Int32Array | null = null
 let vectorN: Int32Array | null = null
 let asciiSlot: Int32Array | null = null
 let asciiStamp: Int32Array | null = null
-let wideSlot: Map<unknown, number> | null = null
 let bandScores: Int32Array | null = null
 
 export function directSlots(): Int32Array {
@@ -26,26 +25,68 @@ export function directStamps(): Int32Array {
   return (asciiStamp ??= new Int32Array(directLimit))
 }
 
-export function wideSlots(): Map<unknown, number> {
-  return (wideSlot ??= new Map<unknown, number>())
-}
-
 export function maskPoolOf(): Int32Array {
   return (maskPool ??= new Int32Array(64))
 }
 
-const RETAINED_MASK_WORDS = 1 << 18
-
-function maskPoolFor(needed: number): Int32Array {
-  const pool = maskPoolOf()
-  if (pool.length <= RETAINED_MASK_WORDS || needed > RETAINED_MASK_WORDS) return pool
-
-  return (maskPool = new Int32Array(64))
+/**
+ * What one build hands its kernel: the generation the symbol table was stamped
+ * with, the block masks the multi-word kernels index, and the lookup for
+ * elements the direct table cannot hold.
+ *
+ * One per build, and never reused between builds — an escape-analysed object
+ * measured flat against a mutable one held by the module (2026-08-16), which
+ * is not worth a result whose fields the next build rewrites.
+ *
+ * A kernel reads its masks from here and never from `maskPoolOf()`. The two are
+ * the same buffer for an ordinary build and are not for an oversized one, whose
+ * symbol table holds offsets past everything the module kept — so reaching for
+ * the module's pool would read a shorter buffer with another build's masks in
+ * it. `wide` has the same rule for the opposite reason: nothing else holds it.
+ */
+export interface BuiltMasks {
+  readonly stamp: number
+  readonly pool: Int32Array
+  readonly wide: ReadonlyMap<unknown, number>
 }
 
-function dropOversizedMaskPool(): void {
-  if (maskPool !== null && maskPool.length > RETAINED_MASK_WORDS) maskPool = null
+const EMPTY_POOL = new Int32Array(0)
+const EMPTY_WIDE: ReadonlyMap<unknown, number> = new Map<unknown, number>()
+
+/** The longest pattern the mask memo will hold an entry for. */
+const MASK_PATTERN_LIMIT = 4096
+
+/**
+ * What the pool would actually be allocated at to hold `needed` words, from
+ * `size` up. A pool that is already larger doubles from where it is; the
+ * retention cap below asks from the bottom, which is the same answer.
+ */
+function poolCapacity(needed: number, size = 64): number {
+  while (size < needed) size *= 2
+  return size
 }
+
+/**
+ * The mask pool is the one buffer here that grows with `distinct * words`
+ * rather than with the input length or the symbol space, so it is the one that
+ * has to stop being the module's. Up to this many words it stays module-owned
+ * and is reused; a build that needs more gets a buffer of its own, which the
+ * kernel reads and then drops.
+ *
+ * Derived rather than chosen, because the two have to agree: a memo entry names
+ * masks the module still holds, and the largest memoisable build is
+ * `MASK_PATTERN_LIMIT` elements each taking a block of `words`. Cap it below
+ * that and patterns the memo would hold start rebuilding — measured 1.22x on
+ * repeated 4096-element comparisons over 2048 distinct elements (2026-08-16).
+ *
+ * Through `poolCapacity`, because what has to fit is the buffer the pool would
+ * be given rather than the words a build asks for. The two coincide at 4096
+ * and would not at, say, 5000, where the largest memoisable build asks for
+ * 785,000 words and is handed 1,048,576.
+ */
+const RETAINED_MASK_WORDS = poolCapacity(
+  MASK_PATTERN_LIMIT * wordCount(MASK_PATTERN_LIMIT),
+)
 
 export let directLimit: number = DIRECT_LOOKUP_LIMIT
 
@@ -59,13 +100,26 @@ function grown(buffer: Int32Array | null, needed: number): Int32Array {
   return new Int32Array(size)
 }
 
-function grownPreserving(buffer: Int32Array, needed: number): Int32Array {
-  if (buffer.length >= needed) return buffer
+/**
+ * Grows the mask pool, and decides who owns each size on the way: within the
+ * cap it goes back to the module for the next build to reuse, past the cap it
+ * does not, which is what leaves an oversized pool reachable only through the
+ * `BuiltMasks` its build returned.
+ *
+ * Handing back each size on the way is a policy choice rather than a rule the
+ * ownership needs: it decides what a build that then outgrows the cap leaves
+ * behind, which is the largest capacity the cap allows rather than whatever the
+ * build started from. It buys the next oversized build some doublings, and
+ * those measured flat against publishing once at the end (2026-08-16) — a build
+ * big enough to reach them is doing far more work in its own loop.
+ */
+function grownPool(pool: Int32Array, needed: number): Int32Array {
+  if (pool.length >= needed) return pool
 
-  let size = buffer.length
-  while (size < needed) size *= 2
+  const size = poolCapacity(needed, pool.length)
   const next = new Int32Array(size)
-  next.set(buffer)
+  next.set(pool)
+  if (size <= RETAINED_MASK_WORDS) maskPool = next
   return next
 }
 
@@ -128,22 +182,16 @@ export function checkedStartGeneration(startGeneration: number): number {
   return startGeneration
 }
 
-function clearWide(wide: Map<unknown, number>): void {
-  if (wide.size !== 0) wide.clear()
-}
-
 export function buildWordMasks(
   pattern: ArrayLike<unknown>,
   start: number,
   length: number,
-): number {
+): BuiltMasks {
   const stamp = nextGeneration()
   let slots = directSlots()
   let stamps = directStamps()
-  const wide = wideSlots()
+  let wide: Map<unknown, number> | null = null
 
-  clearWide(wide)
-  dropOversizedMaskPool()
   let limit = directLimit
   const stringPattern = typeof pattern === 'string'
 
@@ -175,11 +223,12 @@ export function buildWordMasks(
       slots[symbol] = (stamps[symbol] === stamp ? slots[symbol] : 0) | bit
       stamps[symbol] = stamp
     } else if (symbol === symbol) {
-      wide.set(symbol, (wide.get(symbol) ?? 0) | bit)
+      const held = (wide ??= new Map<unknown, number>())
+      held.set(symbol, (held.get(symbol) ?? 0) | bit)
     }
   }
 
-  return stamp
+  return { stamp, pool: EMPTY_POOL, wide: wide ?? EMPTY_WIDE }
 }
 
 function buildBlockMasks(
@@ -187,15 +236,13 @@ function buildBlockMasks(
   start: number,
   length: number,
   words: number,
-): number {
+): BuiltMasks {
   const stamp = nextGeneration()
   let slots = directSlots()
   let stamps = directStamps()
-  const wide = wideSlots()
+  let wide: Map<unknown, number> | null = null
 
-  clearWide(wide)
-
-  let pool = maskPoolFor(length * words)
+  let pool = maskPoolOf()
   let distinct = 0
   let limit = directLimit
   const stringPattern = typeof pattern === 'string'
@@ -213,8 +260,7 @@ function buildBlockMasks(
       let offset = stamps[symbol] === stamp ? slots[symbol] : -1
       if (offset < 0) {
         offset = distinct * words
-        pool = grownPreserving(pool, offset + words)
-        maskPool = pool
+        pool = grownPool(pool, offset + words)
         clearRange(pool, 0, offset, offset + words)
         slots[symbol] = offset
         stamps[symbol] = stamp
@@ -225,7 +271,7 @@ function buildBlockMasks(
       pool[word] = pool[word] | (1 << (i & WORD_MASK))
     }
 
-    return stamp
+    return { stamp, pool, wide: EMPTY_WIDE }
   }
 
   for (let i = 0; i < length; i++) {
@@ -249,19 +295,21 @@ function buildBlockMasks(
       ? stamps[symbol] === stamp
         ? slots[symbol]
         : -1
-      : (wide.get(symbol) ?? -1)
+      : wide === null
+        ? -1
+        : (wide.get(symbol) ?? -1)
 
     if (offset < 0) {
       offset = distinct * words
-      pool = grownPreserving(pool, offset + words)
-      maskPool = pool
+      pool = grownPool(pool, offset + words)
       clearRange(pool, 0, offset, offset + words)
 
       if (direct) {
         slots[symbol] = offset
         stamps[symbol] = stamp
       } else {
-        wide.set(symbol, offset)
+        const held = (wide ??= new Map<unknown, number>())
+        held.set(symbol, offset)
       }
 
       distinct++
@@ -271,10 +319,9 @@ function buildBlockMasks(
     pool[word] = pool[word] | (1 << (i & WORD_MASK))
   }
 
-  return stamp
+  return { stamp, pool, wide: wide ?? EMPTY_WIDE }
 }
 
-const MASK_PATTERN_LIMIT = 4096
 let maskPattern: string | null = null
 let maskStart = -1
 let maskLength = -1
@@ -294,7 +341,7 @@ export function blockMasksFor(
   start: number,
   length: number,
   words: number,
-): number {
+): BuiltMasks {
   if (
     typeof pattern !== 'string' ||
     maskPattern !== pattern ||
@@ -303,17 +350,22 @@ export function blockMasksFor(
     maskWords !== words ||
     maskGeneration !== generation
   ) {
-    const stamp = buildBlockMasks(pattern, start, length, words)
+    const masks = buildBlockMasks(pattern, start, length, words)
+    // A memo entry names masks the module still holds, so a build that kept its
+    // pool to itself cannot leave one behind: `maskPool` is another build's.
+    const retained = masks.pool === maskPool
     maskPattern =
-      typeof pattern === 'string' && pattern.length <= MASK_PATTERN_LIMIT ? pattern : null
+      retained && typeof pattern === 'string' && pattern.length <= MASK_PATTERN_LIMIT
+        ? pattern
+        : null
     maskStart = start
     maskLength = length
     maskWords = words
-    maskGeneration = stamp
-    return stamp
+    maskGeneration = masks.stamp
+    return masks
   }
 
-  return maskGeneration
+  return { stamp: maskGeneration, pool: maskPoolOf(), wide: EMPTY_WIDE }
 }
 
 export const WORD_LIMIT: number = WORD_BITS
@@ -409,7 +461,6 @@ export function resetBitVectorScratch(startGeneration = 0): void {
   vectorN = null
   asciiSlot = null
   asciiStamp = null
-  wideSlot = null
   bandScores = null
   directLimit = DIRECT_LOOKUP_LIMIT
   invalidateMaskCache()

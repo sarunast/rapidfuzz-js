@@ -8,11 +8,10 @@ import {
   buildWordMasks,
   clearRange,
   directLimit,
-  maskPoolOf,
   measureAffix,
   rowVector,
-  wideSlots,
   wordCount,
+  type BuiltMasks,
 } from '../../bitmask/blockMasks.js'
 import type { PatternMask } from '../../bitmask/pattern.js'
 
@@ -43,14 +42,15 @@ function lcsOneWord(
 }
 
 function lcsOneWordStamped(
-  stamp: number,
+  masks: BuiltMasks,
   text: ArrayLike<unknown>,
   textStart: number,
   textLength: number,
 ): number {
+  const stamp = masks.stamp
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   let s = -1
   const limit = directLimit
@@ -107,22 +107,23 @@ function lcsManyWords(
   textLength: number,
 ): number {
   const words = wordCount(patternLength)
-  const stamp = blockMasksFor(pattern, patternStart, patternLength, words)
+  const masks = blockMasksFor(pattern, patternStart, patternLength, words)
 
-  if (words === 4) return lcsFourWordsStamped(stamp, text, textStart, textLength)
-  return lcsManyWordsStamped(stamp, words, text, textStart, textLength)
+  if (words === 4) return lcsFourWordsStamped(masks, text, textStart, textLength)
+  return lcsManyWordsStamped(masks, words, text, textStart, textLength)
 }
 
 function lcsFourWordsStamped(
-  stamp: number,
+  masks: BuiltMasks,
   text: ArrayLike<unknown>,
   textStart: number,
   textLength: number,
 ): number {
-  const pool = maskPoolOf()
+  const stamp = masks.stamp
+  const pool = masks.pool
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   let s0 = -1
   let s1 = -1
@@ -193,7 +194,7 @@ function lcsFourWordsStamped(
 }
 
 function lcsManyWordsStamped(
-  stamp: number,
+  masks: BuiltMasks,
   words: number,
   text: ArrayLike<unknown>,
   textStart: number,
@@ -202,10 +203,11 @@ function lcsManyWordsStamped(
   const row = rowVector(words)
   clearRange(row, -1, 0, words)
 
-  const pool = maskPoolOf()
+  const stamp = masks.stamp
+  const pool = masks.pool
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   const limit = directLimit
   const stringText = typeof text === 'string'
@@ -325,13 +327,14 @@ function lcsManyWordsBanded(
   required: number,
 ): number {
   const words = wordCount(patternLength)
-  const stamp = blockMasksFor(pattern, patternStart, patternLength, words)
+  const masks = blockMasksFor(pattern, patternStart, patternLength, words)
   const row = rowVector(words)
   clearRange(row, -1, 0, words)
-  const pool = maskPoolOf()
+  const stamp = masks.stamp
+  const pool = masks.pool
+  const wide = masks.wide
   const slots = directSlots()
   const stamps = directStamps()
-  const wide = wideSlots()
 
   const left = patternLength - required
   const right = textLength - required
