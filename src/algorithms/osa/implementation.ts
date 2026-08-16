@@ -18,7 +18,12 @@ import {
   type PreparationFactory,
 } from '#core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '#core/scoring/compilation.js'
-import { alignRepresentation, scorerSequence, maxSequenceLength } from '#core/sequence.js'
+import {
+  alignRepresentation,
+  queryAligner,
+  scorerSequence,
+  maxSequenceLength,
+} from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
 import { commonAffix } from '../affix.js'
@@ -84,6 +89,7 @@ function prepareOsa(kind: MetricScoreKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
     const pattern = preparePattern(a, 0, a.length)
+    const alignedQueryFor = queryAligner(a)
 
     const score: PreparedKernel = (rawChoice, rawCutoff) => {
       const b = preparedChoiceSequence(rawChoice)
@@ -101,7 +107,7 @@ function prepareOsa(kind: MetricScoreKind): PreparationFactory {
             ? a.length <= WORD_BITS
               ? osaOneWordPrepared(pattern, b)
               : osaPrepared(pattern, b)
-            : distance_(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)
+            : distance_(alignedQueryFor(b), alignRepresentation(b, a), cutoff)
 
       return scoreFromDistance(kind, distance, max, rawCutoff)
     }

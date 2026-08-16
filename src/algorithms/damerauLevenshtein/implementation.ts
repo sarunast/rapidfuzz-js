@@ -18,7 +18,12 @@ import {
   type PreparationFactory,
 } from '#core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '#core/scoring/compilation.js'
-import { alignRepresentation, scorerSequence, maxSequenceLength } from '#core/sequence.js'
+import {
+  alignRepresentation,
+  queryAligner,
+  scorerSequence,
+  maxSequenceLength,
+} from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
 import { checkedStartGeneration } from '../bitmask/blockMasks.js'
@@ -242,9 +247,10 @@ function distance_(
 function prepareDamerau(kind: MetricScoreKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
+    const alignedQueryFor = queryAligner(a)
     const score: PreparedKernel = (rawChoice, rawCutoff) => {
       let b = preparedChoiceSequence(rawChoice)
-      const s1 = alignRepresentation(a, b)
+      const s1 = alignedQueryFor(b)
       b = alignRepresentation(b, a)
       const max = maxSequenceLength(s1, b)
       const budget = distanceCutoffFor(kind, rawCutoff, max, Number.MAX_SAFE_INTEGER)

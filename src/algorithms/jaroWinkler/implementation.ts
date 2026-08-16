@@ -17,6 +17,7 @@ import {
   alignRepresentation,
   validateSequence,
   convPair,
+  queryAligner,
   scorerSequence,
 } from '#core/sequence.js'
 import type { MaybeSequence, Sequence } from '#core/types.js'
@@ -124,6 +125,7 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparationFactory {
     const prepareQuery = (query: Sequence): PreparedKernel => {
       const a = scorerSequence(query)
       const pattern = preparePattern(a, 0, a.length)
+      const alignedQueryFor = queryAligner(a)
 
       return (rawChoice, rawCutoff) => {
         const b = preparedChoiceSequence(rawChoice)
@@ -134,7 +136,7 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparationFactory {
               : 1 - rawCutoff
             : (rawCutoff ?? 0)
         const similarity = similarity_(
-          alignRepresentation(a, b),
+          alignedQueryFor(b),
           alignRepresentation(b, a),
           prefixWeight,
           similarityCutoff,

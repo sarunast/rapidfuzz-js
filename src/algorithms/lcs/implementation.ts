@@ -34,7 +34,7 @@ import type { PreparedKernel } from '#core/scoring/compilation.js'
 import {
   alignRepresentation,
   convPair,
-  convSequence,
+  queryAligner,
   scorerSequence,
   maxSequenceLength,
 } from '#core/sequence.js'
@@ -220,11 +220,7 @@ function prepareLcs(kind: MetricScoreKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
     let pattern: PatternMask | null = null
-    let convertedQuery: ArrayLike<unknown> | null = null
-    const alignedQueryFor = (b: ArrayLike<unknown>): ArrayLike<unknown> =>
-      typeof a === 'string' && typeof b !== 'string'
-        ? (convertedQuery ??= convSequence(a))
-        : a
+    const alignedQueryFor = queryAligner(a)
     const length = (b: ArrayLike<unknown>, cutoff: number): number => {
       if (
         !preparedLengthWorthwhile(a.length, b.length, cutoff) &&

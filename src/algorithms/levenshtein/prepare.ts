@@ -10,7 +10,7 @@ import {
   type PreparationFactory,
 } from '#core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '#core/scoring/compilation.js'
-import { alignRepresentation, convSequence, scorerSequence } from '#core/sequence.js'
+import { alignRepresentation, queryAligner, scorerSequence } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
 import { passesWideAffixProbe } from '../affix.js'
@@ -84,11 +84,7 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparationFa
     const prepareQuery = (query: Sequence): PreparedKernel => {
       const a = scorerSequence(query)
       let pattern: PatternMask | null = null
-      let convertedQuery: ArrayLike<unknown> | null = null
-      const alignedQueryFor = (b: ArrayLike<unknown>): ArrayLike<unknown> =>
-        typeof a === 'string' && typeof b !== 'string'
-          ? (convertedQuery ??= convSequence(a))
-          : a
+      const alignedQueryFor = queryAligner(a)
 
       const preparedDistance = (b: ArrayLike<unknown>, cutoff: number): number => {
         if (cutoff < MAX_BAND_BUDGET + 1 && uniform && a.length > 0 && b.length > 0) {

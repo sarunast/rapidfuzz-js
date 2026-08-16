@@ -16,6 +16,7 @@ import {
   alignRepresentation,
   validateSequence,
   convPair,
+  queryAligner,
   scorerSequence,
 } from '#core/sequence.js'
 import type { MaybeSequence, Sequence } from '#core/types.js'
@@ -414,6 +415,7 @@ function prepareJaro(kind: PreparedJaroKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
     const pattern = preparePattern(a, 0, a.length)
+    const alignedQueryFor = queryAligner(a)
 
     const score: PreparedKernel = (rawChoice, rawCutoff) => {
       const b = preparedChoiceSequence(rawChoice)
@@ -421,7 +423,7 @@ function prepareJaro(kind: PreparedJaroKind): PreparationFactory {
       const similarityCutoff =
         kind === 'distance' ? (rawCutoff === null ? 0 : 1 - rawCutoff) : (rawCutoff ?? 0)
       const similarity = jaroSimilarityPrepared_(
-        alignRepresentation(a, b),
+        alignedQueryFor(b),
         pattern,
         alignRepresentation(b, a),
         similarityCutoff,

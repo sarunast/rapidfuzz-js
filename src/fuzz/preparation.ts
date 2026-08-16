@@ -7,7 +7,12 @@ import {
   type PreparationFactory,
 } from '#core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '#core/scoring/compilation.js'
-import { alignRepresentation, convSequence, scorerSequence } from '#core/sequence.js'
+import {
+  alignRepresentation,
+  convSequence,
+  queryAligner,
+  scorerSequence,
+} from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
 import {
@@ -82,6 +87,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
     let convertedCharSet: CharSet | null = null
     const convertedCharSetOf = (): CharSet =>
       (convertedCharSet ??= charSetOf(convSequence(a)))
+    const alignedQueryFor = queryAligner(a)
 
     const score: PreparedKernel = (rawChoice, rawCutoff) => {
       const cutoff = rawCutoff ?? 0
@@ -89,7 +95,7 @@ export function prepareFuzz(kind: PreparedFuzzKind): PreparationFactory {
       switch (kind) {
         case 'partialRatio': {
           const b = preparedChoiceSequence(rawChoice)
-          const s1 = alignRepresentation(a, b)
+          const s1 = alignedQueryFor(b)
           const s2 = alignRepresentation(b, a)
           return (
             partialAlignmentConverted(

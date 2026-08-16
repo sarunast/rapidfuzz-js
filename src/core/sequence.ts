@@ -132,6 +132,16 @@ export function alignRepresentation(
     : value
 }
 
+export function queryAligner(
+  query: ArrayLike<unknown>,
+): (choice: ArrayLike<unknown>) => ArrayLike<unknown> {
+  let converted: ArrayLike<unknown> | null = null
+  return (choice) =>
+    typeof query === 'string' && typeof choice !== 'string'
+      ? (converted ??= convSequence(query))
+      : query
+}
+
 export function isMissing(value: unknown): value is null | undefined {
   return value == null
 }
