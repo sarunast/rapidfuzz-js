@@ -221,6 +221,8 @@ class DiceIndex implements ChoiceIndex {
     else
       for (let index = 0; index < touched.length; index++) accumulator[touched[index]] = 0
     touched.length = 0
+    state.keys.length = 0
+    state.counts.length = 0
     state.scannedAll = false
     state.base = 0
   }
