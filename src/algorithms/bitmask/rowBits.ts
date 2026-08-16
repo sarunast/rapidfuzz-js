@@ -15,6 +15,11 @@ export function shiftedRowBitSet(
   pos: number,
 ): boolean {
   const relative = pos - offset
-  if (relative < 0 || relative >= stride << 5) return false
-  return (rows[row * stride + (relative >>> 5)] & (1 << (relative & 31))) !== 0
+  if (relative < 0) return false
+
+  // By word rather than by bit: `stride << 5` is an int32 shift, so a stride
+  // past 2^26 would wrap and answer for a band that does contain the position.
+  const word = relative >>> 5
+  if (word >= stride) return false
+  return (rows[row * stride + word] & (1 << (relative & 31))) !== 0
 }
