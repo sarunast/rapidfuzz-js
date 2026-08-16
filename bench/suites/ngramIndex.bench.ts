@@ -18,6 +18,7 @@
 
 import { similarity as cosineMetric } from '../../src/algorithms/cosine/index.js'
 import { similarity as diceMetric } from '../../src/algorithms/dice/index.js'
+import { similarity as tverskyMetric } from '../../src/algorithms/tversky/index.js'
 import {
   createIndexedMatcher,
   createMatcher,
@@ -31,6 +32,24 @@ const GRAM_SIZE = 3
 
 const dice = createScorer(diceMetric, { gramSize: GRAM_SIZE })
 const cosine = createScorer(cosineMetric, { gramSize: GRAM_SIZE })
+// Three Tversky shapes: the default weights (routed to the Dice index, so
+// their case is a routing control against the Dice pair above it), the
+// practical asymmetric configuration, and pure query containment.
+const tverskyDefault = createScorer(tverskyMetric, {
+  gramSize: GRAM_SIZE,
+  alpha: 0.5,
+  beta: 0.5,
+})
+const tverskyAsymmetric = createScorer(tverskyMetric, {
+  gramSize: GRAM_SIZE,
+  alpha: 1,
+  beta: 0.1,
+})
+const tverskyContainment = createScorer(tverskyMetric, {
+  gramSize: GRAM_SIZE,
+  alpha: 1,
+  beta: 0,
+})
 
 // Two shapes rather than one: 24 random letters give a near-flat gram
 // distribution, while sentences of short words repeat theirs, which is what
@@ -62,12 +81,28 @@ const commonPrefixQuery = 'node_modules/'
 const wholePathQuery = paths[8_391]
 const rareFragmentQuery = paths[8_391].slice(13, 21)
 
+// The containment shape: a short fragment inside a longer document, where
+// `alpha: 1, beta: 0` scores 1 whatever the document adds around it. Built
+// here rather than in `harness/corpus.ts` for the reason `paths` is.
+const containedFragments = words(10_000, 12, 0x7e57_c0de)
+const containers = containedFragments.map(
+  (fragment, index) => `prefix${index % 7} ${fragment} tail${index % 5}`,
+)
+const containedQueries = containedFragments.slice(0, 100)
+
 const smallIndexed = createIndexedMatcher(small, { scorer: dice })
 const mediumIndexed = createIndexedMatcher(medium, { scorer: dice })
 const largeIndexed = createIndexedMatcher(large, { scorer: dice })
 const phraseIndexed = createIndexedMatcher(phrases, { scorer: dice })
 const mediumCosineIndexed = createIndexedMatcher(medium, { scorer: cosine })
 const pathIndexed = createIndexedMatcher(paths, { scorer: dice })
+const mediumTverskyDefaultIndexed = createIndexedMatcher(medium, {
+  scorer: tverskyDefault,
+})
+const mediumTverskyIndexed = createIndexedMatcher(medium, { scorer: tverskyAsymmetric })
+const largeTverskyIndexed = createIndexedMatcher(large, { scorer: tverskyAsymmetric })
+const pathTverskyIndexed = createIndexedMatcher(paths, { scorer: tverskyAsymmetric })
+const containerIndexed = createIndexedMatcher(containers, { scorer: tverskyContainment })
 
 const smallMatcher = createMatcher(small, { scorer: dice })
 const mediumMatcher = createMatcher(medium, { scorer: dice })
@@ -75,6 +110,10 @@ const largeMatcher = createMatcher(large, { scorer: dice })
 const phraseMatcher = createMatcher(phrases, { scorer: dice })
 const mediumCosineMatcher = createMatcher(medium, { scorer: cosine })
 const pathMatcher = createMatcher(paths, { scorer: dice })
+const mediumTverskyMatcher = createMatcher(medium, { scorer: tverskyAsymmetric })
+const largeTverskyMatcher = createMatcher(large, { scorer: tverskyAsymmetric })
+const pathTverskyMatcher = createMatcher(paths, { scorer: tverskyAsymmetric })
+const containerMatcher = createMatcher(containers, { scorer: tverskyContainment })
 
 // The control's own corpus, identical to the case it mirrors in
 // `bench/ngram.bench.ts`.
@@ -174,6 +213,63 @@ describe('cosine search, 10000 choices', () => {
   })
 })
 
+describe('tversky search, 10000 choices', () => {
+  // The routing control: default weights are served by the Dice index, so this
+  // case is expected to read level with `dice search, 10000 choices > indexed,
+  // 100 hits, threshold 0.5`.
+  measure('indexed, default weights, 100 hits, threshold 0.5', () => {
+    for (const query of mediumQueries)
+      mediumTverskyDefaultIndexed.search(query, { limit: 5, threshold: 0.5 })
+  })
+  measure('indexed, asymmetric, 100 hits, threshold 0.5', () => {
+    for (const query of mediumQueries)
+      mediumTverskyIndexed.search(query, { limit: 5, threshold: 0.5 })
+  })
+  measure('exhaustive, asymmetric, 100 hits, threshold 0.5', () => {
+    for (const query of mediumQueries)
+      mediumTverskyMatcher.search(query, { limit: 5, threshold: 0.5 })
+  })
+  measure('indexed, asymmetric, 100 misses, threshold 0.5', () => {
+    for (const query of smallQueries)
+      mediumTverskyIndexed.search(query, { limit: 5, threshold: 0.5 })
+  })
+  measure('exhaustive, asymmetric, 100 misses, threshold 0.5', () => {
+    for (const query of smallQueries)
+      mediumTverskyMatcher.search(query, { limit: 5, threshold: 0.5 })
+  })
+  measure('indexed, asymmetric, 100 hits, threshold 0.8', () => {
+    for (const query of mediumQueries)
+      mediumTverskyIndexed.search(query, { limit: 5, threshold: 0.8 })
+  })
+  measure('exhaustive, asymmetric, 100 hits, threshold 0.8', () => {
+    for (const query of mediumQueries)
+      mediumTverskyMatcher.search(query, { limit: 5, threshold: 0.8 })
+  })
+  measure('indexed, asymmetric, best, 100 hits', () => {
+    for (const query of mediumQueries) mediumTverskyIndexed.best(query)
+  })
+  measure('exhaustive, asymmetric, best, 100 hits', () => {
+    for (const query of mediumQueries) mediumTverskyMatcher.best(query)
+  })
+})
+
+// The actual Tversky use case: a short query against documents that contain
+// it whole, where `alpha: 1, beta: 0` pays no penalty for what the document
+// adds around the fragment.
+describe('tversky containment, 10000 containers', () => {
+  measure('indexed, 100 contained queries, threshold 0.8', () => {
+    for (const query of containedQueries)
+      containerIndexed.search(query, { limit: 5, threshold: 0.8 })
+  })
+  measure('exhaustive, 100 contained queries, threshold 0.8', () => {
+    for (const query of containedQueries)
+      containerMatcher.search(query, { limit: 5, threshold: 0.8 })
+  })
+  measure('indexed, best, 100 contained queries', () => {
+    for (const query of containedQueries) containerIndexed.best(query)
+  })
+})
+
 // Sentences repeat their words, so posting lists are longer here than in the
 // random-letter corpora — the shape that decides whether posting traffic or
 // candidate count dominates.
@@ -254,6 +350,14 @@ describe('dice search, 10000 shared-prefix paths', () => {
   measure('exhaustive, rare fragment query', () =>
     pathMatcher.search(rareFragmentQuery, { limit: 5, threshold: 0.5 }),
   )
+  // The general Tversky arithmetic on the same adverse shape: whether the
+  // extra scoring work matters where the posting lists prune almost nothing.
+  measure('tversky indexed, common prefix query', () =>
+    pathTverskyIndexed.search(commonPrefixQuery, { limit: 5, threshold: 0.5 }),
+  )
+  measure('tversky exhaustive, common prefix query', () =>
+    pathTverskyMatcher.search(commonPrefixQuery, { limit: 5, threshold: 0.5 }),
+  )
 })
 
 // One query, not a hundred: the exhaustive arm is tens of milliseconds per
@@ -272,6 +376,12 @@ describe('dice search, 100000 choices', () => {
   )
   measure('exhaustive, 1 query, threshold 0.8', () =>
     largeMatcher.search(oneQuery, { limit: 5, threshold: 0.8 }),
+  )
+  measure('tversky indexed, 1 query, threshold 0.5', () =>
+    largeTverskyIndexed.search(oneQuery, { limit: 5, threshold: 0.5 }),
+  )
+  measure('tversky exhaustive, 1 query, threshold 0.5', () =>
+    largeTverskyMatcher.search(oneQuery, { limit: 5, threshold: 0.5 }),
   )
 })
 

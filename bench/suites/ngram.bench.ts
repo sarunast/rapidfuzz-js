@@ -5,6 +5,7 @@ import {
 import { similarity as cosineMetric } from '../../src/algorithms/cosine/index.js'
 import { diceDistance, diceSimilarity } from '../../src/algorithms/dice/implementation.js'
 import { similarity as diceMetric } from '../../src/algorithms/dice/index.js'
+import { similarity as tverskyMetric } from '../../src/algorithms/tversky/index.js'
 import { bestMatch, createMatcher, createScorer, search } from '../../src/index.js'
 import { editedPairs, pairs, similarPairs, words } from '../harness/corpus.js'
 import { describe, measure } from '../harness/harness.js'
@@ -145,6 +146,14 @@ const preparedTrigramChoices = choices.map((text) => ({
 const preparedCosineTrigramChoices = choices.map((text) => ({
   prepared: cosineTrigrams.prepareChoice(text),
 }))
+// Asymmetric weights, so nothing routes to the Dice arithmetic. Every choice
+// is the queries' length, which keeps the count bound inert — these cases time
+// the overlap walk itself, on a related and an unrelated overlap shape.
+const tversky = createScorer(tverskyMetric, { alpha: 1, beta: 0.1 })
+const preparedTverskyChoices = choices.map((text) => ({
+  prepared: tversky.prepareChoice(text),
+}))
+const relatedQueries = choices.slice(0, 100)
 
 // Every case below inlines its own loop rather than calling one shared helper,
 // for the reason `bench/distance.bench.ts` gives: V8 attaches an inline cache
@@ -377,6 +386,29 @@ describe('dice search', () => {
   // kernel ever sees it.
   measure('32-char query, 1000 raw 512-char choices, threshold 0.8', () => {
     search(shortQuery, longChoices, { scorer, limit: null, threshold: 0.8 })
+  })
+})
+
+describe('tversky search', () => {
+  measure('100 related queries, 1000 prepared choices, threshold 0.5', () => {
+    for (const each of relatedQueries) {
+      search(each, preparedTverskyChoices, {
+        scorer: tversky,
+        limit: null,
+        threshold: 0.5,
+        getPrepared: (row) => row.prepared,
+      })
+    }
+  })
+  measure('100 unrelated queries, 1000 prepared choices, threshold 0.5', () => {
+    for (const each of queries) {
+      search(each, preparedTverskyChoices, {
+        scorer: tversky,
+        limit: null,
+        threshold: 0.5,
+        getPrepared: (row) => row.prepared,
+      })
+    }
   })
 })
 
