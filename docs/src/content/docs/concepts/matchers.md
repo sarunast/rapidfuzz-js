@@ -140,8 +140,8 @@ figures used to be far larger: a prepared choice held a trie of `Map`s and cost
 against today's representation.
 
 That figure is construction alone, measured before any query runs. Query scratch
-is separate and reused: a broad query — `limit: null`, or a threshold that admits
-choices scoring zero — reserves a result slot per choice, about 12 bytes each,
+is separate and reused: an unlimited query — `search` with `limit: null`, or any
+`searchIter` call — can reserve a result slot per choice, about 12 bytes each,
 and holds them for the next query. An oversized reservation is released once
 query demand returns to the normal retained range, so one broad search does not
 set the matcher's retained memory for good.
