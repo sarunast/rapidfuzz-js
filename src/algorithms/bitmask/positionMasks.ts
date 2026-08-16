@@ -1,7 +1,11 @@
 // Freshly allocated, deliberately, where `blockMasks.ts` pools and stamps.
-// The alignment path retains the row matrix built from these past the call
-// that produced it, so a pooled buffer would be overwritten under a caller
-// still reading it. The two therefore look alike and must not be merged.
+// These are construction state for one matrix and die with it — what outlives
+// the call is the row storage, which each builder allocates separately and
+// which holds nothing from here. So pooling them would be safe, and is still
+// not wanted: the size is set by an alignment's pattern rather than by the
+// bounded scoring cap next door, and process-owning that needs evidence that
+// reuse across calls pays, which nothing here has. The two builders look alike
+// and have different lifetimes; they must not be merged.
 
 const SPAN_SLACK = 256
 
@@ -115,6 +119,21 @@ const INITIAL_BLOCKS = 64
 
 const MAX_SPAN_BLOCKS = 256
 
+/**
+ * Past `MAX_SPAN_BLOCKS` this takes the whole span at once rather than doubling
+ * into it, which trades memory for copies and is worth knowing the size of: a
+ * 10,000-element pattern with 300 distinct elements spread across a span its
+ * own width allocates 11.94 MiB where 0.61 MiB would hold what it fills, 19.5x.
+ *
+ * Both alternatives measured worse (2026-08-16). Doubling throughout costs
+ * 1.19x on a dense 10,000-element alignment, where the span is the size the
+ * masks reach anyway and every doubling is a copy on the way. One doubling
+ * before the jump fixes the 257-512 band and costs 1.07x from 513 up, where it
+ * allocates the span in the end regardless — Levenshtein rebuilds these masks
+ * per Hirschberg recursion, so an extra allocation per build is paid many
+ * times. The waste is bounded by `limit`, which is what a pattern of all
+ * distinct elements would need.
+ */
 function grownMasks(
   masks: Int32Array,
   blocks: number,
