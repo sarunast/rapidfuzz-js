@@ -304,8 +304,10 @@ matcher.search('src/algorthms/dice.ts', { limit: 5, threshold: 0.5 })
 ```
 
 Every member behaves the same and the scores are exact. On 10,000 file paths a
-query measured **11-13x faster**, retaining **256 bytes a choice against
-1,282**, against construction costing about 1.2x more. It is not uniformly
+query measured **11-13x faster**, construction retaining **256 bytes a choice
+against 1,282** and costing about 1.2x more. Query scratch is separate from that
+figure and reused between queries, and an oversized reservation is released once
+query demand returns to the normal retained range. It is not uniformly
 faster: a query made of grams nearly every choice shares reaches everything
 anyway and measured **0.7x**. Only `dice.similarity` and `cosine.similarity`
 offer one — anything else throws at construction, a distance scorer is a

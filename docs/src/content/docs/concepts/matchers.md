@@ -132,12 +132,19 @@ On 10,000 `node_modules` file paths at `gramSize: 3`:
 | `'node_modules/'`         | 0.16 ms | 0.11 ms | 0.7x |
 | a rare fragment           | 0.11 ms | 0.11 ms | 1.0x |
 
-Retained memory is **256 bytes a choice against 1,282** — 5x less — against
-construction costing about **1.2x** more, since a prepared collection packs each
-choice's grams into two typed arrays where the index has a corpus-wide
-structure to assemble. Both figures used to be far larger: a prepared choice
-held a trie of `Map`s and cost 18,049 bytes, which made the index look 57x
-faster and 77x smaller than it is against today's representation.
+Construction retained **256 bytes a choice against 1,282** — 5x less — and cost
+about **1.2x** more, since a prepared collection packs each choice's grams into
+two typed arrays where the index has a corpus-wide structure to assemble. Both
+figures used to be far larger: a prepared choice held a trie of `Map`s and cost
+18,049 bytes, which made the index look 57x faster and 77x smaller than it is
+against today's representation.
+
+That figure is construction alone, measured before any query runs. Query scratch
+is separate and reused: a broad query — `limit: null`, or a threshold that admits
+choices scoring zero — reserves a result slot per choice, about 12 bytes each,
+and holds them for the next query. An oversized reservation is released once
+query demand returns to the normal retained range, so one broad search does not
+set the matcher's retained memory for good.
 
 ### When not to reach for it
 

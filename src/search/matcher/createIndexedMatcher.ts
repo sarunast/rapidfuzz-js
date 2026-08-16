@@ -51,8 +51,11 @@ import {
  * ```
  *
  * On 10,000 `node_modules` file paths at `gramSize: 3`, searching for a path
- * that exists or one with a typo in it: **11–13x faster** per query, retaining
- * **256 bytes a choice against 1,282** — 5x less.
+ * that exists or one with a typo in it: **11–13x faster** per query. Construction
+ * retained **256 bytes a choice against 1,282** — 5x less. Query scratch is
+ * separate from that figure and reused between queries: a broad query reserves a
+ * result slot per choice, and an oversized reservation is released once query
+ * demand returns to the normal retained range.
  *
  * Three things to weigh before reaching for it:
  *

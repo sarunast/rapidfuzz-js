@@ -324,7 +324,19 @@ index exactly as it was. Re-keying is arithmetic on existing keys, so a late
 widening costs the gram _variety_ rather than the corpus.
 
 **Query state is retained and reused**, so nothing per-query is allocated on the
-hot path. The accumulator is cleared by walking only what the query touched —
+hot path — but not without a bound. A broad query reserves one result slot per
+choice, twelve bytes of it, and holding that for the life of the index would let
+a single `limit: null` search over a large collection decide what the process
+retains however narrow every later query is. So a pair up to
+`RETAINED_RESULT_SLOTS` is kept unconditionally, and a pair beyond it is kept
+only while queries still need more than the threshold: the first query needing
+at most that many slots replaces it with exactly what that query asked for. It
+is the same shape as the bitmask mask pool, and legal for the same reason the
+borrowing contract gives — a `SelectedChoices` is valid only until the next call
+on the same index. Every collection at or below the threshold can never reach
+that branch, so their allocation behaviour is unchanged.
+
+The accumulator is cleared by walking only what the query touched —
 walking the whole thing would put a cost proportional to the corpus back into
 every query, which is what this representation exists to avoid — except where a
 dense list already made the walk corpus-wide, and then `fill(0)` wins.

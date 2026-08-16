@@ -16,6 +16,22 @@ export function zeroesQualify(threshold: number | null): boolean {
   return threshold === null || threshold <= 0
 }
 
+/**
+ * The largest result capacity that is always kept for reuse — 786,432 bytes
+ * across the two arrays.
+ *
+ * A capacity above this is still reused while later queries need more than it.
+ * The first query needing at most this many slots replaces the oversized pair
+ * with exactly the capacity that query asked for, so a `limit: null` search over
+ * a large collection stops holding 12 bytes a choice for the life of the index.
+ *
+ * There is no memo domain to derive the threshold from the way
+ * `RETAINED_MASK_WORDS` derives from the largest memoisable pattern. What it
+ * buys is that every collection at or below it can never reach the release
+ * branch, so their allocation behaviour is exactly what it was.
+ */
+const RETAINED_RESULT_SLOTS = 1 << 16
+
 export class QueryState {
   readonly keys: (string | number)[] = []
   readonly counts: number[] = []
@@ -26,7 +42,13 @@ export class QueryState {
   scores: Float64Array = new Float64Array(0)
 
   reserve(needed: number): void {
-    if (this.ids.length >= needed) return
+    const held = this.ids.length
+    if (
+      held >= needed &&
+      (held <= RETAINED_RESULT_SLOTS || needed > RETAINED_RESULT_SLOTS)
+    ) {
+      return
+    }
     this.ids = new Uint32Array(needed)
     this.scores = new Float64Array(needed)
   }
