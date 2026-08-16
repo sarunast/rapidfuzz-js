@@ -22,17 +22,6 @@ export interface SymbolCoverage extends SymbolSpan {
 
 const EMPTY_SPAN: SymbolCoverage = { minSymbol: 1, maxSymbol: 0, spans: false }
 
-export function popcount32(word: number): number {
-  let bits = word - ((word >>> 1) & 0x5555_5555)
-  bits = (bits & 0x3333_3333) + ((bits >>> 2) & 0x3333_3333)
-  return (((bits + (bits >>> 4)) & 0x0f0f_0f0f) * 0x0101_0101) >>> 24
-}
-
-export function validBits(length: number): number {
-  const bits = length & 31
-  return bits === 0 ? -1 : ~(-1 << bits)
-}
-
 export function symbolSpan(
   s1: ArrayLike<unknown>,
   start: number,
@@ -129,10 +118,10 @@ const MAX_SPAN_BLOCKS = 256
  * 1.19x on a dense 10,000-element alignment, where the span is the size the
  * masks reach anyway and every doubling is a copy on the way. One doubling
  * before the jump fixes the 257-512 band and costs 1.07x from 513 up, where it
- * allocates the span in the end regardless — Levenshtein rebuilds these masks
- * per Hirschberg recursion, so an extra allocation per build is paid many
- * times. The waste is bounded by `limit`, which is what a pattern of all
- * distinct elements would need.
+ * allocates the span in the end regardless — Levenshtein can build these masks
+ * at every matrix leaf of a Hirschberg alignment, so an extra allocation per
+ * build is paid repeatedly. The waste is bounded by `limit`, which is what a
+ * pattern of all distinct elements would need.
  */
 function grownMasks(
   masks: Int32Array,

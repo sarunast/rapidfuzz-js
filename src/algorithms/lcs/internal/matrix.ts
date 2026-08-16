@@ -1,15 +1,21 @@
 import { wordCount } from '../../bitmask/blockMasks.js'
-import {
-  oneWordMasks,
-  popcount32,
-  validBits,
-  wordPositionMasks,
-} from '../../bitmask/positionMasks.js'
+import { oneWordMasks, wordPositionMasks } from '../../bitmask/positionMasks.js'
+import { popcount } from './kernel.js'
 
 interface LcsSeqMatrix {
   readonly sim: number
   readonly rows: Int32Array
   readonly words: number
+}
+
+/**
+ * The bits of the last word a pattern of `length` actually occupies. The words
+ * above it are all ones, so counting them unmasked would add the padding to the
+ * similarity.
+ */
+function validBits(length: number): number {
+  const bits = length & 31
+  return bits === 0 ? -1 : ~(-1 << bits)
 }
 
 export function lcsSeqMatrix(
@@ -70,7 +76,7 @@ export function lcsSeqMatrix(
     let sim = 0
     for (let w = 0; w < words; w++) {
       const valid = w === words - 1 ? validBits(s1Length) : -1
-      sim += popcount32(~state[w] & valid)
+      sim += popcount(~state[w] & valid)
     }
 
     return { sim, rows, words }
@@ -112,7 +118,7 @@ export function lcsSeqMatrix(
   let sim = 0
   for (let w = 0; w < words; w++) {
     const valid = w === words - 1 ? validBits(s1Length) : -1
-    sim += popcount32(~storage[s2Length * words + w] & valid)
+    sim += popcount(~storage[s2Length * words + w] & valid)
   }
 
   return { sim, rows, words }
@@ -152,5 +158,5 @@ function oneWordLcsSeqMatrix(
     rows[j] = state
   }
 
-  return { sim: popcount32(~state & validBits(s1Length)), rows, words: 1 }
+  return { sim: popcount(~state & validBits(s1Length)), rows, words: 1 }
 }

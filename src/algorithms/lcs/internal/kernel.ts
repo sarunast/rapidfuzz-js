@@ -19,7 +19,12 @@ const WORD_BITS = 32
 const WORD_SHIFT = 5
 const DIRECT_LOOKUP_LIMIT = 256
 
-function popcount(word: number): number {
+/**
+ * Shared with `matrix.ts`, which counts the bits of a finished row rather than
+ * a live one — one owner because nothing here is per-cell: this runs once per
+ * word at the end of a build, and in the banded kernel's periodic bound check.
+ */
+export function popcount(word: number): number {
   let bits = word - ((word >>> 1) & 0x5555_5555)
   bits = (bits & 0x3333_3333) + ((bits >>> 2) & 0x3333_3333)
   return (((bits + (bits >>> 4)) & 0x0f0f_0f0f) * 0x0101_0101) >>> 24
