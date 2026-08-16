@@ -87,8 +87,8 @@ and a `gramSize: 3` scorer refuses one built at the default.
 
 ## Searching a large collection
 
-Both Dice and Cosine can be searched through
-[`createIndexedMatcher`](/concepts/matchers/#indexed-matchers-for-dice-and-cosine),
+Dice, Cosine and Tversky can all be searched through
+[`createIndexedMatcher`](/concepts/matchers/#indexed-matchers),
 which builds one inverted n-gram index over the collection instead of preparing
 each choice. It is the same Matcher afterwards, with the same exact results, and
 on 10,000 file paths it measured 11–13x faster per query and 5x smaller —

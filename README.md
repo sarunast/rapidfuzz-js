@@ -310,7 +310,7 @@ Strings are retained as-is. Other array-like sequences are shallow-copied, so
 mutating the source later does not change scores. Returned items and nested
 objects stay live references.
 
-For a Dice or Cosine scorer over a large collection, `createIndexedMatcher`
+For a Dice, Cosine or Tversky scorer over a large collection, `createIndexedMatcher`
 builds the same `Matcher` over one inverted n-gram index instead of a prepared
 handle per choice:
 
@@ -331,8 +331,8 @@ against 1,282** and costing about 1.2x more. Query scratch is separate from that
 figure and reused between queries, and an oversized reservation is released once
 query demand returns to the normal retained range. It is not uniformly
 faster: a query made of grams nearly every choice shares reaches everything
-anyway and measured **0.7x**. Only `dice.similarity` and `cosine.similarity`
-offer one — anything else throws at construction, a distance scorer is a
+anyway and measured **0.7x**. Only `dice.similarity`, `cosine.similarity` and
+`tversky.similarity` offer one — anything else throws at construction, a distance scorer is a
 compile error, and `searchIter` settles which choices qualify before yielding
 the first rather than scoring lazily.
 

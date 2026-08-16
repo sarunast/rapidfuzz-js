@@ -106,8 +106,31 @@ depends only on the gram size — the weights are applied at scoring time.
 Sharing the handles is nonetheless per scorer configuration today: the
 all-default scorer and one written as `{ gramSize: 2, alpha: 0.5, beta: 0.5 }`
 accept each other's, and any other configured scorer owns the choices it
-prepares. There is no indexed matcher for Tversky yet; `createIndexedMatcher`
-supports Dice and Cosine today.
+prepares.
+
+## Searching a large collection
+
+Tversky joins Dice and Cosine in
+[`createIndexedMatcher`](/concepts/matchers/#indexed-matchers), which builds
+one inverted n-gram index over the collection instead of preparing each
+choice. The same Matcher, the same exact scores, and the weights ride along:
+
+```ts
+import { createIndexedMatcher, createScorer } from 'rapidfuzz-js'
+import { similarity } from 'rapidfuzz-js/tversky'
+
+const scorer = createScorer(similarity, { alpha: 1, beta: 0.1 })
+const matcher = createIndexedMatcher(titles, { scorer })
+matcher.search('new york mets', { limit: 5, threshold: 0.5 })
+```
+
+At the default weights the scorer shares Dice's index outright — the same
+index hot loop, score arithmetic, and retained index representation — since
+the two are the same metric there.
+One boundary the exhaustive matcher does not have: the index packs integer
+elements, and characters only work because sequences convert to code points.
+Token arrays like the `['google', 'ag']` example above score through
+`createMatcher` but are refused by `createIndexedMatcher` at construction.
 
 ## When to use it
 

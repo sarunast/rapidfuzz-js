@@ -99,7 +99,7 @@ candidate yourself and hand the handles to a one-shot search (or to
 `createMatcher` via `getPrepared`, which then resolves them once instead of
 preparing at all): [Prepared choices](/guides/prepared-choices/).
 
-## Indexed Matchers, for Dice and Cosine
+## Indexed matchers
 
 `createIndexedMatcher` builds the **same Matcher over a different
 representation**. Instead of preparing every choice and scoring them one at a
@@ -148,8 +148,9 @@ set the matcher's retained memory for good.
 
 ### When not to reach for it
 
-- **Only `dice.similarity` and `cosine.similarity` have one.** Any other scorer
-  throws at construction, and a distance scorer is a compile error.
+- **Only `dice.similarity`, `cosine.similarity` and `tversky.similarity` have
+  one.** Any other scorer throws at construction, and a distance scorer is a
+  compile error.
 - **The win is selectivity, not size.** It comes from a query's grams naming few
   choices. The `'node_modules/'` row above is the adverse case in miniature: a
   query made of grams nearly every choice shares reaches everything anyway, and
