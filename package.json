@@ -109,6 +109,7 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "test": "vitest run",
+    "test:memory": "node --expose-gc node_modules/vitest/vitest.mjs run --config vitest.memory.config.ts",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage --coverage.reporter=text --coverage.reporter=lcov --coverage.thresholds.100 --testTimeout=30000 --reporter=default --reporter=junit --outputFile.junit=test-report.junit.xml",
     "bench": "node bench/harness/runner.ts",
@@ -116,6 +117,7 @@
     "bench:memory": "npm run build --silent && node --expose-gc bench/memory/matcher.ts",
     "bench:memory:scratch": "npm run build --silent && node --expose-gc bench/memory/algorithmScratch.ts",
     "bench:memory:index": "npm run build --silent && node bench/memory/indexedQuery.ts",
+    "bench:memory:soak": "npm run build --silent && node bench/memory/soak.ts",
     "bench:compare": "node bench/regression/compare.ts",
     "bench:compare:quick": "node bench/regression/compare.ts --quick",
     "bench:confirm": "node bench/regression/compare.ts --confirm",
@@ -132,7 +134,7 @@
     "check:consumer": "node scripts/check-consumer.mjs",
     "check:tarball": "node scripts/check-tarball.mjs",
     "check:pkg": "publint && attw --pack . --profile esm-only",
-    "check": "npm run typecheck:library && npm run test && npm run lint && npm run format:check && npm run typecheck:tooling && npm run build && npm run typecheck:dev && npm run check:exports && npm run check:consumer && npm run check:tarball && npm run check:pkg",
+    "check": "npm run typecheck:library && npm run test && npm run test:memory && npm run lint && npm run format:check && npm run typecheck:tooling && npm run build && npm run typecheck:dev && npm run check:exports && npm run check:consumer && npm run check:tarball && npm run check:pkg",
     "prepublishOnly": "npm run check"
   },
   "devDependencies": {

@@ -2,6 +2,7 @@ node_modules/
 dist/
 .venv/
 bench/comparison/libraries/last-run.json
+bench/memory/artifacts/
 coverage/
 *.tgz
 .DS_Store

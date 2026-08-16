@@ -30,24 +30,14 @@
 import process from 'node:process'
 
 import { distance as levenshteinDistance } from '../../dist/algorithms/levenshtein/index.js'
+import { collectGarbage, median, sampleMemory } from './harness.ts'
 
 const count = Number(process.argv[2] ?? 20_000)
 if (!Number.isSafeInteger(count) || count <= 0) {
   throw new RangeError('element count must be a positive safe integer')
 }
-if (globalThis.gc === undefined) {
-  throw new Error('run this benchmark with --expose-gc')
-}
-
-function collect(): void {
-  globalThis.gc?.()
-  globalThis.gc?.()
-  globalThis.gc?.()
-}
-
 function retainedBytes(): number {
-  const usage = process.memoryUsage()
-  return usage.heapUsed + usage.arrayBuffers
+  return sampleMemory().retained
 }
 
 // Distinct objects rather than text: an element is whatever the caller's
@@ -60,24 +50,19 @@ const ROUNDS = 5
 
 /** One round: what the comparison leaves behind, and what then outlives it. */
 function round(): { held: number; survived: number } {
-  collect()
+  collectGarbage()
   const before = retainedBytes()
 
   // Scoped so the sequences themselves are unreachable by the first reading,
   // which leaves the scratch as the only thing between it and the baseline.
   const distance = ((): number => levenshteinDistance(unique('a'), unique('b')))()
   if (distance !== count) throw new Error('the comparison did not run to completion')
-  collect()
+  collectGarbage()
   const held = retainedBytes() - before
 
   levenshteinDistance('kitten', 'sitting')
-  collect()
+  collectGarbage()
   return { held, survived: retainedBytes() - before }
-}
-
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b)
-  return sorted[(sorted.length - 1) >> 1] ?? 0
 }
 
 const rounds = Array.from({ length: ROUNDS }, round)

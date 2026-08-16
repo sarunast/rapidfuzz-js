@@ -66,6 +66,9 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
+      - name: Memory reachability
+        run: pnpm test:memory
+
       - name: Lint
         run: pnpm lint
 

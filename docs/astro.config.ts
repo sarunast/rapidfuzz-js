@@ -182,7 +182,13 @@ export default defineConfig({
         },
         { label: 'Errors', slug: 'reference/errors' },
         typeDocSidebarGroup,
-        { label: 'Benchmarks', slug: 'benchmarks' },
+        {
+          label: 'Development',
+          items: [
+            { label: 'Benchmarks', slug: 'benchmarks' },
+            { label: 'Memory tooling', slug: 'guides/memory-tooling' },
+          ],
+        },
       ],
     }),
   ],

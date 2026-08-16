@@ -47,11 +47,11 @@
  * Before a cap lands the churn ratio should read about 1.00, because nothing
  * reallocates yet. That run is the control the "after" is read against.
  */
-import { execFileSync } from 'node:child_process'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 import { words } from '../harness/corpus.ts'
+import { collectGarbage, median, runIsolated, sampleMemory } from './harness.ts'
 
 const GRAM_SIZE = 2
 const WORD_LENGTH = 24
@@ -83,20 +83,8 @@ const LADDER_SAMPLES = 3
  */
 const CHILD_HEAP_MB = 8192
 
-function collect(): void {
-  globalThis.gc?.()
-  globalThis.gc?.()
-  globalThis.gc?.()
-}
-
 function retainedBytes(): number {
-  const usage = process.memoryUsage()
-  return usage.heapUsed + usage.arrayBuffers
-}
-
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((left, right) => left - right)
-  return sorted[(sorted.length - 1) >> 1] ?? 0
+  return sampleMemory().retained
 }
 
 async function indexedMatcherOf(count: number) {
@@ -174,19 +162,19 @@ async function measureMemory(count: number): Promise<MemoryReading> {
     if (matcher.best(query) === undefined) throw new Error('the query matched nothing')
   }
 
-  collect()
+  collectGarbage()
   const constructed = retainedBytes()
 
   broadAndDrop()
-  collect()
+  collectGarbage()
   const afterBroad = retainedBytes() - constructed
 
   bestAndDrop()
-  collect()
+  collectGarbage()
   const afterBest = retainedBytes() - constructed
 
   broadAndDrop()
-  collect()
+  collectGarbage()
   const afterSecondBroad = retainedBytes() - constructed
 
   if (matcher.size !== count) throw new Error('the matcher did not hold every choice')
@@ -332,20 +320,11 @@ if (process.argv.includes('--child')) {
   const here = fileURLToPath(import.meta.url)
 
   function runChild(half: string, count: number, round: number): unknown {
-    const output = execFileSync(
-      process.execPath,
-      [
-        '--expose-gc',
-        `--max-old-space-size=${CHILD_HEAP_MB}`,
-        here,
-        '--child',
-        `--half=${half}`,
-        `--size=${count}`,
-        `--round=${round}`,
-      ],
-      { encoding: 'utf8', maxBuffer: 1 << 20 },
+    return runIsolated<unknown>(
+      here,
+      [`--half=${half}`, `--size=${count}`, `--round=${round}`],
+      CHILD_HEAP_MB,
     )
-    return JSON.parse(output)
   }
 
   function isMemoryReading(value: unknown): value is MemoryReading {
