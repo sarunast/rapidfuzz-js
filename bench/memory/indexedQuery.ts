@@ -231,14 +231,23 @@ async function measureChurn(count: number, round: number): Promise<ChurnReading>
 
   function timeBroad(): number {
     const started = process.hrtime.bigint()
-    index.scan(query, null)
-    return Number(process.hrtime.bigint() - started) / 1e6
+    const found = index.scan(query, null)
+    const elapsed = Number(process.hrtime.bigint() - started) / 1e6
+    if (found.length !== count) {
+      throw new Error(`a broad scan returned ${found.length} of ${count} choices`)
+    }
+    return elapsed
   }
 
   function timeNarrow(limit: number): number {
+    const room = limit < count ? limit : count
     const started = process.hrtime.bigint()
-    index.select(query, null, limit)
-    return Number(process.hrtime.bigint() - started) / 1e6
+    const found = index.select(query, null, limit)
+    const elapsed = Number(process.hrtime.bigint() - started) / 1e6
+    if (found.length !== room) {
+      throw new Error(`a limit of ${limit} returned ${found.length} of ${room} choices`)
+    }
+    return elapsed
   }
 
   /** The scratch is already corpus-sized, so the timed query reserves nothing. */
@@ -317,6 +326,7 @@ if (process.argv.includes('--child')) {
 
   const sizes = [10_000, 100_000]
   const max = Number(argumentValue('--max=') ?? 0)
+  if (max >= 250_000) sizes.push(250_000)
   if (max >= 1_000_000) sizes.push(1_000_000)
 
   const here = fileURLToPath(import.meta.url)
