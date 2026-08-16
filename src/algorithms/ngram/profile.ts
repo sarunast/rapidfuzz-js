@@ -1,4 +1,4 @@
-import { convSequence, elementsEqual } from '../../core/sequence.js'
+import { convSequence, elementsEqual, isUnmatchableElement } from '../../core/sequence.js'
 import type { Sequence } from '../../core/types.js'
 import { canonicalRadix } from './key.js'
 import { domainOf, packedKeys, type ElementDomain } from './packing.js'
@@ -60,20 +60,16 @@ function leafNode(): GramLeaf {
   return { children: null, counts: new Map<unknown, number>() }
 }
 
-function isUnmatchable(element: unknown): boolean {
-  return typeof element === 'number' && Number.isNaN(element)
-}
-
 function bigramProfile(elements: ArrayLike<unknown>, gramCount: number): NGramProfile {
   const children = new Map<unknown, GramLeaf>()
   const root: GramBranch = { children, counts: null }
   let first = elements[0]
-  let lastUnmatchable = isUnmatchable(first) ? 0 : -1
+  let lastUnmatchable = isUnmatchableElement(first) ? 0 : -1
   let squaredNorm = 0
   for (let start = 0; start < gramCount; start++) {
     const end = start + 1
     const second = elements[end]
-    if (isUnmatchable(second)) lastUnmatchable = end
+    if (isUnmatchableElement(second)) lastUnmatchable = end
     if (lastUnmatchable >= start) {
       squaredNorm++
       first = second
@@ -98,12 +94,16 @@ function trigramProfile(elements: ArrayLike<unknown>, gramCount: number): NGramP
   const root: GramNode = { children, counts: null }
   let first = elements[0]
   let second = elements[1]
-  let lastUnmatchable = isUnmatchable(second) ? 1 : isUnmatchable(first) ? 0 : -1
+  let lastUnmatchable = isUnmatchableElement(second)
+    ? 1
+    : isUnmatchableElement(first)
+      ? 0
+      : -1
   let squaredNorm = 0
   for (let start = 0; start < gramCount; start++) {
     const end = start + 2
     const third = elements[end]
-    if (isUnmatchable(third)) lastUnmatchable = end
+    if (isUnmatchableElement(third)) lastUnmatchable = end
     if (lastUnmatchable >= start) {
       squaredNorm++
       first = second
@@ -189,13 +189,13 @@ export function trieProfile(
   const root = emptyNode()
   let lastUnmatchable = -1
   for (let index = 0; index < gramSize - 1; index++) {
-    if (isUnmatchable(elements[index])) lastUnmatchable = index
+    if (isUnmatchableElement(elements[index])) lastUnmatchable = index
   }
   let squaredNorm = 0
   const last = gramSize - 1
   for (let start = 0; start < gramCount; start++) {
     const end = start + last
-    if (isUnmatchable(elements[end])) lastUnmatchable = end
+    if (isUnmatchableElement(elements[end])) lastUnmatchable = end
     if (lastUnmatchable >= start) {
       squaredNorm++
       continue

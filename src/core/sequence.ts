@@ -146,6 +146,10 @@ export function isMissing(value: unknown): value is null | undefined {
   return value == null
 }
 
+export function isUnmatchableElement(value: unknown): boolean {
+  return typeof value === 'number' && Number.isNaN(value)
+}
+
 export function elementsEqual(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
   if (a.length !== b.length) return false
   for (let index = 0; index < a.length; index++) {
