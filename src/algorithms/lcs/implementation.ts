@@ -34,12 +34,13 @@ import type { PreparedKernel } from '#core/scoring/compilation.js'
 import {
   alignRepresentation,
   convPair,
+  convSequence,
   scorerSequence,
   maxSequenceLength,
 } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
-import { commonAffix, sharesAffix } from '../affix.js'
+import { commonAffix, passesAffixProbe } from '../affix.js'
 import { UNBOUNDED_MISSES } from '../bitmask/blockMasks.js'
 import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
 import { rowBitSet } from '../bitmask/rowBits.js'
@@ -219,9 +220,17 @@ function prepareLcs(kind: MetricScoreKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
     let pattern: PatternMask | null = null
+    let convertedQuery: ArrayLike<unknown> | null = null
+    const alignedQueryFor = (b: ArrayLike<unknown>): ArrayLike<unknown> =>
+      typeof a === 'string' && typeof b !== 'string'
+        ? (convertedQuery ??= convSequence(a))
+        : a
     const length = (b: ArrayLike<unknown>, cutoff: number): number => {
-      if (!preparedLengthWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
-        return boundedLength(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)
+      if (
+        !preparedLengthWorthwhile(a.length, b.length, cutoff) &&
+        passesAffixProbe(a, b)
+      ) {
+        return boundedLength(alignedQueryFor(b), alignRepresentation(b, a), cutoff)
       }
       pattern ??= preparePattern(a, 0, a.length)
       const required = Math.max(0, Math.floor(maxSequenceLength(a, b) - cutoff))

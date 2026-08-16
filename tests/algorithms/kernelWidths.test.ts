@@ -409,7 +409,7 @@ describe('every mask region, under a cutoff', () => {
   // Indel and LCS have a banded kernel of their own, with its own copy of the
   // classification, and this reaches it through the direct entry points rather
   // than a held pattern. Deliberately not through the prepared path: which of
-  // the two kernels that picks is a dispatch decision — `sharesAffix` moved
+  // the two kernels that picks is a dispatch decision — `passesAffixProbe` moved
   // these very pairs onto the held pattern and took this copy's coverage with
   // them — and a classification every kernel carries separately has to be
   // covered whichever way the dispatch happens to go.

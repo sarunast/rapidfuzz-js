@@ -19,10 +19,10 @@ import {
   type PreparationFactory,
 } from '#core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '#core/scoring/compilation.js'
-import { alignRepresentation, scorerSequence } from '#core/sequence.js'
+import { alignRepresentation, convSequence, scorerSequence } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
-import { sharesAffix } from '../affix.js'
+import { passesAffixProbe } from '../affix.js'
 import type { PatternMask } from '../bitmask/pattern.js'
 import { wordCount } from '../bitmask/words.js'
 import {
@@ -113,9 +113,17 @@ function prepareIndel(kind: MetricScoreKind): PreparationFactory {
   const prepareQuery = (query: Sequence): PreparedKernel => {
     const a = scorerSequence(query)
     let pattern: PatternMask | null = null
+    let convertedQuery: ArrayLike<unknown> | null = null
+    const alignedQueryFor = (b: ArrayLike<unknown>): ArrayLike<unknown> =>
+      typeof a === 'string' && typeof b !== 'string'
+        ? (convertedQuery ??= convSequence(a))
+        : a
     const preparedDistance = (b: ArrayLike<unknown>, cutoff: number): number => {
-      if (!preparedDistanceWorthwhile(a.length, b.length, cutoff) && sharesAffix(a, b)) {
-        return distance_(alignRepresentation(a, b), alignRepresentation(b, a), cutoff)
+      if (
+        !preparedDistanceWorthwhile(a.length, b.length, cutoff) &&
+        passesAffixProbe(a, b)
+      ) {
+        return distance_(alignedQueryFor(b), alignRepresentation(b, a), cutoff)
       }
       pattern ??= prepareLcsPattern(a, 0, a.length)
       return distanceFromPrepared(a, pattern, b, cutoff)

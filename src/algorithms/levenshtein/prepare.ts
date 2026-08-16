@@ -10,10 +10,10 @@ import {
   type PreparationFactory,
 } from '#core/scoring/builtIn/preparation.js'
 import type { PreparedKernel } from '#core/scoring/compilation.js'
-import { alignRepresentation, scorerSequence } from '#core/sequence.js'
+import { alignRepresentation, convSequence, scorerSequence } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
-import { sharesWideAffix } from '../affix.js'
+import { passesWideAffixProbe } from '../affix.js'
 import { preparePattern, type PatternMask } from '../bitmask/pattern.js'
 import { wordCount } from '../bitmask/words.js'
 import {
@@ -71,7 +71,7 @@ const AFFIX_TRIM_WORDS = 4
 
 function worthTrimming(a: ArrayLike<unknown>, b: ArrayLike<unknown>): boolean {
   const words = wordCount(Math.min(a.length, b.length))
-  return words >= AFFIX_TRIM_WORDS && sharesWideAffix(a, b)
+  return words >= AFFIX_TRIM_WORDS && passesWideAffixProbe(a, b)
 }
 
 export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparationFactory {
@@ -84,6 +84,11 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparationFa
     const prepareQuery = (query: Sequence): PreparedKernel => {
       const a = scorerSequence(query)
       let pattern: PatternMask | null = null
+      let convertedQuery: ArrayLike<unknown> | null = null
+      const alignedQueryFor = (b: ArrayLike<unknown>): ArrayLike<unknown> =>
+        typeof a === 'string' && typeof b !== 'string'
+          ? (convertedQuery ??= convSequence(a))
+          : a
 
       const preparedDistance = (b: ArrayLike<unknown>, cutoff: number): number => {
         if (cutoff < MAX_BAND_BUDGET + 1 && uniform && a.length > 0 && b.length > 0) {
@@ -101,7 +106,7 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparationFa
           return levenshteinPrepared(pattern, b, 0, b.length)
         }
         return distance_(
-          alignRepresentation(a, b),
+          alignedQueryFor(b),
           alignRepresentation(b, a),
           weights,
           cutoff,
