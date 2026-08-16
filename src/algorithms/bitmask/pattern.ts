@@ -14,8 +14,9 @@ function isDirectSymbol(symbol: unknown): symbol is number {
 
 /**
  * An integer at or above the direct table, which is the candidate set for the
- * dense high window — not a guarantee of a place in it, since a symbol outside
- * the chosen span ends up in `wideOffsets` instead.
+ * dense high window rather than a place in it. The span is taken from all of
+ * them together, so the decision is all-or-nothing: too wide a span, or too
+ * many cells for the word count, and every one of them goes to `wideOffsets`.
  */
 function isHighIntegerSymbol(symbol: unknown): symbol is number {
   return (
