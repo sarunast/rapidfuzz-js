@@ -12,6 +12,7 @@ import * as levenshtein from '../../src/algorithms/levenshtein/index.js'
 import * as osa from '../../src/algorithms/osa/index.js'
 import * as postfix from '../../src/algorithms/postfix/index.js'
 import * as prefix from '../../src/algorithms/prefix/index.js'
+import * as tversky from '../../src/algorithms/tversky/index.js'
 import { scorerCompilation } from '../../src/core/scoring/scorer.js'
 import { trustedKernelThreshold } from '../../src/core/scoring/threshold.js'
 import * as fuzz from '../../src/fuzz/index.js'
@@ -45,6 +46,7 @@ describe('Metric and Scorer contracts', () => {
       jaroWinkler.similarity,
       dice.similarity,
       cosine.similarity,
+      tversky.similarity,
     ]) {
       expect(metric('same', 'same')).toBe(1)
       expect(metric('a', 'b')).toBeGreaterThanOrEqual(0)

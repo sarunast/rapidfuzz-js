@@ -80,6 +80,14 @@ import {
   normalizedSimilarity as prefixNormalizedSimilarity,
   similarity as prefixSimilarity,
 } from '../src/algorithms/prefix/index.js'
+import {
+  distance as tverskyDistance,
+  normalizedDistance as tverskyNormalizedDistance,
+  normalizedSimilarity as tverskyNormalizedSimilarity,
+  similarity as tverskySimilarity,
+  type TverskyDistanceConfiguration,
+  type TverskySimilarityConfiguration,
+} from '../src/algorithms/tversky/index.js'
 import type { Metric } from '../src/core/scoring/metric.js'
 import { createScorer, type Scorer } from '../src/core/scoring/scorer.js'
 import type { Sequence, SimilarityConfiguration } from '../src/core/types.js'
@@ -263,4 +271,14 @@ export const JaroWinkler = new MetricHarness<
   jaroWinklerSimilarity,
   jaroWinklerNormalizedDistance,
   jaroWinklerNormalizedSimilarity,
+)
+
+export const Tversky = new MetricHarness<
+  TverskyDistanceConfiguration,
+  TverskySimilarityConfiguration
+>(
+  tverskyDistance,
+  tverskySimilarity,
+  tverskyNormalizedDistance,
+  tverskyNormalizedSimilarity,
 )

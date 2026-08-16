@@ -26,6 +26,7 @@ const config: UserConfig = defineConfig({
     'src/algorithms/jaroWinkler/index.ts',
     'src/algorithms/prefix/index.ts',
     'src/algorithms/postfix/index.ts',
+    'src/algorithms/tversky/index.ts',
   ],
   root: 'src',
   format: 'esm',

@@ -65,6 +65,22 @@ def cosine(left, right, gram_size):
     return dot / sqrt(norm_a * norm_b)
 
 
+def tversky(left, right, gram_size, alpha, beta):
+    a = profile(left, gram_size)
+    b = profile(right, gram_size)
+    total_a = sum(a.values())
+    total_b = sum(b.values())
+    if total_a == 0 or total_b == 0:
+        # The same equality fallback as Dice: no grams on a side leaves nothing
+        # for the weights to price.
+        both_empty = total_a == 0 and total_b == 0
+        return 1.0 if both_empty and list(left) == list(right) else 0.0
+    shared = sum(min(a[gram], b[gram]) for gram in a.keys() & b.keys())
+    return shared / (
+        shared + alpha * (total_a - shared) + beta * (total_b - shared)
+    )
+
+
 PAIRS = [
     ("", ""),
     ("a", "a"),
@@ -124,10 +140,46 @@ for left, right in PAIRS:
             }
         )
 
+# Tversky is asymmetric once alpha and beta differ, so its cases carry both
+# orientations and stay out of the symmetric dice/cosine tables above.
+TVERSKY_WEIGHTS = [(0.5, 0.5), (1.0, 1.0), (1.0, 0.0), (0.2, 0.7)]
+
+tversky_cases = []
+for left, right in PAIRS:
+    for gram_size in [1, 2, 3]:
+        for alpha, beta in TVERSKY_WEIGHTS:
+            similarity = tversky(left, right, gram_size, alpha, beta)
+            if (alpha, beta) == (0.5, 0.5):
+                # At the default weights the formula collapses to Dice exactly.
+                against_dice = dice(left, right, gram_size)
+                if abs(similarity - against_dice) > 1e-15:
+                    raise SystemExit(
+                        f"tversky(0.5, 0.5) disagrees with dice on "
+                        f"{left!r}/{right!r} at gram_size={gram_size}"
+                    )
+            tversky_cases.append(
+                {
+                    "left": left,
+                    "right": right,
+                    "gramSize": gram_size,
+                    "alpha": alpha,
+                    "beta": beta,
+                    "similarity": similarity,
+                    "reverseSimilarity": tversky(right, left, gram_size, alpha, beta),
+                }
+            )
+
 OUTPUT.write_text(
-    json.dumps({"dice": dice_cases, "cosine": cosine_cases}, ensure_ascii=False, indent=2)
+    json.dumps(
+        {"dice": dice_cases, "cosine": cosine_cases, "tversky": tversky_cases},
+        ensure_ascii=False,
+        indent=2,
+    )
     + "\n"
 )
-print(f"wrote {len(dice_cases)} dice and {len(cosine_cases)} cosine cases")
+print(
+    f"wrote {len(dice_cases)} dice, {len(cosine_cases)} cosine and "
+    f"{len(tversky_cases)} tversky cases"
+)
 print(f"  to {OUTPUT.relative_to(ROOT)}")
 print("run `pnpm format` — oxfmt collapses the short arrays this writes expanded")

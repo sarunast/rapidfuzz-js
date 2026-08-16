@@ -72,6 +72,12 @@ import {
   normalizedSimilarity as prefixNormalizedSimilarity,
   similarity as prefixSimilarity,
 } from '../../src/algorithms/prefix/index.js'
+import {
+  distance as tverskyDistance,
+  normalizedDistance as tverskyNormalizedDistance,
+  normalizedSimilarity as tverskyNormalizedSimilarity,
+  similarity as tverskySimilarity,
+} from '../../src/algorithms/tversky/index.js'
 import { scorePairs } from '../../src/batch/scorePairs.js'
 import { createScorer, type Scorer } from '../../src/core/scoring/scorer.js'
 import type { Direction } from '../../src/core/types.js'
@@ -140,6 +146,10 @@ const FAMILIES: ReadonlyArray<readonly [string, ScorerFactory]> = [
   ['Prefix similarity', () => createScorer(prefixSimilarity)],
   ['Prefix normalized distance', () => createScorer(prefixNormalizedDistance)],
   ['Prefix normalized similarity', () => createScorer(prefixNormalizedSimilarity)],
+  ['Tversky distance', () => createScorer(tverskyDistance)],
+  ['Tversky similarity', () => createScorer(tverskySimilarity)],
+  ['Tversky normalized distance', () => createScorer(tverskyNormalizedDistance)],
+  ['Tversky normalized similarity', () => createScorer(tverskyNormalizedSimilarity)],
 ]
 
 describe('compiled built-in metrics', () => {

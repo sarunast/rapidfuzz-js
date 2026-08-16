@@ -99,7 +99,7 @@ Scores are never rescaled between families:
 | Raw edit/count distance and similarity | Native algorithm units |
 | Normalized distance and similarity     | `0–1`                  |
 | Jaro and Jaro-Winkler measures         | `0–1`                  |
-| Dice and Cosine measures               | `0–1`                  |
+| Dice, Cosine and Tversky measures      | `0–1`                  |
 
 Available subpaths:
 
@@ -117,6 +117,7 @@ rapidfuzz-js/jaro
 rapidfuzz-js/jaro-winkler
 rapidfuzz-js/prefix
 rapidfuzz-js/postfix
+rapidfuzz-js/tversky
 ```
 
 Every algorithm subpath exposes `distance`, `similarity`, `normalizedDistance`,
@@ -124,7 +125,7 @@ and `normalizedSimilarity`. Levenshtein, Indel, LCS, and Hamming also export
 `editops` and `opcodes`. The `Editops` and `Opcodes` they return carry their
 alignment in `operations`, a readonly array, and are themselves iterable with a
 `length`, so `for (const op of editops(a, b))` and `[...editops(a, b)]` work
-without reaching through it. Jaro, Jaro-Winkler, Dice, and Cosine are
+without reaching through it. Jaro, Jaro-Winkler, Dice, Cosine, and Tversky are
 normalized by construction, so their `normalized*` exports are the same metrics
 under the names the other algorithms use.
 
@@ -192,6 +193,27 @@ makes it markedly cheaper than Cosine under a high threshold when scoring a
 pair. Cosine has no such bound. Note that a `search` over raw text profiles
 each candidate as it reads it, so the bound saves nothing there; prepared
 choices or a `Matcher` are what let it apply.
+
+`rapidfuzz-js/tversky` generalizes Dice over the same n-gram profiles with a
+separate price on each side's unmatched grams: `alpha` for grams only the
+first sequence has, `beta` for the second's. The defaults (`0.5` each) are
+exactly Dice, `{ alpha: 1, beta: 1 }` is multiset Jaccard, and
+`{ alpha: 1, beta: 0 }` asks how completely the second sequence contains the
+first — asymmetric, so argument order matters there. With `gramSize: 1` and
+token arrays it scores exact-token overlap:
+
+```ts
+import { createScorer } from 'rapidfuzz-js'
+import { similarity as tverskySimilarity } from 'rapidfuzz-js/tversky'
+
+const containment = createScorer(tverskySimilarity, {
+  gramSize: 1,
+  alpha: 1,
+  beta: 0,
+})
+containment.score(['google', 'ag'], ['google', 'deepmind', 'ag'])
+// 1 — every query token is covered
+```
 
 The `fuzz` subpath is the exception: it exports similarity scorers only. Two
 of them are easy to mix up:

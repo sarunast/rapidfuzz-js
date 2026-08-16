@@ -42,6 +42,7 @@ import {
   normalizedSimilarity as prefixNormalizedSimilarity,
   similarity as prefixSimilarity,
 } from '../../src/algorithms/prefix/index.js'
+import { normalizedSimilarity as tverskyNormalizedSimilarity } from '../../src/algorithms/tversky/index.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
 import type { MaybeSequence } from '../../src/core/types.js'
 import { callUntyped } from '../../testing/untyped.js'
@@ -62,6 +63,7 @@ const NORMALIZED_SIMILARITIES: ReadonlyArray<readonly [string, SimilarityMetric]
   ['OSA', osaNormalizedSimilarity],
   ['Postfix', postfixNormalizedSimilarity],
   ['Prefix', prefixNormalizedSimilarity],
+  ['Tversky', tverskyNormalizedSimilarity],
 ]
 
 const DISTANCES: ReadonlyArray<readonly [string, DistanceMetric]> = [

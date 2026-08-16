@@ -18,7 +18,8 @@
     "rapidfuzz",
     "similarity",
     "sorensen-dice",
-    "string-matching"
+    "string-matching",
+    "tversky"
   ],
   "homepage": "https://github.com/sarunast/rapidfuzz-js#readme",
   "bugs": {
@@ -102,6 +103,10 @@
     "./postfix": {
       "types": "./dist/algorithms/postfix/index.d.ts",
       "import": "./dist/algorithms/postfix/index.js"
+    },
+    "./tversky": {
+      "types": "./dist/algorithms/tversky/index.d.ts",
+      "import": "./dist/algorithms/tversky/index.js"
     },
     "./package.json": "./package.json"
   },

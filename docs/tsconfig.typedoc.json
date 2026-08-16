@@ -29,6 +29,7 @@
       "rapidfuzz-js/hamming": ["../src/algorithms/hamming/index.ts"],
       "rapidfuzz-js/dice": ["../src/algorithms/dice/index.ts"],
       "rapidfuzz-js/cosine": ["../src/algorithms/cosine/index.ts"],
+      "rapidfuzz-js/tversky": ["../src/algorithms/tversky/index.ts"],
       "rapidfuzz-js/jaro": ["../src/algorithms/jaro/index.ts"],
       "rapidfuzz-js/jaro-winkler": ["../src/algorithms/jaroWinkler/index.ts"],
       "rapidfuzz-js/prefix": ["../src/algorithms/prefix/index.ts"],

@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest'
 
 import * as cosine from '../../src/algorithms/cosine/index.js'
 import * as dice from '../../src/algorithms/dice/index.js'
+import * as tversky from '../../src/algorithms/tversky/index.js'
 import { scoreMatrix } from '../../src/batch/scoreMatrix.js'
 import { scorePairs } from '../../src/batch/scorePairs.js'
 import type { Metric } from '../../src/core/scoring/metric.js'
@@ -80,6 +81,42 @@ for (const [name, suite, cases] of FAMILIES) {
     )
   })
 }
+
+// Tversky stays out of `FAMILIES`: those assertions read one similarity for
+// both orientations, and Tversky is asymmetric once alpha and beta differ. Its
+// oracle cases carry each orientation separately instead.
+describe('Tversky matches the n-gram oracle', () => {
+  test.each(fixture.tversky)(
+    'case %# at gramSize $gramSize, alpha $alpha, beta $beta',
+    ({ left, right, gramSize, alpha, beta, similarity, reverseSimilarity }) => {
+      const scorer = createScorer(tversky.similarity, { gramSize, alpha, beta })
+      const distance = createScorer(tversky.distance, { gramSize, alpha, beta })
+      const swapped = createScorer(tversky.similarity, {
+        gramSize,
+        alpha: beta,
+        beta: alpha,
+      })
+
+      expect(scorer.score(left, right)).toBeCloseTo(similarity, 12)
+      expect(scorer.score(right, left)).toBeCloseTo(reverseSimilarity, 12)
+      expect(distance.score(left, right)).toBeCloseTo(1 - similarity, 12)
+      // Swapping the weights has to mirror swapping the arguments exactly.
+      expect(swapped.score(right, left)).toBeCloseTo(similarity, 12)
+
+      // The prepared kernel reads gram counts off the profiles rather than
+      // recomputing them, which is where the two paths could drift apart.
+      expect(createMatcher([right], { scorer }).best(left)?.score).toBeCloseTo(
+        similarity,
+        12,
+      )
+      expect(bestMatch(left, [right], { scorer })?.score).toBeCloseTo(similarity, 12)
+      expect(Array.from(scorePairs([left], [right], { scorer }))[0]).toBeCloseTo(
+        similarity,
+        12,
+      )
+    },
+  )
+})
 
 describe('the two families are not the same metric', () => {
   test('a repeated gram separates them', () => {

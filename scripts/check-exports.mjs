@@ -83,6 +83,7 @@ const EXPECTED = {
   ],
   './prefix': ['distance', 'similarity', 'normalizedDistance', 'normalizedSimilarity'],
   './postfix': ['distance', 'similarity', 'normalizedDistance', 'normalizedSimilarity'],
+  './tversky': ['distance', 'similarity', 'normalizedDistance', 'normalizedSimilarity'],
 }
 
 const REMOVED = [

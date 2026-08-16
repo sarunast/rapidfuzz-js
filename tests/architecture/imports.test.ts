@@ -92,6 +92,7 @@ const ENTRYPOINTS: readonly string[] = [
   'algorithms/osa/index.ts',
   'algorithms/postfix/index.ts',
   'algorithms/prefix/index.ts',
+  'algorithms/tversky/index.ts',
 ]
 
 describe('dependency direction', () => {
@@ -526,13 +527,14 @@ describe('metric identity', () => {
   })
 
   it('lets a known alias share an identity rather than mint one', () => {
-    // Cosine, Dice, Jaro and Jaro-Winkler are normalized by construction, so
-    // their normalized exports are the same metrics. `typeof` is what says so,
-    // and an alias that named itself instead would appear below as an id.
+    // Cosine, Dice, Jaro, Jaro-Winkler and Tversky are normalized by
+    // construction, so their normalized exports are the same metrics. `typeof`
+    // is what says so, and an alias that named itself instead would appear
+    // below as an id.
     const aliases = [
       ...declarations.matchAll(/export const (\w+): typeof (\w+) = (\w+)/g),
     ]
-    expect(aliases).toHaveLength(8)
+    expect(aliases).toHaveLength(10)
     for (const [, name, annotation, initializer] of aliases) {
       expect(annotation).toBe(initializer)
       expect(name).not.toBe(initializer)
@@ -540,7 +542,7 @@ describe('metric identity', () => {
     const ids = [...declarations.matchAll(/BuiltInMetric<\s*'([\w.]+)'/g)].map(
       (match) => match[1],
     )
-    for (const family of ['cosine', 'dice', 'jaro', 'jaroWinkler']) {
+    for (const family of ['cosine', 'dice', 'jaro', 'jaroWinkler', 'tversky']) {
       expect(ids).not.toContain(`${family}.normalizedDistance`)
       expect(ids).not.toContain(`${family}.normalizedSimilarity`)
     }
