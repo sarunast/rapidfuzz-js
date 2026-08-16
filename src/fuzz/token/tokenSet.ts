@@ -17,7 +17,7 @@ import {
   intersects,
   joinTokens,
   sortedOf,
-  sortedUniqueOf,
+  sortTokens,
   tokenPair,
   splitOf,
   tokenViewOf,
@@ -93,28 +93,13 @@ export function tokenSetRatioConverted(
 
   if (tokensA.size === 0 || tokensB.size === 0) return 0
 
-  let sectCount = 0
-  let sectPayload = 0
-  let diffAbPayload = 0
-  let diffBaPayload = 0
-  const diffAb: unknown[][] = []
-  const diffBa: unknown[][] = []
-
-  const entriesA = sortedUniqueOf(tokensA)
-  for (let i = 0; i < entriesA.keys.length; i++) {
-    const token = entriesA.tokens[i]
-    if (tokensB.has(entriesA.keys[i], token)) {
-      sectCount++
-      sectPayload += token.length
-    } else {
-      diffAbPayload += token.length
-      diffAb.push(token)
-    }
-  }
-
-  if (sectCount === 0 && uniquePatternA !== undefined && viewB !== undefined) {
+  if (
+    uniquePatternA !== undefined &&
+    viewB !== undefined &&
+    !intersects(tokensA, tokensB)
+  ) {
     return disjointTokensRatio(
-      diffAbPayload + diffAb.length - 1,
+      tokensA.payload + tokensA.size - 1,
       uniquePatternA,
       viewB,
       tokensB,
@@ -122,14 +107,48 @@ export function tokenSetRatioConverted(
     )
   }
 
+  let sectCount = 0
+  let sectPayload = 0
+  let diffAbPayload = 0
+  let diffBaPayload = 0
+  const diffAb: unknown[][] = []
+  const diffBa: unknown[][] = []
+
+  for (const [key, token] of tokensA.packed) {
+    if (tokensB.packed.has(key)) {
+      sectCount++
+      sectPayload += token.length
+    } else {
+      diffAbPayload += token.length
+      diffAb.push(token)
+    }
+  }
+  for (const [key, bucket] of tokensA.mixed) {
+    for (const token of bucket) {
+      if (tokensB.has(key, token)) {
+        sectCount++
+        sectPayload += token.length
+      } else {
+        diffAbPayload += token.length
+        diffAb.push(token)
+      }
+    }
+  }
+
   if (sectCount !== 0 && diffAb.length === 0) return 100
 
-  const entriesB = sortedUniqueOf(tokensB)
-  for (let i = 0; i < entriesB.keys.length; i++) {
-    const token = entriesB.tokens[i]
-    if (!tokensA.has(entriesB.keys[i], token)) {
+  for (const [key, token] of tokensB.packed) {
+    if (!tokensA.packed.has(key)) {
       diffBaPayload += token.length
       diffBa.push(token)
+    }
+  }
+  for (const [key, bucket] of tokensB.mixed) {
+    for (const token of bucket) {
+      if (!tokensA.has(key, token)) {
+        diffBaPayload += token.length
+        diffBa.push(token)
+      }
     }
   }
 
@@ -157,8 +176,8 @@ export function tokenSetRatioConverted(
   const lengthDiff = abLen > baLen ? abLen - baLen : baLen - abLen
 
   if (lengthDiff <= cutoffDistance) {
-    const diffAbJoined = joinTokens(diffAb, abLen)
-    const diffBaJoined = joinTokens(diffBa, baLen)
+    const diffAbJoined = joinTokens(sortTokens(diffAb), abLen)
+    const diffBaJoined = joinTokens(sortTokens(diffBa), baLen)
     const dist = indelDist(diffAbJoined, diffBaJoined, cutoffDistance)
 
     if (dist <= cutoffDistance) {

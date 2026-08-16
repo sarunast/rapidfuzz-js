@@ -90,7 +90,11 @@ describe('prepared scorers agree with raw ones', () => {
     ]
 
     for (const [a, b] of pairs) {
-      for (const cutoff of [0, 60, 70, 90, 98, 100]) {
+      // The score's own value and one ULP either side sit on the exact
+      // accept/reject edge — the place a fast path that rebuilt the score
+      // through different arithmetic would first disagree.
+      const base = fuzzTokenSetRatio(a, b)
+      for (const cutoff of [0, 60, 70, 90, 98, 100, base - 1e-13, base, base + 1e-13]) {
         const expected = fuzzTokenSetRatio(a, b, { scoreCutoff: cutoff })
         expect(preparedScore(factory, a, b, cutoff), `${a} / ${b} @ ${cutoff}`).toBe(
           expected,

@@ -286,6 +286,7 @@ export class UniqueTokenSet {
         this.packed.set(key, token)
         this.size++
         this.payload += token.length
+        this.sortedEntries = null
       }
       return
     }
@@ -295,6 +296,7 @@ export class UniqueTokenSet {
       this.mixed.set(key, [token])
       this.size++
       this.payload += token.length
+      this.sortedEntries = null
       return
     }
 
@@ -304,6 +306,7 @@ export class UniqueTokenSet {
     bucket.push(token)
     this.size++
     this.payload += token.length
+    this.sortedEntries = null
   }
 
   has(key: string, token: readonly unknown[]): boolean {
