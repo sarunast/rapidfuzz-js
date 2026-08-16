@@ -15,6 +15,10 @@ import {
 import type { PatternMask } from '../../bitmask/pattern.js'
 import { wordCount } from '../../bitmask/words.js'
 
+// Local deliberately: these feed the banded per-row index arithmetic, and an
+// imported ESM binding is not reliably folded like a module-local constant in
+// the shipped unbundled build. `wordCount` runs per call, not per cell, so it
+// stays shared from `words.ts`.
 const WORD_BITS = 32
 const WORD_SHIFT = 5
 const DIRECT_LOOKUP_LIMIT = 256
@@ -216,6 +220,7 @@ function lcsManyWordsStamped(
 
   const limit = directLimit
   const stringText = typeof text === 'string'
+  const unrolledEnd = words & ~7
 
   for (let i = 0; i < textLength; i++) {
     let offset: number
@@ -255,7 +260,6 @@ function lcsManyWordsStamped(
     let carry = 0
     let w = 0
 
-    const unrolledEnd = words & ~7
     for (; w < unrolledEnd; w += 8) {
       let s = row[w]
       let u = s & pool[offset + w]
