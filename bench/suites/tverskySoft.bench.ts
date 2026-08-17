@@ -1,13 +1,15 @@
 /**
  * What `elementSimilarity` costs, and what its size limit is holding back.
  *
- * Two questions, and they want different fixtures. A realistic pair — company
+ * Three questions, and they want different fixtures. A realistic pair — company
  * names where one token carries a typo — leaves one element against one, and
- * measures the feature as anyone will actually meet it. The adverse pairs sit
- * exactly on the limit of 32 distinct unmatched elements a side with *every*
- * candidate edge surviving, which is the shape the limit exists to refuse the
- * next size up of; they are what keeps the numbers quoted beside
- * `MAX_SOFT_ELEMENTS` honest.
+ * measures the feature as anyone will actually meet it. A scan asks the same
+ * question of a corpus, where a query is prepared once and met with thousands of
+ * candidates it shares nothing with, so it is the only fixture that can see what
+ * the query side costs per candidate. The adverse pairs sit exactly on the limit
+ * of 32 distinct unmatched elements a side with *every* candidate edge surviving,
+ * which is the shape the limit exists to refuse the next size up of; they are
+ * what keeps the numbers quoted beside `MAX_SOFT_ELEMENTS` honest.
  *
  * Two costs sit behind a soft pair and a fixture has to separate them. Edge
  * building is `n × m` element scores and answers to the distinct counts alone;
@@ -33,7 +35,7 @@
 
 import { normalizedSimilarity as indelMetric } from '../../src/algorithms/indel/index.js'
 import { similarity as tverskyMetric } from '../../src/algorithms/tversky/index.js'
-import { createScorer } from '../../src/index.js'
+import { createMatcher, createScorer } from '../../src/index.js'
 import { words } from '../harness/corpus.js'
 import { describe, measure } from '../harness/harness.js'
 
@@ -62,6 +64,27 @@ const realistic = Array.from({ length: 10_000 }, (_, index) => {
     second: [mistyped(head), tail, suffix],
   }
 })
+
+// A scan is the third shape, and the only one where a query side is prepared
+// once and met with many candidates. Each query is a one-token typo of one
+// corpus record: that record reserves two tokens exactly and leaves a single
+// fuzzy pair, and the other 1999 candidates share nothing, so exact matching
+// reserves nothing and all nine cells are compared and rejected. Both are worth
+// having — the near candidate is the least a preparation can be amortized over,
+// and the disjoint ones are what a scan is actually made of. The pair fixtures
+// above cannot see any of it: they score one pair per call, so a query is
+// prepared for a single candidate.
+const RECORDS = 2000
+const SCAN_TOKENS = words(3 * RECORDS, 9, 0x31c4_0001)
+const scanned = Array.from({ length: RECORDS }, (_, index) =>
+  SCAN_TOKENS.slice(index * 3, index * 3 + 3),
+)
+const scanQueries = Array.from({ length: 5 }, (_, index) => {
+  const record = scanned[index * 397]
+  return [mistyped(record[0]), record[1], record[2]]
+})
+const softMatcher = createMatcher(scanned, { scorer: soft })
+const exactMatcher = createMatcher(scanned, { scorer: exact })
 
 // Distinct tokens sharing a long body, so every one of the `n × m` candidate
 // edges clears the threshold and the matching sees a full matrix. Distinct
@@ -161,6 +184,25 @@ describe('a soft pair at a realistic size', () => {
     let total = 0
     for (let index = 0; index < 10_000; index++) {
       total += exact.score(realistic[index].first, realistic[index].second)
+    }
+    return total
+  })
+})
+
+describe('a soft scan over a corpus', () => {
+  measure('2000 choices, 5 queries', () => {
+    let total = 0
+    for (let index = 0; index < 5; index++) {
+      const best = softMatcher.best(scanQueries[index])
+      total += best === undefined ? 0 : best.score
+    }
+    return total
+  })
+  measure('the same scan without elementSimilarity, 5 queries', () => {
+    let total = 0
+    for (let index = 0; index < 5; index++) {
+      const best = exactMatcher.best(scanQueries[index])
+      total += best === undefined ? 0 : best.score
     }
     return total
   })

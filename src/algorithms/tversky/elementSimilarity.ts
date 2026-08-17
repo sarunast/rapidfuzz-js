@@ -1,5 +1,5 @@
 import { assertOptionKeys } from '#core/options.js'
-import type { AnyMetricCompilation } from '#core/scoring/compilation.js'
+import type { AnyMetricCompilation, PreparedKernel } from '#core/scoring/compilation.js'
 import { scorerCompilation, type Scorer } from '#core/scoring/scorer.js'
 import type { Direction } from '#core/types.js'
 
@@ -209,4 +209,90 @@ export function elementScore(
   second: string,
 ): number {
   return (soft.compilation.rawScore(first, second, null) - soft.lower) / soft.span
+}
+
+/** A leftover as the element scorer sees it: one element, as a string. */
+export interface ElementOperand {
+  readonly operand: string
+}
+
+/**
+ * How much comparing a scan must do before the query side is worth preparing.
+ *
+ * Preparing costs several comparisons, so preparing on first sight loses on
+ * every scan too short or too well-matched to earn it back — measured 0.64x
+ * against no cache on a single candidate leaving one fuzzy pair, and still
+ * 0.95x over sixteen of them.
+ *
+ * `searchIter`'s `STREAM_PREPARE_AFTER` is the same policy one layer up, and
+ * for the same reason: a stream that stops after one candidate must not have
+ * paid for a preparation it never used.
+ */
+const PREPARE_ELEMENT_AFTER = 8
+
+/**
+ * The element scorer's query side, prepared once the scan has done enough
+ * comparing to earn it, and held for as long as one query is being scanned.
+ *
+ * A pair scored on its own can never earn it, so the pair paths hold none of
+ * this and stay on {@link elementScore}.
+ *
+ * The choice side is prepared per pair. It could be held on the prepared choice
+ * instead and amortized across a matcher's queries, but that would retain a
+ * second, opaque representation of every fuzzy-comparable token in the corpus,
+ * and that trade needs its own measurement. The array here is refilled per pair
+ * and is bounded by the leftovers one pair may offer.
+ */
+export class ElementKernels {
+  readonly #compilation: AnyMetricCompilation<Direction>
+  readonly #kernels = new Map<string, PreparedKernel>()
+  readonly #columns: unknown[] = []
+  #comparisons = 0
+
+  constructor(soft: CompiledElementSimilarity) {
+    this.#compilation = soft.compilation
+  }
+
+  /**
+   * Whether a pair worth `comparisons` should go through prepared kernels,
+   * counting it towards the scan either way.
+   *
+   * Counted in comparisons rather than candidates so that one number serves
+   * both shapes a scan is made of: a candidate leaving a full matrix earns the
+   * preparation in its first pair or two, and one leaving a single pair waits
+   * until the corpus is long enough to be worth it. Before that this is the
+   * whole cost of the cache — an add and a compare, no lookup.
+   */
+  earned(comparisons: number): boolean {
+    if (this.#comparisons >= PREPARE_ELEMENT_AFTER) return true
+    this.#comparisons += comparisons
+    return false
+  }
+
+  /** The kernel holding `operand` as its query, prepared on first sight. */
+  kernelFor(operand: string): PreparedKernel {
+    const held = this.#kernels.get(operand)
+    if (held !== undefined) return held
+    const kernel = this.#compilation.prepareQuery(operand)
+    this.#kernels.set(operand, kernel)
+    return kernel
+  }
+
+  /** Those elements in the representation the kernels consume, in order. */
+  columnsFor(columns: readonly ElementOperand[]): readonly unknown[] {
+    this.#columns.length = 0
+    for (const column of columns) {
+      this.#columns.push(this.#compilation.prepareChoice(column.operand))
+    }
+    return this.#columns
+  }
+}
+
+/** {@link elementScore} where the first element is already a prepared kernel. */
+export function preparedElementScore(
+  soft: CompiledElementSimilarity,
+  kernel: PreparedKernel,
+  second: unknown,
+): number {
+  return (kernel(second, null) - soft.lower) / soft.span
 }

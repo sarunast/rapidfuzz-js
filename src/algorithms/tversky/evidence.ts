@@ -511,7 +511,7 @@ function softenEvidence(
   beta: number,
 ): { components: Components; tables: SoftTables; matching: SoftComponents } | null {
   const tables = softTablesOf(first, second)
-  const matching = softComponentsOf(tables, soft, exact.totals.sharedMass)
+  const matching = softComponentsOf(tables, soft, exact.totals.sharedMass, null)
   if (matching === null) return null
   return {
     tables,

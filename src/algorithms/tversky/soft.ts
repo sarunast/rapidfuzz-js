@@ -1,5 +1,10 @@
 import { maximumTransport, type SoftEdge } from './assignment.js'
-import { elementScore, type CompiledElementSimilarity } from './elementSimilarity.js'
+import {
+  elementScore,
+  preparedElementScore,
+  type CompiledElementSimilarity,
+  type ElementKernels,
+} from './elementSimilarity.js'
 import { elementTableOf, type ElementTable, type Occurrence } from './occurrences.js'
 
 /**
@@ -87,9 +92,13 @@ export interface SoftComponents {
 /**
  * A choice prepared for soft matching: the occurrence walk, done once.
  *
- * The element scorer's own preparation is deliberately not cached here yet —
- * that is a measured change, and this one only has to stop a matcher re-walking
- * every candidate on every query.
+ * The element scorer's own preparation is not held here — not because there is
+ * nothing to amortize, since a matcher meets the same choice on every query,
+ * but because holding it would retain a second, opaque representation of every
+ * fuzzy-comparable token in the corpus for the life of the matcher. That trade
+ * of memory against time needs its own measurement. The query side, which
+ * repeats within a single scan and retains nothing beyond it, is held in
+ * `ElementKernels`.
  */
 export class SoftTverskyChoice {
   constructor(readonly occurrences: Occurrence[]) {}
@@ -170,6 +179,8 @@ function comparableLeftovers(table: ElementTable, leftover: Uint32Array): Compar
   return comparable
 }
 
+const EMPTY_COLUMNS: readonly unknown[] = []
+
 function refuseOversized(rows: number, columns: number): void {
   if (rows > MAX_SOFT_ELEMENTS || columns > MAX_SOFT_ELEMENTS) {
     throw new RangeError(
@@ -196,11 +207,16 @@ function refuseOversized(rows: number, columns: number): void {
  * `min(wa, wb) · s` with `s ≤ 1` exactly, and multiplication is monotone under
  * round-to-nearest. Nothing is derived by subtracting one rounded aggregate
  * from another.
+ *
+ * `kernels` is the scan's held query side, and `null` where a pair is scored on
+ * its own — which is a cost decision rather than a behavioural one, since a
+ * prepared kernel and a direct score are the same number.
  */
 export function softComponentsOf(
   tables: SoftTables,
   soft: CompiledElementSimilarity,
   exactShared: number,
+  kernels: ElementKernels | null,
 ): SoftComponents | null {
   const first = tables.first
   const second = tables.second
@@ -210,10 +226,20 @@ export function softComponentsOf(
   if (leftFirst.length === 0 || leftSecond.length === 0) return null
   refuseOversized(leftFirst.length, leftSecond.length)
 
+  const held =
+    kernels !== null && kernels.earned(leftFirst.length * leftSecond.length)
+      ? kernels
+      : null
+  const columns = held === null ? EMPTY_COLUMNS : held.columnsFor(leftSecond)
   const edges: SoftPairing[] = []
   for (const row of leftFirst) {
-    for (const column of leftSecond) {
-      const similarity = elementScore(soft, row.operand, column.operand)
+    const kernel = held === null ? null : held.kernelFor(row.operand)
+    for (let at = 0; at < leftSecond.length; at++) {
+      const column = leftSecond[at]
+      const similarity =
+        kernel === null
+          ? elementScore(soft, row.operand, column.operand)
+          : preparedElementScore(soft, kernel, columns[at])
       if (similarity < soft.threshold) continue
       // A weight several hundred exponents below its partner's can round the
       // shared mass away entirely; a zero-mass edge only widens the tie plateau.

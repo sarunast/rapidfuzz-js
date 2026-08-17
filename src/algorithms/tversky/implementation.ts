@@ -51,6 +51,7 @@ import {
   CompiledElementSimilarity,
   compileElementSimilarity,
   effectiveElementSimilarity,
+  ElementKernels,
   type TverskyElementSimilarity,
 } from './elementSimilarity.js'
 import { tverskyExplainer, type TverskyEvidence } from './evidence.js'
@@ -259,6 +260,7 @@ function softSimilarity(
   soft: CompiledElementSimilarity,
   alpha: number,
   beta: number,
+  kernels: ElementKernels | null,
 ): number {
   const tables = softTablesOf(first, second)
   if (weights === null) {
@@ -266,7 +268,7 @@ function softSimilarity(
       return first.length === second.length ? 1 : 0
     }
     const shared = tables.overlap.sharedCount
-    const components = softComponentsOf(tables, soft, shared)
+    const components = softComponentsOf(tables, soft, shared, kernels)
     return components === null
       ? tverskyScore(shared, first.length, second.length, alpha, beta)
       : weightedTverskyScore(
@@ -286,7 +288,7 @@ function softSimilarity(
   // be another weighted Tversky, which would write over a shared one.
   const parts = new Float64Array(3)
   weightedComponents(query, choice, weights, parts)
-  const components = softComponentsOf(tables, soft, parts[0])
+  const components = softComponentsOf(tables, soft, parts[0], kernels)
   return components === null
     ? weightedTverskyScore(parts[0], parts[1], parts[2], alpha, beta)
     : weightedTverskyScore(
@@ -314,6 +316,7 @@ function directSoftSimilarity(
     soft,
     alpha,
     beta,
+    null,
   )
   return similarity >= scoreCutoff ? similarity : 0
 }
@@ -534,9 +537,21 @@ function prepareSoftTversky(
       new SoftTverskyChoice(occurrencesOf(choice, weights)),
     prepareQuery: (query: Sequence): PreparedKernel => {
       const first = occurrencesOf(query, weights)
+      // The query side of every element comparison, prepared once and met with
+      // every candidate — the one place in soft scoring that has a scan to
+      // amortize over.
+      const kernels = new ElementKernels(soft)
       return (rawChoice, rawCutoff) => {
         const second = preparedSoftChoice(rawChoice).occurrences
-        const similarity = softSimilarity(first, second, weights, soft, alpha, beta)
+        const similarity = softSimilarity(
+          first,
+          second,
+          weights,
+          soft,
+          alpha,
+          beta,
+          kernels,
+        )
         const cutoff = similarityCutoffFor(kind, rawCutoff)
         return preparedResult(kind, similarity >= cutoff ? similarity : 0, rawCutoff)
       }
