@@ -1,5 +1,5 @@
 import { assertOptionKeys } from '#core/options.js'
-import type { MetricCompilation, PreparedKernel } from '#core/scoring/compilation.js'
+import type { AnyMetricCompilation, PreparedKernel } from '#core/scoring/compilation.js'
 import { scorerCompilation } from '#core/scoring/scorer.js'
 import {
   impossibleThreshold,
@@ -107,7 +107,7 @@ export function searchIter<TItem, TDirection extends Direction, TBrand>(
 function* iterateMatches<TItem>(
   query: MaybeSequence,
   items: Items<TItem>,
-  compilation: MetricCompilation<Direction>,
+  compilation: AnyMetricCompilation<Direction>,
   choices: ChoiceReader<TItem>,
   normalize: Normalizer | undefined,
   threshold: number | null,

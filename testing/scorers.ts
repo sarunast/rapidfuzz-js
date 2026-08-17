@@ -88,7 +88,7 @@ import {
   type TverskyDistanceConfiguration,
   type TverskySimilarityConfiguration,
 } from '../src/algorithms/tversky/index.js'
-import type { Metric } from '../src/core/scoring/metric.js'
+import type { AnyMetric } from '../src/core/scoring/metric.js'
 import { createScorer, type Scorer } from '../src/core/scoring/scorer.js'
 import type { Sequence, SimilarityConfiguration } from '../src/core/types.js'
 
@@ -119,16 +119,16 @@ function compileForTest(metric: unknown, options: object | undefined): Scorer {
 }
 
 class MetricHarness<TDistanceConfig extends object, TSimilarityConfig extends object> {
-  readonly #distance: Metric<'distance', TDistanceConfig>
-  readonly #similarity: Metric<'similarity', TSimilarityConfig>
-  readonly #normalizedDistance: Metric<'distance', TDistanceConfig>
-  readonly #normalizedSimilarity: Metric<'similarity', TSimilarityConfig>
+  readonly #distance: AnyMetric<'distance', TDistanceConfig>
+  readonly #similarity: AnyMetric<'similarity', TSimilarityConfig>
+  readonly #normalizedDistance: AnyMetric<'distance', TDistanceConfig>
+  readonly #normalizedSimilarity: AnyMetric<'similarity', TSimilarityConfig>
 
   constructor(
-    distance: Metric<'distance', TDistanceConfig>,
-    similarity: Metric<'similarity', TSimilarityConfig>,
-    normalizedDistance: Metric<'distance', TDistanceConfig>,
-    normalizedSimilarity: Metric<'similarity', TSimilarityConfig>,
+    distance: AnyMetric<'distance', TDistanceConfig>,
+    similarity: AnyMetric<'similarity', TSimilarityConfig>,
+    normalizedDistance: AnyMetric<'distance', TDistanceConfig>,
+    normalizedSimilarity: AnyMetric<'similarity', TSimilarityConfig>,
   ) {
     this.#distance = distance
     this.#similarity = similarity

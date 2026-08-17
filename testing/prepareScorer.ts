@@ -6,7 +6,7 @@ import type { Sequence } from '../src/core/types.js'
 
 /** Test-only adapter that always feeds the kernel its opaque prepared choice. */
 export function prepareScorerOf(
-  scorer: PreparedCapability,
+  scorer: PreparedCapability<unknown>,
 ): (query: Sequence, configuration: Readonly<Record<string, unknown>>) => PreparedKernel {
   const factory = scorer[PREPARE_SCORER]
   return (query, configuration) => {

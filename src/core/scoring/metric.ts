@@ -1,5 +1,9 @@
 import type { Direction, MaybeSequence } from '../types.js'
-import { COMPILE, type MetricCompilation } from './compilation.js'
+import {
+  COMPILE,
+  type AnyMetricCompilation,
+  type MetricCompilation,
+} from './compilation.js'
 import type { AnyBrand } from './preparedChoice.js'
 
 /**
@@ -26,11 +30,43 @@ export interface Metric<
   TDirection extends Direction,
   TConfig extends object = NoConfiguration,
   TBrand = AnyBrand,
+  TExplains extends TConfig = never,
+  TEvidence = never,
 > {
   (a: MaybeSequence, b: MaybeSequence): number
   readonly [COMPILE]: (
     configuration: TConfig | undefined,
-  ) => MetricCompilation<TDirection, TBrand>
+  ) => MetricCompilation<TDirection, TBrand, TExplains, TEvidence>
+}
+
+/**
+ * A metric read without its capability types.
+ *
+ * Every capability-carrying metric is assignable to it, because both erased
+ * parameters occur only in covariant positions of the compilation it returns.
+ * Anything that merely *accepts* one of this package's metrics takes this;
+ * anything that *declares* one keeps the real parameters:
+ *
+ * ```text
+ * construction code    Metric<…real capability…>
+ * runtime plumbing     AnyMetric<…> / AnyMetricCompilation<…>
+ * public surface       Scorer  |  ExplainableScorer
+ * ```
+ *
+ * It is a separate interface rather than a filled-in `Metric` because
+ * `TExplains extends TConfig` makes the inline widening unspellable —
+ * `object extends never` is false — and `never` in its place would refuse the
+ * very compilations it has to accept.
+ */
+export interface AnyMetric<
+  TDirection extends Direction,
+  TConfig extends object = never,
+  TBrand = AnyBrand,
+> {
+  (a: MaybeSequence, b: MaybeSequence): number
+  readonly [COMPILE]: (
+    configuration: TConfig | undefined,
+  ) => AnyMetricCompilation<TDirection, TBrand>
 }
 
 /**
@@ -42,12 +78,16 @@ export interface Metric<
  * `Object.hasOwn` rather than `in`: `COMPILE` is installed on the metric
  * function itself, so an inherited hook is not a metric this package made — it
  * is something that borrowed a prototype from one.
+ *
+ * It narrows to {@link AnyMetric}: the question it answers is "is this one of
+ * ours", which no capability can affect, so this is where a capability is
+ * deliberately dropped.
  */
 export function isBuiltInMetric<
   TDirection extends Direction,
   TConfig extends object,
   TBrand,
->(value: unknown): value is Metric<TDirection, TConfig, TBrand> {
+>(value: unknown): value is AnyMetric<TDirection, TConfig, TBrand> {
   if (typeof value !== 'function' || !Object.hasOwn(value, COMPILE)) return false
   const compile: unknown = Reflect.get(value, COMPILE)
   return typeof compile === 'function'

@@ -12,19 +12,23 @@ interface Flagged {
   readonly rfScorerFlags: ScorerFlags
 }
 
-export interface PreparedCapability {
-  readonly [PREPARE_SCORER]: PreparationFactory
+export interface PreparedCapability<TEvidence = never> {
+  readonly [PREPARE_SCORER]: PreparationFactory<TEvidence>
 }
 
-export interface MetricImplementation<TOptions extends ScorerOptions = ScorerOptions>
-  extends Flagged, PreparedCapability {
+export interface MetricImplementation<
+  TOptions extends ScorerOptions = ScorerOptions,
+  TEvidence = never,
+>
+  extends Flagged, PreparedCapability<TEvidence> {
   (left: Sequence, right: Sequence, options?: TOptions): number
 }
 
 export interface MaybeSequenceMetricImplementation<
   TOptions extends ScorerOptions = ScorerOptions,
+  TEvidence = never,
 >
-  extends Flagged, PreparedCapability {
+  extends Flagged, PreparedCapability<TEvidence> {
   (left: MaybeSequence, right: MaybeSequence, options?: TOptions): number
 }
 
@@ -91,12 +95,15 @@ export type ErasedMetricImplementation = (
   options?: ScorerOptions,
 ) => number
 
-export function withPreparedFlags<TImplementation extends ErasedMetricImplementation>(
+export function withPreparedFlags<
+  TImplementation extends ErasedMetricImplementation,
+  TEvidence = never,
+>(
   implementation: TImplementation,
   flags: ScorerFlags,
-  prepare: PreparationFactory,
+  prepare: PreparationFactory<TEvidence>,
   registration: ScorerRegistration = {},
-): TImplementation & Flagged & PreparedCapability {
+): TImplementation & Flagged & PreparedCapability<TEvidence> {
   const scorer = Object.assign(implementation, {
     rfScorerFlags: Object.freeze({ ...flags }),
     [PREPARE_SCORER]: prepare,

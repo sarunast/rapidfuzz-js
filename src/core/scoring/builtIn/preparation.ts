@@ -9,16 +9,17 @@ export const PREPARE_SCORER: unique symbol = Symbol('rapidfuzz.prepareScorer')
 
 export type ChoicePreparer = (choice: Sequence) => unknown
 
-interface MetricPreparation {
+interface MetricPreparation<TEvidence = never> {
   readonly prepareQuery: (query: Sequence) => PreparedKernel
   readonly prepareChoice: ChoicePreparer
   readonly indexChoices?: (() => ChoiceIndexBuilder) | undefined
   readonly proveOptimum?: ((prepared: readonly unknown[]) => OptimumProof) | undefined
+  readonly explain?: ((first: Sequence, second: Sequence) => TEvidence) | undefined
 }
 
-export type PreparationFactory = (
+export type PreparationFactory<TEvidence = never> = (
   options: Readonly<Record<string, unknown>>,
-) => MetricPreparation
+) => MetricPreparation<TEvidence>
 
 function isPreparedRepresentation(value: unknown): value is ArrayLike<unknown> {
   return (

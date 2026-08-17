@@ -41,8 +41,31 @@ export type BuiltInMetric<
   TId
 >
 
-interface BuiltInMetricOptions<TDirection extends Direction> {
-  readonly implementation: ErasedMetricImplementation & PreparedCapability
+/**
+ * {@link BuiltInMetric} that also declares an explanation capability: `TExplains`
+ * is the configuration shape that unlocks it, and `TEvidence` what it produces.
+ *
+ * `TExplains extends TConfig` because a configuration that unlocks a capability
+ * has to be a valid configuration for the metric in the first place. The
+ * `SimilarityConfiguration` mixin applies to both, so a similarity metric's
+ * explanation configuration accepts `missing` exactly as its ordinary one does.
+ */
+export type ExplainableBuiltInMetric<
+  TId extends string,
+  TDirection extends Direction,
+  TConfig extends object,
+  TExplains extends TConfig,
+  TEvidence,
+> = Metric<
+  TDirection,
+  TDirection extends 'similarity' ? TConfig & SimilarityConfiguration : TConfig,
+  TId,
+  TDirection extends 'similarity' ? TExplains & SimilarityConfiguration : TExplains,
+  TEvidence
+>
+
+interface BuiltInMetricOptions<TDirection extends Direction, TEvidence = never> {
+  readonly implementation: ErasedMetricImplementation & PreparedCapability<TEvidence>
   readonly directImplementation?:
     | ((a: MaybeSequence, b: MaybeSequence) => number)
     | undefined
@@ -92,7 +115,11 @@ export function builtInMetric<
   TDirection extends Direction,
   TConfig extends object,
   TBrand,
->(options: BuiltInMetricOptions<TDirection>): Metric<TDirection, TConfig, TBrand> {
+  TExplains extends TConfig = never,
+  TEvidence = never,
+>(
+  options: BuiltInMetricOptions<TDirection, TEvidence>,
+): Metric<TDirection, TConfig, TBrand, TExplains, TEvidence> {
   const defaultPreparedChoiceKey = Object.freeze({})
   const implementation = options.implementation
   const direct =
@@ -106,7 +133,9 @@ export function builtInMetric<
       if (typeof b !== 'string') validateSequence(b)
       return implementation(a, b)
     })
-  const compile = (given: TConfig | undefined): MetricCompilation<TDirection, TBrand> => {
+  const compile = (
+    given: TConfig | undefined,
+  ): MetricCompilation<TDirection, TBrand, TExplains, TEvidence> => {
     const { record: initial, missing } = configurationRecord(
       configurationObject(given),
       options.direction,
@@ -152,6 +181,7 @@ export function builtInMetric<
       prepareChoice: preparation.prepareChoice,
       indexChoices: preparation.indexChoices,
       proveOptimum: preparation.proveOptimum,
+      explain: preparation.explain,
       prepareOwnedChoice: (choice) =>
         preparation.prepareChoice(
           ArrayBuffer.isView(choice) ? snapshotSequence(choice) : choice,

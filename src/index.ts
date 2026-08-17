@@ -14,6 +14,7 @@ export { scorePairs } from './batch/scorePairs.js'
 export type { Metric } from './core/scoring/metric.js'
 export type {
   CustomScorerConfiguration,
+  ExplainableScorer,
   PrepareChoiceOptions,
   PreparedChoiceOf,
   Scorer,

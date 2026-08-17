@@ -1,4 +1,4 @@
-import type { MetricCompilation } from '#core/scoring/compilation.js'
+import type { AnyMetricCompilation } from '#core/scoring/compilation.js'
 import type { Scorer } from '#core/scoring/scorer.js'
 import { impossibleTrustedThreshold, optionalThreshold } from '#core/scoring/threshold.js'
 import type { Direction, Normalizer } from '#core/types.js'
@@ -94,7 +94,7 @@ export function resolveBatchOptions(
  * answer, so the call is refused up front rather than filling an array with one.
  */
 export function rejectedScore(
-  compilation: MetricCompilation<Direction>,
+  compilation: AnyMetricCompilation<Direction>,
   threshold: number | null,
   multiplier: number,
   integral: boolean,

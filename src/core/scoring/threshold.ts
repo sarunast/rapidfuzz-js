@@ -1,5 +1,5 @@
 import type { Direction } from '../types.js'
-import type { MetricCompilation } from './compilation.js'
+import type { AnyMetricCompilation } from './compilation.js'
 
 export function validateThreshold(value: number): number {
   if (!Number.isFinite(value)) throw new RangeError('threshold must be finite')
@@ -56,7 +56,7 @@ export function trustedKernelThreshold(
 }
 
 export function impossibleThreshold(
-  compilation: MetricCompilation<Direction>,
+  compilation: AnyMetricCompilation<Direction>,
   threshold: number | null,
 ): boolean {
   return (
@@ -66,7 +66,7 @@ export function impossibleThreshold(
 }
 
 export function kernelThreshold(
-  compilation: MetricCompilation<Direction>,
+  compilation: AnyMetricCompilation<Direction>,
   threshold: number | null,
 ): number | null {
   return compilation.trusted
@@ -74,7 +74,9 @@ export function kernelThreshold(
     : threshold
 }
 
-export function knownOptimum(compilation: MetricCompilation<Direction>): number | null {
+export function knownOptimum(
+  compilation: AnyMetricCompilation<Direction>,
+): number | null {
   if (!compilation.trusted) return null
   return compilation.direction === 'similarity'
     ? compilation.bounds[1]

@@ -10,7 +10,12 @@ export interface PreparedKernel {
   (choice: unknown, threshold: number | null): number
 }
 
-interface Compilation<TDirection extends Direction, TBrand = AnyBrand> {
+interface Compilation<
+  TDirection extends Direction,
+  TBrand = AnyBrand,
+  TExplains extends object = never,
+  TEvidence = never,
+> {
   readonly direction: TDirection
   readonly bounds: readonly [number, number]
   readonly symmetric: boolean
@@ -22,13 +27,17 @@ interface Compilation<TDirection extends Direction, TBrand = AnyBrand> {
   readonly preparedChoiceKey: object
   readonly indexChoices?: (() => ChoiceIndexBuilder) | undefined
   readonly proveOptimum?: ((prepared: readonly unknown[]) => OptimumProof) | undefined
+  readonly explain?: ((first: Sequence, second: Sequence) => TEvidence) | undefined
   readonly preparedChoiceBrand?: TBrand
+  readonly explainedConfiguration?: TExplains
 }
 
 export interface TrustedMetricCompilation<
   TDirection extends Direction,
   TBrand = AnyBrand,
-> extends Compilation<TDirection, TBrand> {
+  TExplains extends object = never,
+  TEvidence = never,
+> extends Compilation<TDirection, TBrand, TExplains, TEvidence> {
   readonly trusted: true
   readonly validate: (a: MaybeSequence, b: MaybeSequence) => void
 }
@@ -36,10 +45,33 @@ export interface TrustedMetricCompilation<
 export interface CustomMetricCompilation<
   TDirection extends Direction,
   TBrand = AnyBrand,
-> extends Compilation<TDirection, TBrand> {
+  TExplains extends object = never,
+  TEvidence = never,
+> extends Compilation<TDirection, TBrand, TExplains, TEvidence> {
   readonly trusted: false
 }
 
-export type MetricCompilation<TDirection extends Direction, TBrand = AnyBrand> =
-  | TrustedMetricCompilation<TDirection, TBrand>
-  | CustomMetricCompilation<TDirection, TBrand>
+export type MetricCompilation<
+  TDirection extends Direction,
+  TBrand = AnyBrand,
+  TExplains extends object = never,
+  TEvidence = never,
+> =
+  | TrustedMetricCompilation<TDirection, TBrand, TExplains, TEvidence>
+  | CustomMetricCompilation<TDirection, TBrand, TExplains, TEvidence>
+
+/**
+ * A compilation read back without its capability types.
+ *
+ * Every capability-carrying compilation is assignable to it, because both
+ * erased parameters occur only in covariant positions. This is one of the two
+ * sanctioned places a capability is dropped: everything that merely *runs* a
+ * compilation takes this, and everything that *builds* one keeps the real
+ * parameters. Never spell the erasure inline as
+ * `MetricCompilation<…, object, unknown>` — the whole point is that it is
+ * greppable.
+ */
+export type AnyMetricCompilation<
+  TDirection extends Direction,
+  TBrand = AnyBrand,
+> = MetricCompilation<TDirection, TBrand, object, unknown>

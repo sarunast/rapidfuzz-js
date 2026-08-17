@@ -12,8 +12,12 @@ import type {
   Normalizer,
   Sequence,
 } from '../types.js'
-import { COMPILE, type MetricCompilation } from './compilation.js'
-import { isBuiltInMetric, type Metric } from './metric.js'
+import {
+  COMPILE,
+  type AnyMetricCompilation,
+  type MetricCompilation,
+} from './compilation.js'
+import { isBuiltInMetric, type AnyMetric, type Metric } from './metric.js'
 import {
   createPreparedChoice,
   type AnyBrand,
@@ -98,6 +102,48 @@ export interface Scorer<TDirection extends Direction = Direction, TBrand = AnyBr
 }
 
 /**
+ * A {@link Scorer} that can also say *why* a pair scored what it did.
+ *
+ * `createScorer` returns one where the metric declares an explanation
+ * capability *and* the configuration it was given satisfies that capability's
+ * configuration. Every other scorer is a plain {@link Scorer} with no `explain`
+ * member at all, so an unsupported call is a compile error rather than a throw.
+ * What the evidence contains is the metric's own business — see the algorithm
+ * subpath that offers it.
+ *
+ * Where a capability depends on literal configuration values, it is decided
+ * from the configuration *literal*: a hoisted `const config = { … }` widens
+ * those values and yields a plain `Scorer`. Write the configuration inline, or
+ * hoist it with `satisfies` against the metric's exported
+ * capability-configuration type.
+ *
+ * The trap is that explanation is deliberately absent from search: a matcher
+ * answers *which candidate*, and `explain` answers *why this pair*, recomputed
+ * cold from the original sequences afterwards. `MatcherOptions.scorer` takes
+ * the base `Scorer`, so `matcher.scorer` will not carry `explain` — keep your
+ * own reference to the explainable scorer.
+ */
+export interface ExplainableScorer<
+  TDirection extends Direction = Direction,
+  TBrand = AnyBrand,
+  TEvidence = unknown,
+> extends Scorer<TDirection, TBrand> {
+  /**
+   * Explain one pair: the score, and whatever evidence this metric records
+   * behind it.
+   *
+   * Recomputes from scratch and allocates — it is meant for the handful of
+   * results a search already chose, not for scoring. Unlike `score`, a missing
+   * operand is refused rather than reported as a worst score: there is no
+   * honest evidence for a sequence that is not there.
+   *
+   * @throws `TypeError` if either operand is missing, or is neither a string
+   * nor an array-like sequence.
+   */
+  explain(first: Sequence, second: Sequence): TEvidence
+}
+
+/**
  * The handle type a given scorer produces — for annotating a stored handle
  * without naming the metric's brand by hand:
  *
@@ -119,7 +165,9 @@ export type ScorerOf<TMetric> =
   TMetric extends Metric<
     infer TDirection extends Direction,
     infer _TConfig extends object,
-    infer TBrand
+    infer TBrand,
+    infer _TExplains,
+    infer _TEvidence
   >
     ? Scorer<TDirection, TBrand>
     : never
@@ -145,7 +193,7 @@ export interface CustomScorerConfiguration<TDirection extends Direction> {
   readonly missing?: MissingPolicy | undefined
 }
 
-const compilations = new WeakMap<object, MetricCompilation<Direction>>()
+const compilations = new WeakMap<object, AnyMetricCompilation<Direction>>()
 
 function customCompilation<TDirection extends Direction, TBrand>(
   metric: (a: MaybeSequence, b: MaybeSequence) => number,
@@ -184,7 +232,7 @@ function validatePreparedChoice(value: unknown): Sequence {
 }
 
 function createScoreMethod<TDirection extends Direction>(
-  compilation: MetricCompilation<TDirection>,
+  compilation: AnyMetricCompilation<TDirection>,
 ): Scorer<TDirection, never>['score'] {
   function score(a: MaybeSequence, b: MaybeSequence): number
   function score(
@@ -209,37 +257,68 @@ function createScoreMethod<TDirection extends Direction>(
   return score
 }
 
-function fromCompilation<TDirection extends Direction, TBrand>(
-  compilation: MetricCompilation<TDirection, TBrand>,
-): Scorer<TDirection, TBrand> {
-  const scorer: Scorer<TDirection, TBrand> = {
-    direction: compilation.direction,
-    bounds: Object.freeze([compilation.bounds[0], compilation.bounds[1]]),
-    symmetric: compilation.symmetric,
-    score: createScoreMethod(compilation),
-    prepareChoice: (choice, options) => {
-      if (options !== undefined) {
-        assertOptionKeys(options, PREPARE_CHOICE_OPTION_KEYS, 'prepareChoice')
-      }
-      const valid = validateSequence(choice)
-      const normalize = options?.normalize
-      if (normalize === undefined) {
-        return createPreparedChoice(
-          compilation.preparedChoiceKey,
-          compilation.prepareOwnedChoice(valid),
-          undefined,
-        )
-      }
-      if (typeof normalize !== 'function') {
-        throw new TypeError('normalize must be a function')
-      }
+function createPrepareChoiceMethod<TDirection extends Direction, TBrand>(
+  compilation: AnyMetricCompilation<TDirection, TBrand>,
+): Scorer<TDirection, TBrand>['prepareChoice'] {
+  return (choice, options) => {
+    if (options !== undefined) {
+      assertOptionKeys(options, PREPARE_CHOICE_OPTION_KEYS, 'prepareChoice')
+    }
+    const valid = validateSequence(choice)
+    const normalize = options?.normalize
+    if (normalize === undefined) {
       return createPreparedChoice(
         compilation.preparedChoiceKey,
-        compilation.prepareOwnedChoice(normalizeSequence(valid, normalize)),
-        normalize,
+        compilation.prepareOwnedChoice(valid),
+        undefined,
       )
-    },
+    }
+    if (typeof normalize !== 'function') {
+      throw new TypeError('normalize must be a function')
+    }
+    return createPreparedChoice(
+      compilation.preparedChoiceKey,
+      compilation.prepareOwnedChoice(normalizeSequence(valid, normalize)),
+      normalize,
+    )
   }
+}
+
+/**
+ * Two literals rather than one built and extended, so each scorer shape is
+ * fixed from construction: `explain` is either there from the start or absent
+ * entirely, never attached afterwards.
+ */
+function fromCompilation<TDirection extends Direction, TBrand>(
+  compilation: AnyMetricCompilation<TDirection, TBrand>,
+  explain: ((first: Sequence, second: Sequence) => unknown) | undefined,
+): Scorer<TDirection, TBrand> | ExplainableScorer<TDirection, TBrand, unknown> {
+  const bounds: readonly [number, number] = Object.freeze([
+    compilation.bounds[0],
+    compilation.bounds[1],
+  ])
+  const score = createScoreMethod(compilation)
+  const prepareChoice = createPrepareChoiceMethod(compilation)
+  const scorer:
+    | Scorer<TDirection, TBrand>
+    | ExplainableScorer<TDirection, TBrand, unknown> =
+    explain === undefined
+      ? {
+          direction: compilation.direction,
+          bounds,
+          symmetric: compilation.symmetric,
+          score,
+          prepareChoice,
+        }
+      : {
+          direction: compilation.direction,
+          bounds,
+          symmetric: compilation.symmetric,
+          score,
+          prepareChoice,
+          explain: (first, second) =>
+            explain(validateSequence(first), validateSequence(second)),
+        }
   compilations.set(scorer, compilation)
   return Object.freeze(scorer)
 }
@@ -267,6 +346,10 @@ function fromCompilation<TDirection extends Direction, TBrand>(
  * share them. Two scorers built from the same metric with its default
  * preparation also share prepared choices.
  *
+ * A metric that declares an explanation capability returns the stronger
+ * {@link ExplainableScorer} when the configuration unlocks it — see there for
+ * why the configuration has to be written as a literal.
+ *
  * @param metric A built-in metric from an algorithm subpath.
  * @param configuration That metric's own options, if it takes any.
  * @returns A frozen {@link Scorer}, branded with the metric so its prepared
@@ -276,16 +359,26 @@ export function createScorer<
   TDirection extends Direction,
   TConfig extends object,
   TBrand,
+  TExplains extends TConfig,
+  TEvidence,
 >(
-  metric: Metric<TDirection, TConfig, TBrand>,
+  metric: Metric<TDirection, TConfig, TBrand, TExplains, TEvidence>,
+  configuration: NoInfer<TExplains>,
+): ExplainableScorer<TDirection, TBrand, TEvidence>
+export function createScorer<
+  TDirection extends Direction,
+  TConfig extends object,
+  TBrand,
+>(
+  metric: AnyMetric<TDirection, TConfig, TBrand>,
   configuration: TConfig,
 ): Scorer<TDirection, TBrand>
 export function createScorer<TDirection extends Direction, TBrand>(
-  metric: Metric<TDirection, never, TBrand>,
+  metric: AnyMetric<TDirection, never, TBrand>,
   configuration?: undefined,
 ): Scorer<TDirection, TBrand>
 export function createScorer<TDirection extends Direction>(
-  metric: Metric<TDirection, never, AnyBrand>,
+  metric: AnyMetric<TDirection, never, AnyBrand>,
   configuration?: undefined,
 ): Scorer<TDirection>
 /**
@@ -310,12 +403,13 @@ export function createScorer<TDirection extends Direction>(
 ): Scorer<TDirection>
 export function createScorer<TDirection extends Direction, TBrand>(
   metric:
-    | Metric<TDirection, never, TBrand>
+    | AnyMetric<TDirection, never, TBrand>
     | ((a: MaybeSequence, b: MaybeSequence) => number),
   configuration?: object,
-): Scorer<TDirection, TBrand> {
+): Scorer<TDirection, TBrand> | ExplainableScorer<TDirection, TBrand, unknown> {
   if (isBuiltInMetric<TDirection, object, TBrand>(metric)) {
-    return fromCompilation(metric[COMPILE](configuration))
+    const compilation = metric[COMPILE](configuration)
+    return fromCompilation(compilation, compilation.explain)
   }
   if (typeof metric !== 'function') {
     throw new TypeError('metric must be a function')
@@ -354,6 +448,7 @@ export function createScorer<TDirection extends Direction, TBrand>(
       configuration.symmetric,
       missing,
     ),
+    undefined,
   )
 }
 
@@ -404,7 +499,7 @@ function validateBounds(bounds: readonly [number, number]): void {
 
 export function scorerCompilation(
   scorer: Scorer<Direction>,
-): MetricCompilation<Direction> {
+): AnyMetricCompilation<Direction> {
   const compilation = compilations.get(scorer)
   if (compilation === undefined) {
     throw new TypeError('scorer was not created by createScorer')
