@@ -90,6 +90,70 @@ representation chooses the granularity, the metric never changes. Sequences
 shorter than one gram follow the n-gram family's rule: they score `1` against
 an equal input and `0` against anything else, whatever the weights say.
 
+## Weighing tokens against each other
+
+At `gramSize: 1` each element can carry its own weight, which is what entity
+matching needs: a company suffix should not count as much as a name.
+`elementWeights` makes `shared` and each side's unmatched remainder **weighted
+masses** rather than counts, leaving the formula exactly as it was.
+
+```ts
+const company = createScorer(similarity, {
+  gramSize: 1,
+  elementWeights: new Map([
+    ['swisscom', 5],
+    ['ag', 0.1],
+  ]),
+})
+
+company.score(['swisscom', 'ag'], ['swisscom']) // 0.99 — `ag` costs little
+company.score(['swisscom', 'ag'], ['ag']) // 0.0385 — the name is missing
+```
+
+The rules are short:
+
+- Weights are **per element**, and **global to the scorer** — nothing is derived
+  from the collection being searched, so a pair scores the same through
+  `score`, `createMatcher` and `createIndexedMatcher`.
+- They apply **per occurrence**: `['react', 'react']` at `3` carries `6`.
+- An element the map does not name weighs `defaultElementWeight`, which defaults
+  to `1`. Set it to `0` to score only the vocabulary you listed.
+- A weight of `0` drops an element from the comparison entirely. Two sequences
+  made of nothing but ignored elements score `1` only when their multisets are
+  equal — ignored suffixes alone never make a perfect match.
+- Weights need `gramSize: 1`. A shingle of several elements has no single weight
+  to carry, and no rule for combining its elements is more right than another.
+- The map is **snapshotted** when the scorer is created, so mutating it
+  afterwards changes nothing. Build a new scorer to change a weight.
+- `'a'` and `97` are the same element, so naming both with different weights is
+  a `RangeError` rather than a race between them.
+- A weighting where **everything weighs the same positive amount** prices
+  nothing — one constant factor cancels from the ratio — so the scorer drops it
+  and scores as plain unigram Tversky. `defaultElementWeight: 0` is not that
+  case: ignoring every element has its own rules, above.
+
+Weighted scorers keep their own inverted index, at every weight pair — Dice's
+knows nothing about element weights — and indexed weighted search over 10,000
+token records runs about **8.7x** faster than the exhaustive path.
+
+The representation is not free where the weights really differ: one weight group
+costs about **4.3x** the unweighted index and three tiers about **5.5x**, with
+`scorer.score` at about **3.1x**, so reach for weights when tokens differ in
+importance rather than by default. Weights that are all equal cost nothing at all
+— 0.98x indexed and 1.01x on `scorer.score`, which is the unweighted path inside
+measurement noise — because the scorer detects them and never builds the
+weighted representation. Nothing about the weights is decided per pair, so a
+large vocabulary is never walked while scoring: 20,000 entries no query or
+candidate mentions, beside the same real ones, measured **1.11x** — the cost of
+looking into a bigger map, not of its size.
+
+The trap:
+
+> Element weighting does not make token matching fuzzy.
+
+`swisscom` and `swisscomm` share no mass at all, whatever their weights. Making
+near-matching tokens count is a different feature.
+
 ## Searching with a threshold
 
 Like Dice, Tversky's score has an exact upper bound computable from the two
@@ -126,11 +190,12 @@ matcher.search('new york mets', { limit: 5, threshold: 0.5 })
 
 At the default weights the scorer shares Dice's index outright — the same
 index hot loop, score arithmetic, and retained index representation — since
-the two are the same metric there.
-One boundary the exhaustive matcher does not have: the index packs integer
-elements, and characters only work because sequences convert to code points.
-Token arrays like the `['google', 'ag']` example above score through
-`createMatcher` but are refused by `createIndexedMatcher` at construction.
+the two are the same metric there. Token arrays like the `['google', 'ag']`
+example above index too: arbitrary elements are keyed by ordinal, so exact-token
+search over 10,000 token records runs **14–36x** faster than the exhaustive
+path, depending on the operation — and word shingles, whose grams are rarer
+still, far more than that. Element weights are a separate index with its own
+figure, above.
 
 ## When to use it
 

@@ -9,13 +9,17 @@ algorithms because it is below them, in the same layer as
 `tests/architecture/imports.test.ts` fails an edge from here into any of the
 twelve published directories.
 
-Both metrics reduce to one question — _how many grams do these two sequences
-share?_ — differing only in how a shared gram is scored:
+All three metrics reduce to one question — _how many grams do these two
+sequences share?_ — differing only in how a shared gram is scored:
 
 ```text
-Dice    2 · Σ min(aᵍ, bᵍ) / (gramsA + gramsB)     →  0..1
-Cosine  Σ aᵍ · bᵍ / √(‖a‖² ‖b‖²)                  →  0..1
+Dice     2 · Σ min(aᵍ, bᵍ) / (gramsA + gramsB)              →  0..1
+Cosine   Σ aᵍ · bᵍ / √(‖a‖² ‖b‖²)                           →  0..1
+Tversky  shared / (shared + α · onlyIn(a) + β · onlyIn(b))   →  0..1
 ```
+
+Tversky at `gramSize: 1` also has a weighted form, where each element carries
+its own weight and the three quantities are masses rather than counts.
 
 Everything here exists to answer that numerator quickly, at three different
 lifetimes, over element types ranging from Latin-1 characters to arbitrary
@@ -51,21 +55,26 @@ Every intra-subsystem edge, in topological order — each module may import only
 what is listed for it, and nothing below it:
 
 ```text
-key                (leaf)
-gramSize           (leaf, read by dice/ and cosine/ only)
-packing            → key
-profile            → key, packing
-compare            → key, packing, profile
-kernel             → key, packing, profile, compare
+key                      (leaf)
+gramSize                 (leaf, read by the public n-gram metrics)
+weightedTverskyScore     (leaf, the weighted ratio itself)
+packing                  → key
+profile                  → key, packing
+compare                  → key, packing, profile
+kernel                   → key, packing, profile, compare
+weightedProfile          → weightedTverskyScore
 ─────────────── the index is built on the above, never the reverse ───────────────
-inverted/keys      → key
-inverted/ordinals  → (leaf within the index)
-inverted/builder   → key, inverted/keys, inverted/ordinals
-inverted/query     → inverted/builder, inverted/keys, inverted/ordinals
-inverted/overlap   → inverted/builder, inverted/query
-inverted/dice      → inverted/builder, inverted/overlap, inverted/query
-inverted/cosine    → inverted/builder, inverted/query
-inverted/tversky   → inverted/builder, inverted/overlap, inverted/query
+inverted/keys            → key
+inverted/ordinals        → (leaf within the index)
+inverted/builder         → key, inverted/keys, inverted/ordinals
+inverted/query           → inverted/builder, inverted/keys, inverted/ordinals
+inverted/overlap         → inverted/builder, inverted/query
+inverted/weightedOverlap → inverted/builder
+inverted/dice            → inverted/builder, inverted/overlap, inverted/query
+inverted/cosine          → inverted/builder, inverted/query
+inverted/tversky         → inverted/builder, inverted/overlap, inverted/query
+inverted/weightedTversky → weightedTverskyScore, inverted/builder,
+                           inverted/keys, inverted/query, inverted/weightedOverlap
 ```
 
 Outward, the subsystem reaches only `core/` — `core/sequence` for
@@ -80,35 +89,50 @@ Three rules, all enforced by `tests/architecture/imports.test.ts`:
 1. **`profile.ts`, `compare.ts` and `kernel.ts` never import `inverted/`.** The
    index is an optional acceleration strategy built _on_ n-gram semantics, not
    the foundation.
-2. **`inverted/` reaches back into `ngram/` for `key.ts` and nothing else.** The
-   index shares an _encoding_ with the profiles without sharing a
-   _representation_: it never sees a `GramNode`, an `NGramProfile`, or a
-   comparison. The two halves meet only at the radix ladder.
-3. **`key.ts` and `gramSize.ts` are leaves.** One is integer arithmetic over a
-   radix ladder, the other reads a single option; an edge out of either is the
-   first sign policy has leaked in.
+2. **`inverted/` reaches back into `ngram/` for `key.ts` and
+   `weightedTverskyScore.ts`, and nothing else.** The index shares an _encoding_
+   and a _formula_ with the profiles without sharing a _representation_: it never
+   sees a `GramNode`, an `NGramProfile`, a `WeightedProfile`, or a comparison.
+
+   The second leaf is the deliberate exception, and the reason is exactness
+   rather than convenience: the weighted index has to answer bit for bit what the
+   exhaustive weighted scorer answers, and both sides therefore have to reach the
+   same exponent-safe ratio. A copy of it in `inverted/` would make threshold
+   parity depend on two implementations staying identical through every later
+   edit — which is the one thing an index may not risk. Being importable is what
+   its zero dependencies earn it; the weighted _representation_ stays on the
+   profile side, and the index is handed the compiled table's language-native
+   parts instead.
+
+3. **`key.ts`, `gramSize.ts` and `weightedTverskyScore.ts` are leaves.** Integer
+   arithmetic over a radix ladder, a single option, a ratio over five numbers; an
+   edge out of any of them is the first sign policy has leaked in.
 
 The test also pins both directory listings, so a new file here cannot appear
 without someone acknowledging it.
 
 ### What each module owns
 
-| file                   | owns                                                                                                             |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `key.ts`               | radix-ladder arithmetic: `feasibleRadices`, `canonicalRadix`, `packGram`, `unpackGram`.                          |
-| `packing.ts`           | element → digit → packed key, and the element domain a key is spelled in.                                        |
-| `gramSize.ts`          | the `gramSize` option: validation and parsing.                                                                   |
-| `profile.ts`           | what an n-gram profile _is_ and how one is built — both storages, the trie node shape, the fixed-depth builders. |
-| `compare.ts`           | one comparison: `sharedFrequency`, `dotProduct`, and the direct counter that skips profiles entirely.            |
-| `kernel.ts`            | one query, many comparisons: the query compiled once, then run per candidate.                                    |
-| `inverted/keys.ts`     | the index's _adaptive_ key policy — narrowest radix, widened on demand, joined strings as the floor.             |
-| `inverted/ordinals.ts` | arbitrary element → dense ordinal, for a corpus the direct integer scheme cannot spell.                          |
-| `inverted/builder.ts`  | corpus ingestion, the CSR posting store, and the one-time move between the two key representations.              |
-| `inverted/query.ts`    | query preparation in either representation, plus scratch, zero-filling, selection and ranking.                   |
-| `inverted/overlap.ts`  | the shared-frequency posting traversal, and the `Int32Array` exactness bound it holds to.                        |
-| `inverted/dice.ts`     | the Dice scoring engine, `Int32Array` accumulator.                                                               |
-| `inverted/cosine.ts`   | the Cosine scoring engine, `Float64Array` accumulator.                                                           |
-| `inverted/tversky.ts`  | the Tversky scoring engine, `Int32Array` accumulator, over the shared traversal.                                 |
+| file                          | owns                                                                                                                  |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `key.ts`                      | radix-ladder arithmetic: `feasibleRadices`, `canonicalRadix`, `packGram`, `unpackGram`.                               |
+| `packing.ts`                  | element → digit → packed key, and the element domain a key is spelled in.                                             |
+| `gramSize.ts`                 | the `gramSize` option: validation and parsing.                                                                        |
+| `profile.ts`                  | what an n-gram profile _is_ and how one is built — both storages, the trie node shape, the fixed-depth builders.      |
+| `compare.ts`                  | one comparison: `sharedFrequency`, `dotProduct`, and the direct counter that skips profiles entirely.                 |
+| `kernel.ts`                   | one query, many comparisons: the query compiled once, then run per candidate.                                         |
+| `inverted/keys.ts`            | the index's _adaptive_ key policy — narrowest radix, widened on demand, joined strings as the floor.                  |
+| `inverted/ordinals.ts`        | arbitrary element → dense ordinal, for a corpus the direct integer scheme cannot spell.                               |
+| `inverted/builder.ts`         | corpus ingestion, the CSR posting store, and the one-time move between the two key representations.                   |
+| `inverted/query.ts`           | query preparation in either representation, plus scratch, zero-filling, selection and ranking.                        |
+| `inverted/overlap.ts`         | the shared-frequency posting traversal, and the `Int32Array` exactness bound it holds to.                             |
+| `inverted/dice.ts`            | the Dice scoring engine, `Int32Array` accumulator.                                                                    |
+| `inverted/cosine.ts`          | the Cosine scoring engine, `Float64Array` accumulator.                                                                |
+| `inverted/tversky.ts`         | the Tversky scoring engine, `Int32Array` accumulator, over the shared traversal.                                      |
+| `weightedTverskyScore.ts`     | the weighted Tversky ratio: the mass limit, the scaled fast path, and the exponent-safe one below it.                 |
+| `weightedProfile.ts`          | element weights compiled into ascending groups, the weighted unigram profile and query, and the three-component fold. |
+| `inverted/weightedOverlap.ts` | per-candidate share lists, and the per-group integer posting traversal that fills them.                               |
+| `inverted/weightedTversky.ts` | the weighted scoring engine: the choice-major group CSR, the ascending merge, and the zero-mass branch.               |
 
 ---
 
@@ -406,6 +430,51 @@ afterwards and would throw that order away. An unlimited call collects and sorts
 once (`O(k log k)`) rather than insertion-placing, which is quadratic with room
 for the whole corpus.
 
+### Weighted overlap
+
+`elementWeights` at `gramSize: 1` makes `shared`, `firstOnly` and `secondOnly`
+weighted masses. Three decisions carry the whole design, and each one exists
+because the obvious shape produces wrong scores:
+
+- **Weights are compiled into ascending groups, and each group's overlap is
+  counted in integers.** Summing weights occurrence by occurrence is not
+  permutation-invariant — `{x: 1e16, y: 1, z: 0.1}` over the same multiset in two
+  orders measured `1.0000000000000002` — while one canonical ascending fold of
+  exact per-group counts is. It is also what keeps a dense posting's
+  `base + corrections` arithmetic exact, so the index reuses it.
+- **The three components are accumulated independently, and no mass is ever
+  stored.** Deriving a penalty as `mass − shared` lets the mass absorb the very
+  occurrence the penalty is made of: `['x','y']` against `['x']` at those weights
+  scores `1` instead of `0.5`.
+- **The index holds a choice-major CSR of group counts**, not one total per
+  choice, because `secondOnly` has to be a sum of real unmatched occurrences per
+  group. Shares are a prepended linked list per candidate rather than a row per
+  group, so query storage follows the postings actually read instead of the
+  caller's weight variety times the corpus size.
+
+A uniform positive weighting never reaches any of this: one constant factor over
+all three components cancels from the ratio, so `tversky/` drops it at compile
+time and the unweighted engines answer — measured at **0.98x** the unweighted
+index and 1.01x a direct score, against **4.3x** and **3.1x** for the weighted
+representation over the same postings. That gap is what makes detecting it worth
+a compile-time test.
+
+**Compile time is also the only place that test may run.** Whether a table is
+uniform needs a walk of every entry, and a scorer is handed the compiled table on
+every call — so `CompiledElementWeights` carries the answer as a field. Asking the
+table instead measured **27x** the cost of a direct score over a 20,000-entry
+vocabulary with one ignored token in it, which is the shape that walks furthest
+before it can answer.
+
+Nothing else per score is proportional to the table either, but it is not free of
+it: the same twelve real weights with 20,000 entries no query or candidate
+mentions added beside them measured **1.11x**, which is a wider map to look into
+rather than a walk of one. Both arms of that pair are in
+`weightedTokenIndex.bench.ts`, and they are deliberately identical in every other
+respect — same queries, candidates, groups and scores — because a table with
+fewer weight groups is otherwise the cheaper one to score and would flatter the
+comparison.
+
 ### Exactness and refusal
 
 The index reproduces the exhaustive scorer _to the bit_, and refuses rather than
@@ -458,8 +527,9 @@ would put a stack overflow inside the range of valid inputs.
   `testing/invertedIndex.ts`. The oracle is deliberately the slowest correct
   thing, so a differential failure names the implementation rather than a second
   clever version of it.
-- **Benchmarks**: `bench/suites/ngram.bench.ts` and `bench/suites/ngramIndex.bench.ts`. Read
-  the `benchmarks` skill before running either.
+- **Benchmarks**: `bench/suites/ngram.bench.ts`, `ngramIndex.bench.ts`,
+  `ngramTokenIndex.bench.ts` and `weightedTokenIndex.bench.ts`. Read the
+  `benchmarks` skill before running any of them.
 - **Architecture rules**: `tests/architecture/imports.test.ts`.
 
 **Measuring a change here needs more than `bench:compare`.** The bench suite

@@ -215,6 +215,24 @@ containment.score(['google', 'ag'], ['google', 'deepmind', 'ag'])
 // 1 — every query token is covered
 ```
 
+At that gram size each element can also carry its own weight, so a generic
+suffix need not count as much as a name:
+
+```ts
+const company = createScorer(tverskySimilarity, {
+  gramSize: 1,
+  elementWeights: new Map([
+    ['swisscom', 5],
+    ['ag', 0.1],
+  ]),
+})
+company.score(['swisscom', 'ag'], ['swisscom']) // 0.99 — `ag` costs little
+```
+
+Weights are per element, global to the scorer, applied per occurrence, and
+snapshotted when the scorer is created — nothing is inferred from the collection
+being searched, and none of it makes token matching fuzzy.
+
 The `fuzz` subpath is the exception: it exports similarity scorers only. Two
 of them are easy to mix up:
 

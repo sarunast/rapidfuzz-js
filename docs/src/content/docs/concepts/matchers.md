@@ -163,7 +163,8 @@ set the matcher's retained memory for good.
   skips building the results you never asked for — of 100,000 qualifying
   matches, taking one measured 0.06x against materializing them all — but it
   cannot skip the scoring, which is already done.
-- **Choices must be text, or sequences of integers.** Code points qualify;
-  an array of objects does not, and is refused at construction.
+- **Choices are whatever the exhaustive scorer accepts.** Text, code points,
+  token arrays, objects by identity, `NaN` — an index keys arbitrary elements by
+  ordinal, so word shingles are indexable at any gram size.
 - **`getPrepared` is not an option.** A prepared handle is the per-choice
   representation an index replaces.
