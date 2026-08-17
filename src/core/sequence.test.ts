@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest'
 
 import {
+  convElement,
   convSequence,
   isSequence,
+  MAX_SEQUENCE_LENGTH,
   normalizeSequence,
   snapshotSequence,
   validatePair,
@@ -120,5 +122,30 @@ describe('the sequence boundary', () => {
   test('uses narrow string storage until a code point needs promotion', () => {
     expect(convSequence('abc')).toBeInstanceOf(Uint16Array)
     expect(convSequence('a😀')).toBeInstanceOf(Uint32Array)
+  })
+
+  test('canonicalizes one element the way a sequence of them is canonicalized', () => {
+    // The rule every element-keyed structure has to agree with: after this,
+    // `'a'` and `97` are the same element, and a longer string is itself.
+    expect(convElement('a')).toBe(97)
+    expect(convElement('😀')).toBe(0x1f600)
+    expect(convElement('ab')).toBe('ab')
+    // A lone surrogate is two code units, so the pair test does not fire.
+    expect(convElement('\ud800\ud800')).toBe('\ud800\ud800')
+    expect(convElement('')).toBe('')
+    const object = {}
+    expect(convElement(object)).toBe(object)
+    expect(convElement(97)).toBe(97)
+    expect(convElement(Number.NaN)).toBeNaN()
+    const sequence = convSequence(['a', '😀', 'ab', 97])
+    for (let index = 0; index < sequence.length; index++) {
+      expect(sequence[index]).toBe(convElement(['a', '😀', 'ab', 97][index]))
+    }
+  })
+
+  test('names the longest sequence length once, for everything that bounds by it', () => {
+    expect(MAX_SEQUENCE_LENGTH).toBe(0xffff_ffff)
+    expect(isSequence({ length: MAX_SEQUENCE_LENGTH })).toBe(true)
+    expect(isSequence({ length: MAX_SEQUENCE_LENGTH + 1 })).toBe(false)
   })
 })

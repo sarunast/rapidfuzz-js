@@ -6,7 +6,7 @@ import type {
   Sequence,
 } from './types.js'
 
-const MAX_SEQUENCE_LENGTH = 0xffff_ffff
+export const MAX_SEQUENCE_LENGTH = 0xffff_ffff
 
 export function isSequence(value: unknown): value is Sequence {
   if (typeof value === 'string') return true
@@ -84,7 +84,7 @@ export function hasSurrogatePair(value: string): boolean {
   return SURROGATE_PAIR.test(value)
 }
 
-function convElement(value: unknown): unknown {
+export function convElement(value: unknown): unknown {
   if (typeof value !== 'string') return value
   if (value.length === 1) return value.charCodeAt(0)
   if (value.length === 2) {
