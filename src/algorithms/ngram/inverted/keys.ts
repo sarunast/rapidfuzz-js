@@ -92,6 +92,30 @@ export function encodeGramKey(
     : packGram(digits, 0, gramSize, radix)
 }
 
+/**
+ * How a sealed index spells one element as a unigram key, or `null` when it
+ * holds no key that element could name.
+ *
+ * The same three spellings the extractors below produce at `gramSize: 1` —
+ * packed, comma-joined, or an ordinal — because a caller that walked elements
+ * rather than windows still has to arrive at the index's own keys. Owned here
+ * rather than rederived, so a change to the ladder cannot leave the two apart.
+ */
+export function elementKey(
+  element: unknown,
+  radix: number | null,
+  elementOrdinals: ReadonlyMap<unknown, number> | null,
+): string | number | null {
+  const digit =
+    elementOrdinals === null
+      ? typeof element === 'number' && Number.isInteger(element)
+        ? element
+        : undefined
+      : elementOrdinals.get(element)
+  if (digit === undefined) return null
+  return radix === null || digit < 0 || digit >= radix ? String(digit) : digit
+}
+
 export function extractGrams(
   elements: ArrayLike<unknown>,
   gramSize: number,

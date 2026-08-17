@@ -8,15 +8,25 @@ import {
   type MaybeSequenceMetricImplementation,
 } from '#core/scoring/builtIn/implementation.js'
 import type { ScorerOptions } from '#core/scoring/builtIn/options.js'
-import type { PreparationFactory } from '#core/scoring/builtIn/preparation.js'
+import type {
+  ChoicePreparer,
+  PreparationFactory,
+} from '#core/scoring/builtIn/preparation.js'
+import type { ChoiceIndexBuilder } from '#core/scoring/choiceIndex.js'
 import type { PreparedKernel } from '#core/scoring/compilation.js'
-import { validateSequence, convPair, elementsEqual } from '#core/sequence.js'
+import {
+  validateSequence,
+  convPair,
+  convSequence,
+  elementsEqual,
+} from '#core/sequence.js'
 import type { MaybeSequence, Sequence } from '#core/types.js'
 
 import { directSharedFrequency, sharedFrequency } from '../ngram/compare.js'
 import { parseGramSize, validGramSize } from '../ngram/gramSize.js'
 import { createDiceIndexBuilder } from '../ngram/inverted/dice.js'
 import { createTverskyIndexBuilder } from '../ngram/inverted/tversky.js'
+import { createWeightedTverskyIndexBuilder } from '../ngram/inverted/weightedTversky.js'
 import { sharedFrequencyKernel, type BoundedFrequencyKernel } from '../ngram/kernel.js'
 import {
   buildProfile,
@@ -25,11 +35,33 @@ import {
   zeroGramSimilarity,
   type NGramProfile,
 } from '../ngram/profile.js'
+import {
+  compileElementWeights,
+  CompiledElementWeights,
+  preparedWeightedProfile,
+  weightedComponents,
+  weightedProfile,
+  weightedQueryGroups,
+  zeroMassSimilarity,
+  type WeightedProfile,
+  type WeightedQueryGroups,
+} from '../ngram/weightedProfile.js'
+import { weightedTverskyScore } from '../ngram/weightedTverskyScore.js'
 
 export interface TverskyOptions extends ScorerOptions {
   readonly gramSize?: number | undefined
   readonly alpha?: number | undefined
   readonly beta?: number | undefined
+  /**
+   * A caller's map, or the table a configured scorer compiled it into once —
+   * the canonicalizer replaces one with the other, so a compiled scorer never
+   * recompiles and never sees a later mutation.
+   */
+  readonly elementWeights?:
+    | ReadonlyMap<unknown, number>
+    | CompiledElementWeights
+    | undefined
+  readonly defaultElementWeight?: number | undefined
 }
 
 interface TverskyParameters {
@@ -57,6 +89,48 @@ function validParameters(rawAlpha: unknown, rawBeta: unknown): TverskyParameters
 
 function parseParameters(options: Readonly<Record<string, unknown>>): TverskyParameters {
   return validParameters(Reflect.get(options, 'alpha'), Reflect.get(options, 'beta'))
+}
+
+function weightsRequested(rawWeights: unknown, rawDefault: unknown): boolean {
+  return rawWeights !== undefined || rawDefault !== undefined
+}
+
+/**
+ * Element weights ask for exact element overlap, which is what `gramSize: 1`
+ * is: a shingle of several elements has no single weight to carry, and no
+ * combining rule over its elements is more right than another.
+ */
+function compileWeights(
+  rawWeights: unknown,
+  rawDefault: unknown,
+  gramSize: number,
+): CompiledElementWeights {
+  if (gramSize !== 1) {
+    throw new RangeError('element weights are only defined at gramSize 1')
+  }
+  return rawWeights instanceof CompiledElementWeights
+    ? rawWeights
+    : compileElementWeights(rawWeights, rawDefault)
+}
+
+/**
+ * The compiled table, or `null` where the weights price nothing — no weight key
+ * at all, or every element weighing the same positive amount, which is ordinary
+ * unigram Tversky and is answered by the unweighted engines.
+ *
+ * Every entry point that reads the configuration asks this one question, so a
+ * uniform table cannot take the weighted path through one of them and the
+ * unweighted path through another: the two agree on the real number and need not
+ * agree on its last bit.
+ */
+function effectiveWeights(
+  rawWeights: unknown,
+  rawDefault: unknown,
+  gramSize: number,
+): CompiledElementWeights | null {
+  if (!weightsRequested(rawWeights, rawDefault)) return null
+  const weights = compileWeights(rawWeights, rawDefault, gramSize)
+  return weights.uniformPositive ? null : weights
 }
 
 function tverskyScore(
@@ -117,6 +191,51 @@ function directSimilarity(
   return similarity >= scoreCutoff ? similarity : 0
 }
 
+// Three components at a time, and never two calls deep: the weighted paths read
+// them back before anything else can run.
+const WEIGHTED_PARTS = /* @__PURE__ */ new Float64Array(3)
+
+function weightedSimilarity(
+  query: WeightedQueryGroups,
+  choice: WeightedProfile,
+  weights: CompiledElementWeights,
+  alpha: number,
+  beta: number,
+): number {
+  if (query.groupIds.length === 0 || choice.groupIds.length === 0) {
+    return zeroMassSimilarity(query, choice)
+  }
+  weightedComponents(query, choice, weights, WEIGHTED_PARTS)
+  return weightedTverskyScore(
+    WEIGHTED_PARTS[0],
+    WEIGHTED_PARTS[1],
+    WEIGHTED_PARTS[2],
+    alpha,
+    beta,
+  )
+}
+
+function directWeightedSimilarity(
+  a: Sequence,
+  b: Sequence,
+  weights: CompiledElementWeights,
+  alpha: number,
+  beta: number,
+  scoreCutoff: number,
+): number {
+  // `convSequence` on both sides rather than `convPair`, which keeps two
+  // surrogate-free strings as strings: weight keys are canonical elements, so
+  // `'a'` has to arrive as the `97` the table was built with.
+  const similarity = weightedSimilarity(
+    weightedQueryGroups(convSequence(a), weights),
+    weightedProfile(convSequence(b), weights),
+    weights,
+    alpha,
+    beta,
+  )
+  return similarity >= scoreCutoff ? similarity : 0
+}
+
 function preparedSimilarity(
   a: NGramProfile,
   shared: BoundedFrequencyKernel,
@@ -149,7 +268,25 @@ function tverskySimilarity_impl(
   if (s1 == null || s2 == null) return 0
   const gramSize = validGramSize(options.gramSize)
   const { alpha, beta } = validParameters(options.alpha, options.beta)
+  const weights = effectiveWeights(
+    options.elementWeights,
+    options.defaultElementWeight,
+    gramSize,
+  )
   const scoreCutoff = options.scoreCutoff
+  if (weights !== null) {
+    return normSimCutoff(
+      directWeightedSimilarity(
+        validateSequence(s1),
+        validateSequence(s2),
+        weights,
+        alpha,
+        beta,
+        scoreCutoff ?? 0,
+      ),
+      scoreCutoff,
+    )
+  }
   const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return normSimCutoff(
     directSimilarity(a, b, gramSize, alpha, beta, scoreCutoff ?? 0),
@@ -164,20 +301,106 @@ function tverskyDistance_impl(
 ): number {
   const gramSize = validGramSize(options.gramSize)
   const { alpha, beta } = validParameters(options.alpha, options.beta)
+  const weights = effectiveWeights(
+    options.elementWeights,
+    options.defaultElementWeight,
+    gramSize,
+  )
   const cutoff = options.scoreCutoff
+  const similarityCutoff = cutoff == null ? 0 : 1 - cutoff
+  if (weights !== null) {
+    return normDistCutoff(
+      1 -
+        directWeightedSimilarity(
+          validateSequence(s1),
+          validateSequence(s2),
+          weights,
+          alpha,
+          beta,
+          similarityCutoff,
+        ),
+      cutoff,
+    )
+  }
   const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return normDistCutoff(
-    1 - directSimilarity(a, b, gramSize, alpha, beta, cutoff == null ? 0 : 1 - cutoff),
+    1 - directSimilarity(a, b, gramSize, alpha, beta, similarityCutoff),
     cutoff,
   )
 }
 
 type PreparedTverskyKind = 'distance' | 'similarity'
 
+function similarityCutoffFor(
+  kind: PreparedTverskyKind,
+  rawCutoff: number | null,
+): number {
+  if (kind === 'distance') return rawCutoff === null ? 0 : 1 - rawCutoff
+  return rawCutoff ?? 0
+}
+
+function preparedResult(
+  kind: PreparedTverskyKind,
+  similarity: number,
+  rawCutoff: number | null,
+): number {
+  return kind === 'distance'
+    ? normDistCutoff(1 - similarity, rawCutoff)
+    : normSimCutoff(similarity, rawCutoff)
+}
+
+/**
+ * The weighted preparation, chosen once when the scorer compiles so that no
+ * weight test reaches an unweighted profile or overlap loop.
+ */
+function prepareWeightedTversky(
+  kind: PreparedTverskyKind,
+  weights: CompiledElementWeights,
+  alpha: number,
+  beta: number,
+): {
+  prepareQuery: (query: Sequence) => PreparedKernel
+  prepareChoice: ChoicePreparer
+  indexChoices?: (() => ChoiceIndexBuilder) | undefined
+} {
+  return {
+    // Weighted overlap gets its own index at every weight pair, the default
+    // included: Dice's knows nothing about element weights.
+    indexChoices:
+      kind === 'similarity'
+        ? () =>
+            createWeightedTverskyIndexBuilder(
+              alpha,
+              beta,
+              weights.groupWeights,
+              weights.groupOf,
+              weights.defaultGroup,
+            )
+        : undefined,
+    prepareChoice: (choice: Sequence): WeightedProfile =>
+      weightedProfile(convSequence(choice), weights),
+    prepareQuery: (query: Sequence): PreparedKernel => {
+      const groups = weightedQueryGroups(convSequence(query), weights)
+      return (rawChoice, rawCutoff) => {
+        const choice = preparedWeightedProfile(rawChoice)
+        const similarity = weightedSimilarity(groups, choice, weights, alpha, beta)
+        const cutoff = similarityCutoffFor(kind, rawCutoff)
+        return preparedResult(kind, similarity >= cutoff ? similarity : 0, rawCutoff)
+      }
+    },
+  }
+}
+
 function prepareTversky(kind: PreparedTverskyKind): PreparationFactory {
   return (options) => {
     const gramSize = parseGramSize(options)
     const { alpha, beta } = parseParameters(options)
+    const weights = effectiveWeights(
+      Reflect.get(options, 'elementWeights'),
+      Reflect.get(options, 'defaultElementWeight'),
+      gramSize,
+    )
+    if (weights !== null) return prepareWeightedTversky(kind, weights, alpha, beta)
 
     const prepareChoice = (choice: Sequence): NGramProfile =>
       buildProfile(choice, gramSize)
@@ -188,16 +411,15 @@ function prepareTversky(kind: PreparedTverskyKind): PreparationFactory {
 
       return (rawChoice, rawCutoff) => {
         const b = preparedProfile(rawChoice)
-        const similarityCutoff =
-          kind === 'distance'
-            ? rawCutoff === null
-              ? 0
-              : 1 - rawCutoff
-            : (rawCutoff ?? 0)
-        const similarity = preparedSimilarity(a, shared, b, alpha, beta, similarityCutoff)
-        return kind === 'distance'
-          ? normDistCutoff(1 - similarity, rawCutoff)
-          : normSimCutoff(similarity, rawCutoff)
+        const similarity = preparedSimilarity(
+          a,
+          shared,
+          b,
+          alpha,
+          beta,
+          similarityCutoffFor(kind, rawCutoff),
+        )
+        return preparedResult(kind, similarity, rawCutoff)
       }
     }
 
@@ -215,9 +437,44 @@ function prepareTversky(kind: PreparedTverskyKind): PreparationFactory {
   }
 }
 
+function withoutWeights(
+  options: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  const rest: Record<string, unknown> = { ...options }
+  Reflect.deleteProperty(rest, 'elementWeights')
+  Reflect.deleteProperty(rest, 'defaultElementWeight')
+  return rest
+}
+
+/**
+ * Compiles the element weights once, here, because this runs when the scorer
+ * compiles and its answer is the configuration every later call reads: a
+ * configured scorer therefore cannot observe a mutation of the caller's map, and
+ * pays for validation once rather than per pair.
+ *
+ * A uniform positive weighting is dropped outright, since it multiplies all
+ * three components by one constant and cancels: the scorer that follows is
+ * plain unigram Tversky, over Tversky's own index and profiles, rather than a
+ * weighted representation that measured 4.3x the index and 3.1x the direct score
+ * for nothing. `defaultElementWeight: 0` is deliberately not uniform — it means
+ * the ignored-element rules, which are their own semantics.
+ *
+ * The default-configuration collapse has to stay behind all of that — a
+ * genuinely weighted scorer that canonicalized to `{}` would silently score
+ * unweighted.
+ */
 const tverskyConfigurationCanonicalizer: ConfigurationCanonicalizer = (options) => {
   const { alpha, beta } = parseParameters(options)
-  return parseGramSize(options) === 2 && alpha === 0.5 && beta === 0.5 ? {} : options
+  const gramSize = parseGramSize(options)
+  const rawWeights = Reflect.get(options, 'elementWeights')
+  const rawDefault = Reflect.get(options, 'defaultElementWeight')
+  if (weightsRequested(rawWeights, rawDefault)) {
+    const weights = effectiveWeights(rawWeights, rawDefault, gramSize)
+    return weights === null
+      ? withoutWeights(options)
+      : { ...options, elementWeights: weights }
+  }
+  return gramSize === 2 && alpha === 0.5 && beta === 0.5 ? {} : options
 }
 
 const tverskyConfigurationSymmetry: ConfigurationSymmetryResolver = (options) => {

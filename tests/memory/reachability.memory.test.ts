@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { similarity as cosineSimilarity } from '../../src/algorithms/cosine/index.js'
 import { similarity as diceSimilarity } from '../../src/algorithms/dice/index.js'
 import { QueryState } from '../../src/algorithms/ngram/inverted/query.js'
+import { WeightedShares } from '../../src/algorithms/ngram/inverted/weightedOverlap.js'
 import { similarity as tverskySimilarity } from '../../src/algorithms/tversky/index.js'
 import { createScorer } from '../../src/core/scoring/scorer.js'
 import { createIndexedMatcher } from '../../src/search/matcher/createIndexedMatcher.js'
@@ -15,6 +16,13 @@ const cosine = createScorer(cosineSimilarity, { gramSize: 2 })
 // Non-default weights, so this exercises the Tversky index rather than the
 // Dice index the default configuration routes to.
 const tversky = createScorer(tverskySimilarity, { gramSize: 2, alpha: 1, beta: 0.1 })
+// Weighted overlap is its own index, and its own retention question.
+const weighted = createScorer(tverskySimilarity, {
+  gramSize: 1,
+  alpha: 1,
+  beta: 0.1,
+  elementWeights: new Map<unknown, number>([['common', 0.1]]),
+})
 
 function count(constructor: Function): number {
   return queryObjects(constructor, { format: 'count' })
@@ -29,6 +37,15 @@ function constructUseAndDrop(kind: 'dice' | 'cosine' | 'tversky'): void {
         : createIndexedMatcher([...choices], { scorer: tversky })
   matcher.best('bc')
   matcher.search('cd', { limit: 2 })
+}
+
+function constructUseAndDropWeighted(): void {
+  const matcher = createIndexedMatcher(
+    choices.map((text) => [text, 'common']),
+    { scorer: weighted },
+  )
+  matcher.best(['ab', 'common'])
+  matcher.search(['cd'], { limit: 2 })
 }
 
 class CorpusItem {
@@ -237,5 +254,26 @@ describe.sequential('indexed matcher reachability', () => {
     // may hold the caller's object, before conversion copies it or after.
     const baseline = count(TokenChoice)
     withLiveTokenChoiceMatcher(() => expect(count(TokenChoice)).toBe(baseline))
+  })
+
+  it('holds no map per choice for a weighted index', () => {
+    // The weight groups a choice carries are three typed arrays over the whole
+    // corpus, not a profile each: an all-ignored configuration would otherwise
+    // recreate exactly the per-choice state the index exists to replace.
+    const rows = Array.from({ length: 200 }, (_, id) => [`own${id}`, 'common'])
+    const baseline = count(Map)
+    const matcher = createIndexedMatcher(rows, { scorer: weighted })
+    matcher.best(['own0', 'common'])
+    const observed = count(Map)
+    expect(matcher.size).toBe(rows.length)
+    // The scorer's own snapshot, the builder's postings and the query scratch
+    // are a handful; two hundred choices must not be two hundred more.
+    expect(observed - baseline).toBeLessThan(20)
+  })
+
+  it('returns weighted query state to baseline after destruction', () => {
+    const baseline = count(WeightedShares)
+    for (let repeat = 0; repeat < 5; repeat++) constructUseAndDropWeighted()
+    expect(count(WeightedShares)).toBe(baseline)
   })
 })

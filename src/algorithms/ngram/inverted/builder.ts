@@ -196,10 +196,18 @@ export class NGramIndexBuilder<
   }
 
   add(choice: Sequence): void {
+    this.addElements(convSequence(choice))
+  }
+
+  /**
+   * The same, for a wrapper that has already converted — a weighted index reads
+   * the elements itself to total its weight groups, and converting twice is the
+   * only thing this split saves.
+   */
+  addElements(elements: ArrayLike<unknown>): void {
     const postings = this.postings
     if (postings === null) throw new TypeError('this index is already sealed')
     const id = this.gramCount.length
-    const elements = convSequence(choice)
     const total = elements.length - this.gramSize + 1
     assertAddressable(id + 1, this.entries, total < 0 ? 0 : total)
     if (total <= 0) {

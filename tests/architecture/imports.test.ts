@@ -377,6 +377,8 @@ describe('dependency direction', () => {
       'key.ts',
       'packing.ts',
       'profile.ts',
+      'weightedProfile.ts',
+      'weightedTverskyScore.ts',
     ])
     expect(shippedEntries(join(ngram, 'inverted'))).toEqual([
       'builder.ts',
@@ -387,6 +389,8 @@ describe('dependency direction', () => {
       'overlap.ts',
       'query.ts',
       'tversky.ts',
+      'weightedOverlap.ts',
+      'weightedTversky.ts',
     ])
   })
 
@@ -413,11 +417,12 @@ describe('dependency direction', () => {
 
   it('keeps the n-gram index off the semantics it accelerates', () => {
     // The other direction of the rule above, and the stronger half: the index
-    // reaches back into `ngram/` for the key arithmetic and nothing else, so it
-    // shares an encoding with the profiles without sharing a representation.
+    // reaches back into `ngram/` for the two leaves — key arithmetic and the
+    // weighted score — and nothing else, so it shares an encoding and a formula
+    // with the profiles without sharing a representation.
     const ngram = join(source, 'algorithms/ngram')
     const inverted = join(ngram, 'inverted')
-    const permitted = join(ngram, 'key.ts')
+    const permitted = [join(ngram, 'key.ts'), join(ngram, 'weightedTverskyScore.ts')]
     expect(
       typeScriptFiles(inverted).flatMap((path) =>
         sourceImports(path)
@@ -425,7 +430,7 @@ describe('dependency direction', () => {
             (dependency) =>
               dependency.startsWith(`${ngram}${sep}`) &&
               !dependency.startsWith(`${inverted}${sep}`) &&
-              dependency !== permitted,
+              !permitted.includes(dependency),
           )
           .map(
             (dependency) =>
@@ -436,12 +441,15 @@ describe('dependency direction', () => {
   })
 
   it('keeps the n-gram key arithmetic and option parsing free of dependencies', () => {
-    // Both are leaves by construction — one is integer arithmetic over a radix
-    // ladder, the other reads a single option — and an edge out of either is
-    // the first sign that policy has leaked into them.
+    // Leaves by construction — integer arithmetic over a radix ladder, a single
+    // option, a ratio over three mass components and two coefficients — and an
+    // edge out of any of them is the first sign that policy has leaked into
+    // them. The first and last are also the only two the index above is allowed
+    // to import, which is what being a leaf earns.
     const ngram = join(source, 'algorithms/ngram')
     expect(sourceImports(join(ngram, 'key.ts'))).toEqual([])
     expect(sourceImports(join(ngram, 'gramSize.ts'))).toEqual([])
+    expect(sourceImports(join(ngram, 'weightedTverskyScore.ts'))).toEqual([])
   })
 
   // The layout carries the scorer graph: a public scorer module is named after

@@ -121,6 +121,7 @@
               "expectBounded",
               "expectExact",
               "expectAgrees",
+              "expectParity",
               "agree",
               "same",
               "fc.assert"
