@@ -193,51 +193,91 @@ describe('maximumTransport', () => {
     expect(units).toEqual(Uint32Array.of(2, 0, 2))
   })
 
-  it('refuses a pair that outruns its augmenting-path budget', () => {
-    const edges: SoftEdge[] = [
-      { first: 0, second: 0, profit: 1 },
-      { first: 0, second: 1, profit: 0.9 },
-      { first: 0, second: 2, profit: 0.8 },
-    ]
+  // Why the budget cannot be replaced by counting distinct elements. Same
+  // elements, same edges, same profits: skewing the counts alone buys another
+  // augmenting path, so a limit that only sizes the two sides does not bound the
+  // work. Successive shortest paths is pseudo-polynomial in the supplies.
+  //
+  // Two rows against two columns rather than a star, which would take the greedy
+  // path and walk no augmenting paths at all.
+  const skewable: SoftEdge[] = [
+    { first: 0, second: 0, profit: 0.9 },
+    { first: 0, second: 1, profit: 0.8 },
+    { first: 1, second: 0, profit: 0.7 },
+    { first: 1, second: 1, profit: 0.95 },
+  ]
+
+  it('spends more augmenting paths on skewed counts than on unit ones', () => {
     expect(() =>
-      maximumTransport(edges, Uint32Array.of(3), Uint32Array.of(1, 1, 1), 2),
+      maximumTransport(skewable, Uint32Array.of(1, 1), Uint32Array.of(1, 1), 2),
+    ).not.toThrow()
+    expect(() =>
+      maximumTransport(skewable, Uint32Array.of(2, 3), Uint32Array.of(5, 1), 2),
+    ).toThrow(RangeError)
+  })
+
+  it('names the budget it ran out of', () => {
+    expect(() =>
+      maximumTransport(skewable, Uint32Array.of(2, 3), Uint32Array.of(5, 1), 2),
     ).toThrow(
       new RangeError(
-        'elementSimilarity needed more than 2 augmenting paths to match 1 ' +
-          'unmatched elements against 3; how often those elements repeat is ' +
+        'elementSimilarity needed more than 2 augmenting paths to match 2 ' +
+          'unmatched elements against 2; how often those elements repeat is ' +
           'skewed far enough to cost unbounded work, so compare shorter ' +
           'sequences or even out the repeats before scoring',
       ),
     )
   })
 
-  // Why the budget cannot be replaced by counting distinct elements. Same
-  // elements, same edges, same profits: skewing the counts alone buys another
-  // augmenting path, so a limit that only sizes the two sides does not bound the
-  // work. Successive shortest paths is pseudo-polynomial in the supplies.
-  it('spends more augmenting paths on skewed counts than on unit ones', () => {
-    const edges: SoftEdge[] = [
-      { first: 0, second: 0, profit: 0.9 },
-      { first: 0, second: 1, profit: 0.8 },
-      { first: 1, second: 0, profit: 0.7 },
-      { first: 1, second: 1, profit: 0.95 },
-    ]
-    expect(() =>
-      maximumTransport(edges, Uint32Array.of(1, 1), Uint32Array.of(1, 1), 2),
-    ).not.toThrow()
-    expect(() =>
-      maximumTransport(edges, Uint32Array.of(2, 3), Uint32Array.of(5, 1), 2),
-    ).toThrow(RangeError)
+  // A single distinct element on a side is a star, and takes the greedy path
+  // instead of a residual network. Optimality is what the shortcut has to keep,
+  // so it answers to the same exact oracle as everything else.
+  const star = fc
+    .tuple(fc.integer({ min: 1, max: 5 }), fc.boolean())
+    .chain(([many, oneRow]) => {
+      const rows = oneRow ? 1 : many
+      const columns = oneRow ? many : 1
+      return fc.record({
+        supply: fc.array(fc.integer({ min: 0, max: 4 }), {
+          minLength: rows,
+          maxLength: rows,
+        }),
+        demand: fc.array(fc.integer({ min: 0, max: 4 }), {
+          minLength: columns,
+          maxLength: columns,
+        }),
+        edges: fc.uniqueArray(
+          fc.record({
+            first: fc.integer({ min: 0, max: rows - 1 }),
+            second: fc.integer({ min: 0, max: columns - 1 }),
+            // Few enough values that ties are the norm rather than the exception.
+            profit: fc.constantFrom(ulp(1, -1), 1, 0.5, 0.25, 3),
+          }),
+          { maxLength: 5, selector: (edge) => `${edge.first}:${edge.second}` },
+        ),
+      })
+    })
+
+  it('is exactly optimal on a star, whichever side is the single one', () => {
+    fc.assert(
+      fc.property(star, ({ supply, demand, edges }) => {
+        const supplied = Uint32Array.from(supply)
+        const demanded = Uint32Array.from(demand)
+        const units = maximumTransport(edges, supplied, demanded, PLENTY)
+        expectFeasible(edges, units, supplied, demanded)
+        expect(exactTotal(edges, units)).toBe(exactOptimum(edges, supplied, demanded))
+      }),
+      { numRuns: 3000, seed: 0x5eed },
+    )
   })
 
-  it('allows a pair that lands exactly on the budget', () => {
+  it('gives a tie to the pairing that arrived first', () => {
     const edges: SoftEdge[] = [
-      { first: 0, second: 0, profit: 1 },
-      { first: 0, second: 1, profit: 0.9 },
-      { first: 0, second: 2, profit: 0.8 },
+      { first: 0, second: 0, profit: 0.5 },
+      { first: 0, second: 1, profit: 0.5 },
     ]
-    const units = maximumTransport(edges, Uint32Array.of(3), Uint32Array.of(1, 1, 1), 3)
-    expect(units).toEqual(Uint32Array.of(1, 1, 1))
+    const units = maximumTransport(edges, Uint32Array.of(1), Uint32Array.of(1, 1), PLENTY)
+    expect(units).toEqual(Uint32Array.of(1, 0))
   })
 
   // An exact oracle, because the interesting flows fold to the same double. Every

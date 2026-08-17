@@ -53,6 +53,21 @@ export function maximumTransport(
 ): Uint32Array {
   const units = new Uint32Array(edges.length)
   if (edges.length === 0) return units
+  // One candidate pairing has one answer: fill it, which is optimal because a
+  // profit is strictly positive. Worth its own line because it is the shape a
+  // realistic pair leaves — one typo among tokens that otherwise match exactly —
+  // where the general path would build a residual network of twelve arrays and
+  // run Dijkstra to move a single unit across a single arc.
+  if (edges.length === 1) {
+    const only = edges[0]
+    const room = supply[only.first]
+    const wanted = demand[only.second]
+    units[0] = room < wanted ? room : wanted
+    return units
+  }
+  if (supply.length === 1 || demand.length === 1) {
+    return starTransport(edges, supply, demand, units)
+  }
   let augmentations = 0
 
   const first = supply.length
@@ -190,6 +205,44 @@ export function maximumTransport(
       if (distance[at] !== Number.POSITIVE_INFINITY) potential[at] = distance[at]
     }
   }
+}
+
+/**
+ * The optimum where one side holds a single distinct element, taken in
+ * descending profit.
+ *
+ * A single row — or a single column — is a star rather than a transportation
+ * problem: every unit leaves the same node, so there is nothing an augmenting
+ * path could re-route, and taking the richest pairing first is exactly optimal.
+ * No residual network, no potentials, and no budget: this walks the edges once.
+ *
+ * Ties go to the edge that arrived first, which keeps the answer a function of
+ * the input alone. That the tie-breaking *matches* what the general path settles
+ * on matters more than it looks: the caller prices each side's leftovers per
+ * element, so two matchings carrying the same shared mass can still score
+ * differently, and this has to be a fast path rather than a second opinion.
+ */
+function starTransport(
+  edges: readonly SoftEdge[],
+  supply: Uint32Array,
+  demand: Uint32Array,
+  units: Uint32Array,
+): Uint32Array {
+  const order = Array.from(edges, (_unused, at) => at)
+  order.sort((left, right) => edges[right].profit - edges[left].profit || left - right)
+  const freeSupply = Uint32Array.from(supply)
+  const freeDemand = Uint32Array.from(demand)
+  for (const at of order) {
+    const edge = edges[at]
+    const room = freeSupply[edge.first]
+    const wanted = freeDemand[edge.second]
+    const moved = room < wanted ? room : wanted
+    if (moved === 0) continue
+    units[at] = moved
+    freeSupply[edge.first] -= moved
+    freeDemand[edge.second] -= moved
+  }
+  return units
 }
 
 function refuseBudget(rows: number, columns: number, budget: number): never {

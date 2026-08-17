@@ -20,12 +20,13 @@ import { elementTableOf, type ElementTable, type Occurrence } from './occurrence
  * A per-side limit of 32 implies the old product of 1024, so it is one number in
  * place of two, and the square shape it tops out at is the cheapest of the shapes
  * that product allowed. Measured end to end at the limit with every edge
- * surviving, which is the adverse case: `32 × 32` costs 0.73 ms a pair, 0.78 ms
+ * surviving, which is the adverse case: `32 × 32` costs 0.72 ms a pair, 0.77 ms
  * once every element occurs 32 times over — 1024 occurrences a side — and
- * 1.43 ms once those occurrences are skewed rather than uniform, which is the
+ * 1.41 ms once those occurrences are skewed rather than uniform, which is the
  * dearest shape this limit allows. A realistic pair is nowhere near any of them,
- * at 1.41 µs for one typo among three tokens. Raising this later is not a
- * breaking change; lowering it is.
+ * at 0.55 µs for one typo among three tokens, because a single candidate pairing
+ * never reaches the residual network at all. Raising this later is not a breaking
+ * change; lowering it is.
  *
  * Each figure is a recorded `bench/regression/baseline.json` median over the
  * loop its case runs — `bench/suites/tverskySoft.bench.ts` scores 10 adverse
