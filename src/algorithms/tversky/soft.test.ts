@@ -7,16 +7,18 @@ import { describe, expect, it } from 'vitest'
 import { createScorer } from '#core/scoring/scorer.js'
 
 import { normalizedSimilarity as indelSimilarity } from '../indel/index.js'
+import { compileElementWeights } from '../ngram/weightedProfile.js'
 import {
   compileElementSimilarity,
   ElementKernels,
   elementScore,
   preparedElementScore,
 } from './elementSimilarity.js'
-import { occurrencesOf } from './occurrences.js'
+import { elementTableOf, occurrencesOf } from './occurrences.js'
 import {
   preparedSoftChoice,
   softComponentsOf,
+  softQueryOf,
   SoftTverskyChoice,
   softTablesOf,
 } from './soft.js'
@@ -27,7 +29,10 @@ const soft = compileElementSimilarity(
 )
 
 function tablesOf(first: readonly unknown[], second: readonly unknown[]) {
-  return softTablesOf(occurrencesOf(first, null), occurrencesOf(second, null))
+  return softTablesOf(
+    elementTableOf(occurrencesOf(first, null)),
+    occurrencesOf(second, null),
+  )
 }
 
 describe('softTablesOf', () => {
@@ -44,11 +49,41 @@ describe('softTablesOf', () => {
     expect([...tables.overlap.leftoverFirst]).toEqual([1])
   })
 
+  it('meets every candidate with the table the query derived once', () => {
+    const query = elementTableOf(occurrencesOf(['react', 'react', 'vue'], null))
+    const one = softTablesOf(query, occurrencesOf(['react'], null))
+    const other = softTablesOf(query, occurrencesOf(['vue', 'vue'], null))
+    expect(one.first).toBe(query)
+    expect(other.first).toBe(query)
+    // What a shared table must not share: the reservation is per pair, so one
+    // candidate's leftovers cannot reach the next.
+    expect([...one.overlap.leftoverFirst]).toEqual([1, 1])
+    expect([...other.overlap.leftoverFirst]).toEqual([2, 0])
+  })
+
   it('counts an element the other side does not hold at all', () => {
     const tables = tablesOf(['alpha'], [])
     expect(tables.overlap.sharedCount).toBe(0)
     expect([...tables.overlap.leftoverFirst]).toEqual([1])
     expect([...tables.overlap.leftoverSecond]).toEqual([])
+  })
+})
+
+describe('softQueryOf', () => {
+  it('derives the distinct-element view, and no groups without weights', () => {
+    const query = softQueryOf(['react', 'react', 'vue'], null)
+    expect(query.occurrences).toHaveLength(3)
+    expect(query.table.entries.map((entry) => entry.canonical)).toEqual(['react', 'vue'])
+    expect(query.weighted).toBeNull()
+  })
+
+  it('carries the weight groups beside the table that priced them', () => {
+    const weights = compileElementWeights(new Map([['react', 5]]), 1)
+    const query = softQueryOf(['react', 'vue'], weights)
+    expect(query.weighted?.weights).toBe(weights)
+    // Two prices among two elements, so the query spans two groups — which is
+    // the whole reason a weighted query is worth deriving once.
+    expect(query.weighted?.groups.groupIds).toHaveLength(2)
   })
 })
 

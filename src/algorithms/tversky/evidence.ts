@@ -12,6 +12,7 @@ import { weightedTverskyScore } from '../ngram/weightedTverskyScore.js'
 import type { CompiledElementSimilarity } from './elementSimilarity.js'
 import {
   canonicalElements,
+  elementTableOf,
   occurrencesOf,
   type ElementTable,
   type Occurrence,
@@ -510,7 +511,7 @@ function softenEvidence(
   alpha: number,
   beta: number,
 ): { components: Components; tables: SoftTables; matching: SoftComponents } | null {
-  const tables = softTablesOf(first, second)
+  const tables = softTablesOf(elementTableOf(first), second)
   const matching = softComponentsOf(tables, soft, exact.totals.sharedMass, null)
   if (matching === null) return null
   return {

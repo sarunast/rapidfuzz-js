@@ -83,8 +83,21 @@ const scanQueries = Array.from({ length: 5 }, (_, index) => {
   const record = scanned[index * 397]
   return [mistyped(record[0]), record[1], record[2]]
 })
+// The weighted engine derives more per query than the plain one — group ids,
+// totals and a sorted distinct view — so a scan is the only fixture that can
+// see whether it derives them once or once per candidate. Two groups rather
+// than one: a uniform table prices nothing and compiles away to this file's
+// unweighted scorer.
+const SCAN_WEIGHTS = new Map<string, number>(scanned.map((record) => [record[0], 5]))
+const softWeighted = createScorer(tverskyMetric, {
+  gramSize: 1,
+  elementSimilarity: { scorer: element, threshold: THRESHOLD },
+  elementWeights: SCAN_WEIGHTS,
+  defaultElementWeight: 1,
+})
 const softMatcher = createMatcher(scanned, { scorer: soft })
 const exactMatcher = createMatcher(scanned, { scorer: exact })
+const weightedMatcher = createMatcher(scanned, { scorer: softWeighted })
 
 // Distinct tokens sharing a long body, so every one of the `n × m` candidate
 // edges clears the threshold and the matching sees a full matrix. Distinct
@@ -194,6 +207,14 @@ describe('a soft scan over a corpus', () => {
     let total = 0
     for (let index = 0; index < 5; index++) {
       const best = softMatcher.best(scanQueries[index])
+      total += best === undefined ? 0 : best.score
+    }
+    return total
+  })
+  measure('the same scan with element weights, 5 queries', () => {
+    let total = 0
+    for (let index = 0; index < 5; index++) {
+      const best = weightedMatcher.best(scanQueries[index])
       total += best === undefined ? 0 : best.score
     }
     return total

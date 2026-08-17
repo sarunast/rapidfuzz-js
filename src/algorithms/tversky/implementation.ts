@@ -60,8 +60,10 @@ import { tverskyScore } from './score.js'
 import {
   preparedSoftChoice,
   softComponentsOf,
+  softQueryOf,
   SoftTverskyChoice,
   softTablesOf,
+  type SoftQuery,
 } from './soft.js'
 
 export interface TverskyOptions extends ScorerOptions {
@@ -254,16 +256,17 @@ function directWeightedSimilarity(
  * and short-circuiting is what keeps that from being observable.
  */
 function softSimilarity(
-  first: Occurrence[],
-  second: Occurrence[],
-  weights: CompiledElementWeights | null,
+  query: SoftQuery,
+  second: readonly Occurrence[],
   soft: CompiledElementSimilarity,
   alpha: number,
   beta: number,
   kernels: ElementKernels | null,
 ): number {
-  const tables = softTablesOf(first, second)
-  if (weights === null) {
+  const first = query.occurrences
+  const weighted = query.weighted
+  const tables = softTablesOf(query.table, second)
+  if (weighted === null) {
     if (first.length === 0 || second.length === 0) {
       return first.length === second.length ? 1 : 0
     }
@@ -279,15 +282,15 @@ function softSimilarity(
           beta,
         )
   }
-  const query = weightedQueryGroups(canonicalElements(first), weights)
-  const choice = weightedProfile(canonicalElements(second), weights)
-  if (query.groupIds.length === 0 || choice.groupIds.length === 0) {
-    return zeroMassSimilarity(query, choice)
+  const groups = weighted.groups
+  const choice = weightedProfile(canonicalElements(second), weighted.weights)
+  if (groups.groupIds.length === 0 || choice.groupIds.length === 0) {
+    return zeroMassSimilarity(groups, choice)
   }
   // Its own array rather than the module scratch: the element scorer below can
   // be another weighted Tversky, which would write over a shared one.
   const parts = new Float64Array(3)
-  weightedComponents(query, choice, weights, parts)
+  weightedComponents(groups, choice, weighted.weights, parts)
   const components = softComponentsOf(tables, soft, parts[0], kernels)
   return components === null
     ? weightedTverskyScore(parts[0], parts[1], parts[2], alpha, beta)
@@ -310,9 +313,8 @@ function directSoftSimilarity(
   scoreCutoff: number,
 ): number {
   const similarity = softSimilarity(
-    occurrencesOf(a, weights),
+    softQueryOf(a, weights),
     occurrencesOf(b, weights),
-    weights,
     soft,
     alpha,
     beta,
@@ -536,22 +538,15 @@ function prepareSoftTversky(
     prepareChoice: (choice: Sequence): SoftTverskyChoice =>
       new SoftTverskyChoice(occurrencesOf(choice, weights)),
     prepareQuery: (query: Sequence): PreparedKernel => {
-      const first = occurrencesOf(query, weights)
-      // The query side of every element comparison, prepared once and met with
-      // every candidate — the one place in soft scoring that has a scan to
-      // amortize over.
+      // Everything the query side derives, done once and met with every
+      // candidate — the one place in soft scoring that has a scan to amortize
+      // over. The element scorer's own preparation is held beside it, and is
+      // the one part of it that waits to be earned.
+      const first = softQueryOf(query, weights)
       const kernels = new ElementKernels(soft)
       return (rawChoice, rawCutoff) => {
         const second = preparedSoftChoice(rawChoice).occurrences
-        const similarity = softSimilarity(
-          first,
-          second,
-          weights,
-          soft,
-          alpha,
-          beta,
-          kernels,
-        )
+        const similarity = softSimilarity(first, second, soft, alpha, beta, kernels)
         const cutoff = similarityCutoffFor(kind, rawCutoff)
         return preparedResult(kind, similarity >= cutoff ? similarity : 0, rawCutoff)
       }

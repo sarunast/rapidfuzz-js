@@ -1,3 +1,10 @@
+import type { Sequence } from '#core/types.js'
+
+import {
+  weightedQueryGroups,
+  type CompiledElementWeights,
+  type WeightedQueryGroups,
+} from '../ngram/weightedProfile.js'
 import { maximumTransport, type SoftEdge } from './assignment.js'
 import {
   elementScore,
@@ -5,7 +12,13 @@ import {
   type CompiledElementSimilarity,
   type ElementKernels,
 } from './elementSimilarity.js'
-import { elementTableOf, type ElementTable, type Occurrence } from './occurrences.js'
+import {
+  canonicalElements,
+  elementTableOf,
+  occurrencesOf,
+  type ElementTable,
+  type Occurrence,
+} from './occurrences.js'
 
 /**
  * How many distinct fuzzy-comparable leftovers one *side* of a pair may have.
@@ -99,14 +112,67 @@ export interface SoftComponents {
  * of memory against time needs its own measurement. The query side, which
  * repeats within a single scan and retains nothing beyond it, is held in
  * `ElementKernels`.
+ *
+ * A choice's own {@link ElementTable} — and its weighted profile — are a
+ * different question, and the open one: they are this algorithm's own
+ * representations rather than another scorer's opaque handle, so a matcher is
+ * their natural owner. What is unmeasured there is retained memory, a `Map` per
+ * corpus item against a two-token candidate that rebuilds in nanoseconds.
  */
 export class SoftTverskyChoice {
-  constructor(readonly occurrences: Occurrence[]) {}
+  constructor(readonly occurrences: readonly Occurrence[]) {}
 }
 
 export function preparedSoftChoice(value: unknown): SoftTverskyChoice {
   if (value instanceof SoftTverskyChoice) return value
   throw new TypeError('invalid prepared soft tversky choice')
+}
+
+/**
+ * The weighted view of a query, kept beside the table that priced it.
+ *
+ * The two travel together because one is derived from the other: a query has
+ * groups exactly when the configuration has weights, and every reader of the
+ * groups needs the table as well.
+ */
+interface WeightedSoftQuery {
+  readonly groups: WeightedQueryGroups
+  readonly weights: CompiledElementWeights
+}
+
+/**
+ * Everything the first side of a soft comparison derives before it meets a
+ * candidate: the occurrence walk, the distinct-element view of it, and — where
+ * the configuration prices elements — the weight groups.
+ *
+ * A scan meets one query with every candidate, so this is derived once per
+ * prepared query and read from there on. None of it is written to while a pair
+ * is scored: the reservation goes into arrays allocated per pair, and
+ * `weightedComponents` only reads its query side.
+ */
+export interface SoftQuery {
+  readonly occurrences: readonly Occurrence[]
+  readonly table: ElementTable
+  readonly weighted: WeightedSoftQuery | null
+}
+
+/** {@link SoftQuery} for one sequence, under the configuration's weights. */
+export function softQueryOf(
+  sequence: Sequence,
+  weights: CompiledElementWeights | null,
+): SoftQuery {
+  const occurrences = occurrencesOf(sequence, weights)
+  return {
+    occurrences,
+    table: elementTableOf(occurrences),
+    weighted:
+      weights === null
+        ? null
+        : {
+            groups: weightedQueryGroups(canonicalElements(occurrences), weights),
+            weights,
+          },
+  }
 }
 
 /** Both sides as distinct elements, and what exact matching did with them. */
@@ -123,17 +189,21 @@ export interface SoftTables {
  * its shared mass from `weightedComponents` and the plain path takes it from
  * `overlap.sharedCount`, which this pass has produced anyway. Splitting the two
  * keeps that count from being computed a second way.
+ *
+ * The first side arrives as a table rather than as occurrences because a scan
+ * meets one query with every candidate, so a prepared query derives its table
+ * once and hands the same one in every time. Nothing here writes to it: the
+ * reservation goes into two arrays allocated per pair.
  */
 export function softTablesOf(
-  first: readonly Occurrence[],
+  first: ElementTable,
   second: readonly Occurrence[],
 ): SoftTables {
-  const firstTable = elementTableOf(first)
   const secondTable = elementTableOf(second)
   return {
-    first: firstTable,
+    first,
     second: secondTable,
-    overlap: exactOverlapOf(firstTable, secondTable),
+    overlap: exactOverlapOf(first, secondTable),
   }
 }
 

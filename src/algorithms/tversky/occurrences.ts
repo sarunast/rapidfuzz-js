@@ -52,7 +52,7 @@ function occurrenceOf(
 }
 
 /** The canonical values alone, in occurrence order, for the profile builders. */
-export function canonicalElements(occurrences: Occurrence[]): unknown[] {
+export function canonicalElements(occurrences: readonly Occurrence[]): unknown[] {
   const elements = new Array<unknown>(occurrences.length)
   for (let index = 0; index < occurrences.length; index++) {
     elements[index] = occurrences[index].canonical
