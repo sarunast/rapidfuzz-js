@@ -1,13 +1,24 @@
 import type { MaybeSequenceMetricImplementation } from '#core/scoring/builtIn/implementation.js'
-import { builtInMetric, type BuiltInMetric } from '#core/scoring/builtIn/metric.js'
+import {
+  builtInMetric,
+  type ExplainableBuiltInMetric,
+} from '#core/scoring/builtIn/metric.js'
 import type { Metric } from '#core/scoring/metric.js'
 import type { Direction, SimilarityConfiguration } from '#core/types.js'
 
+import type { TverskyEvidence } from './evidence.js'
 import {
   tverskyDistance,
   tverskySimilarity,
   type TverskyOptions,
 } from './implementation.js'
+
+export type {
+  TverskyEvidence,
+  TverskyEvidenceMatch,
+  TverskyEvidenceTotals,
+  TverskyUnmatchedElement,
+} from './evidence.js'
 
 /** Accepted by every Tversky metric. */
 export interface TverskyDistanceConfiguration {
@@ -119,6 +130,53 @@ export interface TverskyDistanceConfiguration {
 export interface TverskySimilarityConfiguration
   extends TverskyDistanceConfiguration, SimilarityConfiguration {}
 
+/**
+ * The configuration that also buys `scorer.explain(first, second)`.
+ *
+ * Exact element overlap — `gramSize: 1` — is the only shape with occurrences a
+ * caller named, so it is the only one that can say which element matched which
+ * and what each cost. A shingle of several elements is not one thing anybody
+ * asked about, weighted or not.
+ *
+ * `createScorer` reads the configuration *literal*, so hoisting one into a
+ * variable widens `gramSize` to `number` and quietly gives back an ordinary
+ * scorer. Name this type to keep it:
+ *
+ * ```ts
+ * const config = { gramSize: 1, alpha: 1, beta: 0.1 } satisfies TverskyExplainConfiguration
+ * const company = createScorer(similarity, config) // still explains
+ * ```
+ *
+ * This one carries no `missing`, since a distance metric refuses it — hoist a
+ * similarity configuration as {@link TverskySimilarityExplainConfiguration}
+ * instead. Written inline, either metric accepts what it accepts.
+ */
+export interface TverskyExplainConfiguration extends TverskyDistanceConfiguration {
+  /** Exactly `1`: one element to a gram, so an occurrence is a whole element. */
+  readonly gramSize: 1
+}
+
+/**
+ * {@link TverskyExplainConfiguration} plus the missing-value policy: what a
+ * hoisted configuration for {@link similarity} is named.
+ *
+ * It stands to {@link TverskyExplainConfiguration} exactly as
+ * {@link TverskySimilarityConfiguration} stands to
+ * {@link TverskyDistanceConfiguration} — `missing` is accepted by a similarity
+ * and refused by a distance, so the explanation configurations divide the same
+ * way.
+ *
+ * ```ts
+ * const config = {
+ *   gramSize: 1,
+ *   missing: 'throw',
+ * } satisfies TverskySimilarityExplainConfiguration
+ * const tokens = createScorer(similarity, config) // still explains
+ * ```
+ */
+export interface TverskySimilarityExplainConfiguration
+  extends TverskyExplainConfiguration, SimilarityConfiguration {}
+
 const CONFIGURATION_KEYS: readonly string[] = [
   'gramSize',
   'alpha',
@@ -127,10 +185,15 @@ const CONFIGURATION_KEYS: readonly string[] = [
   'defaultElementWeight',
 ]
 
-function tverskyMetric<TDirection extends Direction, TConfig extends object, TBrand>(
-  implementation: MaybeSequenceMetricImplementation<TverskyOptions>,
+function tverskyMetric<
+  TDirection extends Direction,
+  TConfig extends object,
+  TBrand,
+  TExplains extends TConfig,
+>(
+  implementation: MaybeSequenceMetricImplementation<TverskyOptions, TverskyEvidence>,
   direction: TDirection,
-): Metric<TDirection, TConfig, TBrand> {
+): Metric<TDirection, TConfig, TBrand, TExplains, TverskyEvidence> {
   return builtInMetric({
     implementation,
     directImplementation: implementation,
@@ -141,10 +204,12 @@ function tverskyMetric<TDirection extends Direction, TConfig extends object, TBr
 }
 
 /** `1 − similarity`, on the same `0..1` scale. */
-export const distance: BuiltInMetric<
+export const distance: ExplainableBuiltInMetric<
   'tversky.distance',
   'distance',
-  TverskyDistanceConfiguration
+  TverskyDistanceConfiguration,
+  TverskyExplainConfiguration,
+  TverskyEvidence
 > = /* @__PURE__ */ tverskyMetric(tverskyDistance, 'distance')
 /**
  * N-gram overlap with a separate price on each side's unmatched grams,
@@ -174,11 +239,17 @@ export const distance: BuiltInMetric<
  * the query first. And containment is generous by construction:
  * `{ alpha: 1, beta: 0 }` scores a flat `1` for *any* second sequence that
  * covers the first's grams, however much else it carries.
+ *
+ * At `gramSize: 1` a scorer also gains `explain(first, second)`, which reports
+ * the {@link TverskyEvidence} behind a score — see
+ * {@link TverskyExplainConfiguration}.
  */
-export const similarity: BuiltInMetric<
+export const similarity: ExplainableBuiltInMetric<
   'tversky.similarity',
   'similarity',
-  TverskyDistanceConfiguration
+  TverskyDistanceConfiguration,
+  TverskyExplainConfiguration,
+  TverskyEvidence
 > = /* @__PURE__ */ tverskyMetric(tverskySimilarity, 'similarity')
 
 /** Tversky is already `0..1`, so this is {@link distance} itself. */

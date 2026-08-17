@@ -32,6 +32,8 @@ import { ratio, tokenSetRatio } from 'rapidfuzz-js/fuzz'
 import { distance } from 'rapidfuzz-js/levenshtein'
 import { distance as jaroWinklerDistance } from 'rapidfuzz-js/jaro-winkler'
 import { similarity as diceSimilarity } from 'rapidfuzz-js/dice'
+import { similarity as tverskySimilarity } from 'rapidfuzz-js/tversky'
+import type { TverskyExplainConfiguration } from 'rapidfuzz-js/tversky'
 
 const scorer = createScorer(tokenSetRatio)
 
@@ -63,6 +65,24 @@ export const indexed = createIndexedMatcher(['alpha', 'beta'], {
   scorer: createScorer(diceSimilarity, { gramSize: 3 }),
 })
 export const indexedBest = indexed.best('alpha', { threshold: 0.5 })
+
+// Also unannotated, and deliberately WITHOUT importing \`ExplainableScorer\` or
+// \`TverskyEvidence\`: naming them here would hand declaration emit a name it
+// already has, which is the thing being tested. Inference has to reach both
+// through the export map on its own.
+export const company = createScorer(tverskySimilarity, {
+  gramSize: 1,
+  alpha: 1,
+  beta: 0.1,
+  elementWeights: new Map<unknown, number>([['ag', 0.1]]),
+})
+export const explained = company.explain(['swisscom', 'ag'], ['swisscom'])
+
+// The capability survives a configuration hoisted with \`satisfies\` rather than
+// written inline, which is the documented way to keep it.
+const hoisted = { gramSize: 1, alpha: 1, beta: 0 } satisfies TverskyExplainConfiguration
+export const containment = createScorer(tverskySimilarity, hoisted)
+export const containmentEvidence = containment.explain(['swisscom'], ['swisscom', 'ag'])
 
 // Widening stays possible: \`Scorer<D>\` is still the type that holds a scorer
 // of any metric, which is what most annotations want.
@@ -247,6 +267,14 @@ try {
   if (!emitted.includes(`"fuzz.tokenSetRatio"`)) {
     throw new Error(
       `expected the emitted declarations to spell the brand as a literal:\n${emitted}`,
+    )
+  }
+  // The capability has to survive inference too. Nothing above would fail if a
+  // metric quietly stopped declaring one — the scorer would simply emit as
+  // `Scorer<…>` and still typecheck.
+  if (!emitted.includes('ExplainableScorer<"similarity", "tversky.similarity"')) {
+    throw new Error(
+      `expected an inferred explainable scorer to keep its capability:\n${emitted}`,
     )
   }
   console.log("✓ the consumer's own declaration emit stays portable")

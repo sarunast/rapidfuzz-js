@@ -47,6 +47,7 @@ import {
   type WeightedQueryGroups,
 } from '../ngram/weightedProfile.js'
 import { weightedTverskyScore } from '../ngram/weightedTverskyScore.js'
+import { tverskyExplainer, type TverskyEvidence } from './evidence.js'
 import { tverskyScore } from './score.js'
 
 export interface TverskyOptions extends ScorerOptions {
@@ -343,8 +344,12 @@ function prepareWeightedTversky(
   prepareQuery: (query: Sequence) => PreparedKernel
   prepareChoice: ChoicePreparer
   indexChoices?: (() => ChoiceIndexBuilder) | undefined
+  explain: (first: Sequence, second: Sequence) => TverskyEvidence
 } {
   return {
+    // Weights are only accepted at `gramSize: 1`, so a weighted scorer always
+    // explains.
+    explain: tverskyExplainer(kind, weights, alpha, beta),
     // Weighted overlap gets its own index at every weight pair, the default
     // included: Dice's knows nothing about element weights.
     indexChoices:
@@ -372,7 +377,7 @@ function prepareWeightedTversky(
   }
 }
 
-function prepareTversky(kind: PreparedTverskyKind): PreparationFactory {
+function prepareTversky(kind: PreparedTverskyKind): PreparationFactory<TverskyEvidence> {
   return (options) => {
     const gramSize = parseGramSize(options)
     const { alpha, beta } = parseParameters(options)
@@ -414,7 +419,11 @@ function prepareTversky(kind: PreparedTverskyKind): PreparationFactory {
           : () => createTverskyIndexBuilder(gramSize, alpha, beta)
         : undefined
 
-    return { prepareQuery, prepareChoice, indexChoices }
+    // Only exact element overlap has occurrences to explain: a shingle of
+    // several elements is not one thing a caller named.
+    const explain = gramSize === 1 ? tverskyExplainer(kind, null, alpha, beta) : undefined
+
+    return { prepareQuery, prepareChoice, indexChoices, explain }
   }
 }
 
@@ -463,23 +472,27 @@ const tverskyConfigurationSymmetry: ConfigurationSymmetryResolver = (options) =>
   return alpha === beta
 }
 
-export const tverskySimilarity: MaybeSequenceMetricImplementation<TverskyOptions> =
-  /* @__PURE__ */ withPreparedFlags(
-    tverskySimilarity_impl,
-    NORMALIZED_SIMILARITY_FLAGS,
-    prepareTversky('similarity'),
-    {
-      configurationCanonicalizer: tverskyConfigurationCanonicalizer,
-      configurationSymmetry: tverskyConfigurationSymmetry,
-    },
-  )
-export const tverskyDistance: MaybeSequenceMetricImplementation<TverskyOptions> =
-  /* @__PURE__ */ withPreparedFlags(
-    tverskyDistance_impl,
-    NORMALIZED_DISTANCE_FLAGS,
-    prepareTversky('distance'),
-    {
-      configurationCanonicalizer: tverskyConfigurationCanonicalizer,
-      configurationSymmetry: tverskyConfigurationSymmetry,
-    },
-  )
+export const tverskySimilarity: MaybeSequenceMetricImplementation<
+  TverskyOptions,
+  TverskyEvidence
+> = /* @__PURE__ */ withPreparedFlags(
+  tverskySimilarity_impl,
+  NORMALIZED_SIMILARITY_FLAGS,
+  prepareTversky('similarity'),
+  {
+    configurationCanonicalizer: tverskyConfigurationCanonicalizer,
+    configurationSymmetry: tverskyConfigurationSymmetry,
+  },
+)
+export const tverskyDistance: MaybeSequenceMetricImplementation<
+  TverskyOptions,
+  TverskyEvidence
+> = /* @__PURE__ */ withPreparedFlags(
+  tverskyDistance_impl,
+  NORMALIZED_DISTANCE_FLAGS,
+  prepareTversky('distance'),
+  {
+    configurationCanonicalizer: tverskyConfigurationCanonicalizer,
+    configurationSymmetry: tverskyConfigurationSymmetry,
+  },
+)

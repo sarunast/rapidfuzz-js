@@ -48,6 +48,23 @@ function constructUseAndDropWeighted(): void {
   matcher.search(['cd'], { limit: 2 })
 }
 
+class ExplainedElement {
+  constructor(readonly name: string) {}
+}
+
+/**
+ * Explanation is cold: it keeps nothing between calls. Counting `WeightedShares`
+ * would not prove that — a retained occurrence, bucket or caller element would
+ * leave that count perfect — so the probe is an element type of its own, handed
+ * in and then dropped while the scorer stays alive.
+ */
+function explainAndDrop(): void {
+  weighted.explain(
+    [new ExplainedElement('ab'), 'common'],
+    [new ExplainedElement('cd'), 'common'],
+  )
+}
+
 class CorpusItem {
   constructor(readonly text: string) {}
 }
@@ -275,5 +292,14 @@ describe.sequential('indexed matcher reachability', () => {
     const baseline = count(WeightedShares)
     for (let repeat = 0; repeat < 5; repeat++) constructUseAndDropWeighted()
     expect(count(WeightedShares)).toBe(baseline)
+  })
+
+  it('retains nothing a live scorer was asked to explain', () => {
+    const baseline = count(ExplainedElement)
+    for (let repeat = 0; repeat < 5; repeat++) explainAndDrop()
+    expect(count(ExplainedElement)).toBe(baseline)
+    // The scorer has to still be alive, or this proves only that a dead scorer
+    // holds nothing.
+    expect(weighted.score(['ab'], ['ab'])).toBe(1)
   })
 })
