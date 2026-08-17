@@ -25,7 +25,7 @@ const MATRIX_SPECS: readonly MetricSpec[] = [
 ]
 
 function gramSizesOf(spec: MetricSpec): readonly number[] {
-  return spec.metric === 'tversky' ? [1, 2, 3, 4] : [2, 3]
+  return spec.metric === 'tversky' ? [1, 2, 3, 4] : [1, 2, 3]
 }
 
 describe('an indexed search answers what the exhaustive one does', () => {

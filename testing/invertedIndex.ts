@@ -15,6 +15,7 @@ import { createTverskyIndexBuilder } from '../src/algorithms/ngram/inverted/tver
 import { similarity as tverskySimilarity } from '../src/algorithms/tversky/index.js'
 import type { ChoiceIndex } from '../src/core/scoring/choiceIndex.js'
 import { createScorer } from '../src/core/scoring/scorer.js'
+import type { Sequence } from '../src/core/types.js'
 import { createMatcher } from '../src/index.js'
 
 export type MetricSpec =
@@ -22,7 +23,7 @@ export type MetricSpec =
   | { readonly metric: 'cosine' }
   | { readonly metric: 'tversky'; readonly alpha: number; readonly beta: number }
 
-function matcherOf(spec: MetricSpec, gramSize: number, choices: readonly string[]) {
+function matcherOf(spec: MetricSpec, gramSize: number, choices: readonly Sequence[]) {
   switch (spec.metric) {
     case 'dice':
       return createMatcher(choices, {
@@ -46,7 +47,7 @@ function matcherOf(spec: MetricSpec, gramSize: number, choices: readonly string[
 export function indexOf(
   spec: MetricSpec,
   gramSize: number,
-  choices: readonly string[],
+  choices: readonly Sequence[],
 ): ChoiceIndex {
   const builder =
     spec.metric === 'dice'
@@ -62,8 +63,8 @@ export function indexOf(
 export function exhaustive(
   spec: MetricSpec,
   gramSize: number,
-  choices: readonly string[],
-  query: string,
+  choices: readonly Sequence[],
+  query: Sequence,
   threshold: number | null,
   limit: number | null,
 ): { id: number; score: number }[] {
@@ -90,8 +91,8 @@ export function pairs(selected: {
 export function exhaustiveScan(
   spec: MetricSpec,
   gramSize: number,
-  choices: readonly string[],
-  query: string,
+  choices: readonly Sequence[],
+  query: Sequence,
   threshold: number | null,
 ): { id: number; score: number }[] {
   const matcher = matcherOf(spec, gramSize, choices)

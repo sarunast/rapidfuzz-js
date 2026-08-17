@@ -305,14 +305,22 @@ describe('what it refuses', () => {
     ).toThrow(/unknown createIndexedMatcher option 'getPrepared'/)
   })
 
-  it('refuses choices whose elements are not integers', () => {
+  it('takes choices whose elements are not integers', () => {
+    // Not a refusal any more, and the entry that used to be one: the exhaustive
+    // matcher scores arbitrary elements, so an index that turned them away
+    // would be answering a different question than the scorer it replaces.
     const scorer = createScorer(diceSimilarity, { gramSize: 2 })
-    expect(() => createIndexedMatcher([[{}, {}, {}]], { scorer })).toThrow(
-      /integer elements only/,
+    const choices = [
+      ['senior', 'software', 'engineer'],
+      ['frontend', 'engineer'],
+    ]
+    const query = ['senior', 'software', 'engineer']
+    expect(createIndexedMatcher(choices, { scorer }).search(query)).toEqual(
+      createMatcher(choices, { scorer }).search(query),
     )
   })
 
-  it('refuses an unindexable choice before reading the rest', () => {
+  it('refuses a bad choice before reading the rest', () => {
     // Construction reads and indexes one choice at a time, so the collection
     // after a bad one is never touched. Collecting the sequences and indexing
     // them afterwards would run every accessor first and refuse the same
@@ -320,20 +328,15 @@ describe('what it refuses', () => {
     const scorer = createScorer(diceSimilarity, { gramSize: 2 })
     let reads = 0
     expect(() =>
-      createIndexedMatcher(
-        [
-          [{}, {}, {}],
-          [1, 2, 3],
-        ],
-        {
-          scorer,
-          getText: (item: unknown[]) => {
-            reads++
-            return item
-          },
+      createIndexedMatcher([{ text: null }, { text: 'abc' }], {
+        scorer,
+        missingItems: 'throw',
+        getText: (item: { text: string | null }) => {
+          reads++
+          return item.text
         },
-      ),
-    ).toThrow(/integer elements only/)
+      }),
+    ).toThrow(TypeError)
     expect(reads).toBe(1)
   })
 })

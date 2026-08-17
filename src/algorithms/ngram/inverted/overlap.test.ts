@@ -43,7 +43,7 @@ function accumulate(
   accumulator: Int32Array,
 ): number[] {
   const elements = convSequence(query)
-  extractGrams(elements, sealed.gramSize, sealed.radix, false, state.keys, state.counts)
+  extractGrams(elements, sealed.gramSize, sealed.radix, null, state.keys, state.counts)
   accumulateSharedFrequency(sealed, state, accumulator)
   return Array.from(accumulator, (value) => state.base + value)
 }

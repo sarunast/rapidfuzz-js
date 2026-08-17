@@ -2,7 +2,14 @@ import type { SelectedChoices } from '#core/scoring/choiceIndex.js'
 import { elementsEqual } from '#core/sequence.js'
 
 import type { Postings, SealedIndex } from './builder.js'
-import { extractGrams } from './keys.js'
+import {
+  extractGrams,
+  extractOrdinalGrams,
+  narrowToDirectKeys,
+  NEEDS_ORDINALS,
+  radixFor,
+} from './keys.js'
+import { ordinalizeChoice, ordinalizeQuery } from './ordinals.js'
 
 export function outranks(
   score: number,
@@ -37,6 +44,8 @@ export class QueryState {
   readonly keys: (string | number)[] = []
   readonly counts: number[] = []
   readonly touched: number[] = []
+  readonly ordinals: number[] = []
+  readonly queryOrdinals: Map<unknown, number> = new Map()
   base = 0
   scannedAll = false
   ids: Uint32Array = new Uint32Array(0)
@@ -152,14 +161,66 @@ export function prepareQueryGrams(
   elements: ArrayLike<unknown>,
   state: QueryState,
 ): number {
-  return extractGrams(
+  const table = sealed.elementOrdinals
+  if (table !== null) {
+    const unknown = state.queryOrdinals
+    unknown.clear()
+    ordinalizeQuery(elements, table, unknown, state.ordinals)
+    return extractOrdinalGrams(
+      state.ordinals,
+      sealed.gramSize,
+      sealed.radix,
+      null,
+      state.keys,
+      state.counts,
+    )
+  }
+  const squaredNorm = extractGrams(
     elements,
     sealed.gramSize,
     sealed.radix,
-    false,
+    null,
     state.keys,
     state.counts,
   )
+  return squaredNorm === NEEDS_ORDINALS
+    ? arbitraryQueryGrams(sealed, elements, state)
+    : squaredNorm
+}
+
+/**
+ * A query holding what a direct index cannot key. Its own gram frequencies and
+ * norm come from query-local ordinals, which give arbitrary elements an
+ * identity; the grams that are still all-integer are then rewritten into the
+ * index's own keys, and the rest simply have nothing to match.
+ */
+function arbitraryQueryGrams(
+  sealed: SealedIndex<Float64Array | null>,
+  elements: ArrayLike<unknown>,
+  state: QueryState,
+): number {
+  const gramSize = sealed.gramSize
+  const table = state.queryOrdinals
+  table.clear()
+  ordinalizeChoice(elements, gramSize, table, state.ordinals)
+  const localRadix = table.size === 0 ? null : radixFor(gramSize, table.size - 1)
+  const squaredNorm = extractOrdinalGrams(
+    state.ordinals,
+    gramSize,
+    localRadix,
+    null,
+    state.keys,
+    state.counts,
+  )
+  narrowToDirectKeys(
+    [...table.keys()],
+    localRadix,
+    sealed.radix,
+    gramSize,
+    state.keys,
+    state.counts,
+  )
+  return squaredNorm
 }
 
 /** Returns the per-query scratch to its untouched state after an answer. */
@@ -174,6 +235,11 @@ export function resetQuery(
   touched.length = 0
   state.keys.length = 0
   state.counts.length = 0
+  state.ordinals.length = 0
+  // `clear` replaces a Map's backing table rather than emptying it, so calling
+  // it unconditionally would allocate one per query for the queries that never
+  // touched the table at all.
+  if (state.queryOrdinals.size !== 0) state.queryOrdinals.clear()
   state.scannedAll = false
   state.base = 0
 }

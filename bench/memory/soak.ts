@@ -26,13 +26,9 @@ import {
   SOAK_THRESHOLDS,
   type SoakScenario,
 } from './thresholds.ts'
-import { runLateInvalidQuery } from './workloads/exceptionRecovery.ts'
+import { runArbitraryElementQuery } from './workloads/arbitraryElements.ts'
 import { runQueryProfileSpike } from './workloads/queryProfile.ts'
-import {
-  lowercaseBigramCorpus,
-  ordinaryQuery,
-  runOrdinaryBest,
-} from './workloads/shared.ts'
+import { lowercaseBigramCorpus, runOrdinaryBest } from './workloads/shared.ts'
 import { runSteadyBatch, STEADY_BATCH_SIZE } from './workloads/steady.ts'
 import { runTouchedSetSpike, validateTouchedCorpus } from './workloads/touchedSet.ts'
 
@@ -193,11 +189,9 @@ function executeScenario(
     capture(snapshots, scenario, 'pre-spike')
     if (scenario === 'query-profile') runQueryProfileSpike(matcher)
     else if (scenario === 'touched-set') runTouchedSetSpike(matcher)
-    else runLateInvalidQuery(matcher)
+    else runArbitraryElementQuery(matcher)
     capture(snapshots, scenario, 'post-spike')
 
-    // Exception cleanup is allowed to wait until one later successful operation.
-    if (scenario === 'exception') matcher.best(ordinaryQuery(90_000_000))
     if (fixture === 'recovery') {
       retainedFixture.push(new ArrayBuffer(2 * threshold.recoveryBytes))
     }

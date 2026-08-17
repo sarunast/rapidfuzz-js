@@ -80,28 +80,79 @@ function startAndDropSearchIterator(matcher: {
   expect(iterator.next().done).toBe(false)
 }
 
-class InvalidSentinel {
+class ArbitrarySentinel {
   toString(): string {
-    return 'invalid-sentinel'
+    return 'arbitrary-sentinel'
   }
 }
 
-class LateInvalidWrapper implements ArrayLike<unknown> {
+class ArbitraryWrapper implements ArrayLike<unknown> {
   readonly length = 10_001;
   [index: number]: unknown
 
-  constructor(sentinel: InvalidSentinel) {
+  constructor(sentinel: ArbitrarySentinel) {
     for (let index = 0; index < this.length - 1; index++) this[index] = index
     this[this.length - 1] = sentinel
   }
 }
 
-function submitLateInvalid(
+function submitArbitraryQuery(
   matcher: import('../../bench/memory/workloads/shared.ts').IndexedMatcherWorkload,
 ): void {
-  expect(() => matcher.best(new LateInvalidWrapper(new InvalidSentinel()))).toThrow(
-    /integer elements only/,
+  matcher.best(new ArbitraryWrapper(new ArbitrarySentinel()))
+}
+
+class TokenItem {
+  constructor(readonly name: string) {}
+}
+
+function withLiveTokenMatcher(check: () => void): void {
+  const matcher = createIndexedMatcher(
+    [
+      [new TokenItem('a'), new TokenItem('b')],
+      [new TokenItem('c'), new TokenItem('d')],
+    ],
+    { scorer: dice },
   )
+  matcher.best(['unrelated', 'tokens'])
+  check()
+  if (matcher.size !== 2) throw new Error('matcher unexpectedly changed')
+}
+
+// The tokens are made inside `getText` and never handed back, so the index is
+// the only thing that could still be holding one when the matcher is live.
+function withLiveUnreachableTokenMatcher(check: () => void): void {
+  const matcher = createIndexedMatcher(['dead', 'react typescript'], {
+    scorer: dice,
+    getText: (item) => (item === 'dead' ? [new TokenItem('dead'), NaN] : item.split(' ')),
+  })
+  matcher.best(['react', 'typescript'])
+  check()
+  if (matcher.size !== 2) throw new Error('matcher unexpectedly changed')
+}
+
+class TokenChoice implements ArrayLike<unknown> {
+  readonly length = 2;
+  [index: number]: unknown
+
+  constructor() {
+    this[0] = 'react'
+    this[1] = 'typescript'
+  }
+}
+
+// The check runs while the matcher is live, because a matcher already dead
+// retains nothing whatever the index did with a choice. The sequences are made
+// inside `getText` rather than being the items themselves — a matcher holds its
+// items to return them, which would answer the question before the index got
+// to.
+function withLiveTokenChoiceMatcher(check: () => void): void {
+  const matcher = createIndexedMatcher(['first', 'second'], {
+    scorer: dice,
+    getText: () => new TokenChoice(),
+  })
+  check()
+  if (matcher.size !== 2) throw new Error('matcher unexpectedly changed')
 }
 
 describe.sequential('indexed matcher reachability', () => {
@@ -149,16 +200,42 @@ describe.sequential('indexed matcher reachability', () => {
     expect(observed).toBe(baseline)
   })
 
-  it('collects late-invalid wrappers and sentinels after a successful query', () => {
+  it('collects an arbitrary query and its elements when the call returns', () => {
+    // The rare path ordinalizes the whole query into a table of its own, which
+    // holds every element it saw — so this is the one query shape that could
+    // outlive its call. Query state is retained and reused, so the release has
+    // to happen on return rather than at whatever the next query is.
     const matcher = createIndexedMatcher(choices, { scorer: dice })
-    const wrapperBaseline = count(LateInvalidWrapper)
-    const sentinelBaseline = count(InvalidSentinel)
-    submitLateInvalid(matcher)
-    matcher.best('ab')
-    const wrapperObserved = count(LateInvalidWrapper)
-    const sentinelObserved = count(InvalidSentinel)
-    expect(matcher.size).toBe(choices.length)
+    const wrapperBaseline = count(ArbitraryWrapper)
+    const sentinelBaseline = count(ArbitrarySentinel)
+    submitArbitraryQuery(matcher)
+    const wrapperObserved = count(ArbitraryWrapper)
+    const sentinelObserved = count(ArbitrarySentinel)
     expect(wrapperObserved).toBe(wrapperBaseline)
     expect(sentinelObserved).toBe(sentinelBaseline)
+    expect(matcher.best('ab')?.item).toBe('ab')
+    expect(matcher.size).toBe(choices.length)
+  })
+
+  it('holds token elements for the matcher lifetime, because identity is the key', () => {
+    const baseline = count(TokenItem)
+    withLiveTokenMatcher(() => expect(count(TokenItem)).toBe(baseline + 4))
+    expect(count(TokenItem)).toBe(baseline)
+  })
+
+  it('holds no element that sits in a window an unmatchable one poisons', () => {
+    // Every window `dead` could appear in also holds the `NaN` beside it, so it
+    // can never name a posting. An ordinal for it would be held for the life of
+    // the index and push every later element further up the radix ladder.
+    const baseline = count(TokenItem)
+    withLiveUnreachableTokenMatcher(() => expect(count(TokenItem)).toBe(baseline))
+  })
+
+  it('retains no choice sequence once its elements have ordinals', () => {
+    // What a gram-bearing choice leaves behind is its postings and its
+    // elements' ordinals, never the sequence they were read from — so nothing
+    // may hold the caller's object, before conversion copies it or after.
+    const baseline = count(TokenChoice)
+    withLiveTokenChoiceMatcher(() => expect(count(TokenChoice)).toBe(baseline))
   })
 })

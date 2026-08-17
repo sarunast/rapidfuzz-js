@@ -72,14 +72,32 @@ import {
  *   breaks out early saves the scoring it would have skipped there, and only
  *   the cost of building the results it never asked for.
  *
+ * Choices may be any sequence the scorer itself accepts, not just text — arrays
+ * of word tokens, mixed primitives, or objects compared by identity, at any
+ * gram size. An index over such a corpus keys its postings by an internal
+ * ordinal per distinct element, so a token n-gram search is the same call:
+ *
+ * ```ts
+ * const scorer = createScorer(tverskySimilarity, { gramSize: 2, alpha: 1, beta: 0 })
+ * const roles = createIndexedMatcher(
+ *   [
+ *     ['senior', 'software', 'engineer', 'typescript'],
+ *     ['frontend', 'engineer', 'react'],
+ *   ],
+ *   { scorer },
+ * )
+ * roles.best(['senior', 'software', 'engineer'])?.score // 1 — the pairs are contained
+ * ```
+ *
  * @param items Array, `Map`, plain object or any iterable — the shape decides
  * what `key` is on every result, exactly as it does for `createMatcher`.
  * @returns A frozen {@link Matcher} exposing `best`, `search`, `searchIter`,
  * `size` and the `scorer` it was built from.
  * @throws `TypeError` for an unknown option key — `getPrepared` among them,
  * since a prepared handle is the representation this replaces — for a scorer
- * with no indexed representation, for a gap when `missingItems: 'throw'`, or
- * for a choice whose elements are not integers.
+ * with no indexed representation, or for a gap when `missingItems: 'throw'`.
+ * @throws `RangeError` if a collection or a choice is past what the index can
+ * address — 4,294,967,295 choices, posting entries, or grams in one choice.
  */
 export function createIndexedMatcher<TItem, TBrand>(
   items: readonly TItem[],

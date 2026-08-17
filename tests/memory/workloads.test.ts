@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import {
-  LATE_INVALID_ELEMENTS,
-  runLateInvalidQuery,
-} from '../../bench/memory/workloads/exceptionRecovery.ts'
+  ARBITRARY_QUERY_ELEMENTS,
+  runArbitraryElementQuery,
+} from '../../bench/memory/workloads/arbitraryElements.ts'
 import {
   QUERY_PROFILE_ELEMENTS,
   runQueryProfileSpike,
@@ -91,18 +91,17 @@ describe('runtime-neutral memory workloads', () => {
     expect(observedLength).toBe(QUERY_PROFILE_ELEMENTS)
   })
 
-  it('reaches the final element before rejecting the late-invalid query', () => {
+  it('puts the arbitrary element last, where the whole query has to be read first', () => {
     let sawFinal = false
     const matcher = stub((query) => {
       expect(query[0]).toBe(0)
-      expect(query[LATE_INVALID_ELEMENTS - 2]).toBe(LATE_INVALID_ELEMENTS - 2)
-      expect(String(query[LATE_INVALID_ELEMENTS - 1])).toBe('late-invalid-sentinel')
-      sawFinal = true
-      throw new TypeError(
-        'an indexed choice holds integer elements only, and one of them is late-invalid-sentinel',
+      expect(query[ARBITRARY_QUERY_ELEMENTS - 2]).toBe(ARBITRARY_QUERY_ELEMENTS - 2)
+      expect(String(query[ARBITRARY_QUERY_ELEMENTS - 1])).toBe(
+        'arbitrary-element-sentinel',
       )
+      sawFinal = true
     })
-    runLateInvalidQuery(matcher)
+    runArbitraryElementQuery(matcher)
     expect(sawFinal).toBe(true)
   })
 
@@ -128,7 +127,7 @@ describe('runtime-neutral memory workloads', () => {
       'steady.ts',
       'queryProfile.ts',
       'touchedSet.ts',
-      'exceptionRecovery.ts',
+      'arbitraryElements.ts',
     ]) {
       const source = readFileSync(fileURLToPath(new URL(name, directory)), 'utf8')
       expect(source).not.toMatch(/node:|child_process|globalThis\.gc|process\./)

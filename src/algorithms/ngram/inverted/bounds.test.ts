@@ -12,15 +12,13 @@ import { createDiceIndexBuilder } from './dice.js'
 import { assertSharedAccumulatorExact } from './overlap.js'
 
 describe('what an index refuses', () => {
-  it('refuses a choice whose elements are not integers', () => {
+  it('refuses nothing about an element, on either side', () => {
+    // The one thing an index may not do is disagree with the scorer it stands
+    // in for, and the exhaustive scorer takes any element at all.
     const builder = createDiceIndexBuilder(2)
-    expect(() => builder.add([{}, {}, {}])).toThrow(TypeError)
-    expect(() => builder.add([{}, {}, {}])).toThrow(/integer elements only/)
-  })
-
-  it('refuses a query whose elements are not integers', () => {
+    expect(() => builder.add([{}, {}, {}])).not.toThrow()
     const index = indexOf({ metric: 'dice' }, 2, ['abc'])
-    expect(() => index.select([{}, {}, {}], null, 1)).toThrow(TypeError)
+    expect(() => index.select([{}, {}, {}], null, 1)).not.toThrow()
   })
 
   it('refuses what the fixed-width arrays cannot address', () => {
@@ -49,17 +47,14 @@ describe('what an index refuses', () => {
     expect(Number.isFinite(found[1].score)).toBe(true)
   })
 
-  it('keeps arbitrary string-token sequences out of the index', () => {
-    // The key extractor packs integer elements — characters only work because
-    // sequence conversion turns them into code points. The exhaustive matcher
-    // scores token arrays; the indexed one refuses them at construction.
+  it('takes arbitrary string-token sequences, as the exhaustive matcher does', () => {
     const scorer = createScorer(tverskySimilarity, { gramSize: 1, alpha: 1, beta: 0 })
     expect(
       createMatcher([['google', 'ag']], { scorer }).best(['google', 'ag'])?.score,
     ).toBe(1)
-    expect(() => createIndexedMatcher([['google', 'ag']], { scorer })).toThrow(
-      /integer elements only/,
-    )
+    expect(
+      createIndexedMatcher([['google', 'ag']], { scorer }).best(['google', 'ag'])?.score,
+    ).toBe(1)
   })
 
   it('refuses a Cosine pair whose dot product would leave the exact integers', () => {
@@ -116,10 +111,9 @@ describe('what an index refuses', () => {
   })
 
   it('takes a gramless sequence of any element the exhaustive scorer takes', () => {
-    // Not an oversight that `add` skips the integer check here: the gramless
-    // branch stores elements and compares them, and refusing what the metric
-    // itself scores would be the one thing an index may not do — disagree with
-    // the scorer it stands in for. Longer sequences still reach the check.
+    // The gramless branch stores elements and compares them, so it never
+    // reaches a key at all — which is why such a choice leaves an index keying
+    // elements directly rather than moving it onto ordinals.
     const scorer = createScorer(diceSimilarity, { gramSize: 3 })
     const builder = createDiceIndexBuilder(3)
     expect(() => builder.add([{}, {}])).not.toThrow()

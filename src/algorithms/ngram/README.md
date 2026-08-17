@@ -1,10 +1,11 @@
 # `algorithms/ngram/`
 
 An **algorithm foundation**, not a metric family. Nothing here is exported from
-a public entry point; `algorithms/dice/` and `algorithms/cosine/` are the only
-consumers, and it depends on no public algorithm. That is what its position
-states — it sits beside the public algorithms because it is below them, in the
-same layer as `algorithms/bitmask/` and `algorithms/affix.ts`, and
+a public entry point; `algorithms/dice/`, `algorithms/cosine/` and
+`algorithms/tversky/` are the only consumers, and it depends on no public
+algorithm. That is what its position states — it sits beside the public
+algorithms because it is below them, in the same layer as
+`algorithms/bitmask/` and `algorithms/affix.ts`, and
 `tests/architecture/imports.test.ts` fails an edge from here into any of the
 twelve published directories.
 
@@ -58,17 +59,21 @@ compare            → key, packing, profile
 kernel             → key, packing, profile, compare
 ─────────────── the index is built on the above, never the reverse ───────────────
 inverted/keys      → key
-inverted/builder   → key, inverted/keys
-inverted/query     → inverted/builder
-inverted/dice      → inverted/keys, inverted/builder, inverted/query
-inverted/cosine    → inverted/keys, inverted/builder, inverted/query
+inverted/ordinals  → (leaf within the index)
+inverted/builder   → key, inverted/keys, inverted/ordinals
+inverted/query     → inverted/builder, inverted/keys, inverted/ordinals
+inverted/overlap   → inverted/builder, inverted/query
+inverted/dice      → inverted/builder, inverted/overlap, inverted/query
+inverted/cosine    → inverted/builder, inverted/query
+inverted/tversky   → inverted/builder, inverted/overlap, inverted/query
 ```
 
-Outward, the subsystem reaches only `core/` — `core/sequence` for `convSequence`
-and `elementsEqual`, `core/types` for `Sequence`, and `core/scoring/choiceIndex`
+Outward, the subsystem reaches only `core/` — `core/sequence` for
+`convSequence`, `elementsEqual` and `isUnmatchableElement`, `core/types` for
+`Sequence`, and `core/scoring/choiceIndex`
 for the `ChoiceIndex`/`ChoiceIndexBuilder` protocol the index implements. It
-imports no algorithm, and nothing imports it except `algorithms/dice/` and
-`algorithms/cosine/`.
+imports no algorithm, and nothing imports it except `algorithms/dice/`,
+`algorithms/cosine/` and `algorithms/tversky/`.
 
 Three rules, all enforced by `tests/architecture/imports.test.ts`:
 
@@ -88,19 +93,22 @@ without someone acknowledging it.
 
 ### What each module owns
 
-| file                  | owns                                                                                                             |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `key.ts`              | radix-ladder arithmetic: `feasibleRadices`, `canonicalRadix`, `packGram`, `unpackGram`.                          |
-| `packing.ts`          | element → digit → packed key, and the element domain a key is spelled in.                                        |
-| `gramSize.ts`         | the `gramSize` option: validation and parsing.                                                                   |
-| `profile.ts`          | what an n-gram profile _is_ and how one is built — both storages, the trie node shape, the fixed-depth builders. |
-| `compare.ts`          | one comparison: `sharedFrequency`, `dotProduct`, and the direct counter that skips profiles entirely.            |
-| `kernel.ts`           | one query, many comparisons: the query compiled once, then run per candidate.                                    |
-| `inverted/keys.ts`    | the index's _adaptive_ key policy — narrowest radix, widened on demand, joined strings as the floor.             |
-| `inverted/builder.ts` | corpus ingestion and the CSR posting store. Generic across both metrics.                                         |
-| `inverted/query.ts`   | query scratch, zero-filling, selection and ranking.                                                              |
-| `inverted/dice.ts`    | the Dice scoring engine, `Int32Array` accumulator.                                                               |
-| `inverted/cosine.ts`  | the Cosine scoring engine, `Float64Array` accumulator.                                                           |
+| file                   | owns                                                                                                             |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `key.ts`               | radix-ladder arithmetic: `feasibleRadices`, `canonicalRadix`, `packGram`, `unpackGram`.                          |
+| `packing.ts`           | element → digit → packed key, and the element domain a key is spelled in.                                        |
+| `gramSize.ts`          | the `gramSize` option: validation and parsing.                                                                   |
+| `profile.ts`           | what an n-gram profile _is_ and how one is built — both storages, the trie node shape, the fixed-depth builders. |
+| `compare.ts`           | one comparison: `sharedFrequency`, `dotProduct`, and the direct counter that skips profiles entirely.            |
+| `kernel.ts`            | one query, many comparisons: the query compiled once, then run per candidate.                                    |
+| `inverted/keys.ts`     | the index's _adaptive_ key policy — narrowest radix, widened on demand, joined strings as the floor.             |
+| `inverted/ordinals.ts` | arbitrary element → dense ordinal, for a corpus the direct integer scheme cannot spell.                          |
+| `inverted/builder.ts`  | corpus ingestion, the CSR posting store, and the one-time move between the two key representations.              |
+| `inverted/query.ts`    | query preparation in either representation, plus scratch, zero-filling, selection and ranking.                   |
+| `inverted/overlap.ts`  | the shared-frequency posting traversal, and the `Int32Array` exactness bound it holds to.                        |
+| `inverted/dice.ts`     | the Dice scoring engine, `Int32Array` accumulator.                                                               |
+| `inverted/cosine.ts`   | the Cosine scoring engine, `Float64Array` accumulator.                                                           |
+| `inverted/tversky.ts`  | the Tversky scoring engine, `Int32Array` accumulator, over the shared traversal.                                 |
 
 ---
 
@@ -190,7 +198,13 @@ Three details that are easy to break:
   gram holding `NaN` is therefore never inserted — but it still counts toward
   `gramCount` and `squaredNorm`, so denominators and search bounds stay right.
   Tracked by comparing each window's start against the last unmatchable index
-  seen, so every element is tested once rather than once per window.
+  seen, so every element is tested once rather than once per window. The rule
+  itself is `isUnmatchableElement` in `core/sequence`, and `inverted/` follows it
+  at every gram size through the `-1` ordinal. Which is also why an ordinal is
+  handed only to an element inside a run of at least `gramSize` matchable ones:
+  everything in a shorter run sits in a window an unmatchable element already
+  poisons, so it can never name a posting, and an ordinal would hold it for the
+  life of the index and push every later element further up the ladder.
 - **`squaredNorm` is maintained incrementally** as `(c + 1)² − c² = 2c + 1` per
   occurrence, rather than by a second pass over the finished structure.
 - **A sequence with no grams keeps its elements**, and only such a profile does
@@ -319,9 +333,47 @@ index when a choice does not fit — a loop, not one attempt and a fallback, sin
 a single choice can need more than one rung (`'\ud800😀'` pushes a byte radix to
 BMP and then to full). Each rung is strictly wider than the element that forced
 it, so it cannot cycle. Nothing is rolled back on the way round: extraction fills
-scratch arrays and only `record` writes to a posting list, so a throw leaves the
-index exactly as it was. Re-keying is arithmetic on existing keys, so a late
-widening costs the gram _variety_ rather than the corpus.
+scratch arrays and only `record` writes to a posting list, so a refused choice
+leaves the index exactly as it was. Re-keying is arithmetic on existing keys, so
+a late widening costs the gram _variety_ rather than the corpus.
+
+**Two key representations, and one move between them.** Elements are keyed
+directly while they are integers a rung can hold, which is every text corpus.
+The first gram-bearing choice holding anything else — a word token, an object, a
+`NaN`, a fraction — moves the index onto **ordinal keys**: one dense integer per
+distinct element, assigned by `inverted/ordinals`, packed by the same ladder.
+The move happens once, and re-keys the postings rather than the corpus: the
+direct spelling is reversible, so each key is decoded, its elements take
+ordinals, and the posting list moves to the re-encoded key unchanged. Ordinals
+are dense from zero, so the move usually _narrows_ the radix a text corpus had
+been forced to widen — which is why the keys are walked **twice**, once to hand
+out every ordinal and again to re-encode with the radix that follows from them.
+Holding each gram's ordinals from the first walk instead would allocate one
+array per distinct gram, and gram variety is exactly what a late move is large
+in; a second decode is arithmetic over keys already in hand. Ordinalization ends at the key boundary — the posting
+store, the accumulators and the candidate loops never see an arbitrary element.
+
+**One poisoned choice moves the whole index, deliberately.** `[someObject, NaN]`
+at `gramSize: 2` bears a gram, so it reaches the direct extractor, which sees
+the object and asks for ordinals before anything has worked out that the only
+window is poisoned anyway — and every later choice is then keyed by ordinal. The
+alternative is a pre-scan of every choice on the path that does not need one,
+and the direct path is worth more than this shape is. The move is one-time and
+proportional to the gram _variety_ already recorded rather than to the corpus —
+a 10,000-choice text index measured 30.4 ms to build and 35.7 ms with a final
+choice that forces the move — and only the representation changes: no score
+does. `ordinalizeQuery` has the same shape one
+step smaller — it gives a query-local ordinal to a matchable element in a run
+too short to reach a gram — and that table dies with the call.
+
+A query is prepared in whichever representation the sealed index holds. Against
+an ordinal index, an element the corpus never had takes a query-local ordinal
+past the corpus's own, so its grams can name nothing while still counting toward
+the query's gram count and norm. Against a direct index, an arbitrary query
+falls back to the same query-local ordinalization for its counts, and only the
+grams that are still all-integer are rewritten into keys the index could hold.
+That fallback is entered by a status from the extractor rather than by checking
+every element, so an ordinary query pays no additional per-element scan for it.
 
 **Query state is retained and reused**, so nothing per-query is allocated on the
 hot path — but not without a bound. A broad query reserves one result slot per
@@ -357,8 +409,10 @@ for the whole corpus.
 ### Exactness and refusal
 
 The index reproduces the exhaustive scorer _to the bit_, and refuses rather than
-silently disagreeing. Each bound is checked because its failure mode is a wrong
-score, not a thrown error:
+silently disagreeing. Every refusal left is a _size_: nothing about an element
+is refused on either side, because the one thing an index may not do is answer a
+question its scorer would have answered. Each bound is checked because its
+failure mode is a wrong score, not a thrown error:
 
 | guard                        | bound                                 | why                                                                                                                                                 |
 | ---------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |

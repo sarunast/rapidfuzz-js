@@ -63,8 +63,7 @@ export interface ChoiceIndexBuilder {
    * caller decides what to add and therefore what each id means, so a collection
    * with gaps numbers only what it kept.
    *
-   * @throws {TypeError} If the choice holds an element that is not an integer,
-   * or if the builder is already sealed.
+   * @throws {TypeError} If the builder is already sealed.
    * @throws {RangeError} If the choice takes the index past what its ids can
    * address — 4,294,967,295 choices, posting entries, or grams in one choice.
    */

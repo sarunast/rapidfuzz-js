@@ -3,7 +3,18 @@ import { convSequence } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
 
 import { feasibleRadices } from '../key.js'
-import { extractGrams, OutOfRadix, radixFor, repackKey } from './keys.js'
+import {
+  decodeGramKey,
+  encodeGramKey,
+  extractGrams,
+  extractOrdinalGrams,
+  NEEDS_ORDINALS,
+  NEEDS_WIDER_RADIX,
+  radixFor,
+  type RadixWidening,
+  repackKey,
+} from './keys.js'
+import { ordinalizeChoice, resolveOrdinals } from './ordinals.js'
 
 export interface Postings {
   readonly ordinals: Map<string | number, number>
@@ -26,6 +37,13 @@ interface GramlessChoice {
 export interface SealedIndex<TNorm extends Float64Array | null> {
   readonly gramSize: number
   readonly radix: number | null
+  /**
+   * The element-to-ordinal table when the index keys by ordinal, and `null`
+   * when its posting keys hold elements directly. It says which representation
+   * the keys are in, not whether every element in the corpus is an integer — a
+   * gramless choice never reaches a key at all.
+   */
+  readonly elementOrdinals: ReadonlyMap<unknown, number> | null
   readonly choiceCount: number
   readonly postings: Postings
   readonly gramCount: Uint32Array
@@ -155,11 +173,15 @@ export class NGramIndexBuilder<
 > implements ChoiceIndexBuilder {
   private postings: Map<string | number, PostingBuilder> | null = new Map()
   private radix: number | null
+  private readonly initialRadix: number | null
+  private elementOrdinals: Map<unknown, number> | null = null
   private readonly gramCount: number[] = []
   private readonly squaredNorm: number[] = []
   private readonly gramless: GramlessChoice[] = []
   private readonly keys: (string | number)[] = []
   private readonly counts: number[] = []
+  private readonly ordinals: number[] = []
+  private readonly widening: RadixWidening = { from: 0, to: null }
   private entries = 0
   private maxGramCount = 0
   private maxSquaredNorm = 0
@@ -169,7 +191,8 @@ export class NGramIndexBuilder<
     private readonly norms: (values: readonly number[]) => TNorm,
     private readonly build: (sealed: SealedIndex<TNorm>) => ChoiceIndex,
   ) {
-    this.radix = feasibleRadices(gramSize)[0] ?? null
+    this.initialRadix = feasibleRadices(gramSize)[0] ?? null
+    this.radix = this.initialRadix
   }
 
   add(choice: Sequence): void {
@@ -186,26 +209,88 @@ export class NGramIndexBuilder<
       return
     }
     for (;;) {
-      try {
-        const squaredNorm = extractGrams(
-          elements,
-          this.gramSize,
-          this.radix,
-          true,
-          this.keys,
-          this.counts,
-        )
-        this.gramCount.push(total)
-        if (total > this.maxGramCount) this.maxGramCount = total
-        if (squaredNorm > this.maxSquaredNorm) this.maxSquaredNorm = squaredNorm
-        this.squaredNorm.push(squaredNorm)
-        this.record(postings, id)
-        return
-      } catch (error) {
-        if (!(error instanceof OutOfRadix)) throw error
-        this.rekey(postings, error.radix, radixFor(this.gramSize, error.element))
+      const squaredNorm = this.extract(elements)
+      if (squaredNorm === NEEDS_ORDINALS) {
+        this.ordinalize(postings)
+        continue
       }
+      if (squaredNorm === NEEDS_WIDER_RADIX) {
+        this.rekey(postings, this.widening.from, this.widening.to)
+        continue
+      }
+      this.gramCount.push(total)
+      if (total > this.maxGramCount) this.maxGramCount = total
+      if (squaredNorm > this.maxSquaredNorm) this.maxSquaredNorm = squaredNorm
+      this.squaredNorm.push(squaredNorm)
+      this.record(postings, id)
+      return
     }
+  }
+
+  private extract(elements: ArrayLike<unknown>): number {
+    const table = this.elementOrdinals
+    if (table === null) {
+      return extractGrams(
+        elements,
+        this.gramSize,
+        this.radix,
+        this.widening,
+        this.keys,
+        this.counts,
+      )
+    }
+    ordinalizeChoice(elements, this.gramSize, table, this.ordinals)
+    return extractOrdinalGrams(
+      this.ordinals,
+      this.gramSize,
+      this.radix,
+      this.widening,
+      this.keys,
+      this.counts,
+    )
+  }
+
+  /**
+   * Moves an index that keys elements directly onto ordinal keys, once, without
+   * re-reading a choice: the direct spelling is reversible, so each posting's
+   * key is decoded, its elements take ordinals, and the posting moves to the
+   * re-encoded key. Ordinals are dense from zero, so this usually narrows the
+   * radix a text corpus had been forced to widen.
+   *
+   * Two passes, because the radix the second one encodes with is not known
+   * until every ordinal has been handed out. The alternative — holding each
+   * gram's ordinals from the first pass — allocates one array per distinct
+   * gram, which is the corpus's gram variety; a second decode is arithmetic
+   * over the keys already in hand, and this runs once per index.
+   *
+   * The first pass defines the vocabulary and the second encodes against it,
+   * frozen: `resolveOrdinals` cannot add one, so no ordinal can appear that the
+   * chosen radix was not sized for.
+   */
+  private ordinalize(postings: Map<string | number, PostingBuilder>): void {
+    const gramSize = this.gramSize
+    const table = new Map<unknown, number>()
+    const elements = new Array<number>(gramSize)
+    const ordinals: number[] = []
+    for (const key of postings.keys()) {
+      decodeGramKey(key, gramSize, this.radix, elements)
+      ordinalizeChoice(elements, gramSize, table, ordinals)
+    }
+    // An empty table means no gram survived to carry an element — every window
+    // of the choice that forced this held an unmatchable one — so there is no
+    // largest ordinal to size the radix from, and the index starts over.
+    const radix =
+      table.size === 0 ? this.initialRadix : radixFor(gramSize, table.size - 1)
+    const rekeyed = new Map<string | number, PostingBuilder>()
+    for (const [key, posting] of postings) {
+      decodeGramKey(key, gramSize, this.radix, elements)
+      resolveOrdinals(elements, table, ordinals)
+      rekeyed.set(encodeGramKey(ordinals, gramSize, radix), posting)
+    }
+    postings.clear()
+    for (const [key, posting] of rekeyed) postings.set(key, posting)
+    this.elementOrdinals = table
+    this.radix = radix
   }
 
   private record(postings: Map<string | number, PostingBuilder>, id: number): void {
@@ -245,6 +330,7 @@ export class NGramIndexBuilder<
     return this.build({
       gramSize: this.gramSize,
       radix: this.radix,
+      elementOrdinals: this.elementOrdinals,
       choiceCount,
       postings: compact(postings, choiceCount),
       gramCount: Uint32Array.from(this.gramCount),

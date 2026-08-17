@@ -7,7 +7,7 @@ export const SOAK_SCENARIOS = [
   'steady',
   'query-profile',
   'touched-set',
-  'exception',
+  'arbitrary-elements',
 ] as const
 
 export type SoakScenario = (typeof SOAK_SCENARIOS)[number]
@@ -23,5 +23,5 @@ export const SOAK_THRESHOLDS = {
   steady: { slopeBytesPerBatch: 12_288, recoveryBytes: 327_680 },
   'query-profile': { slopeBytesPerBatch: 12_288, recoveryBytes: 327_680 },
   'touched-set': { slopeBytesPerBatch: 12_288, recoveryBytes: 327_680 },
-  exception: { slopeBytesPerBatch: 12_288, recoveryBytes: 327_680 },
+  'arbitrary-elements': { slopeBytesPerBatch: 12_288, recoveryBytes: 327_680 },
 } as const satisfies Record<SoakScenario, ScenarioThreshold>
