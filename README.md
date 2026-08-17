@@ -233,6 +233,37 @@ Weights are per element, global to the scorer, applied per occurrence, and
 snapshotted when the scorer is created — nothing is inferred from the collection
 being searched, and none of it makes token matching fuzzy.
 
+A `gramSize: 1` scorer — weighted or not — also carries `explain`, which reports
+what a score was made of:
+
+```ts
+const evidence = company.explain(['swisscom', 'ag'], ['swisscom'])
+evidence.totals.sharedMass // 5
+evidence.unmatchedFirst // [{ element: 'ag', index: 1, weight: 0.1, unmatchedMass: 0.1 }]
+```
+
+Four things are worth knowing before relying on it. It exists only at
+`gramSize: 1`, where a gram is a whole element a caller named — every other
+scorer has no `explain` at all, so an unsupported call is a compile error rather
+than a throw. It recomputes one pair from scratch and is deliberately not part
+of a matcher's results: `search` answers _which candidate_, `explain` answers
+_why this pair_, for the few results search already chose. An element weighing
+`0` appears nowhere in the evidence, having contributed neither overlap nor
+penalty. And the masses are on the scorer's own normalized scale, which is a
+constant factor away from the numbers you passed — Tversky is invariant to that
+factor, so no score changes, but they are not a unit quantity.
+
+```ts
+for (const match of matcher.search(query, { threshold: 0.82, limit: 5 })) {
+  const evidence = company.explain(query, match.item)
+  // evidence.score === company.score(query, match.item)
+}
+```
+
+`explain` takes the pair as you hand it over. A matcher's `normalize` option
+transforms both sides before scoring, so pass the normalized pair if you want
+evidence for a normalized match's score.
+
 The `fuzz` subpath is the exception: it exports similarity scorers only. Two
 of them are easy to mix up:
 

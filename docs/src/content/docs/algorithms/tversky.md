@@ -144,8 +144,8 @@ importance rather than by default. Weights that are all equal cost nothing at al
 measurement noise — because the scorer detects them and never builds the
 weighted representation. Nothing about the weights is decided per pair, so a
 large vocabulary is never walked while scoring: 20,000 entries no query or
-candidate mentions, beside the same real ones, measured **1.11x** — the cost of
-looking into a bigger map, not of its size.
+candidate mentions, beside the same real ones, measured **1.11x** — a constant
+factor for reaching into a larger map, not a cost that follows its size.
 
 The trap:
 
@@ -153,6 +153,71 @@ The trap:
 
 `swisscom` and `swisscomm` share no mass at all, whatever their weights. Making
 near-matching tokens count is a different feature.
+
+## Explaining an exact match
+
+A `gramSize: 1` scorer — weighted or not — also carries `explain`, which reports
+what a score was made of rather than only what it came to:
+
+```ts
+const evidence = company.explain(['swisscom', 'ag'], ['swisscom'])
+
+evidence.score // 0.9900990099009901, the same number `score` gives
+evidence.totals.sharedMass // 5
+evidence.matches // [{ first: 'swisscom', second: 'swisscom', sharedMass: 5, … }]
+evidence.unmatchedFirst // [{ element: 'ag', index: 1, weight: 0.1, unmatchedMass: 0.1 }]
+```
+
+`matches` pairs occurrences in input order, so `['react', 'react']` against
+`['react']` leaves the _second_ `react` unmatched. Elements are reported as you
+passed them while equality is decided on canonical elements, so `'a'` matches
+`97` and each is shown as its own side held it; a string is walked by code
+point, so `'😀'` is one occurrence at one index.
+
+Four things are worth knowing:
+
+- It exists **only at `gramSize: 1`**, where a gram is a whole element somebody
+  named. Every other scorer has no `explain` member at all, so an unsupported
+  call is a compile error rather than a throw. The capability is read off the
+  configuration _literal_, so hoisting one into a variable widens `gramSize` to
+  `number` and gives back an ordinary scorer unless you name what it satisfies:
+  `satisfies TverskyExplainConfiguration`, or
+  `satisfies TverskySimilarityExplainConfiguration` where the configuration also
+  carries `missing` — the same division as
+  `TverskyDistanceConfiguration`/`TverskySimilarityConfiguration`, since a
+  distance metric refuses `missing`.
+- It is **not part of search**. A matcher answers _which candidate_; `explain`
+  answers _why this pair_, recomputed cold for the few results search chose.
+  Nothing is retained between calls, and no index stores evidence.
+- An element weighing `0` **appears nowhere** — it contributed neither overlap
+  nor penalty. So with every element ignored you get empty evidence and zero
+  totals, and the score comes from the zero-mass rule instead: `1` for equal
+  multisets, `0` otherwise. `firstMass === 0 && secondMass === 0` identifies it.
+- Masses are on the scorer's own **normalized** scale, a constant factor away
+  from the numbers you passed. Tversky is invariant to that factor so no score
+  changes, but a mass is not a unit quantity, and only `totals` is
+  authoritative — the per-occurrence masses are for reading, not for re-deriving
+  the totals.
+
+The intended shape is search first, explain after:
+
+```ts
+for (const match of matcher.search(query, { threshold: 0.82, limit: 5 })) {
+  const evidence = company.explain(query, match.item)
+}
+```
+
+`explain` takes the pair as given. A matcher's `normalize` runs over both sides
+before scoring, so pass the normalized pair to explain a normalized score.
+
+Explaining a weighted pair costs about **1.31x** scoring it, and unweighted
+evidence is cheaper still — about a fifth of the weighted figure. The cost
+follows the pair rather than the table it reads: the same comparisons, at the
+same weights and against a weight table grown from 7 entries to 20,007,
+measured **1.06x**, showing that explanation does not walk the table. Direct
+scoring shows the same shape of effect — **1.11x** for its own 20,000-entry
+control above — so what remains is a constant factor for reaching into a larger
+map, not a cost that follows the vocabulary.
 
 ## Searching with a threshold
 
