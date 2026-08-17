@@ -411,6 +411,7 @@ describe('occurrence pairing', () => {
         second: 'swisscom',
         firstIndex: 0,
         secondIndex: 0,
+        exact: true,
         similarity: 1,
         firstWeight: 5,
         secondWeight: 5,

@@ -130,8 +130,7 @@ export function createIndexedMatcher<TItem, TBrand>(
   if (indexChoices === undefined) {
     throw new TypeError(
       'createIndexedMatcher: this scorer has no indexed representation. ' +
-        'Indexed search is available for dice.similarity, cosine.similarity ' +
-        'and tversky.similarity.',
+        'Indexed availability depends on the scorer and its configuration.',
     )
   }
   const read = sequenceReader({ getText, normalize, missingItems }, false)

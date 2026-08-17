@@ -283,10 +283,13 @@ describe('what it refuses', () => {
     )
   })
 
-  it('names the metrics that do have one', () => {
+  // Deliberately not a list of metric names. Configuration can remove an
+  // indexed representation from a metric that otherwise has one, so a list
+  // would be wrong for exactly the caller who needs the message.
+  it('points at the configuration rather than naming metrics', () => {
     const scorer = createScorer(levenshteinSimilarity)
     expect(() => createIndexedMatcher(['a'], { scorer })).toThrow(
-      /dice\.similarity, cosine\.similarity and tversky\.similarity/,
+      /depends on the scorer and its configuration/,
     )
   })
 

@@ -33,7 +33,11 @@ import { distance } from 'rapidfuzz-js/levenshtein'
 import { distance as jaroWinklerDistance } from 'rapidfuzz-js/jaro-winkler'
 import { similarity as diceSimilarity } from 'rapidfuzz-js/dice'
 import { similarity as tverskySimilarity } from 'rapidfuzz-js/tversky'
-import type { TverskyExplainConfiguration } from 'rapidfuzz-js/tversky'
+import type {
+  TverskyElementSimilarity,
+  TverskyExplainConfiguration,
+} from 'rapidfuzz-js/tversky'
+import { normalizedSimilarity as indelNormalizedSimilarity } from 'rapidfuzz-js/indel'
 
 const scorer = createScorer(tokenSetRatio)
 
@@ -83,6 +87,19 @@ export const explained = company.explain(['swisscom', 'ag'], ['swisscom'])
 const hoisted = { gramSize: 1, alpha: 1, beta: 0 } satisfies TverskyExplainConfiguration
 export const containment = createScorer(tverskySimilarity, hoisted)
 export const containmentEvidence = containment.explain(['swisscom'], ['swisscom', 'ag'])
+
+// A nested scorer is a second inference surface: the option holds a
+// \`Scorer<'similarity'>\` and the result still has to emit as an explainable
+// scorer without naming anything a consumer cannot reach.
+const elementSimilarity: TverskyElementSimilarity = {
+  scorer: createScorer(indelNormalizedSimilarity),
+  threshold: 0.8,
+}
+export const fuzzyCompany = createScorer(tverskySimilarity, {
+  gramSize: 1,
+  elementSimilarity,
+})
+export const fuzzyEvidence = fuzzyCompany.explain(['swisscom', 'ag'], ['swisscomm', 'ag'])
 
 // Widening stays possible: \`Scorer<D>\` is still the type that holds a scorer
 // of any metric, which is what most annotations want.

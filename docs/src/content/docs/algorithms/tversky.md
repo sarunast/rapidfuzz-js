@@ -152,9 +152,93 @@ The trap:
 > Element weighting does not make token matching fuzzy.
 
 `swisscom` and `swisscomm` share no mass at all, whatever their weights. Making
-near-matching tokens count is a different feature.
+near-matching tokens count is the next section.
 
-## Explaining an exact match
+## Matching tokens that are not quite equal
+
+`elementSimilarity` hands the tokens exact matching could not pair to an inner
+scorer, and lets each surviving pair share part of its mass:
+
+```ts
+import { normalizedSimilarity as indel } from 'rapidfuzz-js/indel'
+
+const fuzzy = createScorer(similarity, {
+  gramSize: 1,
+  elementSimilarity: { scorer: createScorer(indel), threshold: 0.8 },
+})
+
+fuzzy.score(['swisscom', 'ag'], ['swisscomm', 'ag']) // 0.9705882352941176
+```
+
+The same pair scores `0.5` without it: `ag` matches, `swisscom` does not, and
+half the mass on each side goes unmatched.
+
+**Exact overlap still decides everything it can.** Only what it leaves over is
+offered to the inner scorer, and the pairs it reserved are never reconsidered.
+`['google', 'deepmind']` against `['google', 'deepmindd']` always pairs `google`
+with `google`, even in the rare case where pairing it elsewhere would have scored
+higher. The documented answer is the best matching over what exact matching left,
+not the best matching overall — and "best" there means the maximum-share matching
+subject to floating-point path arithmetic, so two matchings whose totals differ in
+the last bit are not told apart.
+
+Each pair shares `min(firstWeight, secondWeight) × similarity`, so mass is
+conserved on each side and the arithmetic reduces to today's when the similarity
+is `1` and the weights agree. Fuzzy matching therefore cannot lower the exact
+score. That is a statement about the mathematics rather than about the last bit:
+once any pair is matched across, the components are folded per element rather
+than per weight group, so the two can differ by an ulp in either direction. Where
+nothing is matched across, the guarantee is exact — see below. The matching is
+one-to-one: `swisscom` and `swisscoma` cannot both claim the same `swisscomm`.
+
+`threshold` is on a `0..1` scale whatever the inner scorer's own range — a scorer
+bounded `0..100` is rescaled for you, so the fuzz scorers work unadapted. There
+is deliberately no default: a useful threshold is a property of your data, and
+`0` is refused because it admits arbitrarily weak pairings.
+
+Four traps, and the first is the one that surprises people:
+
+> Only multi-character **string** tokens are compared.
+
+A single code point canonicalizes to a number — `'a'` becomes `97`, and `'😀'`
+becomes `128512` — so one-character tokens are exact-only, as are numbers,
+objects and array-valued tokens. A plain string at `gramSize: 1` is a sequence of
+code points, so `elementSimilarity` changes nothing about it:
+
+```ts
+fuzzy.score('swisscom', 'swisscomm') // exactly what it scored before
+```
+
+This is a feature for arrays of word tokens. The other three:
+
+- **It costs up to `n × m` element comparisons** on the distinct unmatched
+  elements, then a matching over them. Past 32 distinct _fuzzy-comparable_
+  leftovers on either side it throws a `RangeError` rather than quietly becoming
+  slow. The limit is per side rather than on the product because the matching,
+  not the comparing, is what a long sequence against a short one makes
+  expensive. Repeats do not count towards it — `['react', 'react', 'react']`
+  against `['reakt', 'reakt']` is one comparison, not six, and one element a
+  side, not three — but they are not entirely free either: a second `RangeError`
+  refuses a pair whose occurrence counts are skewed enough to need more than 512
+  augmenting paths to match. Nothing measured has come close.
+- **`symmetric` is `false`**, even at `alpha === beta`. The optimum itself is
+  symmetric there; the tie-breaking and the order masses are folded in are not,
+  so the last bit may differ. `scoreMatrix` therefore scores both halves of a
+  pair rather than mirroring one.
+- **There is no indexed representation yet**, so `createIndexedMatcher` refuses a
+  soft scorer. The inverted index scores exact overlap, and returning one would
+  make it disagree with `createMatcher`.
+
+A configuration whose threshold nothing reaches scores bit-for-bit what the same
+configuration without `elementSimilarity` scores, on every path — so the feature
+can be switched on and tuned down without moving any existing number.
+
+What it does not fix is a **different tokenization**. `['google', 'deepmind']`
+against `['google', 'deep', 'mind']` is not a typo, and no element threshold
+pairs one token with two; that is a job for the preprocessing that produced the
+tokens, or for a whole-string scorer.
+
+## Explaining a match
 
 A `gramSize: 1` scorer — weighted or not — also carries `explain`, which reports
 what a score was made of rather than only what it came to:
@@ -173,6 +257,24 @@ evidence.unmatchedFirst // [{ element: 'ag', index: 1, weight: 0.1, unmatchedMas
 passed them while equality is decided on canonical elements, so `'a'` matches
 `97` and each is shown as its own side held it; a string is walked by code
 point, so `'😀'` is one occurrence at one index.
+
+Under `elementSimilarity` a row can be a fuzzy pair, and `exact` says which:
+
+```ts
+const evidence = fuzzy.explain(['swisscom', 'ag'], ['swisscomm', 'ag'])
+
+evidence.matches[0] // { first: 'swisscom', second: 'swisscomm', exact: false,
+//                       similarity: 0.9411764705882353,
+//                       sharedMass: 0.9411764705882353,
+//                       firstUnmatchedMass: 0.05882352941176472, … }
+evidence.matches[1] // { first: 'ag', second: 'ag', exact: true, similarity: 1, … }
+evidence.totals.sharedMass // 1.9411764705882353
+```
+
+Read `exact` rather than `similarity === 1` — an inner scorer is free to call two
+different elements identical. A partially matched occurrence appears in `matches`
+with a positive `firstUnmatchedMass`, not in `unmatchedFirst`; those arrays hold
+only the occurrences with no partner at all.
 
 Four things are worth knowing:
 
@@ -230,6 +332,12 @@ still reach `1` against an arbitrarily long candidate, while the reversed
 orientation is bounded low and rejected on the counts — orientation prunes,
 not length as such.
 
+A soft scorer prunes nothing on the counts. The bound above says a pair cannot
+share more than the shorter side holds, which stays true, but a soft score is
+folded by a different route than the bound is computed by, and the two need not
+agree in the last bit — so `elementSimilarity` skips the bound rather than risk
+rejecting a candidate that qualifies.
+
 Prepared choices behave as Dice's do: the profile a choice is prepared into
 depends only on the gram size — the weights are applied at scoring time.
 Sharing the handles is nonetheless per scorer configuration today: the
@@ -242,7 +350,9 @@ prepares.
 Tversky joins Dice and Cosine in
 [`createIndexedMatcher`](/concepts/matchers/#indexed-matchers), which builds
 one inverted n-gram index over the collection instead of preparing each
-choice. The same Matcher, the same exact scores, and the weights ride along:
+choice — `elementSimilarity` is the one configuration it refuses, since the
+index scores exact overlap. The same Matcher, the same exact scores, and the
+weights ride along:
 
 ```ts
 import { createIndexedMatcher, createScorer } from 'rapidfuzz-js'
@@ -270,6 +380,45 @@ two sides are not peers: a short query against long titles, a tag list against
 a document's keywords, deduplicating where one record is an abbreviation of
 the other. When the weights are exactly `0.5` each, use
 [Dice](/algorithms/dice/) directly; at `1` each, Tversky is multiset Jaccard;
-other equal weights remain symmetric Tversky variants in their own right. For
-typo tolerance between peers, an edit distance like
-[Levenshtein](/algorithms/levenshtein/) remains the better tool.
+other equal weights remain symmetric Tversky variants in their own right.
+
+For typo tolerance between two whole strings, an edit distance like
+[Levenshtein](/algorithms/levenshtein/) remains the better tool. Reach for
+`elementSimilarity` when you want both at once — per-token pricing _and_
+tolerance of a typo inside a token — which is the shape entity deduplication
+takes.
+
+It costs a scan, though: a soft scorer has no index and prunes nothing. Narrowing
+the corpus first is the way around that, but **mind what an exact token scorer
+does to the cutoff you can then use**. `Swisscom AG` against `Swisscomm AG`
+shares one token of two, so an exact Tversky blocker scores that pair `0.5`, and
+any cutoff above `0.5` throws away the very pair `elementSimilarity` exists to
+catch — with the recall gone before the soft scorer is ever called. Whether a
+cutoff that low leaves you a corpus small enough to rescore is a question about
+your corpus.
+
+Block on something a typo cannot break instead. Character bigrams over the joined
+record survive one, and [Dice](/algorithms/dice/) indexes them:
+
+```ts
+// `records` is an array of token arrays; the blocker searches them as text.
+const blocker = createIndexedMatcher(
+  records.map((tokens) => tokens.join(' ')),
+  { scorer: createScorer(diceSimilarity) },
+)
+
+const nearby = blocker.search(query.join(' '), { threshold: 0.5, limit: 200 })
+const rescored = nearby.map(({ key }) => ({
+  record: records[key],
+  score: fuzzy.score(query, records[key]),
+}))
+```
+
+`['swisscomm', 'ag']` survives that blocker at about **0.95** against
+`['swisscom', 'ag']`, because one doubled letter costs only a handful of
+character bigrams — where an exact token scorer gives that same pair `0.5`, and
+any cutoff above it loses the match.
+
+Whatever you block with, pick its threshold by checking it against pairs you know
+should match. A blocking step that drops one of them is a recall bug no later
+threshold can undo.

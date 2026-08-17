@@ -150,6 +150,20 @@ const FAMILIES: ReadonlyArray<readonly [string, ScorerFactory]> = [
   ['Tversky similarity', () => createScorer(tverskySimilarity)],
   ['Tversky normalized distance', () => createScorer(tverskyNormalizedDistance)],
   ['Tversky normalized similarity', () => createScorer(tverskyNormalizedSimilarity)],
+  // A soft scorer runs its own engine on every path, so it has to agree across
+  // them like any other. The operands here are strings, whose elements are code
+  // points and therefore exact-only — what this row pins is the plumbing.
+  [
+    'Tversky soft similarity',
+    () =>
+      createScorer(tverskySimilarity, {
+        gramSize: 1,
+        elementSimilarity: {
+          scorer: createScorer(indelNormalizedSimilarity),
+          threshold: 0.8,
+        },
+      }),
+  ],
 ]
 
 describe('compiled built-in metrics', () => {

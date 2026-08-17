@@ -6,6 +6,7 @@ import {
 import type { Metric } from '#core/scoring/metric.js'
 import type { Direction, SimilarityConfiguration } from '#core/types.js'
 
+import type { TverskyElementSimilarity } from './elementSimilarity.js'
 import type { TverskyEvidence } from './evidence.js'
 import {
   tverskyDistance,
@@ -13,6 +14,7 @@ import {
   type TverskyOptions,
 } from './implementation.js'
 
+export type { TverskyElementSimilarity } from './elementSimilarity.js'
 export type {
   TverskyEvidence,
   TverskyEvidenceMatch,
@@ -124,6 +126,24 @@ export interface TverskyDistanceConfiguration {
    *   `1`.
    */
   readonly defaultElementWeight?: number | undefined
+  /**
+   * Let elements that are not equal still share mass, by scoring the leftovers
+   * of exact matching with an inner element scorer.
+   *
+   * This is what makes `['swisscom', 'ag']` and `['swisscomm', 'ag']` score
+   * close to `1` instead of counting `swisscom` as missing on both sides. Only
+   * multi-character string tokens are compared — see
+   * {@link TverskyElementSimilarity} for that and the other four traps.
+   *
+   * @throws {TypeError} If it is not an object, holds an unknown key, or its
+   *   `scorer` is not a symmetric similarity scorer from `createScorer`.
+   * @throws {RangeError} If `gramSize` is not `1`, `threshold` is outside
+   *   `0 < threshold <= 1`, or the scorer's bounds do not span a finite,
+   *   non-zero range. Scoring throws one too, where a pair leaves more than 32
+   *   distinct fuzzy-comparable leftovers on a side, or its occurrence counts are
+   *   skewed enough to need more than 512 augmenting paths to match.
+   */
+  readonly elementSimilarity?: TverskyElementSimilarity | undefined
 }
 
 /** {@link TverskyDistanceConfiguration} plus the missing-value policy. */
@@ -183,6 +203,7 @@ const CONFIGURATION_KEYS: readonly string[] = [
   'beta',
   'elementWeights',
   'defaultElementWeight',
+  'elementSimilarity',
 ]
 
 function tverskyMetric<

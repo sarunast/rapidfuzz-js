@@ -47,8 +47,21 @@ import {
   type WeightedQueryGroups,
 } from '../ngram/weightedProfile.js'
 import { weightedTverskyScore } from '../ngram/weightedTverskyScore.js'
+import {
+  CompiledElementSimilarity,
+  compileElementSimilarity,
+  effectiveElementSimilarity,
+  type TverskyElementSimilarity,
+} from './elementSimilarity.js'
 import { tverskyExplainer, type TverskyEvidence } from './evidence.js'
+import { canonicalElements, occurrencesOf, type Occurrence } from './occurrences.js'
 import { tverskyScore } from './score.js'
+import {
+  preparedSoftChoice,
+  softComponentsOf,
+  SoftTverskyChoice,
+  softTablesOf,
+} from './soft.js'
 
 export interface TverskyOptions extends ScorerOptions {
   readonly gramSize?: number | undefined
@@ -64,6 +77,14 @@ export interface TverskyOptions extends ScorerOptions {
     | CompiledElementWeights
     | undefined
   readonly defaultElementWeight?: number | undefined
+  /**
+   * A caller's option, or the compiled form the canonicalizer replaced it with
+   * — the same public-input/internal-compiled pattern the weights follow.
+   */
+  readonly elementSimilarity?:
+    | TverskyElementSimilarity
+    | CompiledElementSimilarity
+    | undefined
 }
 
 interface TverskyParameters {
@@ -218,6 +239,85 @@ function directWeightedSimilarity(
   return similarity >= scoreCutoff ? similarity : 0
 }
 
+/**
+ * Exact unigram overlap completed by fuzzy matching of what it left over.
+ *
+ * A soft configuration gets its own engine because the packed profiles and
+ * weight groups the exact paths ride count grams without saying *which*
+ * occurrences are left over, which is exactly what the reservation needs.
+ *
+ * The exact answer is computed first and returned verbatim whenever the fuzzy
+ * phase adds nothing, so a configuration whose threshold nothing reaches is
+ * bit-identical to the same configuration without one. The two fold their
+ * penalties in different orders — per element here, per weight group there —
+ * and short-circuiting is what keeps that from being observable.
+ */
+function softSimilarity(
+  first: Occurrence[],
+  second: Occurrence[],
+  weights: CompiledElementWeights | null,
+  soft: CompiledElementSimilarity,
+  alpha: number,
+  beta: number,
+): number {
+  const tables = softTablesOf(first, second)
+  if (weights === null) {
+    if (first.length === 0 || second.length === 0) {
+      return first.length === second.length ? 1 : 0
+    }
+    const shared = tables.overlap.sharedCount
+    const components = softComponentsOf(tables, soft, shared)
+    return components === null
+      ? tverskyScore(shared, first.length, second.length, alpha, beta)
+      : weightedTverskyScore(
+          components.shared,
+          components.firstOnly,
+          components.secondOnly,
+          alpha,
+          beta,
+        )
+  }
+  const query = weightedQueryGroups(canonicalElements(first), weights)
+  const choice = weightedProfile(canonicalElements(second), weights)
+  if (query.groupIds.length === 0 || choice.groupIds.length === 0) {
+    return zeroMassSimilarity(query, choice)
+  }
+  // Its own array rather than the module scratch: the element scorer below can
+  // be another weighted Tversky, which would write over a shared one.
+  const parts = new Float64Array(3)
+  weightedComponents(query, choice, weights, parts)
+  const components = softComponentsOf(tables, soft, parts[0])
+  return components === null
+    ? weightedTverskyScore(parts[0], parts[1], parts[2], alpha, beta)
+    : weightedTverskyScore(
+        components.shared,
+        components.firstOnly,
+        components.secondOnly,
+        alpha,
+        beta,
+      )
+}
+
+function directSoftSimilarity(
+  a: Sequence,
+  b: Sequence,
+  weights: CompiledElementWeights | null,
+  soft: CompiledElementSimilarity,
+  alpha: number,
+  beta: number,
+  scoreCutoff: number,
+): number {
+  const similarity = softSimilarity(
+    occurrencesOf(a, weights),
+    occurrencesOf(b, weights),
+    weights,
+    soft,
+    alpha,
+    beta,
+  )
+  return similarity >= scoreCutoff ? similarity : 0
+}
+
 function preparedSimilarity(
   a: NGramProfile,
   shared: BoundedFrequencyKernel,
@@ -255,7 +355,22 @@ function tverskySimilarity_impl(
     options.defaultElementWeight,
     gramSize,
   )
+  const soft = effectiveElementSimilarity(options.elementSimilarity, gramSize)
   const scoreCutoff = options.scoreCutoff
+  if (soft !== null) {
+    return normSimCutoff(
+      directSoftSimilarity(
+        validateSequence(s1),
+        validateSequence(s2),
+        weights,
+        soft,
+        alpha,
+        beta,
+        scoreCutoff ?? 0,
+      ),
+      scoreCutoff,
+    )
+  }
   if (weights !== null) {
     return normSimCutoff(
       directWeightedSimilarity(
@@ -288,8 +403,24 @@ function tverskyDistance_impl(
     options.defaultElementWeight,
     gramSize,
   )
+  const soft = effectiveElementSimilarity(options.elementSimilarity, gramSize)
   const cutoff = options.scoreCutoff
   const similarityCutoff = cutoff == null ? 0 : 1 - cutoff
+  if (soft !== null) {
+    return normDistCutoff(
+      1 -
+        directSoftSimilarity(
+          validateSequence(s1),
+          validateSequence(s2),
+          weights,
+          soft,
+          alpha,
+          beta,
+          similarityCutoff,
+        ),
+      cutoff,
+    )
+  }
   if (weights !== null) {
     return normDistCutoff(
       1 -
@@ -377,6 +508,42 @@ function prepareWeightedTversky(
   }
 }
 
+/**
+ * The soft preparation. It offers no `indexChoices` in either direction: the
+ * inverted indexes score exact overlap, so an indexed matcher built on one
+ * would quietly disagree with the exhaustive scorer it is meant to reproduce.
+ */
+function prepareSoftTversky(
+  kind: PreparedTverskyKind,
+  weights: CompiledElementWeights | null,
+  soft: CompiledElementSimilarity,
+  alpha: number,
+  beta: number,
+): {
+  prepareQuery: (query: Sequence) => PreparedKernel
+  prepareChoice: ChoicePreparer
+  indexChoices?: (() => ChoiceIndexBuilder) | undefined
+  explain: (first: Sequence, second: Sequence) => TverskyEvidence
+} {
+  return {
+    // Element similarity is only accepted at `gramSize: 1`, so a soft scorer
+    // always explains.
+    explain: tverskyExplainer(kind, weights, alpha, beta, soft),
+    indexChoices: undefined,
+    prepareChoice: (choice: Sequence): SoftTverskyChoice =>
+      new SoftTverskyChoice(occurrencesOf(choice, weights)),
+    prepareQuery: (query: Sequence): PreparedKernel => {
+      const first = occurrencesOf(query, weights)
+      return (rawChoice, rawCutoff) => {
+        const second = preparedSoftChoice(rawChoice).occurrences
+        const similarity = softSimilarity(first, second, weights, soft, alpha, beta)
+        const cutoff = similarityCutoffFor(kind, rawCutoff)
+        return preparedResult(kind, similarity >= cutoff ? similarity : 0, rawCutoff)
+      }
+    },
+  }
+}
+
 function prepareTversky(kind: PreparedTverskyKind): PreparationFactory<TverskyEvidence> {
   return (options) => {
     const gramSize = parseGramSize(options)
@@ -386,6 +553,11 @@ function prepareTversky(kind: PreparedTverskyKind): PreparationFactory<TverskyEv
       Reflect.get(options, 'defaultElementWeight'),
       gramSize,
     )
+    const soft = effectiveElementSimilarity(
+      Reflect.get(options, 'elementSimilarity'),
+      gramSize,
+    )
+    if (soft !== null) return prepareSoftTversky(kind, weights, soft, alpha, beta)
     if (weights !== null) return prepareWeightedTversky(kind, weights, alpha, beta)
 
     const prepareChoice = (choice: Sequence): NGramProfile =>
@@ -456,20 +628,31 @@ function withoutWeights(
 const tverskyConfigurationCanonicalizer: ConfigurationCanonicalizer = (options) => {
   const { alpha, beta } = parseParameters(options)
   const gramSize = parseGramSize(options)
+  // Compiled before either return below, so a weight branch cannot carry an
+  // unvalidated element similarity forward.
+  const rawSoft = Reflect.get(options, 'elementSimilarity')
+  const base =
+    rawSoft === undefined
+      ? options
+      : { ...options, elementSimilarity: compileElementSimilarity(rawSoft, gramSize) }
   const rawWeights = Reflect.get(options, 'elementWeights')
   const rawDefault = Reflect.get(options, 'defaultElementWeight')
   if (weightsRequested(rawWeights, rawDefault)) {
     const weights = effectiveWeights(rawWeights, rawDefault, gramSize)
-    return weights === null
-      ? withoutWeights(options)
-      : { ...options, elementWeights: weights }
+    return weights === null ? withoutWeights(base) : { ...base, elementWeights: weights }
   }
-  return gramSize === 2 && alpha === 0.5 && beta === 0.5 ? {} : options
+  // No `elementSimilarity` guard on the collapse: it demands `gramSize: 2`,
+  // which compiling an element similarity has already refused.
+  return gramSize === 2 && alpha === 0.5 && beta === 0.5 ? {} : base
 }
 
 const tverskyConfigurationSymmetry: ConfigurationSymmetryResolver = (options) => {
   const { alpha, beta } = parseParameters(options)
-  return alpha === beta
+  // A soft score is symmetric as a real number where alpha equals beta, but the
+  // solver's tie-break and the element-order fold are not transpose invariant,
+  // and `scoreMatrix` mirrors a symmetric scorer's cells rather than scoring
+  // them — a wrong `true` would be wrong numbers, not wasted work.
+  return alpha === beta && Reflect.get(options, 'elementSimilarity') === undefined
 }
 
 export const tverskySimilarity: MaybeSequenceMetricImplementation<

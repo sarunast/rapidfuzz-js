@@ -231,7 +231,35 @@ company.score(['swisscom', 'ag'], ['swisscom']) // 0.99 — `ag` costs little
 
 Weights are per element, global to the scorer, applied per occurrence, and
 snapshotted when the scorer is created — nothing is inferred from the collection
-being searched, and none of it makes token matching fuzzy.
+being searched.
+
+Weighting alone does not make token matching fuzzy: `swisscom` and `swisscomm`
+share no mass at all. `elementSimilarity` is what closes that gap. Exact overlap
+still claims everything it can, and only the tokens it left over are scored
+against each other by an inner scorer:
+
+```ts
+import { normalizedSimilarity as indel } from 'rapidfuzz-js/indel'
+
+const fuzzy = createScorer(tverskySimilarity, {
+  gramSize: 1,
+  elementSimilarity: { scorer: createScorer(indel), threshold: 0.8 },
+})
+fuzzy.score(['swisscom', 'ag'], ['swisscomm', 'ag'])
+// 0.9705882352941176 — `ag` pairs exactly, `swisscom` partially
+// without elementSimilarity the same pair scores 0.5
+```
+
+Each surviving pair shares `min(firstWeight, secondWeight) × similarity` rather
+than a whole occurrence, so a typo costs a little instead of everything. Four
+things to know before reaching for it: only multi-character **string** tokens are
+compared, since a single code point canonicalizes to a number — which also means
+a plain string scores exactly what it scored before; exact pairs are reserved
+first, so the answer is the best matching over what is left rather than the best
+matching overall, and best only up to floating-point path arithmetic; a pair with
+more than 32 distinct fuzzy-comparable leftovers on either side throws rather than
+quietly becoming slow; and such a scorer reports `symmetric: false` and offers no
+indexed representation, so `createIndexedMatcher` refuses it.
 
 A `gramSize: 1` scorer — weighted or not — also carries `explain`, which reports
 what a score was made of:

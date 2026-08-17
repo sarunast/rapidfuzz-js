@@ -128,3 +128,46 @@ and the `snake_case` parameter name, so a message searched for in a Python
 codebase's issue tracker still finds the same explanation. The n-gram family
 has no upstream counterpart, so `gramSize` reads as the option a caller
 actually wrote.
+
+### Tversky element similarity
+
+Everything here comes from
+[`elementSimilarity`](/algorithms/tversky/#matching-tokens-that-are-not-quite-equal).
+
+| Message                                                                          | Type         | Cause                                                   |
+| -------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- |
+| `element similarity is only defined at gramSize 1`                               | `RangeError` | Any other `gramSize`, including the default `2`         |
+| `elementSimilarity must be an object with a scorer and a threshold`              | `TypeError`  | `null`, a number, a string, or a function               |
+| `elementSimilarity.scorer must be a scorer from createScorer`                    | `TypeError`  | A missing or non-scorer-shaped `scorer`                 |
+| `elementSimilarity.scorer must be a similarity scorer`                           | `TypeError`  | A distance scorer                                       |
+| `elementSimilarity.scorer must be symmetric`                                     | `TypeError`  | A scorer declaring `symmetric: false`                   |
+| `elementSimilarity.scorer needs finite bounds spanning a finite, non-zero range` | `RangeError` | Bounds such as `[1, 1]`, `[0, Infinity]`, `[-MAX, MAX]` |
+| `elementSimilarity.threshold must be a number`                                   | `TypeError`  | A missing, `null`, or non-numeric threshold             |
+| `elementSimilarity.threshold has to be above 0 and at most 1`                    | `RangeError` | `0`, negative, above `1`, `NaN`, or infinite            |
+| `elementSimilarity would compare N unmatched elements against M, …`              | `RangeError` | More than 32 fuzzy-comparable leftovers on a side       |
+| `elementSimilarity needed more than N augmenting paths, …`                       | `RangeError` | Occurrence counts skewed past the search ceiling        |
+
+The bounds rule is stricter than the one `createScorer` itself applies, because
+rescaling onto `0..1` needs a span it can divide by: `[1, 1]` divides by zero,
+and `[-Number.MAX_VALUE, Number.MAX_VALUE]` has two finite ends whose span
+overflows to `Infinity` and would rescale every score to `0`.
+
+The last two are the only ones thrown while scoring rather than while building
+the scorer, and they are deliberately not silent — the alternative was a pair
+that quietly costs seconds.
+
+The first counts **distinct fuzzy-comparable leftovers on each side**, and
+refuses past 32 on either. Per side rather than on the product, because the
+matching is what a long side against a short one makes expensive: `1 × 1024` and
+`32 × 32` are the same number of comparisons and three orders of magnitude apart
+in time. Raising `threshold` does not help, because the count is fixed before any
+comparison is made. Two things do not count towards it: leftovers no element
+scorer can see — numbers, objects, single code points — and any leftover at all
+when the _other_ side has none, since there is then nothing to match and the pair
+is scored exactly.
+
+The second is a ceiling on the search itself rather than on the input, and takes
+skewed occurrence counts to reach: repeating one element far more often than its
+neighbours buys augmenting paths that counting distinct elements cannot see. No
+measured pair has come near 512. If one does, evening out the repeats or
+comparing shorter sequences is the way out.
