@@ -14,10 +14,11 @@ import {
 } from './elementSimilarity.js'
 import {
   canonicalElements,
+  elementCountsOf,
   elementTableOf,
   occurrencesOf,
+  type ElementCounts,
   type ElementTable,
-  type Occurrence,
 } from './occurrences.js'
 
 /**
@@ -40,9 +41,9 @@ import {
  * that product allowed. Measured end to end at the limit with every edge
  * surviving, which is the adverse case: `32 × 32` costs 0.72 ms a pair, 0.77 ms
  * once every element occurs 32 times over — 1024 occurrences a side — and
- * 1.41 ms once those occurrences are skewed rather than uniform, which is the
+ * 1.42 ms once those occurrences are skewed rather than uniform, which is the
  * dearest shape this limit allows. A realistic pair is nowhere near any of them,
- * at 0.55 µs for one typo among three tokens, because a single candidate pairing
+ * at 0.58 µs for one typo among three tokens, because a single candidate pairing
  * never reaches the residual network at all. Raising this later is not a breaking
  * change; lowering it is.
  *
@@ -103,24 +104,75 @@ export interface SoftComponents {
 }
 
 /**
- * A choice prepared for soft matching: the occurrence walk, done once.
+ * A choice prepared for soft matching: what a candidate is scored *from*, held
+ * rather than the occurrence walk it was derived from.
  *
- * The element scorer's own preparation is not held here — not because there is
- * nothing to amortize, since a matcher meets the same choice on every query,
- * but because holding it would retain a second, opaque representation of every
- * fuzzy-comparable token in the corpus for the life of the matcher. That trade
- * of memory against time needs its own measurement. The query side, which
+ * A matcher meets the same choice on every query, so a candidate's own
+ * distinct-element view is worth deriving once. It replaces the occurrences
+ * rather than joining them — the plain path needs their count, and the weighted
+ * one the canonical values, and neither needs the `Occurrence` objects
+ * themselves. Over 50 000 three-token company names (`pnpm bench:memory:soft`)
+ * that is 401 → 457 retained bytes a choice, 449 → 578 weighted, against a scan
+ * that runs 1.09x and 1.03x. The same corpus under exact weighted Tversky
+ * retains 705 B a choice, which is the scale to read those against.
+ *
+ * `elements` is empty where the configuration prices nothing, since only the
+ * weighted path reads it and a choice cannot reach a scorer other than the one
+ * that prepared it — `PreparedChoice` refuses that by owner. Where a
+ * configuration does price elements it holds *every* canonical occurrence,
+ * zero-weight ones included, because all-zero weights are decided by multiset
+ * equality over exactly the elements the counts leave out.
+ *
+ * Two things are deliberately not held. The element scorer's own preparation
+ * would retain a second, opaque representation of every fuzzy-comparable token
+ * in the corpus for the life of the matcher; the query side of it, which
  * repeats within a single scan and retains nothing beyond it, is held in
- * `ElementKernels`.
- *
- * A choice's own {@link ElementTable} — and its weighted profile — are a
- * different question, and the open one: they are this algorithm's own
- * representations rather than another scorer's opaque handle, so a matcher is
- * their natural owner. What is unmeasured there is retained memory, a `Map` per
- * corpus item against a two-token candidate that rebuilds in nanoseconds.
+ * `ElementKernels` instead. And the weighted profile, which is the expensive
+ * one: measured at some 620 B a choice more — a `Map` per corpus item — for a
+ * further 1.4-2.0x on a weighted scan. It is deferred rather than refused,
+ * because the fold that reads it could be computed from the counts below and
+ * then nothing needs holding at all.
  */
 export class SoftTverskyChoice {
-  constructor(readonly occurrences: readonly Occurrence[]) {}
+  constructor(
+    readonly occurrenceCount: number,
+    readonly counts: ElementCounts,
+    readonly elements: readonly unknown[],
+  ) {}
+}
+
+/** The elements of an unweighted choice, which no path reads. */
+const NO_ELEMENTS: readonly unknown[] = []
+
+/** {@link SoftTverskyChoice} for one sequence, under the configuration's weights. */
+export function softChoiceOf(
+  sequence: Sequence,
+  weights: CompiledElementWeights | null,
+): SoftTverskyChoice {
+  const occurrences = occurrencesOf(sequence, weights)
+  return new SoftTverskyChoice(
+    occurrences.length,
+    elementCountsOf(occurrences),
+    weights === null ? NO_ELEMENTS : canonicalElements(occurrences),
+  )
+}
+
+/**
+ * The same for a pair scored once, and deliberately its own construction site:
+ * a prepared choice survives, so sharing this one would pretenure it — see
+ * `elementCountsOf`. It keeps the index it built for the same reason a prepared
+ * choice drops it: nothing here outlives the call.
+ */
+export function directSoftChoiceOf(
+  sequence: Sequence,
+  weights: CompiledElementWeights | null,
+): SoftTverskyChoice {
+  const occurrences = occurrencesOf(sequence, weights)
+  return new SoftTverskyChoice(
+    occurrences.length,
+    elementTableOf(occurrences),
+    weights === null ? NO_ELEMENTS : canonicalElements(occurrences),
+  )
 }
 
 export function preparedSoftChoice(value: unknown): SoftTverskyChoice {
@@ -151,7 +203,7 @@ interface WeightedSoftQuery {
  * `weightedComponents` only reads its query side.
  */
 export interface SoftQuery {
-  readonly occurrences: readonly Occurrence[]
+  readonly occurrenceCount: number
   readonly table: ElementTable
   readonly weighted: WeightedSoftQuery | null
 }
@@ -163,7 +215,7 @@ export function softQueryOf(
 ): SoftQuery {
   const occurrences = occurrencesOf(sequence, weights)
   return {
-    occurrences,
+    occurrenceCount: occurrences.length,
     table: elementTableOf(occurrences),
     weighted:
       weights === null
@@ -178,7 +230,7 @@ export function softQueryOf(
 /** Both sides as distinct elements, and what exact matching did with them. */
 export interface SoftTables {
   readonly first: ElementTable
-  readonly second: ElementTable
+  readonly second: ElementCounts
   readonly overlap: ExactOverlap
 }
 
@@ -190,42 +242,35 @@ export interface SoftTables {
  * `overlap.sharedCount`, which this pass has produced anyway. Splitting the two
  * keeps that count from being computed a second way.
  *
- * The first side arrives as a table rather than as occurrences because a scan
- * meets one query with every candidate, so a prepared query derives its table
- * once and hands the same one in every time. Nothing here writes to it: the
- * reservation goes into two arrays allocated per pair.
+ * Both sides arrive derived, because both amortize over something: a scan meets
+ * one query with every candidate, and a matcher meets one choice with every
+ * query. Nothing here writes to either: the reservation goes into two arrays
+ * allocated per pair.
  */
-export function softTablesOf(
-  first: ElementTable,
-  second: readonly Occurrence[],
-): SoftTables {
-  const secondTable = elementTableOf(second)
-  return {
-    first,
-    second: secondTable,
-    overlap: exactOverlapOf(first, secondTable),
-  }
+export function softTablesOf(first: ElementTable, second: ElementCounts): SoftTables {
+  return { first, second, overlap: exactOverlapOf(first, second) }
 }
 
-function exactOverlapOf(first: ElementTable, second: ElementTable): ExactOverlap {
+function exactOverlapOf(first: ElementTable, second: ElementCounts): ExactOverlap {
   const leftoverFirst = new Uint32Array(first.entries.length)
   const leftoverSecond = new Uint32Array(second.entries.length)
+  const indexOf = first.indexOf
   let sharedCount = 0
-  for (let at = 0; at < second.entries.length; at++) {
-    leftoverSecond[at] = second.entries[at].count
-  }
   for (let at = 0; at < first.entries.length; at++) {
-    const entry = first.entries[at]
-    const other = second.indexOf.get(entry.canonical)
+    leftoverFirst[at] = first.entries[at].count
+  }
+  for (let at = 0; at < second.entries.length; at++) {
+    const entry = second.entries[at]
+    const other = indexOf.get(entry.canonical)
     if (other === undefined) {
-      leftoverFirst[at] = entry.count
+      leftoverSecond[at] = entry.count
       continue
     }
-    const partner = second.entries[other].count
+    const partner = first.entries[other].count
     const overlap = entry.count < partner ? entry.count : partner
     sharedCount += overlap
-    leftoverFirst[at] = entry.count - overlap
-    leftoverSecond[other] = partner - overlap
+    leftoverSecond[at] = entry.count - overlap
+    leftoverFirst[other] = partner - overlap
   }
   return { leftoverFirst, leftoverSecond, sharedCount }
 }
@@ -237,7 +282,7 @@ interface Comparable {
   readonly weight: number
 }
 
-function comparableLeftovers(table: ElementTable, leftover: Uint32Array): Comparable[] {
+function comparableLeftovers(table: ElementCounts, leftover: Uint32Array): Comparable[] {
   const comparable: Comparable[] = []
   for (let at = 0; at < leftover.length; at++) {
     if (leftover[at] === 0) continue
@@ -355,7 +400,7 @@ export function softComponentsOf(
 }
 
 function residualMass(
-  table: ElementTable,
+  table: ElementCounts,
   leftover: Uint32Array,
   used: Uint32Array,
   edges: readonly SoftEdge[],

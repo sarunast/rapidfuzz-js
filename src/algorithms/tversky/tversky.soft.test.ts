@@ -513,6 +513,41 @@ describe('thresholds', () => {
   })
 })
 
+describe('a query with no weighted mass at all', () => {
+  // What a prepared choice must keep on top of its counts. Zero-weight elements
+  // are excluded from the distinct-element view — nothing can match on them —
+  // yet all-zero weights are decided by multiset equality over exactly those
+  // elements, so a choice that kept counts alone would answer this wrong on
+  // every path but the one-shot one.
+  const zero = { defaultElementWeight: 0, elementSimilarity: SOFT }
+
+  it.each(PATHS)('proves equality by multiset through the %s path', (_name, score) => {
+    expect(score(['alpha', 'beta'], ['alpha', 'beta'], zero)).toBe(1)
+    expect(score(['alpha', 'beta'], ['alpha', 'gamma'], zero)).toBe(0)
+    expect(score(['alpha', 'alpha'], ['alpha'], zero)).toBe(0)
+    // Unmatchable on both sides is still unmatchable: two `NaN` occurrences are
+    // not proof of anything, whatever they weigh.
+    expect(score(['alpha', Number.NaN], ['alpha', Number.NaN], zero)).toBe(0)
+  })
+
+  it.each(PATHS)(
+    'scores a zero-weight query as the exact scorer does (%s)',
+    (_name, score) => {
+      const pairs: ReadonlyArray<readonly [readonly unknown[], readonly unknown[]]> = [
+        [
+          ['alpha', 'beta'],
+          ['alpha', 'beta'],
+        ],
+        [['alpha'], ['alphaa']],
+        [[], []],
+      ]
+      for (const [a, b] of pairs) {
+        expect(score(a, b, zero)).toBe(score(a, b, { defaultElementWeight: 0 }))
+      }
+    },
+  )
+})
+
 describe('extreme weights', () => {
   it('drops an edge whose shared mass underflows to nothing', () => {
     // Both tokens weigh 1e-300 and are 1e-30 alike, so the mass they could

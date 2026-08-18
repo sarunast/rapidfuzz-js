@@ -93,10 +93,21 @@ export interface ElementEntry {
  * count a `NaN` occurrence, so a residual fold that walked only `entries` would
  * silently drop that penalty.
  */
-export interface ElementTable {
+export interface ElementCounts {
   readonly entries: readonly ElementEntry[]
-  readonly indexOf: ReadonlyMap<unknown, number>
   readonly unmatchableMass: number
+}
+
+/**
+ * {@link ElementCounts} with the index that finds an element among the entries.
+ *
+ * A pair needs one of these, not two: the reservation walks one side and looks
+ * the other up, so whichever side is walked can be counts alone. The query is
+ * the side that carries the index, because a scan derives it once and meets
+ * every candidate with it.
+ */
+export interface ElementTable extends ElementCounts {
+  readonly indexOf: ReadonlyMap<unknown, number>
 }
 
 interface CountingEntry extends Omit<ElementEntry, 'count'> {
@@ -127,4 +138,46 @@ export function elementTableOf(occurrences: readonly Occurrence[]): ElementTable
     entries[at].count++
   }
   return { entries, indexOf, unmatchableMass }
+}
+
+/**
+ * The same view without the index, for a side that is only ever walked — its
+ * elements are looked up in the indexed side. The index is built either way,
+ * since it is what collapses the repeats, and then let go: a matcher holds one
+ * of these per corpus item for its lifetime, and over three-token company names
+ * the `Map` costs 184 B a choice against the 332 B the entries cost.
+ *
+ * The walk is copied from {@link elementTableOf} rather than called into it,
+ * and that is load-bearing rather than an un-refactored duplicate. V8 pretenures
+ * an allocation site whose objects survive, so one shared builder would put a
+ * one-shot pair's entries in old space because a matcher's entries live there:
+ * measured over a process that built a 2000-choice soft matcher and then scored
+ * 10 000 pairs directly, sharing the builder cost the pair loop 11-25%, and
+ * running the same binary with `--no-allocation-site-pretenuring` closed
+ * exactly that gap. Two builders keep the transient side in the nursery.
+ */
+export function elementCountsOf(occurrences: readonly Occurrence[]): ElementCounts {
+  const entries: CountingEntry[] = []
+  const indexOf = new Map<unknown, number>()
+  let unmatchableMass = 0
+  for (const occurrence of occurrences) {
+    if (occurrence.weight === 0) continue
+    if (isUnmatchableElement(occurrence.canonical)) {
+      unmatchableMass += occurrence.weight
+      continue
+    }
+    const at = indexOf.get(occurrence.canonical)
+    if (at === undefined) {
+      indexOf.set(occurrence.canonical, entries.length)
+      entries.push({
+        canonical: occurrence.canonical,
+        operand: fuzzyOperand(occurrence.canonical),
+        count: 1,
+        weight: occurrence.weight,
+      })
+      continue
+    }
+    entries[at].count++
+  }
+  return { entries, unmatchableMass }
 }

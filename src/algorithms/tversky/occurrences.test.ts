@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { compileElementWeights } from '../ngram/weightedProfile.js'
 import {
   canonicalElements,
+  elementCountsOf,
   elementTableOf,
   fuzzyOperand,
   occurrencesOf,
@@ -96,5 +97,15 @@ describe('elementTableOf', () => {
     expect(table.entries).toEqual([])
     expect(table.indexOf.size).toBe(0)
     expect(table.unmatchableMass).toBe(0)
+  })
+})
+
+describe('elementCountsOf', () => {
+  it('counts exactly what the indexed view counts, and keeps no index', () => {
+    const occurrences = occurrencesOf(['react', 'vue', 'react', Number.NaN], null)
+    const counts = elementCountsOf(occurrences)
+    expect(counts.entries).toEqual(elementTableOf(occurrences).entries)
+    expect(counts.unmatchableMass).toBe(1)
+    expect(Object.hasOwn(counts, 'indexOf')).toBe(false)
   })
 })

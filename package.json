@@ -123,6 +123,7 @@
     "bench:memory:scratch": "npm run build --silent && node --expose-gc bench/memory/algorithmScratch.ts",
     "bench:memory:index": "npm run build --silent && node bench/memory/indexedQuery.ts",
     "bench:memory:soak": "npm run build --silent && node bench/memory/soak.ts",
+    "bench:memory:soft": "npm run build --silent && node bench/memory/softChoice.ts",
     "bench:compare": "node bench/regression/compare.ts",
     "bench:compare:quick": "node bench/regression/compare.ts --quick",
     "bench:confirm": "node bench/regression/compare.ts --confirm",

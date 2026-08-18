@@ -14,12 +14,12 @@ import {
   elementScore,
   preparedElementScore,
 } from './elementSimilarity.js'
-import { elementTableOf, occurrencesOf } from './occurrences.js'
+import { elementCountsOf, elementTableOf, occurrencesOf } from './occurrences.js'
 import {
   preparedSoftChoice,
+  softChoiceOf,
   softComponentsOf,
   softQueryOf,
-  SoftTverskyChoice,
   softTablesOf,
 } from './soft.js'
 
@@ -31,7 +31,7 @@ const soft = compileElementSimilarity(
 function tablesOf(first: readonly unknown[], second: readonly unknown[]) {
   return softTablesOf(
     elementTableOf(occurrencesOf(first, null)),
-    occurrencesOf(second, null),
+    elementCountsOf(occurrencesOf(second, null)),
   )
 }
 
@@ -51,8 +51,11 @@ describe('softTablesOf', () => {
 
   it('meets every candidate with the table the query derived once', () => {
     const query = elementTableOf(occurrencesOf(['react', 'react', 'vue'], null))
-    const one = softTablesOf(query, occurrencesOf(['react'], null))
-    const other = softTablesOf(query, occurrencesOf(['vue', 'vue'], null))
+    const one = softTablesOf(query, elementCountsOf(occurrencesOf(['react'], null)))
+    const other = softTablesOf(
+      query,
+      elementCountsOf(occurrencesOf(['vue', 'vue'], null)),
+    )
     expect(one.first).toBe(query)
     expect(other.first).toBe(query)
     // What a shared table must not share: the reservation is per pair, so one
@@ -72,7 +75,7 @@ describe('softTablesOf', () => {
 describe('softQueryOf', () => {
   it('derives the distinct-element view, and no groups without weights', () => {
     const query = softQueryOf(['react', 'react', 'vue'], null)
-    expect(query.occurrences).toHaveLength(3)
+    expect(query.occurrenceCount).toBe(3)
     expect(query.table.entries.map((entry) => entry.canonical)).toEqual(['react', 'vue'])
     expect(query.weighted).toBeNull()
   })
@@ -84,6 +87,27 @@ describe('softQueryOf', () => {
     // Two prices among two elements, so the query spans two groups — which is
     // the whole reason a weighted query is worth deriving once.
     expect(query.weighted?.groups.groupIds).toHaveLength(2)
+  })
+})
+
+describe('softChoiceOf', () => {
+  it('holds what a candidate is scored from rather than the walk behind it', () => {
+    const choice = softChoiceOf(['react', 'react', 'vue'], null)
+    expect(choice.occurrenceCount).toBe(3)
+    expect(choice.counts.entries.map((entry) => entry.canonical)).toEqual([
+      'react',
+      'vue',
+    ])
+    // The index is what a matcher must not keep per corpus item: it collapses
+    // the repeats above and is then dropped, which is this shape's whole point.
+    expect(Object.hasOwn(choice.counts, 'indexOf')).toBe(false)
+    expect(choice.elements).toEqual([])
+  })
+
+  it('carries the canonical elements a weighted score prices', () => {
+    const weights = compileElementWeights(new Map([['react', 5]]), 1)
+    const choice = softChoiceOf(['react', 'a'], weights)
+    expect(choice.elements).toEqual(['react', 97])
   })
 })
 
@@ -237,7 +261,7 @@ describe('preparedElementScore carries the element scorer onto 0..1', () => {
 
 describe('preparedSoftChoice', () => {
   it('accepts a choice this engine prepared', () => {
-    const choice = new SoftTverskyChoice(occurrencesOf(['react'], null))
+    const choice = softChoiceOf(['react'], null)
     expect(preparedSoftChoice(choice)).toBe(choice)
   })
 
@@ -245,7 +269,7 @@ describe('preparedSoftChoice', () => {
     ['a bare sequence', ['react']],
     ['a string', 'react'],
     ['null', null],
-    ['a foreign object', { occurrences: [] }],
+    ['a foreign object', { occurrenceCount: 0 }],
   ])('refuses %s', (_label, value) => {
     expect(() => preparedSoftChoice(value)).toThrow(
       new TypeError('invalid prepared soft tversky choice'),

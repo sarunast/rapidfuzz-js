@@ -18,12 +18,7 @@ import {
   type Occurrence,
 } from './occurrences.js'
 import { tverskyScore } from './score.js'
-import {
-  softComponentsOf,
-  softTablesOf,
-  type SoftComponents,
-  type SoftTables,
-} from './soft.js'
+import { softComponentsOf, softTablesOf, type SoftComponents } from './soft.js'
 
 /**
  * A paired occurrence, and what the pair contributed.
@@ -415,7 +410,7 @@ function softPairing(
   pairing: Pairing,
   first: Occurrence[],
   second: Occurrence[],
-  tables: SoftTables,
+  tables: ExplainedTables,
   components: SoftComponents,
 ): Pairing {
   const firstQueues = queuesOf(pairing.unmatchedFirst, first, tables.first)
@@ -503,6 +498,15 @@ export function tverskyExplainer(
   }
 }
 
+/**
+ * Both sides indexed, which scoring needs of the query alone: an explanation
+ * walks the second side's leftovers back to their occurrences too.
+ */
+interface ExplainedTables {
+  readonly first: ElementTable
+  readonly second: ElementTable
+}
+
 function softenEvidence(
   first: Occurrence[],
   second: Occurrence[],
@@ -510,12 +514,16 @@ function softenEvidence(
   soft: CompiledElementSimilarity,
   alpha: number,
   beta: number,
-): { components: Components; tables: SoftTables; matching: SoftComponents } | null {
-  const tables = softTablesOf(elementTableOf(first), second)
+): { components: Components; tables: ExplainedTables; matching: SoftComponents } | null {
+  const indexed: ExplainedTables = {
+    first: elementTableOf(first),
+    second: elementTableOf(second),
+  }
+  const tables = softTablesOf(indexed.first, indexed.second)
   const matching = softComponentsOf(tables, soft, exact.totals.sharedMass, null)
   if (matching === null) return null
   return {
-    tables,
+    tables: indexed,
     matching,
     components: {
       totals: {
