@@ -888,6 +888,39 @@ describe('the size limit', () => {
   })
 })
 
+describe('indexed evaluation order', () => {
+  const query = Array.from({ length: 32 }, (_unused, at) => `company-token-${at}`)
+  const throwing = Array.from({ length: 33 }, (_unused, at) => `company-token-${at}x`)
+
+  it('stops best after an optimum that follows a non-optimum row', () => {
+    const choices = [query.slice(1), query, throwing]
+    const scorer = createScorer(tverskyMetric, unigram({ elementSimilarity: SOFT }))
+    const exhaustive = createMatcher(choices, { scorer })
+    const indexed = createIndexedMatcher(choices, { scorer })
+    expect(exhaustive.best(query)).toEqual(indexed.best(query))
+    expect(indexed.best(query)?.key).toBe(1)
+  })
+
+  it('stops finite top-k once its retained floor reaches the optimum', () => {
+    const choices = [query.slice(1), query, query, query, query, query, throwing]
+    const scorer = createScorer(tverskyMetric, unigram({ elementSimilarity: SOFT }))
+    const exhaustive = createMatcher(choices, { scorer })
+    const indexed = createIndexedMatcher(choices, { scorer })
+    expect(exhaustive.search(query, { limit: 5 })).toEqual(
+      indexed.search(query, { limit: 5 }),
+    )
+  })
+
+  it('still throws when an oversized row precedes enough optima', () => {
+    const choices = [query.slice(1), throwing, query]
+    const scorer = createScorer(tverskyMetric, unigram({ elementSimilarity: SOFT }))
+    expect(() => createMatcher(choices, { scorer }).best(query)).toThrow(RangeError)
+    expect(() => createIndexedMatcher(choices, { scorer }).best(query)).toThrow(
+      RangeError,
+    )
+  })
+})
+
 describe('the indexed 32-and-33 fuzzy boundary', () => {
   // 32 distinct fuzzy-comparable entries is the last query the index serves and
   // the last pair the solver accepts; 33 falls back on the query side and is
