@@ -12,7 +12,14 @@
  * ```sh
  * pnpm bench:memory:soft
  * pnpm bench:memory:soft --choices=20000 --tokens=12
+ * pnpm bench:memory:soft --vocabulary=20000
  * ```
+ *
+ * **`--vocabulary` is what prices the index**, not `--choices`. The indexed
+ * arms retain one inner q-gram entry per *distinct* token, so a corpus whose
+ * every occurrence is distinct and one drawing three tokens from a shared
+ * vocabulary cost the same matcher very different amounts. The default draws
+ * every token distinct, which is the worst case for the vocabulary side.
  *
  * **One configuration per child, always.** A heap delta taken after another
  * matcher already exists in the process measures the collector's mood as much
@@ -34,7 +41,7 @@ import { fileURLToPath } from 'node:url'
 
 import { normalizedSimilarity as indelSimilarity } from '../../dist/algorithms/indel/index.js'
 import { similarity as tverskySimilarity } from '../../dist/algorithms/tversky/index.js'
-import { createMatcher, createScorer } from '../../dist/index.js'
+import { createIndexedMatcher, createMatcher, createScorer } from '../../dist/index.js'
 import { words } from '../harness/corpus.ts'
 import {
   assertCliOptions,
@@ -48,14 +55,29 @@ import {
 
 const DEFAULT_CHOICES = 50_000
 const DEFAULT_TOKENS = 3
+/** Zero draws a distinct token per occurrence rather than sharing a pool. */
+const DEFAULT_VOCABULARY = 0
 const WORD_LENGTH = 9
 const SEED = 0x31c4_0001
 const ELEMENT_THRESHOLD = 0.8
 
 /** How a scorer is configured, which is the whole experiment. */
-type Arm = 'soft' | 'softWeighted' | 'exact' | 'exactWeighted'
+type Arm =
+  | 'soft'
+  | 'softIndexed'
+  | 'softWeighted'
+  | 'softWeightedIndexed'
+  | 'exact'
+  | 'exactWeighted'
 
-const ARMS: readonly Arm[] = ['soft', 'softWeighted', 'exact', 'exactWeighted']
+const ARMS: readonly Arm[] = [
+  'soft',
+  'softIndexed',
+  'softWeighted',
+  'softWeightedIndexed',
+  'exact',
+  'exactWeighted',
+]
 
 function isArm(value: string): value is Arm {
   return ARMS.some((arm) => arm === value)
@@ -65,14 +87,31 @@ interface ArmResult {
   readonly arm: Arm
   readonly choices: number
   readonly tokensPerChoice: number
+  readonly distinctTokens: number
   readonly retainedBytes: number
   readonly retainedBytesPerChoice: number
+  readonly retainedBytesPerDistinctToken: number
+  readonly constructionMs: number
 }
 
-function corpusOf(choices: number, tokensPerChoice: number): string[][] {
-  const tokens = words(choices * tokensPerChoice, WORD_LENGTH, SEED)
-  return Array.from({ length: choices }, (_unused, at) =>
-    tokens.slice(at * tokensPerChoice, at * tokensPerChoice + tokensPerChoice),
+function corpusOf(
+  choices: number,
+  tokensPerChoice: number,
+  vocabulary: number,
+): string[][] {
+  if (vocabulary === 0) {
+    const tokens = words(choices * tokensPerChoice, WORD_LENGTH, SEED)
+    return Array.from({ length: choices }, (_unused, at) =>
+      tokens.slice(at * tokensPerChoice, at * tokensPerChoice + tokensPerChoice),
+    )
+  }
+  // Cycling the pool in order is what "deterministic uniform reuse" means, and
+  // it stays uniform at every pool size — a fixed stride only spreads the draws
+  // when it happens to be coprime with the pool.
+  const pool = words(vocabulary, WORD_LENGTH, SEED)
+  let at = 0
+  return Array.from({ length: choices }, () =>
+    Array.from({ length: tokensPerChoice }, () => pool[at++ % vocabulary]),
   )
 }
 
@@ -87,10 +126,10 @@ function weightsOf(corpus: readonly string[][]): Map<string, number> {
 
 function scorerOf(arm: Arm, corpus: readonly string[][]) {
   const element = { scorer: createScorer(indelSimilarity), threshold: ELEMENT_THRESHOLD }
-  if (arm === 'soft') {
+  if (arm === 'soft' || arm === 'softIndexed') {
     return createScorer(tverskySimilarity, { gramSize: 1, elementSimilarity: element })
   }
-  if (arm === 'softWeighted') {
+  if (arm === 'softWeighted' || arm === 'softWeightedIndexed') {
     return createScorer(tverskySimilarity, {
       gramSize: 1,
       elementSimilarity: element,
@@ -106,36 +145,53 @@ function scorerOf(arm: Arm, corpus: readonly string[][]) {
   })
 }
 
-function measure(arm: Arm, choices: number, tokensPerChoice: number): ArmResult {
-  const corpus = corpusOf(choices, tokensPerChoice)
+function measure(
+  arm: Arm,
+  choices: number,
+  tokensPerChoice: number,
+  vocabulary: number,
+): ArmResult {
+  const corpus = corpusOf(choices, tokensPerChoice, vocabulary)
   const scorer = scorerOf(arm, corpus)
   collectGarbage()
   const before = sampleMemory().retained
-  const matcher = createMatcher(corpus, { scorer })
+  const started = performance.now()
+  const matcher = arm.endsWith('Indexed')
+    ? createIndexedMatcher(corpus, { scorer })
+    : createMatcher(corpus, { scorer })
+  const constructionMs = performance.now() - started
   collectGarbage()
   const retained = sampleMemory().retained - before
   if (matcher.size !== choices) throw new Error('the matcher dropped a choice')
+  // A corpus with one distinct token per occurrence and one with a small shared
+  // vocabulary cost the index very differently, so the per-choice figure alone
+  // does not say what the vocabulary side is worth.
+  const distinctTokens = new Set(corpus.flat()).size
   return {
     arm,
     choices,
     tokensPerChoice,
+    distinctTokens,
     retainedBytes: retained,
     retainedBytesPerChoice: retained / choices,
+    retainedBytesPerDistinctToken: retained / distinctTokens,
+    constructionMs,
   }
 }
 
 const here = fileURLToPath(import.meta.url)
 const options = parseCli(process.argv.slice(2))
-assertCliOptions(options, ['child', 'arm', 'choices', 'tokens'])
+assertCliOptions(options, ['child', 'arm', 'choices', 'tokens', 'vocabulary'])
 const choices = numberOption(options, 'choices', DEFAULT_CHOICES)
 const tokens = numberOption(options, 'tokens', DEFAULT_TOKENS)
+const vocabulary = numberOption(options, 'vocabulary', DEFAULT_VOCABULARY)
 
 if (options.has('child')) {
   const requested = options.get('arm')
   if (typeof requested !== 'string' || !isArm(requested)) {
     throw new TypeError(`--arm must be one of ${ARMS.join(', ')}`)
   }
-  writeStructured(measure(requested, choices, tokens))
+  writeStructured(measure(requested, choices, tokens, vocabulary))
 } else {
   writeStructured(
     ARMS.map((arm) =>
@@ -143,6 +199,10 @@ if (options.has('child')) {
         `--arm=${arm}`,
         `--choices=${choices}`,
         `--tokens=${tokens}`,
+        // Omitted rather than passed as zero: `numberOption` takes only
+        // positive integers, and absent is what "a distinct token per
+        // occurrence" means.
+        ...(vocabulary === 0 ? [] : [`--vocabulary=${vocabulary}`]),
       ]),
     ),
   )

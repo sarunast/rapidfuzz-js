@@ -225,9 +225,13 @@ This is a feature for arrays of word tokens. The other three:
   symmetric there; the tie-breaking and the order masses are folded in are not,
   so the last bit may differ. `scoreMatrix` therefore scores both halves of a
   pair rather than mirroring one.
-- **There is no indexed representation yet**, so `createIndexedMatcher` refuses a
-  soft scorer. The inverted index scores exact overlap, and returning one would
-  make it disagree with `createMatcher`.
+- **Indexed search depends on the inner scorer.** `createIndexedMatcher` accepts
+  a soft similarity scorer whose `elementSimilarity.scorer` can shortlist
+  candidates — normalized Indel does, and so does any exact indexed similarity.
+  Jaro, Jaro-Winkler and `fuzz.ratio` cannot, and are still refused, as is soft
+  Tversky in the distance direction. The index only chooses _what to rescore_:
+  every score it returns comes from this same soft kernel, so it agrees with
+  `createMatcher` to the bit.
 
 A configuration whose threshold nothing reaches scores bit-for-bit what the same
 configuration without `elementSimilarity` scores, on every path — so the feature
@@ -350,9 +354,7 @@ prepares.
 Tversky joins Dice and Cosine in
 [`createIndexedMatcher`](/concepts/matchers/#indexed-matchers), which builds
 one inverted n-gram index over the collection instead of preparing each
-choice — `elementSimilarity` is the one configuration it refuses, since the
-index scores exact overlap. The same Matcher, the same exact scores, and the
-weights ride along:
+choice. The same Matcher, the same exact scores, and the weights ride along:
 
 ```ts
 import { createIndexedMatcher, createScorer } from 'rapidfuzz-js'
@@ -388,9 +390,57 @@ For typo tolerance between two whole strings, an edit distance like
 tolerance of a typo inside a token — which is the shape entity deduplication
 takes.
 
-It costs a scan, though: a soft scorer has no index and prunes nothing. Narrowing
-the corpus first is the way around that, but **mind what an exact token scorer
-does to the cutoff you can then use**. `Swisscom AG` against `Swisscomm AG`
+### Indexing a soft scorer
+
+`createIndexedMatcher` accepts a soft similarity scorer whose inner scorer can
+shortlist candidates — normalized Indel does. It indexes two channels: exact
+tokens by their canonical element, and the distinct fuzzy vocabulary through a
+q-gram index over the inner scorer. A query unions both, and every choice that
+survives is then scored by the ordinary soft kernel, so the numbers that come
+back are the ones `createMatcher` returns.
+
+Over 50,000 three-token records — 150,000 token occurrences over about 116,700
+distinct tokens, including the `ag` and `gmbh` suffixes a third of the corpus
+shares each — timing `best`:
+
+| query                                     | exhaustive |    indexed |                 |
+| ----------------------------------------- | ---------: | ---------: | --------------: |
+| a typo, two exact tokens left             |    52.45ms |     2.11ms |      25x faster |
+| a typo, reachable only through vocabulary |    57.43ms |     2.08ms |      28x faster |
+| a typo, behind a shared `ag` suffix       |    45.40ms |    13.33ms |     3.4x faster |
+| a typo, with element weights              |    84.62ms |     2.15ms |      39x faster |
+| no token seen before                      |    58.03ms |     1.29ms |      45x faster |
+| no token within the inner threshold       |    52.66ms |     0.09ms |     601x faster |
+| a token a third of the corpus shares      |    45.38ms |    12.62ms |     3.6x faster |
+| **`best` on an exact early record**       | **0.38ms** | **1.99ms** | **5.2x slower** |
+
+Two rows say most of it. The second is the path the feature exists for — the
+other two query tokens are unseen, so only the q-gram vocabulary index can reach
+the answer, and it is the _best_ case rather than a discount on the first. The
+third is what an application usually looks like: once the only exact token left
+is a suffix a third of the corpus shares, correctness drags every `ag` record
+into the candidate union, and the gain falls to the same 3–4x that any common
+token buys.
+
+The last row is the shape to know about. `best` stops at the first score of `1`,
+so an exhaustive scan that finds an exact match 398 records in never looks at the
+other 49,602 — while the index still pays its vocabulary lookup. Lowering
+`elementSimilarity.threshold` narrows the gain the same way, to about 1.8x at
+`0.5`, because a loose inner threshold shortlists most of the vocabulary.
+
+It is not free to build. The index retains about **410 bytes per distinct
+vocabulary token** — 3.7x a `createMatcher` over a corpus where every token is
+distinct, but only 1.37x over one drawing its three tokens from a 20,000-token
+vocabulary, since the cost follows the vocabulary rather than the corpus.
+Construction goes from 37ms to 284ms over 150,000 distinct tokens, and from 21ms
+to 78ms over 20,000. Index when you will run many queries against one
+collection; scan when you will run few.
+
+If the inner scorer cannot shortlist — Jaro, Jaro-Winkler, `fuzz.ratio` — or you
+are scoring in the distance direction, the matcher is refused and a scan is what
+is left. Narrowing the corpus yourself is the way around that, but **mind what an
+exact token scorer does to the cutoff you can then use**. `Swisscom AG` against
+`Swisscomm AG`
 shares one token of two, so an exact Tversky blocker scores that pair `0.5`, and
 any cutoff above `0.5` throws away the very pair `elementSimilarity` exists to
 catch — with the recall gone before the soft scorer is ever called. Whether a

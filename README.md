@@ -258,8 +258,17 @@ a plain string scores exactly what it scored before; exact pairs are reserved
 first, so the answer is the best matching over what is left rather than the best
 matching overall, and best only up to floating-point path arithmetic; a pair with
 more than 32 distinct fuzzy-comparable leftovers on either side throws rather than
-quietly becoming slow; and such a scorer reports `symmetric: false` and offers no
-indexed representation, so `createIndexedMatcher` refuses it.
+quietly becoming slow; and such a scorer reports `symmetric: false`.
+
+`createIndexedMatcher` is available when the inner scorer supplies a safe
+candidate index, including normalized Indel. Its outer index unions exact-token
+postings with fuzzy vocabulary matches and then delegates every final score to
+the ordinary Soft Tversky kernel. Empty, zero-mass, oversized-query, and
+unlimited zero-admitting searches fall back to exhaustive prepared scoring;
+finite zero-admitting selections merge only the untouched zero-score choices
+needed to preserve ranking. Unsupported inner scorers (including Jaro,
+Jaro-Winkler, and `fuzz.ratio`) and Soft Tversky distance remain scan-only;
+matcher options and result ordering are unchanged.
 
 A `gramSize: 1` scorer — weighted or not — also carries `explain`, which reports
 what a score was made of:
