@@ -6,6 +6,7 @@ import type {
   Sequence,
   SimilarityConfiguration,
 } from '../../types.js'
+import { candidateBuilderFromExactIndex } from '../candidateIndex.js'
 import { COMPILE, type MetricCompilation } from '../compilation.js'
 import type { Metric, NoConfiguration } from '../metric.js'
 import {
@@ -180,6 +181,10 @@ export function builtInMetric<
       prepareQuery: preparation.prepareQuery,
       prepareChoice: preparation.prepareChoice,
       indexChoices: preparation.indexChoices,
+      candidateChoices:
+        options.direction === 'similarity' && preparation.indexChoices !== undefined
+          ? candidateBuilderFromExactIndex(preparation.indexChoices)
+          : undefined,
       proveOptimum: preparation.proveOptimum,
       explain: preparation.explain,
       prepareOwnedChoice: (choice) =>

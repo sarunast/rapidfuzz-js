@@ -1,4 +1,5 @@
 import type { Direction, MaybeSequence, Sequence } from '../types.js'
+import type { CandidateIndexBuilder } from './candidateIndex.js'
 import type { ChoiceIndexBuilder } from './choiceIndex.js'
 import type { OptimumProof } from './optimumProof.js'
 import type { AnyBrand } from './preparedChoice.js'
@@ -26,6 +27,7 @@ interface Compilation<
   readonly prepareOwnedChoice: (choice: Sequence) => unknown
   readonly preparedChoiceKey: object
   readonly indexChoices?: (() => ChoiceIndexBuilder) | undefined
+  readonly candidateChoices?: (() => CandidateIndexBuilder) | undefined
   readonly proveOptimum?: ((prepared: readonly unknown[]) => OptimumProof) | undefined
   readonly explain?: ((first: Sequence, second: Sequence) => TEvidence) | undefined
   readonly preparedChoiceBrand?: TBrand
