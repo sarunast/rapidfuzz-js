@@ -33,6 +33,7 @@ import {
   prepareLcsPattern,
   UNBOUNDED_MISSES,
 } from '../lcs/implementation.js'
+import { createIndelCandidateIndexBuilder } from './candidateIndex.js'
 
 function combinedLength(s1: ArrayLike<unknown>, s2: ArrayLike<unknown>): number {
   return s1.length + s2.length
@@ -133,7 +134,14 @@ function prepareIndel(kind: MetricScoreKind): PreparationFactory {
     }
     return score
   }
-  return () => ({ prepareQuery, prepareChoice: prepareChoiceSequence })
+  return () => ({
+    prepareQuery,
+    prepareChoice: prepareChoiceSequence,
+    candidateChoices:
+      kind === 'normalizedSimilarity'
+        ? () => createIndelCandidateIndexBuilder(prepareQuery)
+        : undefined,
+  })
 }
 
 export const indelDistance: MetricImplementation = /* @__PURE__ */ withPreparedFlags(

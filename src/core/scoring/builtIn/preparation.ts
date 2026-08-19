@@ -1,5 +1,6 @@
 import { alignRepresentation, convSequence, scorerSequence } from '../../sequence.js'
 import type { Sequence } from '../../types.js'
+import type { CandidateIndexBuilder } from '../candidateIndex.js'
 import type { ChoiceIndexBuilder } from '../choiceIndex.js'
 import type { PreparedKernel } from '../compilation.js'
 import type { OptimumProof } from '../optimumProof.js'
@@ -13,6 +14,7 @@ interface MetricPreparation<TEvidence = never> {
   readonly prepareQuery: (query: Sequence) => PreparedKernel
   readonly prepareChoice: ChoicePreparer
   readonly indexChoices?: (() => ChoiceIndexBuilder) | undefined
+  readonly candidateChoices?: (() => CandidateIndexBuilder) | undefined
   readonly proveOptimum?: ((prepared: readonly unknown[]) => OptimumProof) | undefined
   readonly explain?: ((first: Sequence, second: Sequence) => TEvidence) | undefined
 }

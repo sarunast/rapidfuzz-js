@@ -182,8 +182,11 @@ export function builtInMetric<
       prepareChoice: preparation.prepareChoice,
       indexChoices: preparation.indexChoices,
       candidateChoices:
-        options.direction === 'similarity' && preparation.indexChoices !== undefined
-          ? candidateBuilderFromExactIndex(preparation.indexChoices)
+        options.direction === 'similarity'
+          ? (preparation.candidateChoices ??
+            (preparation.indexChoices === undefined
+              ? undefined
+              : candidateBuilderFromExactIndex(preparation.indexChoices)))
           : undefined,
       proveOptimum: preparation.proveOptimum,
       explain: preparation.explain,
