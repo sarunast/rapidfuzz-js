@@ -89,6 +89,13 @@ import {
  * roles.best(['senior', 'software', 'engineer'])?.score // 1 — the pairs are contained
  * ```
  *
+ * Soft Tversky can also be indexed when its inner similarity supplies a safe
+ * candidate capability (including normalized Indel). Exact-token postings and
+ * fuzzy vocabulary candidates only choose what to rescore: the ordinary Soft
+ * Tversky kernel remains authoritative for every returned score. Degenerate and
+ * zero-admitting queries fall back or merge untouched zeroes as required, so the
+ * public ordering and exception behavior remain the same as `createMatcher`.
+ *
  * @param items Array, `Map`, plain object or any iterable — the shape decides
  * what `key` is on every result, exactly as it does for `createMatcher`.
  * @returns A frozen {@link Matcher} exposing `best`, `search`, `searchIter`,

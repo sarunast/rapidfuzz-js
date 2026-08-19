@@ -754,9 +754,17 @@ describe('a soft scorer declines the guarantees it cannot make', () => {
     expect(matrix.at(1, 0)).toBe(scorer.score(items[1], items[0]))
   })
 
-  it('offers no indexed representation', () => {
+  it('offers an exact indexed representation for a candidate-capable inner scorer', () => {
     const scorer = createScorer(tverskyMetric, unigram({ elementSimilarity: SOFT }))
-    expect(() => createIndexedMatcher([['swisscom']], { scorer })).toThrow(TypeError)
+    const choices = [['swisscom'], ['swisscomm'], ['google'], ['swisscom', 'ag']]
+    const exhaustive = createMatcher(choices, { scorer })
+    const indexed = createIndexedMatcher(choices, { scorer })
+    expect(indexed.search(['swisscomm'], { limit: null })).toEqual(
+      exhaustive.search(['swisscomm'], { limit: null }),
+    )
+    expect(indexed.search(['swisscomm'], { limit: 2, threshold: 0.2 })).toEqual(
+      exhaustive.search(['swisscomm'], { limit: 2, threshold: 0.2 }),
+    )
   })
 
   it('offers none in the distance direction either', () => {
@@ -878,4 +886,119 @@ describe('the size limit', () => {
       ),
     ).not.toThrow()
   })
+})
+
+describe('the indexed 32-and-33 fuzzy boundary', () => {
+  // 32 distinct fuzzy-comparable entries is the last query the index serves and
+  // the last pair the solver accepts; 33 falls back on the query side and is
+  // refused on the choice side. Both sides are checked here rather than only
+  // through the evaluation-order suite, which reaches the boundary incidentally.
+  const tokensOf = (count: number, suffix: string): string[] =>
+    Array.from({ length: count }, (_unused, at) => `boundary-token-${at}${suffix}`)
+  const thirtyTwo = tokensOf(32, '')
+  const thirtyThree = tokensOf(33, '')
+  const scorer = createScorer(tverskyMetric, unigram({ elementSimilarity: SOFT }))
+
+  it('serves a 32-entry query from the index and agrees with the scan', () => {
+    const choices = [thirtyTwo.slice(1), thirtyTwo, ['unrelated']]
+    const exhaustive = createMatcher(choices, { scorer })
+    const indexed = createIndexedMatcher(choices, { scorer })
+    expect(indexed.best(thirtyTwo)).toEqual(exhaustive.best(thirtyTwo))
+    expect(indexed.search(thirtyTwo, { limit: null })).toEqual(
+      exhaustive.search(thirtyTwo, { limit: null }),
+    )
+  })
+
+  it('falls back on a 33-entry query and still matches the scan', () => {
+    // Every choice has to leave at most 32 fuzzy leftovers against a 33-token
+    // query, or both paths refuse the pair before the fallback is observable.
+    const choices = [thirtyThree, [...thirtyThree.slice(0, 30), 'extra-token']]
+    const exhaustive = createMatcher(choices, { scorer })
+    const indexed = createIndexedMatcher(choices, { scorer })
+    expect(indexed.best(thirtyThree)).toEqual(exhaustive.best(thirtyThree))
+    expect(indexed.search(thirtyThree, { limit: 1 })).toEqual(
+      exhaustive.search(thirtyThree, { limit: 1 }),
+    )
+    expect(indexed.search(thirtyThree, { limit: null })).toEqual(
+      exhaustive.search(thirtyThree, { limit: null }),
+    )
+  })
+
+  it('reaches a 33-entry choice through the capped posting and throws like the scan', () => {
+    // Every query token is fuzzy-comparable but scores at most 0.2 against every
+    // choice token, and none of them matches one exactly. So neither the exact
+    // postings nor the vocabulary index can reach the oversized choice, and the
+    // capped posting is the only route left: drop it and the index answers where
+    // the scan refuses.
+    const choices = [['unrelated'], thirtyThree]
+    const query = Array.from({ length: 32 }, (_unused, at) => `zqvwx-${at}-jkmp`)
+    const exhaustive = createMatcher(choices, { scorer })
+    const indexed = createIndexedMatcher(choices, { scorer })
+    expect(() => exhaustive.best(query)).toThrow(RangeError)
+    expect(() => indexed.best(query)).toThrow(RangeError)
+  })
+
+  it('leaves a 33-entry choice untouched when the query has no fuzzy entry', () => {
+    // A single code point canonicalizes to a number rather than a string, so
+    // `x` is exact-only and the query has no fuzzy entry at all — which is what
+    // keeps the capped posting out of the union. A multi-character token like
+    // `unrelated` would not test this: it is a fuzzy operand itself.
+    const choices = [['unrelated'], thirtyThree]
+    const exhaustive = createMatcher(choices, { scorer })
+    const indexed = createIndexedMatcher(choices, { scorer })
+    expect(indexed.best(['x'])).toEqual(exhaustive.best(['x']))
+    expect(indexed.search(['x'], { limit: null })).toEqual(
+      exhaustive.search(['x'], { limit: null }),
+    )
+  })
+})
+
+describe('indexed cross-path parity', () => {
+  const identity = {}
+  const corpus: readonly (readonly unknown[])[] = [
+    [],
+    ['swisscom', 'ag'],
+    ['swisscomm', 'ag'],
+    ['swisscom', 'swisscom', 'ag'],
+    ['google', 'deepmind'],
+    ['x'],
+    [identity, 'swisscom'],
+    [Number.NaN, 'swisscomm'],
+  ]
+  const configurations: readonly SoftConfiguration[] = [
+    { elementSimilarity: SOFT },
+    {
+      alpha: 0.25,
+      beta: 0.75,
+      elementSimilarity: SOFT,
+      elementWeights: new Map<unknown, number>([
+        ['ag', 0],
+        ['swisscom', 3],
+        [identity, 2],
+      ]),
+      defaultElementWeight: 0.5,
+    },
+  ]
+
+  for (const configuration of configurations) {
+    it(`matches every public search path (${configuration.alpha ?? 'default'})`, () => {
+      const scorer = createScorer(tverskyMetric, unigram(configuration))
+      const exhaustive = createMatcher(corpus, { scorer })
+      const indexed = createIndexedMatcher(corpus, { scorer })
+      for (const query of corpus) {
+        expect(indexed.best(query)).toEqual(exhaustive.best(query))
+        for (const limit of [1, 3, null]) {
+          for (const threshold of [undefined, 0, 0.5, 0.9, 1]) {
+            const options = { limit, threshold }
+            expect(indexed.search(query, options)).toEqual(
+              exhaustive.search(query, options),
+            )
+            expect([...indexed.searchIter(query, { threshold })]).toEqual([
+              ...exhaustive.searchIter(query, { threshold }),
+            ])
+          }
+        }
+      }
+    })
+  }
 })

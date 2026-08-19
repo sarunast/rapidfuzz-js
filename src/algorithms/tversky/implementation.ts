@@ -55,6 +55,7 @@ import {
   type TverskyElementSimilarity,
 } from './elementSimilarity.js'
 import { tverskyExplainer, type TverskyEvidence } from './evidence.js'
+import { createSoftTverskyIndexBuilder, type PreparedSoftQuery } from './indexed/soft.js'
 import { tverskyScore } from './score.js'
 import {
   directSoftChoiceOf,
@@ -516,9 +517,8 @@ function prepareWeightedTversky(
 }
 
 /**
- * The soft preparation. It offers no `indexChoices` in either direction: the
- * inverted indexes score exact overlap, so an indexed matcher built on one
- * would quietly disagree with the exhaustive scorer it is meant to reproduce.
+ * Soft similarity exposes an exact outer index only when the inner similarity
+ * has a no-false-negative candidate index. Distance remains scan-only.
  */
 function prepareSoftTversky(
   kind: PreparedTverskyKind,
@@ -532,26 +532,37 @@ function prepareSoftTversky(
   indexChoices?: (() => ChoiceIndexBuilder) | undefined
   explain: (first: Sequence, second: Sequence) => TverskyEvidence
 } {
-  return {
-    // Element similarity is only accepted at `gramSize: 1`, so a soft scorer
-    // always explains.
-    explain: tverskyExplainer(kind, weights, alpha, beta, soft),
-    indexChoices: undefined,
-    prepareChoice: (choice: Sequence): SoftTverskyChoice => softChoiceOf(choice, weights),
-    prepareQuery: (query: Sequence): PreparedKernel => {
-      // Everything the query side derives, done once and met with every
-      // candidate — the one place in soft scoring that has a scan to amortize
-      // over. The element scorer's own preparation is held beside it, and is
-      // the one part of it that waits to be earned.
-      const first = softQueryOf(query, weights)
-      const kernels = new ElementKernels(soft)
-      return (rawChoice, rawCutoff) => {
+  const prepare = (query: Sequence): PreparedSoftQuery => {
+    const first = softQueryOf(query, weights)
+    const kernels = new ElementKernels(soft)
+    return {
+      query: first,
+      scoreChoice: (rawChoice, rawCutoff) => {
         const second = preparedSoftChoice(rawChoice)
         const similarity = softSimilarity(first, second, soft, alpha, beta, kernels)
         const cutoff = similarityCutoffFor(kind, rawCutoff)
         return preparedResult(kind, similarity >= cutoff ? similarity : 0, rawCutoff)
-      }
-    },
+      },
+    }
+  }
+  const candidateChoices = soft.compilation.candidateChoices
+
+  return {
+    // Element similarity is only accepted at `gramSize: 1`, so a soft scorer
+    // always explains.
+    explain: tverskyExplainer(kind, weights, alpha, beta, soft),
+    indexChoices:
+      kind === 'similarity' && candidateChoices !== undefined
+        ? () =>
+            createSoftTverskyIndexBuilder(
+              (choice) => softChoiceOf(choice, weights),
+              prepare,
+              candidateChoices(),
+              soft.nativeThreshold,
+            )
+        : undefined,
+    prepareChoice: (choice: Sequence): SoftTverskyChoice => softChoiceOf(choice, weights),
+    prepareQuery: (query: Sequence): PreparedKernel => prepare(query).scoreChoice,
   }
 }
 

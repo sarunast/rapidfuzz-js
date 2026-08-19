@@ -12,9 +12,29 @@ import {
   CompiledElementSimilarity,
   effectiveElementSimilarity,
   elementScore,
+  firstQualifyingFloat64,
 } from './elementSimilarity.js'
 
 const inner = createScorer(indelSimilarity)
+
+function ordinalOf(value: number): bigint {
+  const buffer = new ArrayBuffer(8)
+  const view = new DataView(buffer)
+  view.setFloat64(0, value)
+  const bits = view.getBigUint64(0)
+  const sign = 0x8000_0000_0000_0000n
+  return (bits & sign) === 0n ? bits ^ sign : bits ^ 0xffff_ffff_ffff_ffffn
+}
+
+function previousFloat(value: number): number {
+  if (value === 0) return -Number.MIN_VALUE
+  const buffer = new ArrayBuffer(8)
+  const view = new DataView(buffer)
+  view.setFloat64(0, value)
+  const bits = view.getBigUint64(0)
+  view.setBigUint64(0, value > 0 ? bits - 1n : bits + 1n)
+  return view.getFloat64(0)
+}
 
 function custom(
   bounds: readonly [number, number],
@@ -160,6 +180,41 @@ describe('compileElementSimilarity', () => {
 
   it('accepts a threshold of exactly 1', () => {
     expect(compileElementSimilarity({ scorer: inner, threshold: 1 }, 1).threshold).toBe(1)
+  })
+})
+
+describe('native element threshold', () => {
+  it.each([
+    [0, 1, Number.MIN_VALUE],
+    [0, 1, 0],
+    [0, 1, 1],
+    [-1, 1, 0.5],
+    [-1000, -999, 0.9],
+    [-Number.MIN_VALUE, Number.MIN_VALUE, 0.5],
+    [-1e16, 1, Number.MIN_VALUE],
+    [-1e16, 1, 0.5],
+    [-1e300, 1e300, 0.5],
+    [1e300, 1e300 + 1e284, 0.25],
+  ])('finds the first qualifying Float64 in [%d, %d]', (lower, upper, threshold) => {
+    const span = upper - lower
+    const raw = firstQualifyingFloat64(lower, upper, threshold, span)
+    expect((raw - lower) / span).toBeGreaterThanOrEqual(threshold)
+    if (raw !== lower) {
+      expect((previousFloat(raw) - lower) / span).toBeLessThan(threshold)
+    }
+  })
+
+  it('lands astronomically far from the lower bound, where walking cannot reach', () => {
+    // The reason this is a binary search over ordered bits and not a `nextUp`
+    // walk: the answer sits over 10^17 representable values above `lower`, so
+    // an adjacent-value walk would never terminate. Replacing the search with
+    // one must fail this test rather than merely run slowly.
+    const lower = -1e300
+    const upper = 1e300
+    const raw = firstQualifyingFloat64(lower, upper, 0.5, upper - lower)
+    expect(ordinalOf(raw) - ordinalOf(lower)).toBeGreaterThan(2n ** 50n)
+    expect((raw - lower) / (upper - lower)).toBeGreaterThanOrEqual(0.5)
+    expect((previousFloat(raw) - lower) / (upper - lower)).toBeLessThan(0.5)
   })
 })
 

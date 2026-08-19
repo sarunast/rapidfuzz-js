@@ -45,8 +45,10 @@ import type { Direction } from '#core/types.js'
  *   count either, though they are not quite free: skewing how often elements
  *   repeat costs the solve more paths, and a separate ceiling refuses a pair that
  *   takes more than 512 of them.
- * - **A soft scorer has no indexed representation**, so `createIndexedMatcher`
- *   refuses it; the index scores exact overlap and would disagree.
+ * - **Indexed search depends on the inner scorer.** Candidate-capable similarity
+ *   scorers (currently normalized Indel and exact indexed similarities) let
+ *   `createIndexedMatcher` compose exact-token and fuzzy-vocabulary postings.
+ *   Every shortlisted choice is still scored by this same Soft Tversky kernel.
  * - **`symmetric` is `false`.** The optimum itself is symmetric where
  *   `alpha === beta`, but tie-breaking and fold order are not transpose
  *   invariant, so the last bit may differ.
@@ -92,12 +94,69 @@ export interface TverskyElementSimilarity {
  * and cannot observe a later mutation of the caller's option object.
  */
 export class CompiledElementSimilarity {
+  readonly nativeThreshold: number
+
   constructor(
     readonly compilation: AnyMetricCompilation<Direction>,
     readonly threshold: number,
     readonly lower: number,
     readonly span: number,
-  ) {}
+    upper: number,
+  ) {
+    this.nativeThreshold = firstQualifyingFloat64(lower, upper, threshold, span)
+  }
+}
+
+const FLOAT_SIGN = 0x8000_0000_0000_0000n
+const FLOAT_MASK = 0xffff_ffff_ffff_ffffn
+const floatBuffer = new ArrayBuffer(8)
+const floatView = new DataView(floatBuffer)
+
+function floatBits(value: number): bigint {
+  floatView.setFloat64(0, value, false)
+  return floatView.getBigUint64(0, false)
+}
+
+function fromFloatBits(bits: bigint): number {
+  floatView.setBigUint64(0, bits, false)
+  return floatView.getFloat64(0, false)
+}
+
+function floatOrdinal(value: number): bigint {
+  const bits = floatBits(value)
+  return (bits & FLOAT_SIGN) === 0n ? bits ^ FLOAT_SIGN : bits ^ FLOAT_MASK
+}
+
+function fromFloatOrdinal(ordinal: bigint): number {
+  const bits = (ordinal & FLOAT_SIGN) === 0n ? ordinal ^ FLOAT_MASK : ordinal ^ FLOAT_SIGN
+  return fromFloatBits(bits)
+}
+
+/**
+ * First representable raw score whose affine normalization reaches threshold.
+ *
+ * A lower-bound search over the IEEE ordinal keys rather than a `nextUp` walk:
+ * the answer can sit 10^17 representable values above `lower`, which no walk
+ * reaches. `(raw - lower) / span` is monotone non-decreasing in `raw` because
+ * both the subtraction and the division by a positive span are, so the search
+ * is exact, and `upper` normalizes to exactly `1` — `span` is `upper - lower` —
+ * so a threshold in `(0, 1]` always has an answer.
+ */
+export function firstQualifyingFloat64(
+  lower: number,
+  upper: number,
+  threshold: number,
+  span: number = upper - lower,
+): number {
+  let low = floatOrdinal(lower)
+  let high = floatOrdinal(upper)
+  while (low < high) {
+    const middle = (low + high) >> 1n
+    const raw = fromFloatOrdinal(middle)
+    if ((raw - lower) / span >= threshold) high = middle
+    else low = middle + 1n
+  }
+  return fromFloatOrdinal(low)
 }
 
 const OPTION_KEYS: readonly string[] = ['scorer', 'threshold']
@@ -180,6 +239,7 @@ export function compileElementSimilarity(
     threshold,
     compilation.bounds[0],
     span,
+    compilation.bounds[1],
   )
 }
 
