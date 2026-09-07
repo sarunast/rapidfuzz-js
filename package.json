@@ -146,16 +146,16 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@codecov/rollup-plugin": "2.0.1",
-    "@types/node": "26.2.0",
-    "@vitest/coverage-v8": "4.1.10",
+    "@types/node": "26.4.1",
+    "@vitest/coverage-v8": "5.0.0",
     "esbuild": "0.28.2",
     "fast-check": "4.9.0",
-    "oxfmt": "0.63.0",
-    "oxlint": "1.78.0",
-    "publint": "0.3.23",
-    "tsdown": "0.22.14",
+    "oxfmt": "0.66.0",
+    "oxlint": "1.81.0",
+    "publint": "0.3.24",
+    "tsdown": "0.23.0",
     "typescript": "7.0.2",
-    "vitest": "4.1.10"
+    "vitest": "5.0.0"
   },
   "peerDependencies": {
     "typescript": ">=5.4"
