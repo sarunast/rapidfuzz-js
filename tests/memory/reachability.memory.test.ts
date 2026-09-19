@@ -189,7 +189,7 @@ function withLiveTokenChoiceMatcher(check: () => void): void {
   if (matcher.size !== 2) throw new Error('matcher unexpectedly changed')
 }
 
-describe.sequential('indexed matcher reachability', () => {
+describe('indexed matcher reachability', { concurrent: false }, () => {
   it('returns Dice, Cosine and Tversky query states to baseline after destruction', () => {
     const baseline = count(QueryState)
     for (const kind of ['dice', 'cosine', 'tversky'] as const) {
