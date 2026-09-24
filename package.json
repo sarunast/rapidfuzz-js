@@ -146,10 +146,10 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@codecov/rollup-plugin": "2.0.1",
-    "@types/node": "26.6.1",
+    "@types/node": "26.6.2",
     "@vitest/coverage-v8": "5.0.1",
     "esbuild": "0.28.2",
-    "fast-check": "4.10.1",
+    "fast-check": "4.10.2",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
     "publint": "0.3.24",
