@@ -150,7 +150,9 @@ set the matcher's retained memory for good.
 
 - **Only `dice.similarity`, `cosine.similarity` and `tversky.similarity` have
   one.** Any other scorer throws at construction, and a distance scorer is a
-  compile error.
+  compile error. A soft `tversky.similarity` has one only when its inner scorer
+  can shortlist candidates — normalized Indel can, while Jaro, Jaro-Winkler and
+  `fuzz.ratio` cannot and throw.
 - **The win is selectivity, not size.** It comes from a query's grams naming few
   choices. The `'node_modules/'` row above is the adverse case in miniature: a
   query made of grams nearly every choice shares reaches everything anyway, and

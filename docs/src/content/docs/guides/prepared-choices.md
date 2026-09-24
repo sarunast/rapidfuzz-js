@@ -92,11 +92,14 @@ their handles; treat a configured or custom scorer as owning the handles it
 made. Anything else throws — a handle from the wrong scorer is refused as
 incompatible, a value that never was a handle as invalid.
 
-[Dice](/algorithms/dice/) and [Cosine](/algorithms/cosine/) are the one place
-where writing the default out still shares: their preparation depends only on
-`gramSize`, so a default scorer and one written as `{ gramSize: 2 }` accept
-each other's handles, and any other depth does not. Levenshtein's `weights`
-are not like that — spelling out the default costs the sharing, because the
+The n-gram metrics are where writing the default out still shares.
+[Dice](/algorithms/dice/) and [Cosine](/algorithms/cosine/) prepare from
+`gramSize` alone, so a default scorer and one written as `{ gramSize: 2 }`
+accept each other's handles, and any other depth does not.
+[Tversky](/algorithms/tversky/) is narrower: the all-default scorer and one
+written as `{ gramSize: 2, alpha: 0.5, beta: 0.5 }` share, and any other
+configuration owns its handles. Levenshtein's `weights` are not like that —
+spelling out the default costs the sharing, because the
 handle records the scorer rather than the values.
 
 Most of those mistakes never reach runtime: a handle's type carries which

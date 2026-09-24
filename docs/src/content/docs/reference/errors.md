@@ -129,6 +129,23 @@ codebase's issue tracker still finds the same explanation. The n-gram family
 has no upstream counterpart, so `gramSize` reads as the option a caller
 actually wrote.
 
+### Tversky weights
+
+Everything here comes from `alpha`, `beta`,
+[`elementWeights` and `defaultElementWeight`](/algorithms/tversky/).
+
+| Message                                                                               | Type         | Cause                                                                                         |
+| ------------------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------- |
+| `alpha must be a number` / `beta must be a number`                                    | `TypeError`  | A string, `null`, or any other non-number                                                     |
+| `alpha has to be a finite non-negative number` / `beta …`                             | `RangeError` | A negative, `NaN`, or infinite weight                                                         |
+| `alpha and beta must not both be zero`                                                | `RangeError` | `{ alpha: 0, beta: 0 }`, which leaves every score undefined                                   |
+| `element weights are only defined at gramSize 1`                                      | `RangeError` | `elementWeights` or `defaultElementWeight` at any other `gramSize`, including the default `2` |
+| `elementWeights must be a map from elements to weights`                               | `TypeError`  | A plain object, an array, or anything without `entries` and `get`                             |
+| `an element weight must be a number` / `defaultElementWeight must be a number`        | `TypeError`  | A non-numeric weight                                                                          |
+| `an element weight has to be a finite non-negative number` / `defaultElementWeight …` | `RangeError` | A negative, `NaN`, or infinite weight                                                         |
+| `elementWeights gives one element two weights: …`                                     | `RangeError` | `'a'` and `97` mapped to different weights — they are the same element                        |
+| `element weights span a range too wide to represent; scale them yourself`             | `RangeError` | Weights so far apart that bringing the largest into range flushes the smallest to zero        |
+
 ### Tversky element similarity
 
 Everything here comes from
@@ -171,3 +188,22 @@ skewed occurrence counts to reach: repeating one element far more often than its
 neighbours buys augmenting paths that counting distinct elements cannot see. No
 measured pair has come near 512. If one does, evening out the repeats or
 comparing shorter sequences is the way out.
+
+## Indexed matchers
+
+| Message                                                                                      | Type         | Cause                                                                                                                                             |
+| -------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createIndexedMatcher: this scorer has no indexed representation. …`                         | `TypeError`  | A scorer without an index — anything but `dice`, `cosine` or `tversky` similarity, or a soft Tversky whose inner scorer offers no candidate index |
+| `an indexed collection cannot exceed 4294967295 choices`                                     | `RangeError` | A collection past what a `Uint32Array` id can address                                                                                             |
+| `an index cannot exceed 4294967295 posting entries`                                          | `RangeError` | The same limit, reached through the total grams across all choices                                                                                |
+| `an index cannot exceed 4294967295 weight group entries`                                     | `RangeError` | The same limit, for a weighted Tversky index                                                                                                      |
+| `an indexed choice cannot exceed 4294967295 grams`                                           | `RangeError` | One choice past the per-choice gram count                                                                                                         |
+| `a query of more than 2147483647 grams cannot be indexed`                                    | `RangeError` | A query too long for the shared-gram accumulator                                                                                                  |
+| `a query cannot read more than 4294967295 shared postings`                                   | `RangeError` | A weighted query touching more postings than the scratch can address                                                                              |
+| `a cosine query of this many grams cannot be scored exactly against a choice this long`      | `RangeError` | A dot product that could pass `Number.MAX_SAFE_INTEGER`                                                                                           |
+| `a cosine query with grams repeated this often cannot be scored exactly against this corpus` | `RangeError` | A squared norm past `Number.MAX_SAFE_INTEGER`                                                                                                     |
+
+The size limits exist so that an index never answers with a wrapped id or a
+rounded count: every one is a point where the exact answer would stop being
+representable. The collections that reach them are far past what fits in memory
+in practice. The scorer message is thrown at construction, never mid-search.

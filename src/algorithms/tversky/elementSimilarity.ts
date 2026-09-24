@@ -14,6 +14,10 @@ import type { Direction } from '#core/types.js'
  * exactly, then `swisscom` with `swisscomm` partially.
  *
  * ```ts
+ * import { createScorer } from 'rapidfuzz-js'
+ * import { normalizedSimilarity as indelNormalizedSimilarity } from 'rapidfuzz-js/indel'
+ * import { similarity as tverskySimilarity } from 'rapidfuzz-js/tversky'
+ *
  * const company = createScorer(tverskySimilarity, {
  *   gramSize: 1,
  *   elementSimilarity: {
@@ -34,8 +38,8 @@ import type { Direction } from '#core/types.js'
  *   what exact matching left, not the best matching overall. `['google', 'x']`
  *   against `['google', 'y']` always pairs `google` with `google`, even where
  *   pairing it with `y` would have scored higher. "Best" is also subject to
- *   floating-point path arithmetic — see `maximumTransport` — so two matchings
- *   whose totals differ in the last bit are not distinguished.
+ *   floating-point path arithmetic, so two matchings whose totals differ in
+ *   the last bit are not distinguished.
  * - **It costs `n × m` element comparisons** on the distinct unmatched elements,
  *   followed by a transport solve. Past 32 distinct *fuzzy-comparable* leftovers
  *   on either side it throws rather than quietly becoming slow — leftovers no

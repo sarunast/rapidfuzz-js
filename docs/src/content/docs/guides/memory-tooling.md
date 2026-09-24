@@ -40,7 +40,7 @@ failure.
 
 ```sh
 pnpm bench:memory:soak
-pnpm bench:memory:soak -- --scenario=steady
+pnpm bench:memory:soak --scenario=steady
 ```
 
 Each scenario builds one deterministic 100,000-choice Dice index in an isolated
@@ -76,14 +76,14 @@ the next 4 KiB/batch above `max(8 KiB/batch, 3 × clean p95)`. Recovery is the n
 or CI platform:
 
 ```sh
-pnpm bench:memory:soak -- --calibrate --artifact=bench/memory/artifacts/calibration.json
+pnpm bench:memory:soak --calibrate --artifact=bench/memory/artifacts/calibration.json
 ```
 
 The controls deliberately fail if retained growth is injected:
 
 ```sh
-pnpm bench:memory:soak -- --scenario=steady --fixture=slope
-pnpm bench:memory:soak -- --scenario=query-profile --fixture=recovery
+pnpm bench:memory:soak --scenario=steady --fixture=slope
+pnpm bench:memory:soak --scenario=query-profile --fixture=recovery
 ```
 
 The slope fixture retains one `ArrayBuffer` per 100 operations, totaling twice the scenario's
@@ -97,8 +97,8 @@ Snapshots are opt-in because writing one blocks the event loop and may require a
 current heap size. Never enable snapshot capture in CI:
 
 ```sh
-pnpm bench:memory:soak -- --scenario=query-profile --snapshot
-pnpm bench:memory:soak -- --scenario=touched-set --snapshot=/tmp/rapidfuzz-snapshots
+pnpm bench:memory:soak --scenario=query-profile --snapshot
+pnpm bench:memory:soak --scenario=touched-set --snapshot=/tmp/rapidfuzz-snapshots
 ```
 
 With plain `--snapshot`, the gitignored output goes into one timestamped directory per run,

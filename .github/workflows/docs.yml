@@ -60,7 +60,7 @@ jobs:
       #
       # If this step fails with ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION, read the
       # publish timestamp in the message before touching anything. pnpm 11
-      # rejects any lockfile entry published in the last 24 hours — a default,
+      # and later reject any lockfile entry published in the last 24 hours — a default,
       # not a setting in this repository — so a dependency bumped today fails
       # here until it ages out, and the same run passes unchanged afterwards.
       # The message suggests a stale lockfile or a bypassed policy, which is

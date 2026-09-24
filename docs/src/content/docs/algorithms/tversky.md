@@ -196,7 +196,7 @@ bounded `0..100` is rescaled for you, so the fuzz scorers work unadapted. There
 is deliberately no default: a useful threshold is a property of your data, and
 `0` is refused because it admits arbitrarily weak pairings.
 
-Four traps, and the first is the one that surprises people:
+Four more traps, and the first is the one that surprises people:
 
 > Only multi-character **string** tokens are compared.
 
@@ -299,8 +299,9 @@ Four things are worth knowing:
   nor penalty. So with every element ignored you get empty evidence and zero
   totals, and the score comes from the zero-mass rule instead: `1` for equal
   multisets, `0` otherwise. `firstMass === 0 && secondMass === 0` identifies it.
-- Masses are on the scorer's own **normalized** scale, a constant factor away
-  from the numbers you passed. Tversky is invariant to that factor so no score
+- Masses are on the scorer's own **normalized** scale, which may be a constant
+  factor away from the numbers you passed — only weights large enough to
+  need rescaling move it. Tversky is invariant to that factor so no score
   changes, but a mass is not a unit quantity, and only `totals` is
   authoritative — the per-occurrence masses are for reading, not for re-deriving
   the totals.

@@ -1,4 +1,4 @@
-# pnpm 11 reads its settings from here. Only auth and registry settings are
+# pnpm 11 and later read their settings from here. Only auth and registry settings are
 # still read from .npmrc, so the save-exact=true that pins every devDependency
 # to an exact version has to be restated as saveExact below — left in .npmrc
 # alone it would be silently ignored, and the next `pnpm add` would quietly

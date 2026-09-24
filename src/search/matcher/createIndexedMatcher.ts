@@ -94,7 +94,11 @@ import {
  * fuzzy vocabulary candidates only choose what to rescore: the ordinary Soft
  * Tversky kernel remains authoritative for every returned score. Degenerate and
  * zero-admitting queries fall back or merge untouched zeroes as required, so the
- * public ordering and exception behavior remain the same as `createMatcher`.
+ * public ordering is the same as `createMatcher`'s, and so are the exceptions
+ * `best` and `search` raise. `searchIter` differs: it settles every
+ * candidate before its first yield, so a choice with more than 32 fuzzy
+ * leftovers throws on the first `next()` even where `createMatcher` would have
+ * yielded earlier matches first.
  *
  * @param items Array, `Map`, plain object or any iterable — the shape decides
  * what `key` is on every result, exactly as it does for `createMatcher`.

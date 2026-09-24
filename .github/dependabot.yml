@@ -15,7 +15,7 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    # pnpm 11 refuses to install a release younger than 1440 minutes unless the
+    # pnpm 11 and later refuse to install a release younger than 1440 minutes unless the
     # version is written into `minimumReleaseAgeExclude`. Dependabot cannot
     # write that list, so without a cooldown a pull request raised against a
     # same-day release would fail `pnpm install` in CI and need the exemption

@@ -286,11 +286,15 @@ than a throw. It recomputes one pair from scratch and is deliberately not part
 of a matcher's results: `search` answers _which candidate_, `explain` answers
 _why this pair_, for the few results search already chose. An element weighing
 `0` appears nowhere in the evidence, having contributed neither overlap nor
-penalty. And the masses are on the scorer's own normalized scale, which is a
+penalty. And the masses are on the scorer's own normalized scale, which may be a
 constant factor away from the numbers you passed — Tversky is invariant to that
 factor, so no score changes, but they are not a unit quantity.
 
 ```ts
+const matcher = createMatcher([['swisscom'], ['swisscomm', 'ag'], ['sunrise']], {
+  scorer: company,
+})
+const query = ['swisscom', 'ag']
 for (const match of matcher.search(query, { threshold: 0.82, limit: 5 })) {
   const evidence = company.explain(query, match.item)
   // evidence.score === company.score(query, match.item)

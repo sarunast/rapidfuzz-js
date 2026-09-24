@@ -919,6 +919,16 @@ describe('indexed evaluation order', () => {
       RangeError,
     )
   })
+
+  it('settles searchIter before the first yield, so a later oversized row throws', () => {
+    const choices = [query, throwing]
+    const scorer = createScorer(tverskyMetric, unigram({ elementSimilarity: SOFT }))
+    const first = createMatcher(choices, { scorer }).searchIter(query).next()
+    expect(first.value?.key).toBe(0)
+    expect(() =>
+      createIndexedMatcher(choices, { scorer }).searchIter(query).next(),
+    ).toThrow(RangeError)
+  })
 })
 
 describe('the indexed 32-and-33 fuzzy boundary', () => {
