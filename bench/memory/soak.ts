@@ -28,7 +28,11 @@ import {
 } from './thresholds.ts'
 import { runArbitraryElementQuery } from './workloads/arbitraryElements.ts'
 import { runQueryProfileSpike } from './workloads/queryProfile.ts'
-import { lowercaseBigramCorpus, runOrdinaryBest } from './workloads/shared.ts'
+import {
+  lowercaseBigramCorpus,
+  runOrdinaryBest,
+  type IndexedMatcherWorkload,
+} from './workloads/shared.ts'
 import { runSteadyBatch, STEADY_BATCH_SIZE } from './workloads/steady.ts'
 import { runTouchedSetSpike, validateTouchedCorpus } from './workloads/touchedSet.ts'
 
@@ -113,7 +117,7 @@ function capture(
 }
 
 function runOrdinaryBatch(
-  matcher: import('./workloads/shared.ts').IndexedMatcherWorkload,
+  matcher: IndexedMatcherWorkload,
   batch: number,
   operations: number,
 ): void {

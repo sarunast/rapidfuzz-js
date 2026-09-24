@@ -2,6 +2,7 @@ import { queryObjects } from 'node:v8'
 
 import { describe, expect, it } from 'vitest'
 
+import type { IndexedMatcherWorkload } from '../../bench/memory/workloads/shared.ts'
 import { similarity as cosineSimilarity } from '../../src/algorithms/cosine/index.js'
 import { similarity as diceSimilarity } from '../../src/algorithms/dice/index.js'
 import { QueryState } from '../../src/algorithms/ngram/inverted/query.js'
@@ -101,9 +102,7 @@ class IteratorQuery implements ArrayLike<number> {
   }
 }
 
-function submitNumericQuery(
-  matcher: import('../../bench/memory/workloads/shared.ts').IndexedMatcherWorkload,
-): void {
+function submitNumericQuery(matcher: IndexedMatcherWorkload): void {
   matcher.best(new NumericQuery())
 }
 
@@ -130,9 +129,7 @@ class ArbitraryWrapper implements ArrayLike<unknown> {
   }
 }
 
-function submitArbitraryQuery(
-  matcher: import('../../bench/memory/workloads/shared.ts').IndexedMatcherWorkload,
-): void {
+function submitArbitraryQuery(matcher: IndexedMatcherWorkload): void {
   matcher.best(new ArbitraryWrapper(new ArbitrarySentinel()))
 }
 

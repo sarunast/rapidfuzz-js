@@ -4,6 +4,7 @@ import type {
   CandidateIndex,
   CandidateIndexBuilder,
 } from '#core/scoring/candidateIndex.js'
+import type { ChoiceIndex } from '#core/scoring/choiceIndex.js'
 import type { PreparedKernel } from '#core/scoring/compilation.js'
 import { scorerSequence, snapshotSequence } from '#core/sequence.js'
 import type { Sequence } from '#core/types.js'
@@ -38,7 +39,7 @@ class IndelCandidateIndex implements CandidateIndex {
     readonly bucketLengths: Uint32Array,
     readonly bucketOffsets: Uint32Array,
     readonly bucketIds: Uint32Array,
-    readonly dice: import('#core/scoring/choiceIndex.js').ChoiceIndex,
+    readonly dice: ChoiceIndex,
     readonly prepareQuery: (query: Sequence) => PreparedKernel,
     readonly gramSize: number,
   ) {
