@@ -1,6 +1,7 @@
 import {
   canonicalRawCutoff,
   canonicalSimilarityCutoff,
+  complementFraction,
   normalizeDistance,
   normDistCutoff,
   normSimCutoff,
@@ -390,7 +391,7 @@ export function levenshteinNormalizedSimilarityImpl(
   const cutoff =
     options.scoreCutoff == null
       ? Number.MAX_SAFE_INTEGER
-      : rawBound((1 - options.scoreCutoff) * max, integral)
+      : rawBound(complementFraction(options.scoreCutoff) * max, integral)
   const hint =
     options.scoreHint == null ? cutoff : rawBound((1 - options.scoreHint) * max, integral)
   const norm = normalizeDistance(distance_(a, b, weights, cutoff, hint), max)

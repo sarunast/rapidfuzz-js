@@ -1,4 +1,8 @@
-import { normDistCutoff, normSimCutoff } from '#core/scoring/builtIn/cutoff.js'
+import {
+  complementCutoff,
+  normDistCutoff,
+  normSimCutoff,
+} from '#core/scoring/builtIn/cutoff.js'
 import {
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
@@ -413,7 +417,7 @@ function tverskyDistance_impl(
   )
   const soft = effectiveElementSimilarity(options.elementSimilarity, gramSize)
   const cutoff = options.scoreCutoff
-  const similarityCutoff = cutoff == null ? 0 : 1 - cutoff
+  const similarityCutoff = complementCutoff(cutoff)
   if (soft !== null) {
     return normDistCutoff(
       1 -
@@ -456,7 +460,7 @@ function similarityCutoffFor(
   kind: PreparedTverskyKind,
   rawCutoff: number | null,
 ): number {
-  if (kind === 'distance') return rawCutoff === null ? 0 : 1 - rawCutoff
+  if (kind === 'distance') return complementCutoff(rawCutoff)
   return rawCutoff ?? 0
 }
 

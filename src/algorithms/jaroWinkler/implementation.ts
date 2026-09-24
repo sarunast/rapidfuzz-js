@@ -1,4 +1,8 @@
-import { normDistCutoff, normSimCutoff } from '#core/scoring/builtIn/cutoff.js'
+import {
+  complementCutoff,
+  normDistCutoff,
+  normSimCutoff,
+} from '#core/scoring/builtIn/cutoff.js'
 import {
   type ConfigurationCanonicalizer,
   type MaybeSequenceMetricImplementation,
@@ -93,13 +97,7 @@ function jaroWinklerDistance_impl(
   const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   const cutoff = options.scoreCutoff
   return normDistCutoff(
-    1 -
-      directSimilarity(
-        a,
-        b,
-        options.prefixWeight ?? 0.1,
-        cutoff == null ? 0 : 1 - cutoff,
-      ),
+    1 - directSimilarity(a, b, options.prefixWeight ?? 0.1, complementCutoff(cutoff)),
     cutoff,
   )
 }
@@ -130,11 +128,7 @@ function prepareJaroWinkler(kind: PreparedJaroWinklerKind): PreparationFactory {
       return (rawChoice, rawCutoff) => {
         const b = preparedChoiceSequence(rawChoice)
         const similarityCutoff =
-          kind === 'distance'
-            ? rawCutoff === null
-              ? 0
-              : 1 - rawCutoff
-            : (rawCutoff ?? 0)
+          kind === 'distance' ? complementCutoff(rawCutoff) : (rawCutoff ?? 0)
         const similarity = similarity_(
           alignedQueryFor(b),
           alignRepresentation(b, a),

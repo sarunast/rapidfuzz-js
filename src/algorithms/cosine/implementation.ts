@@ -1,4 +1,8 @@
-import { normDistCutoff, normSimCutoff } from '#core/scoring/builtIn/cutoff.js'
+import {
+  complementCutoff,
+  normDistCutoff,
+  normSimCutoff,
+} from '#core/scoring/builtIn/cutoff.js'
 import {
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
@@ -78,7 +82,7 @@ function cosineDistance_impl(
         query,
         (choice) => dotProduct(query, choice),
         profileOfElements(b, gramSize),
-        cutoff == null ? 0 : 1 - cutoff,
+        complementCutoff(cutoff),
       ),
     cutoff,
   )
@@ -100,11 +104,7 @@ function prepareCosine(kind: PreparedCosineKind): PreparationFactory {
       return (rawChoice, rawCutoff) => {
         const b = preparedProfile(rawChoice)
         const similarityCutoff =
-          kind === 'distance'
-            ? rawCutoff === null
-              ? 0
-              : 1 - rawCutoff
-            : (rawCutoff ?? 0)
+          kind === 'distance' ? complementCutoff(rawCutoff) : (rawCutoff ?? 0)
         const similarity = profileSimilarity(a, dot, b, similarityCutoff)
         return kind === 'distance'
           ? normDistCutoff(1 - similarity, rawCutoff)

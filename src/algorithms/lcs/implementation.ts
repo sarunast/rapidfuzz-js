@@ -7,13 +7,14 @@ import {
 import {
   canonicalRawCutoff,
   canonicalSimilarityCutoff,
+  complementFraction,
   distanceCutoffFor,
-  scoreFromDistance,
-  type MetricScoreKind,
   distCutoff,
+  type MetricScoreKind,
   normalizeDistance,
   normDistCutoff,
   normSimCutoff,
+  scoreFromDistance,
   simCutoff,
 } from '#core/scoring/builtIn/cutoff.js'
 import {
@@ -133,7 +134,7 @@ function lcsSeqNormalizedSimilarity_impl(
   const cutoff =
     options.scoreCutoff == null
       ? Number.MAX_SAFE_INTEGER
-      : (1 - options.scoreCutoff) * max
+      : complementFraction(options.scoreCutoff) * max
   return normSimCutoff(
     1 - normalizeDistance(max - boundedLength(a, b, cutoff), max),
     options.scoreCutoff,

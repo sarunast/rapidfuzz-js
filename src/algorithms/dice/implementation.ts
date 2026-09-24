@@ -1,4 +1,8 @@
-import { normDistCutoff, normSimCutoff } from '#core/scoring/builtIn/cutoff.js'
+import {
+  complementCutoff,
+  normDistCutoff,
+  normSimCutoff,
+} from '#core/scoring/builtIn/cutoff.js'
 import {
   NORMALIZED_DISTANCE_FLAGS,
   NORMALIZED_SIMILARITY_FLAGS,
@@ -103,7 +107,7 @@ function diceDistance_impl(
   const cutoff = options.scoreCutoff
   const [a, b] = convPair(validateSequence(s1), validateSequence(s2))
   return normDistCutoff(
-    1 - directSimilarity(a, b, gramSize, cutoff == null ? 0 : 1 - cutoff),
+    1 - directSimilarity(a, b, gramSize, complementCutoff(cutoff)),
     cutoff,
   )
 }
@@ -124,11 +128,7 @@ function prepareDice(kind: PreparedDiceKind): PreparationFactory {
       return (rawChoice, rawCutoff) => {
         const b = preparedProfile(rawChoice)
         const similarityCutoff =
-          kind === 'distance'
-            ? rawCutoff === null
-              ? 0
-              : 1 - rawCutoff
-            : (rawCutoff ?? 0)
+          kind === 'distance' ? complementCutoff(rawCutoff) : (rawCutoff ?? 0)
         const similarity = preparedSimilarity(a, shared, b, similarityCutoff)
         return kind === 'distance'
           ? normDistCutoff(1 - similarity, rawCutoff)

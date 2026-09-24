@@ -1,4 +1,5 @@
 import {
+  complementFraction,
   normalizeDistance,
   normDistCutoff,
   normSimCutoff,
@@ -140,7 +141,7 @@ export function prepareLevenshtein(kind: PreparedLevenshteinKind): PreparationFa
             const cutoff =
               rawCutoff === null
                 ? Number.MAX_SAFE_INTEGER
-                : rawBound((1 - rawCutoff) * max, integral)
+                : rawBound(complementFraction(rawCutoff) * max, integral)
             return normSimCutoff(
               1 - normalizeDistance(preparedDistance(b, cutoff), max),
               rawCutoff,

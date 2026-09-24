@@ -18,6 +18,19 @@ export function canonicalSimilarityCutoff(
   return cutoff == null ? null : Math.ceil(cutoff)
 }
 
+// A kernel pruned at the exact complement `1 - cutoff` rejects a pair whose
+// score equals the cutoff whenever `1 - cutoff` rounds past it. The slack only
+// widens the pruning bound; the final check is still made against `cutoff`.
+const COMPLEMENT_SLACK = 4 * Number.EPSILON
+
+export function complementCutoff(cutoff: number | null | undefined): number {
+  return cutoff == null ? 0 : Math.max(0, 1 - cutoff - COMPLEMENT_SLACK)
+}
+
+export function complementFraction(cutoff: number): number {
+  return 1 - cutoff + COMPLEMENT_SLACK
+}
+
 export function distanceCutoffFor(
   kind: MetricScoreKind,
   rawCutoff: number | null | undefined,
@@ -33,7 +46,7 @@ export function distanceCutoffFor(
     case 'normalizedDistance':
       return rawCutoff * maximum
     case 'normalizedSimilarity':
-      return (1 - rawCutoff) * maximum
+      return complementFraction(rawCutoff) * maximum
   }
 }
 
