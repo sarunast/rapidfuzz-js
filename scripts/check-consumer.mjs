@@ -101,6 +101,12 @@ export const fuzzyCompany = createScorer(tverskySimilarity, {
 })
 export const fuzzyEvidence = fuzzyCompany.explain(['swisscom', 'ag'], ['swisscomm', 'ag'])
 
+// Unannotated too: an index over a soft scorer is a separate inference surface,
+// and its matcher has to keep the Tversky brand rather than widen it away.
+export const fuzzyIndexed = createIndexedMatcher([['swisscomm', 'ag']], {
+  scorer: fuzzyCompany,
+})
+
 // Widening stays possible: \`Scorer<D>\` is still the type that holds a scorer
 // of any metric, which is what most annotations want.
 export const held: Scorer<'distance'> = createScorer(distance)
@@ -292,6 +298,14 @@ try {
   if (!emitted.includes('ExplainableScorer<"similarity", "tversky.similarity"')) {
     throw new Error(
       `expected an inferred explainable scorer to keep its capability:\n${emitted}`,
+    )
+  }
+  const fuzzyIndexedDeclaration = emitted
+    .split('\n')
+    .find((line) => line.includes('const fuzzyIndexed:'))
+  if (!fuzzyIndexedDeclaration?.includes('"tversky.similarity"')) {
+    throw new Error(
+      `expected an inferred indexed soft matcher to keep its brand:\n${emitted}`,
     )
   }
   console.log("✓ the consumer's own declaration emit stays portable")
