@@ -4,7 +4,7 @@
  *
  * `QueryState.reserve` was grow-only: a `limit: null` search over N choices
  * reserves N ids and N scores — 12 bytes a choice — and a later `best()` reserved
- * one without ever giving them back. The construction figure the README quotes
+ * one without ever giving them back. The construction figure `createIndexedMatcher`'s documentation quotes
  * cannot see this, because `bench/comparison/indexedSearch/memory.mjs` reads the
  * heap before any query runs.
  *

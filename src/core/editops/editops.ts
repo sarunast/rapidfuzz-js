@@ -12,7 +12,7 @@
  *
  * `srcLen` and `destLen` keep their upstream spelling under the camelCase rule
  * (`src_len`, `dest_len`), so those field names in upstream's documentation
- * still map. See README's "Differences from Python RapidFuzz" for the rest.
+ * still map.
  */
 
 import { hasSurrogatePair } from '../sequence.js'

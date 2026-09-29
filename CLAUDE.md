@@ -210,11 +210,14 @@ is the state to keep it in.
 
 ## Library constraints
 
-Load-bearing for bundle size — see README.md for the full rationale:
+Load-bearing for bundle size:
 
-- `"sideEffects": false` — nothing in `src/` may do work at import time.
-- Export standalone named functions, never namespace objects.
-- No runtime dependencies, and no Node built-ins in `src/`.
+- `"sideEffects": false` — nothing in `src/` may do work at import time, so a
+  bundler can drop whatever a build does not reach.
+- Export standalone named functions, never namespace objects — touching one
+  member of a namespace object keeps every member alive.
+- No runtime dependencies, and no Node built-ins in `src/`, so the same build
+  runs unchanged in browsers and edge runtimes.
 
 Nothing measures bytes. A `check:bundles` with sixteen recorded gzip budgets was
 removed because the number it produced was never one to act on: the budgets

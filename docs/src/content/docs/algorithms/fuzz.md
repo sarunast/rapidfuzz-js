@@ -75,8 +75,9 @@ Coming from rapidfuzz-js 0.11? These scorers were called `similarity`,
 `tokenSortSimilarity`, `weightedSimilarity` and so on until 0.12.0, which gave
 the whole subpath RapidFuzz's vocabulary. Replace `…Similarity` with `…Ratio`,
 and plain `similarity` with `ratio`; the metric brands changed to match, and no
-score moved. The [README](https://github.com/sarunast/rapidfuzz-js#upgrading-from-011)
-has the full table.
+score moved. The
+[0.12.0 release notes](https://github.com/sarunast/rapidfuzz-js/releases/tag/v0.12.0)
+have the full table.
 
 ## Empty inputs: the family disagrees on purpose
 

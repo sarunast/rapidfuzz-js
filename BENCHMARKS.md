@@ -263,7 +263,7 @@ the `Matcher`. Plain `ratio` gains least because its reusable setup is a
 smaller share of the total work.
 
 See [`bench/suites/process.bench.ts`](bench/suites/process.bench.ts) for the paired cases and
-the [README](README.md#one-query-or-many) for usage. The suite does not yet
+the [README](README.md#api) for usage. The suite does not yet
 carry a one-shot partner for the normalized-edit `Matcher` case, so that family
 has no paired figure here.
 
